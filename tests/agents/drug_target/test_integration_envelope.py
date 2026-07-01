@@ -9,6 +9,7 @@ Failure paths are parametrized across the 5 error class prefixes.
 from __future__ import annotations
 
 import json
+import threading
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
@@ -54,7 +55,10 @@ def _make_failure_state(data_dir: str, error_msg: str) -> dict:
 
 
 @pytest.mark.asyncio
-async def test_envelope_shape_invariant_success_path(tmp_path: Path) -> None:
+async def test_envelope_shape_invariant_success_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Success envelope has exact keys and correct types."""
     data_dir = str(tmp_path)
     (tmp_path / "lr_candidates.json").write_text("[]", encoding="utf-8")
@@ -65,6 +69,15 @@ async def test_envelope_shape_invariant_success_path(tmp_path: Path) -> None:
     )
 
     final_state = _make_success_state(data_dir)
+    original_read_text = Path.read_text
+    read_threads: list[str] = []
+
+    def tracking_read_text(path_self, *args, **kwargs):
+        if path_self.name in {"drug.md", "target_assessment.json"}:
+            read_threads.append(threading.current_thread().name)
+        return original_read_text(path_self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", tracking_read_text)
 
     with patch("src.agents.drug_target.graph_builder.drug_target_graph") as mock_g:
         mock_g.ainvoke = AsyncMock(return_value=final_state)
@@ -93,6 +106,8 @@ async def test_envelope_shape_invariant_success_path(tmp_path: Path) -> None:
     # Value assertions for success path
     assert envelope["success"] is True
     assert envelope["errors"] == []
+    assert len(read_threads) == 2
+    assert threading.main_thread().name not in read_threads
 
 
 # ---------------------------------------------------------------------------

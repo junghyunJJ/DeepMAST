@@ -97,6 +97,14 @@ class DeepInterpreterWrapperAgent(BaseAgent):
         "INVOKE_DEEP": "invoke_deep_agent",
     }
 
+    LIANA_MORANS_SUMMARY_COLUMNS: ClassVar[tuple[str, ...]] = (
+        "morans",
+        "morans_r",
+        "MoransR",
+        "morans_R",
+        "Morans_R",
+    )
+
     ANALYSIS_STEPS = [
         {"step": 1, "tool": "plot_cluster", "desc": "Spatial clustering",
          "figures": ["1.cluster_spatial.png"], "data_files": []},
@@ -559,7 +567,6 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
         sample_key = state.get("sample_key")
         interest_sample = state.get("interest_sample")
         save_path = state["data_directory"]
-        lrdata_path = self._resolve_lrdata_path(save_path, interest_sample) or f"{save_path}/lrdata.h5ad"
 
         if step == 1:
             args = {"filename": filename, "cluster_key": cluster_key, "save_path": save_path}
@@ -597,12 +604,14 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
             return args
 
         if step == 7:
+            lrdata_path = self._resolve_combined_lrdata_path(save_path) or f"{save_path}/lrdata.h5ad"
             args = {"filename": lrdata_path, "cluster_key": cluster_key, "save_path": save_path}
             if sample_key:
                 args["sample_key"] = sample_key
             return args
 
         if step == 8:
+            lrdata_path = self._resolve_lrdata_path(save_path, interest_sample) or f"{save_path}/lrdata.h5ad"
             return {"filename": lrdata_path, "organism": organism,
                     "geneset": "progeny", "save_path": save_path}
 
@@ -746,7 +755,10 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
         if data_files:
             for f in data_files:
                 if f == "lrdata.h5ad":
-                    if not self._resolve_lrdata_path(save_path, interest_sample):
+                    if step == 6:
+                        if not self._resolve_combined_lrdata_path(save_path):
+                            return False
+                    elif not self._resolve_lrdata_path(save_path, interest_sample):
                         return False
                 elif not os.path.exists(f"{save_path}/{f}"):
                     return False
@@ -793,20 +805,29 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
 
         return step_config["figures"]
 
+    def _resolve_combined_lrdata_path(self, save_path: str) -> str | None:
+        """Resolve the full-dataset lrdata artifact used for global NMF factor plots."""
+        combined = f"{save_path}/lrdata.h5ad"
+        if os.path.exists(combined):
+            return combined
+        return None
+
     def _resolve_lrdata_path(self, save_path: str, interest_sample: str | None = None) -> str | None:
         """Resolve lrdata h5ad path, supporting interest_sample suffix.
 
-        Resolution order (no glob to avoid blocking scandir in async context):
-        1. {save_path}/lrdata.h5ad (backward compat)
-        2. {save_path}/lrdata_{interest_sample}.h5ad
+        Resolution order:
+        1. {save_path}/lrdata_{interest_sample}.h5ad when interest_sample is set
+        2. {save_path}/lrdata.h5ad
         """
-        default = f"{save_path}/lrdata.h5ad"
-        if os.path.exists(default):
-            return default
         if interest_sample:
             specific = f"{save_path}/lrdata_{interest_sample}.h5ad"
             if os.path.exists(specific):
                 return specific
+
+        default = f"{save_path}/lrdata.h5ad"
+        if os.path.exists(default):
+            return default
+
         return None
 
     # ===== Node Initialization =====
@@ -1225,13 +1246,18 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
         save_path = state["data_directory"]
         sample_key = state.get("sample_key")
 
-        # Dependency check: Steps 7-8 need lrdata.h5ad from Step 6
+        # Dependency check: Step 7 needs combined lrdata; Step 8 can use sample-specific lrdata.
         if current_step in (7, 8):
             interest_sample = state.get("interest_sample")
-            lrdata_path = await asyncio.to_thread(self._resolve_lrdata_path, save_path, interest_sample)
+            if current_step == 7:
+                lrdata_path = await asyncio.to_thread(self._resolve_combined_lrdata_path, save_path)
+                missing_text = "combined lrdata.h5ad not found, Step 6 may have failed"
+            else:
+                lrdata_path = await asyncio.to_thread(self._resolve_lrdata_path, save_path, interest_sample)
+                missing_text = "sample-specific lrdata not found, Step 6 may have failed"
             if not lrdata_path:
                 message_content = [{"type": "text",
-                    "text": f"**Step {current_step}/8: {step_config['desc']}** - SKIPPED (lrdata.h5ad not found, Step 6 may have failed)"}]
+                    "text": f"**Step {current_step}/8: {step_config['desc']}** - SKIPPED ({missing_text})"}]
                 is_last = current_step >= 8
                 return {
                     "current_analysis_step": current_step + 1 if not is_last else current_step,
@@ -1310,6 +1336,14 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
             8, sample_key,
         )
 
+        if status == "failed":
+            is_last = current_step >= 8
+            return {
+                "current_analysis_step": current_step + 1 if not is_last else current_step,
+                "messages": [AIMessage(content=message_content)],
+                **({"analysis_1_8_complete": True} if is_last else {}),
+            }
+
         is_last = current_step >= 8
         update = {
             "current_analysis_step": current_step + 1 if not is_last else current_step,
@@ -1383,7 +1417,7 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
                     pair_counts = {f: int(liana_df[f].notna().sum()) for f in factor_cols_liana}
                     summary_lines.append(f"Significant L-R pairs per factor: {pair_counts}")
                 morans_col = None
-                for candidate in ["morans_r", "MoransR", "morans_R", "Morans_R"]:
+                for candidate in self.LIANA_MORANS_SUMMARY_COLUMNS:
                     if candidate in liana_df.columns:
                         morans_col = candidate
                         break
@@ -1859,13 +1893,23 @@ Available factors: {available_factors}
         sel_factor = state["sel_factor"]
         if current_step == 9:
             csv_path = f"{save_path}/sig_liana.csv"
-            try:
-                sig_headers = await asyncio.to_thread(pd.read_csv, csv_path, index_col=0, nrows=0)
-                available = [c for c in sig_headers.columns if c.startswith("Factor")]
-                if sel_factor not in available and available:
-                    sel_factor = available[0]
-            except FileNotFoundError:
-                pass
+            if not os.path.exists(csv_path):
+                message_content = [{
+                    "type": "text",
+                    "text": (
+                        f"**Step {current_step}/11: {step_config['desc']}** - "
+                        "BLOCKED (sig_liana.csv not found; Step 8 must complete first)"
+                    ),
+                }]
+                return {
+                    "current_analysis_step": current_step,
+                    "messages": [AIMessage(content=message_content)],
+                }
+
+            sig_headers = await asyncio.to_thread(pd.read_csv, csv_path, nrows=0)
+            available = [c for c in sig_headers.columns if c.startswith("Factor")]
+            if sel_factor not in available and available:
+                sel_factor = available[0]
 
         # Dependency check: Steps 10-11 need sel_interest_sig_liana.csv from Step 9
         if current_step in (10, 11):
@@ -1951,6 +1995,19 @@ Available factors: {available_factors}
             11, sample_key,
         )
 
+        if status == "failed":
+            is_last = current_step >= 11
+            update = {
+                "current_analysis_step": current_step + 1 if not is_last else current_step,
+                "messages": [AIMessage(content=message_content)],
+            }
+            if current_step == 9:
+                update["drug_target_complete"] = True
+                update["drug_target_error"] = "skipped because Step 9 failed"
+            if is_last:
+                update["analysis_9_11_complete"] = True
+            return update
+
         is_last = current_step >= 11
         update = {
             "current_analysis_step": current_step + 1 if not is_last else current_step,
@@ -1971,12 +2028,78 @@ Available factors: {available_factors}
         1. Call prioritize_top_lr_pairs() to generate lr_candidates.json
         2. Call run_drug_target_assessment() to generate drug.md + target_assessment.json
         3. Extract featured pairs from target_assessment.json → state
-        4. Delete cached Step 10-11 figures so they regenerate with featured pairs
+        4. Delete cached Step 10-11 figures so they regenerate after Step 9.5
         """
         save_path = state["data_directory"]
         disease = state.get("disease", "cancer")
 
         logger.info("Step 9.5: Running drug target assessment pipeline")
+
+        base_path = Path(save_path)
+        drug_md_path = base_path / "drug.md"
+        part4_path = base_path / "part4_therapeutic_synthesis.md"
+        part4_selection_path = base_path / "part4_candidate_selection.json"
+        configurable = (config or {}).get("configurable", {})
+        force_rerun = configurable.get("force_rerun", False)
+
+        def _load_selected_lr_pairs_sync() -> list[str]:
+            if not part4_selection_path.exists():
+                return []
+            try:
+                payload = json.loads(part4_selection_path.read_text(encoding="utf-8"))
+            except Exception as e:  # noqa: BLE001
+                logger.warning(f"Step 9.5: Failed to read part4 selected pairs: {e}")
+                return []
+            return [
+                str(pair["interaction"])
+                for pair in payload.get("selected_lr_pairs", [])
+                if isinstance(pair, dict) and pair.get("interaction")
+            ]
+
+        def _delete_cached_step_10_11_figures_sync() -> int:
+            figs_to_delete = [
+                base_path / "10.spatial_plot_interections.png",
+                base_path / "11.lr_interections.png",
+            ]
+            figs_to_delete += [
+                Path(p)
+                for p in glob.glob(f"{save_path}/10.spatial_plot_interections_*.png")
+            ]
+            figs_to_delete += [
+                Path(p)
+                for p in glob.glob(f"{save_path}/11.lr_interections_*.png")
+            ]
+            deleted = 0
+            for fig_path in figs_to_delete:
+                if fig_path.exists():
+                    fig_path.unlink()
+                    deleted += 1
+                    logger.info(f"Deleted cached {fig_path.name} for Step 10/11 regeneration")
+            return deleted
+
+        def _cached_drug_target_outputs_exist() -> bool:
+            return drug_md_path.exists() and part4_path.exists()
+
+        if not force_rerun and await asyncio.to_thread(_cached_drug_target_outputs_exist):
+            featured_pairs = await asyncio.to_thread(_load_selected_lr_pairs_sync)
+            deleted_fig_count = await asyncio.to_thread(_delete_cached_step_10_11_figures_sync)
+            status_parts = [
+                "**Step 9.5: Drug Target Assessment**",
+                "SKIPPED (cached drug.md and part4_therapeutic_synthesis.md found)",
+                f"Deleted cached Step 10/11 figures: {deleted_fig_count}",
+            ]
+            if featured_pairs:
+                status_parts.append(
+                    f"Featured L-R pairs ({len(featured_pairs)}): {', '.join(featured_pairs[:3])}"
+                )
+            else:
+                status_parts.append("No featured pairs extracted (will fallback to combinedscore ranking)")
+            return {
+                "drug_target_complete": True,
+                "drug_target_error": None,
+                "featured_lr_pairs": featured_pairs,
+                "messages": [AIMessage(content=[{"type": "text", "text": "\n".join(status_parts)}])],
+            }
 
         # 0. Write targets.json so Drug Target agent can read interest_celltypes
         targets_content = {
@@ -1986,14 +2109,15 @@ Available factors: {available_factors}
             "data_directory": str(save_path),
         }
         targets_path = Path(save_path) / "targets.json"
-        if not targets_path.exists():
-            targets_path.write_text(json.dumps(targets_content, indent=2, ensure_ascii=False))
-            logger.info("Step 9.5: Wrote targets.json with interest_celltypes=%s",
-                        targets_content["interest_celltypes"])
+        targets_path.write_text(json.dumps(targets_content, indent=2, ensure_ascii=False))
+        logger.info("Step 9.5: Wrote targets.json with interest_celltypes=%s",
+                    targets_content["interest_celltypes"])
 
         # 1. Generate lr_candidates.json via prioritizer
         drug_target_error = None
+        lr_candidates_path = Path(save_path) / "lr_candidates.json"
         try:
+            await asyncio.to_thread(lr_candidates_path.unlink, missing_ok=True)
             # Lazy import to break circular dependency (wrapper → lr_prioritizer)
             from src.agents.deep_interpreter.tools.lr_prioritizer import prioritize_top_lr_pairs
             lr_result_json = await asyncio.to_thread(
@@ -2001,7 +2125,11 @@ Available factors: {available_factors}
                 {"data_dir": save_path, "candidate_count": 30},
             )
             lr_result = json.loads(lr_result_json)
+            if lr_result.get("error"):
+                raise RuntimeError(lr_result["error"])
             candidate_count = len(lr_result.get("pairs", []))
+            if candidate_count == 0:
+                raise RuntimeError("no L-R candidates generated")
             logger.info(f"Step 9.5: Generated lr_candidates.json with {candidate_count} candidates")
         except Exception as e:
             logger.error(f"Step 9.5: prioritize_top_lr_pairs failed: {e}")
@@ -2010,49 +2138,40 @@ Available factors: {available_factors}
 
         # 2. Run drug target assessment (generates drug.md + target_assessment.json)
         featured_pairs = []
-        try:
-            # Lazy import to break circular dependency (wrapper → drug_target integration)
-            from src.agents.drug_target.integration import run_drug_target_assessment
-            result_json = await run_drug_target_assessment.ainvoke(
-                {"data_dir": save_path, "disease": disease}
-            )
-            result = json.loads(result_json)
+        if drug_target_error is None:
+            try:
+                # Lazy import to break circular dependency (wrapper → drug_target integration)
+                from src.agents.drug_target.integration import run_drug_target_assessment
+                result_json = await run_drug_target_assessment.ainvoke(
+                    {"data_dir": save_path, "disease": disease}
+                )
+                result = json.loads(result_json)
 
-            if result.get("success"):
-                logger.info("Step 9.5: Drug target assessment completed successfully")
+                if result.get("success"):
+                    logger.info("Step 9.5: Drug target assessment completed successfully")
 
-                # 3. Extract featured pairs from target_assessment.json
-                target_assessment = result.get("target_assessment")
-                if target_assessment:
-                    matrix = target_assessment.get("druggability_matrix", [])
-                    for entry in matrix:
-                        if entry.get("is_featured"):
-                            interaction = entry.get("interaction", "")
-                            if interaction:
-                                featured_pairs.append(interaction)
+                    # 3. Prefer Part 4 selected pairs; fallback to legacy featured matrix
+                    featured_pairs = await asyncio.to_thread(_load_selected_lr_pairs_sync)
+
+                    target_assessment = result.get("target_assessment")
+                    if not featured_pairs and target_assessment:
+                        matrix = target_assessment.get("druggability_matrix", [])
+                        for entry in matrix:
+                            if entry.get("is_featured"):
+                                interaction = entry.get("interaction", "")
+                                if interaction:
+                                    featured_pairs.append(interaction)
                     logger.info(f"Step 9.5: Extracted {len(featured_pairs)} featured pairs: {featured_pairs}")
-            else:
-                error_msg = result.get('error', 'unknown error')
-                logger.warning(f"Step 9.5: Drug target assessment returned error: {error_msg}")
-                drug_target_error = drug_target_error or f"run_drug_target_assessment error: {error_msg}"
-        except Exception as e:
-            logger.error(f"Step 9.5: run_drug_target_assessment failed: {e}", exc_info=True)
-            drug_target_error = drug_target_error or f"run_drug_target_assessment failed: {e}"
+                else:
+                    error_msg = result.get('error', 'unknown error')
+                    logger.warning(f"Step 9.5: Drug target assessment returned error: {error_msg}")
+                    drug_target_error = drug_target_error or f"run_drug_target_assessment error: {error_msg}"
+            except Exception as e:
+                logger.error(f"Step 9.5: run_drug_target_assessment failed: {e}", exc_info=True)
+                drug_target_error = drug_target_error or f"run_drug_target_assessment failed: {e}"
 
-        # 4. Delete cached Step 10-11 figures only when we have better data to regenerate with
-        if featured_pairs:
-            def _delete_cached_figs():
-                figs_to_delete = [
-                    Path(save_path) / "10.spatial_plot_interections.png",
-                    Path(save_path) / "11.lr_interections.png",
-                ]
-                figs_to_delete += [Path(p) for p in glob.glob(f"{save_path}/10.spatial_plot_interections_*.png")]
-                figs_to_delete += [Path(p) for p in glob.glob(f"{save_path}/11.lr_interections_*.png")]
-                for fig_path in figs_to_delete:
-                    if fig_path.exists():
-                        fig_path.unlink()
-                        logger.info(f"Deleted cached {fig_path.name} for featured pair regeneration")
-            await asyncio.to_thread(_delete_cached_figs)
+        # 4. Always invalidate Step 10-11 figures so they regenerate after Step 9.5.
+        deleted_fig_count = await asyncio.to_thread(_delete_cached_step_10_11_figures_sync)
 
         # Build status message
         status_parts = ["**Step 9.5: Drug Target Assessment**"]
@@ -2061,13 +2180,12 @@ Available factors: {available_factors}
         else:
             status_parts.append("No featured pairs extracted (will fallback to combinedscore ranking)")
         status_parts.append(f"Candidates evaluated: {candidate_count}")
+        status_parts.append(f"Deleted cached Step 10/11 figures: {deleted_fig_count}")
         if drug_target_error:
             status_parts.append(f"Warning: {drug_target_error}")
 
-        # Only mark complete on success (both sub-steps succeeded or at least assessment ran)
-        is_complete = drug_target_error is None or featured_pairs
         return {
-            "drug_target_complete": bool(is_complete),
+            "drug_target_complete": True,
             "drug_target_error": drug_target_error,
             "featured_lr_pairs": featured_pairs or [],
             "messages": [AIMessage(content=[{"type": "text", "text": "\n".join(status_parts)}])],

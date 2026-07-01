@@ -272,11 +272,12 @@ Use each paper's `evidence_bucket` when wording claims:
 ## RAG Enhancement (Optional but Recommended)
 
 If Docker infrastructure is available, use RAG for improved accuracy:
-1. **prepare_rag_literature** - Downloads full-text papers and indexes for search
-2. **search_literature_fulltext** - Semantic search on full paper text
+1. **prepare_rag_literature** - Downloads full-text papers, indexes them for search, and builds SNI/LLM Wiki navigation context when new papers are indexed
+2. **search_literature_fulltext** - Uses SNI promotion through SGCP-RAG agentic search when available, then falls back to chunk search
 3. **validate_claim_fulltext** - Validate claims against full-text content
 
 **Fallback**: If RAG unavailable (rag_mode=False), use Abstract mode with existing tools.
+**Citation boundary**: SNI/LLM Wiki summaries are navigation only, not citation evidence. Cite only real source chunks returned by RAG search and PMIDs from `/papers.json`.
 
 ## Workflow for EACH Part (1, 2, 3)
 
@@ -321,7 +322,8 @@ For EACH analysis to be interpreted:
    results = search_literature_fulltext(
        query="<gene> <mechanism> <cell_type>",
        part_name="all",
-       limit=5
+       limit=5,
+       data_dir=data_path.strip()
    )
    ```
 
@@ -332,15 +334,15 @@ For EACH analysis to be interpreted:
 **Example for Part 1 Spatial Analysis**:
 ```
 # Before interpreting spatial clustering:
-search_literature_fulltext(query="CDH1 E-cadherin epithelial spatial", part_name="all")
-search_literature_fulltext(query="stromal fibroblast tumor microenvironment", part_name="all")
+search_literature_fulltext(query="CDH1 E-cadherin epithelial spatial", part_name="all", data_dir=data_path.strip())
+search_literature_fulltext(query="stromal fibroblast tumor microenvironment", part_name="all", data_dir=data_path.strip())
 ```
 
 **Example for Part 2 CCI Analysis**:
 ```
 # Before interpreting L-R interactions:
-search_literature_fulltext(query="TGFB1 TGFBR2 fibroblast cancer", part_name="all")
-search_literature_fulltext(query="WNT signaling epithelial mesenchymal", part_name="all")
+search_literature_fulltext(query="TGFB1 TGFBR2 fibroblast cancer", part_name="all", data_dir=data_path.strip())
+search_literature_fulltext(query="WNT signaling epithelial mesenchymal", part_name="all", data_dir=data_path.strip())
 ```
 
 **Why this matters**: Without pre-search, you will hallucinate PMIDs that don't exist in the indexed papers. The search results provide REAL citations from the full-text corpus.
@@ -390,6 +392,7 @@ For EACH claim with a PMID citation:
    - claim: The biological claim text
    - pmid: The cited PMID
    - part_name: "all"
+   - data_dir: data_path.strip()
 
 2. Check the validation result:
    - **valid=True, confidence>=0.7**: Keep the claim as-is (strong full-text support)
@@ -413,63 +416,33 @@ For EACH claim with a PMID citation:
    - Revise the claim to match paper content
    - OR mark as **(Novel Finding - based on data analysis)** if biologically valid but unsupported
 
-### Phase 4: Reflection-Driven Quality Loop (MANDATORY ordering: Steps A–E)
+### Phase 4: Advisory Quality Check
 
-`think_tool` is the ACTIVE reflection/completeness loop for INTERPRETER. `validate_quality`
-is an OBJECTIVE deterministic rubric checkpoint layered under that loop — NOT the primary
-reflection mechanism. You MUST follow Steps A → B → C → D → E in order.
+Draft the Part N interpretation from the grounded evidence already collected in
+Phases 1-3. The INTERPRETER's primary job is to produce a complete,
+evidence-grounded `/partN_final.md`; final claim-level guardrails are handled
+downstream by `validate_report.py`, optional `repair_report.py`, and a second
+`validate_report.py` pass.
 
-**Step A — Draft.** Produce the Part N interpretation draft grounded in `/papers.json`
-citations (and full-text RAG context when `rag_mode=True`).
+`think_tool` and `validate_quality` remain available as optional/advisory tools:
 
-**Step B — Reflect (MANDATORY).** Call `think_tool` with a one-paragraph self-critique
-of the draft's completeness, depth, mechanism clarity, and citation coverage. Pass
-`score_threshold=0.8` as an explicit call-site argument:
+- Use `think_tool` only when a local self-check would help clarify coverage,
+  mechanism depth, or citation grounding before writing the final markdown.
+- Use `validate_quality(interpretation=..., references=..., use_llm=False)` only
+  as an advisory rubric check. Do not treat its score as a retry gate.
+- Do not run a fixed reflection loop. Do not delay writing `/partN_final.md`
+  solely to improve a numeric quality score.
 
-```python
-think_tool(
-    reflection="<one-paragraph self-critique of draft completeness, mechanism depth, "
-               "quantitative coverage, and citation grounding>",
-    score_threshold=0.8,
-    max_iterations=3,
-)
-```
+Regardless of whether advisory tools are used, preserve the hard grounding rules:
 
-**Step C — Revise if needed.** If `think_tool` returns `should_continue=True`
-(reflection-side score < 0.8), revise the draft to address the feedback and return to
-Step B. This is the primary revision/completeness reflection loop.
-
-**Step D — Deterministic checkpoint.** After the `think_tool` reflection loop settles,
-call `validate_quality` with `use_llm=False` — this disables LLM averaging so the
-check is a purely deterministic regex/count rubric (statistics, references, mechanism
-keywords, specificity, depth, structure). This avoids a duplicate reflection-tool MCP
-call since Step B already performed the LLM-side semantic check:
-
-```python
-validate_quality(
-    interpretation=revised_draft,
-    references=papers_list,
-    use_llm=False,
-)
-```
-
-Note: `validate_quality` does NOT accept `score_threshold` — its signature is
-`(interpretation, references, use_llm=True)`. Do NOT pass `score_threshold` here;
-the 0.8 gate is applied in Step E as a consumer-side comparison.
-
-**Step E — Gate (Consumer-side comparison).** If `result['score'] < 0.8`, return to
-Step B (the `think_tool` reflection loop) with feedback targeting the weak rubric
-dimension. The 0.8 threshold is a **consumer-side comparison** against the returned
-score — it is NOT a parameter passed into `validate_quality`. Maximum 3 total
-iterations across Steps B–D.
-
-**Deterministic rubric dimensions scored by `validate_quality(use_llm=False)`:**
-- **statistics_score**: >= 0.8 (at least 4 quantitative statistics per analysis)
-- **references_score**: >= 0.8 (at least 4 PMIDs per analysis)
-- **mechanism_score**: >= 0.8 (detailed biological mechanism with cascades)
-- **specificity_score**: >= 0.8 (no vague language)
-- **depth_score**: >= 0.7 (at least 150 words per analysis section)
-- **structure_score**: >= 0.7 (all required headings present)
+- Cite only PMIDs present in filtered `/papers.json`.
+- Use RAG/full-text snippets as supporting context, not as uncited authority.
+- Revise unsupported paper claims to match the source, or mark biologically
+  plausible but uncited observations as **(Novel Finding - based on data analysis)**.
+- For Part 3, use `part4_candidate_selection.json.selected_genes` and
+  `selected_lr_pairs` as the source of truth for 3-10 and 3-11 L-R evidence.
+- Do not read or summarize `part4_therapeutic_synthesis.md`; Part 4 owns
+  therapeutic synthesis, druggability, drug ranking, and clinical prioritization.
 
 ### Phase 5: Write Final Interpretation
 
@@ -585,33 +558,43 @@ Focus on: Select 3-5 top L-R pairs, connect to pathways and cell types
 
 ### Part 3 (L-R Interaction Details)
 
-**MANDATORY FIRST STEP**: Load target_assessment.json using **load_analysis_data**.
-This file is pre-generated by the wrapper pipeline (Step 9.5) and contains the drug target
-evidence funnel results from 11 databases (OpenTargets, GWAS, ChEMBL, ClinicalTrials, FDA, etc.).
-The `target_assessment` field in load_analysis_data output includes `druggability_matrix` with
-`is_featured` flags identifying the evidence-based featured candidates.
+**MANDATORY FIRST STEP**: Load part4_candidate_selection.json using **load_analysis_data**.
+The `part4_candidate_selection` field in load_analysis_data output includes `selected_genes`
+and may include `selected_lr_pairs`. Use selected_genes as the fixed gene-section list.
+Use selected_lr_pairs as the source of truth for Figure 3-10 and 3-11 direct L-R
+evidence when present; fall back to selected_genes only if selected_lr_pairs is missing.
 
 **DO NOT** call prioritize_top_lr_pairs or run_drug_target_assessment — these are already
 executed by the wrapper before interpretation begins.
 
 **Process**:
-1. Call load_analysis_data(data_dir=data_path) — check `target_assessment` in the result
-2. From the druggability_matrix, identify featured candidates (`is_featured: true`)
-3. Read /papers.json (ONLY citation source)
-4. Write Part 3 interpretation for the featured candidates' L-R pairs
-5. Inline claim validation + quality check
-6. Output: /part3_final.md
+1. Call load_analysis_data(data_dir=data_path) — check `part4_candidate_selection` in the result
+2. Extract exactly 3 genes from `part4_candidate_selection.selected_genes`
+3. Extract up to 3 direct LR interactions from `part4_candidate_selection.selected_lr_pairs` when present
+4. Read /papers.json (ONLY citation source)
+5. Write Part 3 interpretation for selected genes' L-R spatial evidence
+6. Inline claim validation + quality check
+7. Output: /part3_final.md
 
-**IMPORTANT**: Figures 3-10 (Spatial L-R) and 3-11 (L-R Summary) already show the SAME
-featured L-R pairs. Integrate their spatial and quantitative evidence directly into each
-featured pair's subsection rather than treating them as separate analyses.
+**IMPORTANT**: Figures 3-10 (Spatial L-R) and 3-11 (L-R Summary) should be interpreted
+for selected_lr_pairs from part4_candidate_selection.json when present. Do not claim a
+pair is shown in 3-10/3-11 unless it appears in selected_lr_pairs. Integrate spatial and
+quantitative evidence directly into each relevant selected gene subsection rather than
+treating 3-10 and 3-11 as separate analyses.
+
+**Part 4 boundary**: You must not read, summarize, or reproduce part4_therapeutic_synthesis.md.
+Part 3 must not discuss therapeutic synthesis, therapeutic ranking, druggability scoring,
+clinical prioritization, or drug matching. Those belong to Part 4. Part 3 only interprets
+selected genes' L-R spatial evidence, molecular mechanism, literature context, and
+cross-part biological links.
 
 Analyses to interpret:
 - **3-9 NMF Quadrant with GenePT**: Combined score quadrant plot (0.4×factor + 0.4×morans + 0.2×genept)
-- **3-10 & 3-11 Featured L-R Spatial Evidence**: Spatial expression patterns AND quantitative
-  L-R interaction summary for the featured pairs (integrated, not separate sections)
+- **3-10 & 3-11 Selected Gene L-R Spatial Evidence**: Spatial expression patterns AND quantitative
+  L-R interaction summary for selected_lr_pairs, organized under selected_genes
+  (integrated, not separate sections)
 
-Focus on: Specific mechanisms of the featured L-R pairs, source→target relationships, novelty
+Focus on: Specific mechanisms involving the selected genes, source→target relationships, novelty
 
 **Output template for Part 3**:
 ```markdown
@@ -623,18 +606,18 @@ Focus on: Specific mechanisms of the featured L-R pairs, source→target relatio
 ### Biological Interpretation
 ### References
 
-## Featured L-R Pair Analysis (3-10 & 3-11 Integrated)
+## Selected Gene L-R Spatial Evidence (3-10 & 3-11 Integrated)
 
-### [FEATURED] LIGAND–RECEPTOR (#1)
+### [SELECTED] GENE (#1)
 #### Molecular Mechanism
 #### Spatial Evidence (3-10 spatial plot + 3-11 interaction summary integrated)
 #### Literature Context
 #### Novelty Assessment
 
-### [FEATURED] LIGAND–RECEPTOR (#2)
+### [SELECTED] GENE (#2)
 (same structure)
 
-### [FEATURED] LIGAND–RECEPTOR (#3)
+### [SELECTED] GENE (#3)
 (same structure)
 
 ## Cross-Part Connections
@@ -642,14 +625,14 @@ Focus on: Specific mechanisms of the featured L-R pairs, source→target relatio
 ```
 
 **Depth requirements:**
-- For each of the 3 featured L-R pairs, write a dedicated subsection with at least
+- For each of the 3 selected genes, write a dedicated subsection with at least
   4 paragraphs covering:
-  1. Molecular mechanism of the L-R interaction
+  1. Molecular mechanism involving the selected gene and relevant L-R context
   2. Spatial evidence from the tissue (Moran's R, co-localization) — integrate 3-10 and 3-11
   3. Literature context and known roles in disease
   4. Novelty assessment — what makes this finding unique in this tissue context
 - Connect Part 3 findings back to Part 1 spatial patterns and Part 2 NMF/pathway results
-- Synthesize all 3 featured pairs into a coherent biological narrative
+- Synthesize all 3 selected genes into a coherent biological narrative
 
 ## Quality Requirements (per analysis)
 - At least 4 quantitative statistics (p-values, fold changes, percentages, spatial scores)
@@ -659,7 +642,7 @@ Focus on: Specific mechanisms of the featured L-R pairs, source→target relatio
 - Required sections: Figure Description, Quantitative Findings, Biological Interpretation, Cross-Analysis Connections, References
 - Specific language (no vague hedging)
 - Minimum 150 words per analysis section
-- Quality threshold: 0.8
+- Advisory quality checks may be used, but do not block final file writing on a numeric score
 - Mark genuinely novel observations as **(Novel Finding)**
 
 ## Tools Available
@@ -667,21 +650,23 @@ Focus on: Specific mechanisms of the featured L-R pairs, source→target relatio
 ### Core Tools
 - **load_analysis_data**: Load analysis results from data directory
 - **validate_claim_literature**: Verify claim-paper alignment (Abstract mode)
-- **think_tool**: ACTIVE reflection/completeness loop (Phase 4 Steps B–C). Call with
-  `score_threshold=0.8`, `max_iterations=3`. Drives the revision cycle.
-- **validate_quality**: OBJECTIVE deterministic rubric checkpoint (Phase 4 Step D).
-  Call with `use_llm=False` — this is a layered checkpoint under the `think_tool`
-  reflection loop, not the primary reflection mechanism. The 0.8 gate is a
-  consumer-side comparison (Step E), not a tool kwarg.
+- **think_tool**: Optional advisory self-check for coverage, mechanism depth, and
+  citation grounding. Do not run a fixed reflection loop.
+- **validate_quality**: Optional deterministic rubric check. Call with
+  `use_llm=False` when useful, but treat the score as advisory; downstream
+  `validate_report.py`/`repair_report.py` handles report-level guardrails.
 
 ### RAG Tools (use when rag_mode=True)
-- **prepare_rag_literature**: Download full-text papers and index for RAG search
-- **search_literature_fulltext**: Semantic search on full paper text
+- **prepare_rag_literature**: Download full-text papers, index for RAG search, and build SNI/LLM Wiki navigation context after new indexing
+- **search_literature_fulltext**: Use SNI promotion through SGCP-RAG agentic search when available, then fallback to chunk search
 - **validate_claim_fulltext**: Validate claims against full-text content
 
-### Drug Target Data (Part 3 — pre-generated by wrapper Step 9.5)
-- **target_assessment.json**: Loaded automatically via load_analysis_data. Contains druggability_matrix
-  with is_featured flags. DO NOT call prioritize_top_lr_pairs or run_drug_target_assessment.
+### Selected Gene Data (Part 3)
+- **part4_candidate_selection.json**: Loaded automatically via load_analysis_data. Contains
+  selected_genes for gene sections and selected_lr_pairs for 3-10/3-11 direct LR
+  evidence when present. DO NOT call
+  prioritize_top_lr_pairs or run_drug_target_assessment. DO NOT read
+  part4_therapeutic_synthesis.md; Part 4 owns therapeutic synthesis.
 
 ## CRITICAL: Citation Rules (Anti-Hallucination)
 
@@ -691,6 +676,7 @@ Focus on: Specific mechanisms of the featured L-R pairs, source→target relatio
    - PMIDs from `search_literature_fulltext` results (RAG mode)
    - PMIDs from the loaded papers JSON file
    - **NOTHING ELSE**
+   - SNI/LLM Wiki summaries are navigation only and are not citation evidence
 
 2. **Prohibited Actions**:
    - ❌ Never invent PMIDs from memory or training data
@@ -715,15 +701,17 @@ Before declaring your work complete, you MUST verify:
    - If assigned Part 2: `/part2_final.md` must exist
    - If assigned Part 3: `/part3_final.md` must exist
 
-2. **Quality Score Met**: The quality score from validate_quality is >= 0.8
+2. **Advisory Quality Reviewed**: Optional quality checks were considered where useful; do not block final file writing on a numeric score
 
 3. **All Analyses Covered**: Every analysis in your assigned Part has an interpretation section
 
 4. **Part 3 Specific**: If interpreting Part 3, confirm that:
-   - `target_assessment.json` was read via load_analysis_data (pre-generated by wrapper Step 9.5)
-   - Featured candidates identified from druggability_matrix (is_featured=true)
-   - Featured candidates' L-R pairs are the focus of interpretation
-   - 3-10 and 3-11 spatial evidence is integrated into each featured pair's subsection
+   - `part4_candidate_selection.json` was read via load_analysis_data
+   - `selected_genes` were used for gene sections
+   - `selected_lr_pairs` were used for 3-10 and 3-11 direct LR evidence when present
+   - Selected genes' L-R spatial evidence is the focus of interpretation
+   - 3-10 and 3-11 spatial evidence is integrated into each selected gene's subsection
+   - part4_therapeutic_synthesis.md was not read or summarized
 
 **DO NOT return to the orchestrator until the output file for your assigned Part is confirmed written.**
 
@@ -732,7 +720,7 @@ Before declaring your work complete, you MUST verify:
 ```
 START
   │
-  ├── Call prepare_rag_literature(papers_json_path, part_name)
+  ├── Call prepare_rag_literature(papers_json_path, part_name, data_dir)
   │
   └── Check result.rag_mode
         │
@@ -789,10 +777,10 @@ Phase 4.5: VALIDATE SYNTHESIS WITH LITERATURE
     ├── Step 4: Quality Reflection (think_tool)
     └── Step 5: RAG Validate & Write
     ↓
-Phase 4.7: INTEGRATE DRUG TARGET ASSESSMENT (read existing drug.md)
+Phase 4.7: INTEGRATE PART 4 THERAPEUTIC SYNTHESIS
     │
-    ├── Step 1: Read drug.md (generated by wrapper Step 9.5)
-    ├── Step 2: Integrate into /synthesis.md
+    ├── Step 1: Read part4_therapeutic_synthesis.md, then drug.md
+    ├── Step 2: Integrate concise Part 4 implications into /synthesis.md
     └── Step 3: Write /synthesis_targets.json
     ↓
 Phase 5: Generate HTML Report (with Therapeutic Implications tab)
@@ -1050,11 +1038,11 @@ If `prepare_rag_literature` returns `rag_mode=False`:
 # Read data directory written by PLANNER
 data_path = read_file("/data_path.txt")
 # Papers stored in {data_path}/papers/synthesis/
-# RAG collection: deep_interpreter_synthesis
+# RAG collection is namespaced by data_dir and part_name.
 prepare_rag_literature(
     papers_json_path="/synthesis_papers.json",
     part_name="synthesis",  # → papers/synthesis/ folder
-                            # → deep_interpreter_synthesis collection
+                            # → data_dir-namespaced RAG collection
     data_dir=data_path.strip()
 )
 ```
@@ -1066,7 +1054,8 @@ For each key claim in synthesis Themes:
 result = validate_claim_fulltext(
     claim=claim_text,
     pmid=relevant_pmid,
-    part_name="synthesis"
+    part_name="synthesis",
+    data_dir=data_path.strip()
 )
 # Result: {valid, confidence, supporting_text, source}
 ```
@@ -1106,34 +1095,42 @@ Based on validation results:
 }
 ```
 
-### Phase 4.7: Integrate Drug Target Assessment (read existing drug.md)
+### Phase 4.7: Integrate Part 4 Therapeutic Synthesis
 
-**Purpose**: The drug target assessment has already been performed by the wrapper pipeline
-(Step 9.5, before Steps 10-11). The REPORTER reads the existing drug.md
-and integrates it into the synthesis and HTML report.
+**Purpose**: The drug target assessment has already been performed by the wrapper pipeline.
+The REPORTER reads `part4_therapeutic_synthesis.md` as the canonical Part 4 narrative and
+reads `drug.md` as supporting detail. Prefer `part4_therapeutic_synthesis.md` when the two
+files differ about selected candidates, headline interpretation, or prioritization.
+In short: prefer part4_therapeutic_synthesis.md; do not duplicate either source.
 
-#### Step 1: Read existing drug.md
+#### Step 1: Read Part 4 sources
 
 ```python
 # Read data directory (written by PLANNER)
 data_path = read_file("/data_path.txt")
 
-# Read existing drug.md generated by wrapper Step 9.5
-drug_md = read_file(f"{data_path.strip()}/drug.md")
+# Canonical Part 4 narrative
+part4_synthesis_md = read_file("/part4_therapeutic_synthesis.md")
+
+# Supporting therapeutic assessment details
+drug_md = read_file("/drug.md")
 ```
 
-#### Step 2: Integrate drug.md into synthesis
+#### Step 2: Integrate Part 4 into synthesis
 
-1. Read the drug.md content
-2. Add a **### Therapeutic Implications** section to `/synthesis.md`
-   incorporating the key findings from drug.md (Executive Summary + Recommendations)
-3. Write `/synthesis_targets.json` with structured results for HTML report:
+1. Use `part4_therapeutic_synthesis.md` as the canonical source for the **### Therapeutic Implications** section in `/synthesis.md`.
+2. Use `drug.md` only as supporting detail for evidence, target assessment context, and recommendations.
+3. Do not duplicate large blocks from either file. Write a concise synthesis section that links therapeutic findings back to Parts 1-3.
+4. Write `/synthesis_targets.json` with structured source tracking for HTML report:
 
 ```python
 write_file("/synthesis_targets.json", json.dumps({
+    "part4_synthesis_available": True,
+    "part4_synthesis_path": f"{data_path.strip()}/part4_therapeutic_synthesis.md",
     "drug_md_available": True,
     "drug_md_path": f"{data_path.strip()}/drug.md",
-    "source": "DrugTargetAgent"
+    "canonical_source": "part4_therapeutic_synthesis.md",
+    "supporting_source": "drug.md"
 }, indent=2))
 ```
 
@@ -1143,19 +1140,18 @@ write_file("/synthesis_targets.json", json.dumps({
 
 ```
 think_tool(
-    reflection="Drug target assessment completed by INTERPRETER. "
-               "Review drug.md findings: validated targets, exploratory targets, "
-               "GWAS evidence, clinical trial landscape, safety considerations. "
-               "How do these findings connect to our CCI interpretation?",
+    reflection="Part 4 integration: use part4_therapeutic_synthesis.md as the canonical "
+               "therapeutic narrative and drug.md as supporting evidence. Connect the "
+               "selected candidates and therapeutic implications back to Parts 1-3 without "
+               "duplicating the Part 4 source files.",
     iteration=1,
     max_iterations=2
 )
 ```
 
-**Note**: If drug.md does not exist (e.g., drug target assessment failed during Part 3),
-proceed to Phase 5. The Therapeutic Implications tab will show
-"No therapeutic analysis available" — this is acceptable as the drug target assessment
-is an enhancement, not a requirement.
+**Note**: If `part4_therapeutic_synthesis.md` is missing but `drug.md` exists, proceed using
+`drug.md` and state `"canonical_source": "drug.md"` in `/synthesis_targets.json`. If both are
+missing, proceed to Phase 5 with "No therapeutic analysis available".
 
 ### Phase 5.0: HTML Structure Blueprint
 
@@ -1228,10 +1224,11 @@ summary-box (Overall Biological Model)
   → analysis-section (References with linked list)
 ```
 
-### Phase 5: Generate HTML Report (HTML Override Mode)
+### Phase 5: Generate HTML Report (Deterministic Template Mode)
 
-Use HTML override mode for maximum control over report structure. For each Part,
-generate rich HTML following the blueprints above.
+Use deterministic template mode for reproducible report structure. The renderer
+reads final markdown, JSON/CSV tables, and figures from `data_dir` and renders
+the fixed Part 1, Part 2, Part 3, Summary, and Therapeutic Implications tabs.
 
 #### Citation Conversion Rules
 
@@ -1263,28 +1260,29 @@ You do NOT need to base64-encode figures yourself.
 
 #### Tool Call
 
+Use deterministic template mode. Do not hand-author `part1_html`, `part2_html`,
+`part3_html`, `summary_html`, or `therapeutic_html`; the renderer reads the final
+markdown, JSON/CSV tables, and figures from `data_dir` and renders the fixed report
+structure.
+
 ```python
 # Read data directory (written by PLANNER)
 data_path = read_file("/data_path.txt")
 
 generate_html_report(
     parts={
+        "template_mode": "comprehensive",
         "title": "CCI Analysis Report",
         "subtitle": "Comprehensive Cell-Cell Interaction Analysis",
-        "executive_summary": "<p>Overview...</p><div class='key-findings'><h4>Key Findings:</h4><ul><li>...</li></ul></div>",
+        "executive_summary": "",
         "analysis_config": {
             "Target Clusters": "4, 17, 14",
             "Data Directory": data_path,
             "NMF Factor": "Factor3",
             "L-R Selection": "Combined score (0.4×factor + 0.4×morans + 0.2×genept)"
         },
-        "part1_html": "<rich HTML for Part 1 following Per-Analysis + Part Summary blueprints>",
-        "part2_html": "<rich HTML for Part 2 following Per-Analysis + Part Summary blueprints>",
-        "part3_html": "<rich HTML for Part 3 with L-R Pagination blueprint>",
-        "summary_html": "<rich HTML following Summary Tab blueprint>",
-        "therapeutic_html": "<HTML for Therapeutic Implications tab>",
         "synthesis": "",
-        "quality_score": <average quality score>,
+        "quality_score": 0.70,
         "references": []
     },
     output_path="CCI_Analysis_Report.html",
@@ -1292,27 +1290,18 @@ generate_html_report(
 )
 ```
 
-**CRITICAL**: Use `part1_html`, `part2_html`, `part3_html`, `summary_html` fields (HTML override mode),
-NOT `part1`, `part2`, `part3` fields (structured mode). HTML override mode gives you full control
-over the report structure and produces reference-quality output.
-
 **CRITICAL**: For figure paths, use the file names from `load_analysis_data` results
 (e.g., `"1.spatial.png"`, `"6.liana_MoransR.png"`). The tool resolves these relative
 to `data_dir` and converts to base64 automatically.
 
 #### Phase 5 Quality Checklist
 
-Before calling generate_html_report, verify your HTML content meets these criteria:
-- [ ] Executive summary has `key-findings` div with 6-8 `<li>` bullet points
-- [ ] Each analysis section: `<h3>` → `figure-container` → [optional `pathway-box`/`key-findings` table] → `interpretation`
-- [ ] ALL biological entities use semantic highlight classes (`highlight-cluster`, `highlight-pathway`, `highlight-celltype`)
-- [ ] ALL PMIDs converted to `<a class="reference">` links (no plain-text PMIDs)
-- [ ] Data tables use `rowspan` for cluster grouping where applicable
-- [ ] FDR values use `<sup>` scientific notation (e.g., `2.47 × 10<sup>-244</sup>`)
-- [ ] Each Part tab ends with a `summary-box`
-- [ ] Part 3 L-R table uses pagination with `interactions-page` divs (5 rows per page)
-- [ ] Summary tab follows: Biological Model → Integrated Findings → Clinical Implications → Conclusions → References
-- [ ] All figure paths reference actual files from `load_analysis_data`
+Before calling generate_html_report, verify these inputs exist:
+- [ ] `/part1_final.md`, `/part2_final.md`, `/part3_final.md`
+- [ ] `/part4_therapeutic_synthesis.md`
+- [ ] `/synthesis.md`, `/synthesis_targets.json`
+- [ ] Figure files from `load_analysis_data`
+- [ ] JSON/CSV tables used by the deterministic renderer
 
 ### Phase 6: Verification
 
@@ -1354,8 +1343,9 @@ The HTML report will have:
 ### Strategic Planning Tool
 - **think_tool**: Strategic planning (Step 2) and quality reflection (Step 4)
 
-### Drug Target Assessment (Phase 4.7)
-- **drug.md**: Already generated by wrapper pipeline (Step 9.5). Read from data_dir and integrate into synthesis and HTML report.
+### Part 4 Therapeutic Synthesis (Phase 4.7)
+- **part4_therapeutic_synthesis.md**: Canonical Part 4 narrative. Read from data_dir and integrate into synthesis and HTML report.
+- **drug.md**: Supporting therapeutic assessment detail. Use only as supporting context.
 
 ## Output Files Summary
 
@@ -1368,7 +1358,7 @@ The HTML report will have:
 | Phase 4.5 | /synthesis_validation.json | Detailed validation results |
 | Phase 4.5 | /synthesis.md (updated) | Revised with validation |
 | Phase 4.7 | /synthesis_targets.json | Structured results for HTML report |
-| Phase 4.7 | /synthesis.md (updated) | Therapeutic Implications section added (from existing drug.md) |
+| Phase 4.7 | /synthesis.md (updated) | Therapeutic Implications section added from Part 4 synthesis |
 | Phase 5 | CCI_Analysis_Report.html | Final HTML report (with Therapeutic tab) |
 
 ## Guidelines
@@ -1378,8 +1368,8 @@ The HTML report will have:
 - Clearly distinguish between supported and novel findings
 - **NEW**: Validate synthesis integration claims with independent literature (Phase 4.5)
 - **NEW**: Synthesis papers are stored separately in `papers/synthesis/` folder
-- **NEW**: Read existing drug.md (generated by wrapper Step 9.5) and integrate into report (Phase 4.7)
-- **NEW**: Include therapeutic_html in generate_html_report parts dict for the Therapeutic Implications tab
+- **NEW**: Read part4_therapeutic_synthesis.md as canonical and drug.md as supporting detail (Phase 4.7)
+- **NEW**: Use `template_mode="comprehensive"` in generate_html_report for the fixed report structure
 - Acknowledge limitations honestly
 """
 

@@ -7,7 +7,9 @@ from pathlib import Path
 
 import pytest
 
+from src.agents.deep_interpreter.tools import literature_rag
 from src.agents.deep_interpreter.tools.literature_rag import (
+    _rag_collection_key,
     _repair_json,
     _resolve_papers_path,
 )
@@ -104,6 +106,353 @@ class TestDataDirEnvVarIsolation:
         monkeypatch.setenv("DEEP_INTERPRETER_DATA_DIR", "/first")
         monkeypatch.setenv("DEEP_INTERPRETER_DATA_DIR", "/second")
         assert os.getenv("DEEP_INTERPRETER_DATA_DIR") == "/second"
+
+
+class TestRagCollectionNamespace:
+    def test_legacy_part_name_when_no_data_dir_or_env(self, monkeypatch):
+        monkeypatch.delenv("DEEP_INTERPRETER_DATA_DIR", raising=False)
+
+        assert _rag_collection_key("all") == "all"
+        assert _rag_collection_key("synthesis") == "synthesis"
+
+    def test_data_dir_namespaces_collection_key(self, tmp_path, monkeypatch):
+        monkeypatch.delenv("DEEP_INTERPRETER_DATA_DIR", raising=False)
+        data_dir = tmp_path / "tmp_final_ipf"
+        data_dir.mkdir()
+
+        key = _rag_collection_key("all", str(data_dir))
+
+        assert key.startswith("tmp_final_ipf_")
+        assert key.endswith("_all")
+        assert key != "all"
+
+    def test_same_basename_different_parent_gets_different_key(self, tmp_path, monkeypatch):
+        monkeypatch.delenv("DEEP_INTERPRETER_DATA_DIR", raising=False)
+        first = tmp_path / "a" / "run"
+        second = tmp_path / "b" / "run"
+        first.mkdir(parents=True)
+        second.mkdir(parents=True)
+
+        assert _rag_collection_key("synthesis", str(first)) != _rag_collection_key(
+            "synthesis", str(second)
+        )
+
+    def test_env_data_dir_is_used_when_explicit_data_dir_missing(self, tmp_path, monkeypatch):
+        data_dir = tmp_path / "final_bc"
+        data_dir.mkdir()
+        monkeypatch.setenv("DEEP_INTERPRETER_DATA_DIR", str(data_dir))
+
+        key = _rag_collection_key("all")
+
+        assert key.startswith("final_bc_")
+        assert key.endswith("_all")
+
+
+class TestRagCollectionNamespaceRouting:
+    @pytest.mark.asyncio
+    async def test_prepare_rag_for_interpretation_indexes_namespaced_key(
+        self, tmp_path, monkeypatch
+    ):
+        papers_path = tmp_path / "papers.json"
+        papers_path.write_text(json.dumps({"papers": [{"pmid": "12345678"}]}))
+        paper_file = tmp_path / "pmid_12345678.txt"
+        paper_file.write_text("full text")
+        captured = {}
+
+        async def fake_check_rag_availability():
+            return True
+
+        async def fake_download_papers_for_rag(pmids, output_dir):
+            return {
+                "12345678": {
+                    "success": True,
+                    "file_path": str(paper_file),
+                    "source": "test",
+                }
+            }
+
+        async def fake_index_papers_to_vectordb(file_paths, collection_name):
+            captured["file_paths"] = file_paths
+            captured["collection_name"] = collection_name
+            return {
+                "success": True,
+                "collection_id": "collection-id",
+                "collection_name": f"deep_interpreter_{collection_name}",
+                "sni_mode": True,
+                "sni_rebuild": '{"status":"success"}',
+                "sni_message": "SNI rebuild completed",
+            }
+
+        monkeypatch.setattr(
+            literature_rag, "check_rag_availability", fake_check_rag_availability
+        )
+        monkeypatch.setattr(
+            literature_rag, "download_papers_for_rag", fake_download_papers_for_rag
+        )
+        monkeypatch.setattr(
+            literature_rag, "index_papers_to_vectordb", fake_index_papers_to_vectordb
+        )
+
+        result = await literature_rag.prepare_rag_for_interpretation(
+            str(papers_path),
+            part_name="all",
+            data_dir=str(tmp_path),
+        )
+
+        expected_key = _rag_collection_key("all", str(tmp_path))
+        assert captured["collection_name"] == expected_key
+        assert captured["file_paths"] == [str(paper_file)]
+        assert result["collection_key"] == expected_key
+        assert result["collection_part_name"] == "all"
+        assert result["collection_name"] == f"deep_interpreter_{expected_key}"
+        assert result["sni_mode"] is True
+        assert result["sni_rebuild"] == '{"status":"success"}'
+        assert result["sni_message"] == "SNI rebuild completed"
+
+    def test_search_literature_fulltext_uses_namespaced_key(self, tmp_path, monkeypatch):
+        literature_rag.reset_rag_state()
+        literature_rag._RAG_STATE["available"] = True
+        captured = {}
+
+        async def fake_search_fulltext_rag(query, collection_name, limit):
+            captured["query"] = query
+            captured["collection_name"] = collection_name
+            captured["limit"] = limit
+            return [{"page_content": "matched text"}]
+
+        monkeypatch.setattr(literature_rag, "search_fulltext_rag", fake_search_fulltext_rag)
+
+        result = literature_rag.search_literature_fulltext.invoke(
+            {
+                "query": "ICAM1 fibrosis",
+                "part_name": "all",
+                "limit": 3,
+                "data_dir": str(tmp_path),
+            }
+        )
+
+        assert result == [{"page_content": "matched text"}]
+        assert captured["collection_name"] == _rag_collection_key("all", str(tmp_path))
+        assert captured["query"] == "ICAM1 fibrosis"
+        assert captured["limit"] == 3
+
+    def test_validate_claim_fulltext_uses_namespaced_key(self, tmp_path, monkeypatch):
+        literature_rag.reset_rag_state()
+        literature_rag._RAG_STATE["available"] = True
+        captured = {}
+
+        async def fake_validate_claim_with_rag(claim, pmid, collection_name):
+            captured["claim"] = claim
+            captured["pmid"] = pmid
+            captured["collection_name"] = collection_name
+            return {"valid": True, "confidence": 0.9}
+
+        monkeypatch.setattr(
+            literature_rag, "validate_claim_with_rag", fake_validate_claim_with_rag
+        )
+
+        result = literature_rag.validate_claim_fulltext.invoke(
+            {
+                "claim": "ICAM1 is involved in fibrosis",
+                "pmid": "12345678",
+                "part_name": "all",
+                "data_dir": str(tmp_path),
+            }
+        )
+
+        assert result == {"valid": True, "confidence": 0.9}
+        assert captured["collection_name"] == _rag_collection_key("all", str(tmp_path))
+        assert captured["claim"] == "ICAM1 is involved in fibrosis"
+        assert captured["pmid"] == "12345678"
+
+
+class TestRagSniIntegration:
+    @pytest.mark.asyncio
+    async def test_index_papers_rebuilds_llm_wiki_after_new_index(self, monkeypatch):
+        literature_rag.reset_rag_state()
+
+        class FakeTool:
+            def __init__(self, name, result):
+                self.name = name
+                self.result = result
+                self.calls = []
+
+            async def ainvoke(self, args):
+                self.calls.append(args)
+                return self.result
+
+        create = FakeTool("create_collection", {"id": "collection-id"})
+        add_docs = FakeTool("add_documents_from_files", {"added_chunk_ids": ["chunk-1"]})
+        rebuild = FakeTool("rebuild_llm_wiki", '{"status":"success"}')
+
+        async def fake_tools():
+            return [create, add_docs, rebuild]
+
+        monkeypatch.setattr(literature_rag, "_get_cci_rag_tools", fake_tools)
+
+        result = await literature_rag.index_papers_to_vectordb(
+            ["/tmp/paper.txt"],
+            "all",
+        )
+
+        assert result["success"] is True
+        assert result["collection_id"] == "collection-id"
+        assert result["sni_mode"] is True
+        assert add_docs.calls[0]["chunk_size"] == 3000
+        assert add_docs.calls[0]["chunk_overlap"] == 200
+        assert rebuild.calls == [{"collection_id": "collection-id"}]
+
+    @pytest.mark.asyncio
+    async def test_index_papers_skips_llm_wiki_rebuild_for_existing_collection(
+        self, monkeypatch
+    ):
+        literature_rag.reset_rag_state()
+
+        class FakeTool:
+            def __init__(self, name, result):
+                self.name = name
+                self.result = result
+                self.calls = []
+
+            async def ainvoke(self, args):
+                self.calls.append(args)
+                return self.result
+
+        list_collections = FakeTool(
+            "list_collections",
+            [{"name": "deep_interpreter_all", "id": "collection-id"}],
+        )
+        add_docs = FakeTool("add_documents_from_files", {"added_chunk_ids": ["chunk-1"]})
+        rebuild = FakeTool("rebuild_llm_wiki", '{"status":"success"}')
+
+        async def fake_tools():
+            return [list_collections, add_docs, rebuild]
+
+        monkeypatch.setattr(literature_rag, "_get_cci_rag_tools", fake_tools)
+
+        result = await literature_rag.index_papers_to_vectordb(
+            ["/tmp/paper.txt"],
+            "all",
+        )
+
+        assert result["success"] is True
+        assert result["already_indexed"] is True
+        assert result["sni_mode"] is False
+        assert add_docs.calls == []
+        assert rebuild.calls == []
+
+    @pytest.mark.asyncio
+    async def test_search_fulltext_rag_prefers_agentic_search_with_wiki_context(
+        self, monkeypatch
+    ):
+        literature_rag.reset_rag_state()
+        literature_rag._RAG_STATE["collection_ids"]["all"] = "collection-id"
+
+        class FakeTool:
+            name = "agentic_search"
+
+            def __init__(self):
+                self.calls = []
+
+            async def ainvoke(self, args):
+                self.calls.append(args)
+                return json.dumps(
+                    {
+                        "answer": "ICAM1 is linked to fibrosis.",
+                        "sources": [
+                            {
+                                "content": (
+                                    "ICAM1 supports inflammatory fibroblast signaling."
+                                ),
+                                "metadata": {"filename": "pmid_12345678.txt"},
+                                "score": 0.91,
+                            }
+                        ],
+                        "steps": ["wiki_promotion: promoted 1/1 refs"],
+                        "selected_wiki_pages": [{"title": "ICAM1 fibrosis"}],
+                        "wiki_context_status": "selected",
+                    }
+                )
+
+        agentic = FakeTool()
+
+        async def fake_tools():
+            return [agentic]
+
+        monkeypatch.setattr(literature_rag, "_get_cci_rag_tools", fake_tools)
+
+        result = await literature_rag.search_fulltext_rag(
+            "ICAM1 fibrosis",
+            "all",
+            limit=5,
+        )
+
+        assert agentic.calls == [
+            {
+                "collection_id": "collection-id",
+                "question": "ICAM1 fibrosis",
+                "search_type": "hybrid",
+                "search_limit": 5,
+                "max_rewrites": 3,
+                "use_wiki_context": True,
+            }
+        ]
+        assert result[0]["page_content"] == (
+            "ICAM1 supports inflammatory fibroblast signaling."
+        )
+        assert result[0]["metadata"]["filename"] == "pmid_12345678.txt"
+        assert result[0]["metadata"]["rag_backend"] == "agentic_search"
+        assert result[0]["metadata"]["wiki_context_status"] == "selected"
+
+    @pytest.mark.asyncio
+    async def test_search_fulltext_rag_falls_back_when_agentic_search_fails(
+        self, monkeypatch
+    ):
+        literature_rag.reset_rag_state()
+        literature_rag._RAG_STATE["collection_ids"]["all"] = "collection-id"
+
+        class FailingAgenticTool:
+            name = "agentic_search"
+
+            async def ainvoke(self, args):
+                raise RuntimeError("agentic unavailable")
+
+        async def fake_tools():
+            return [FailingAgenticTool()]
+
+        async def fake_generate_multi_query(query, num_queries=5):
+            return [query]
+
+        async def fake_search_single_query(query, collection_id, limit, search_type):
+            return [
+                {
+                    "page_content": "fallback chunk",
+                    "metadata": {"filename": "pmid_12345678.txt"},
+                    "score": 0.7,
+                }
+            ]
+
+        monkeypatch.setattr(literature_rag, "_get_cci_rag_tools", fake_tools)
+        monkeypatch.setattr(
+            literature_rag, "generate_multi_query", fake_generate_multi_query
+        )
+        monkeypatch.setattr(
+            literature_rag, "_search_single_query", fake_search_single_query
+        )
+
+        result = await literature_rag.search_fulltext_rag(
+            "ICAM1 fibrosis",
+            "all",
+            limit=5,
+        )
+
+        assert result == [
+            {
+                "page_content": "fallback chunk",
+                "metadata": {"filename": "pmid_12345678.txt"},
+                "score": 0.7,
+            }
+        ]
 
 
 class TestResolvePathFallback:

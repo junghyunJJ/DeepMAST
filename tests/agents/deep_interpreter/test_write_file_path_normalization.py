@@ -143,6 +143,19 @@ class TestNormalizePathRelativePass:
         assert result["file_path"] == "evidence/x.json"
 
 
+class TestNormalizePathVirtualRootPass:
+    """DeepAgents virtual root paths should resolve under backend_root."""
+
+    def test_normalize_path_virtual_root_file_returns_relative(self):
+        middleware = WriteFileArgGuardMiddleware(backend_root="/abs/root")
+        args = _args("/interpretation_guide.md")
+
+        result = middleware._normalize_path(args, backend_root="/abs/root")
+
+        assert isinstance(result, dict), "Expected dict (pass-through), got ToolMessage"
+        assert result["file_path"] == "interpretation_guide.md"
+
+
 class TestNormalizePathEmptyReject:
     """Scenario 4: empty file_path → BLOCKED."""
 
@@ -379,3 +392,60 @@ async def test_awrap_tool_call_normalizes_root_prefix_async() -> None:
         f"awrap_tool_call must rewrite absolute-inside-root to relative; "
         f"got file_path={captured_args.get('file_path')!r}"
     )
+
+
+@pytest.mark.asyncio
+async def test_awrap_tool_call_blocked_path_preserves_tool_call_id() -> None:
+    """Blocked write_file responses must keep the originating tool_call_id."""
+    from langgraph.prebuilt.tool_node import ToolCallRequest
+
+    middleware = WriteFileArgGuardMiddleware(backend_root="/abs/root")
+
+    async def async_handler(req: ToolCallRequest) -> ToolMessage:
+        return ToolMessage(content="unexpected", tool_call_id=req.tool_call.get("id", ""))
+
+    req = ToolCallRequest(
+        tool_call={
+            "id": "tc_async_blocked",
+            "name": "write_file",
+            "args": {"file_path": "/abs/other/file.json", "content": "data"},
+        },
+        tool=None,
+        state={},
+        runtime=None,  # type: ignore[arg-type]
+    )
+
+    result = await middleware.awrap_tool_call(req, async_handler)
+
+    assert isinstance(result, ToolMessage)
+    assert _is_blocked(result)
+    assert result.tool_call_id == "tc_async_blocked"
+
+
+@pytest.mark.asyncio
+async def test_awrap_tool_call_virtual_root_path_rewrites_to_relative() -> None:
+    """awrap_tool_call path: virtual root file path is passed as relative."""
+    from langgraph.prebuilt.tool_node import ToolCallRequest
+
+    middleware = WriteFileArgGuardMiddleware(backend_root="/abs/root")
+    captured_args: dict = {}
+
+    async def async_handler(req: ToolCallRequest) -> ToolMessage:
+        captured_args.update(req.tool_call.get("args") or {})
+        return ToolMessage(content="written", tool_call_id=req.tool_call.get("id", ""))
+
+    req = ToolCallRequest(
+        tool_call={
+            "id": "tc_async_virtual",
+            "name": "write_file",
+            "args": {"file_path": "/interpretation_guide.md", "content": "data"},
+        },
+        tool=None,
+        state={},
+        runtime=None,  # type: ignore[arg-type]
+    )
+
+    result = await middleware.awrap_tool_call(req, async_handler)
+
+    assert isinstance(result, ToolMessage)
+    assert captured_args.get("file_path") == "interpretation_guide.md"

@@ -11,6 +11,8 @@
 
 from __future__ import annotations
 
+import threading
+
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
@@ -123,6 +125,54 @@ async def test_messages_contract_only_last_ai_message_survives(
         f"Last message must be AIMessage, got {type(msgs[-1])}"
     )
     assert msgs[-1].content == "final answer"
+
+
+@pytest.mark.asyncio
+async def test_run_deep_agent_builds_agent_and_cleans_backend_off_event_loop_thread(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    """LangGraph async node must not run sync agent setup/cleanup on MainThread."""
+    import types
+
+    build_threads = []
+    cleanup_threads = []
+
+    async def _fake_ainvoke(inp, config=None):
+        return {"messages": [AIMessage(content="final answer")]}
+
+    class FakeBackend:
+        def cleanup(self):
+            cleanup_threads.append(threading.current_thread().name)
+
+    def fake_create_agent(cfg):
+        build_threads.append(threading.current_thread().name)
+        return types.SimpleNamespace(ainvoke=_fake_ainvoke), FakeBackend()
+
+    monkeypatch.setattr(
+        "src.agents.drug_target.agent.create_drug_target_agent",
+        fake_create_agent,
+    )
+
+    from src.agents.drug_target.super_graph import run_deep_agent
+
+    result = await run_deep_agent(
+        {
+            "messages": [],
+            "data_dir": str(tmp_path),
+            "disease": "IPF",
+            "featured_lr_pairs": None,
+            "report_finalization_error": None,
+            "evidence_truncated": False,
+        },
+        {"recursion_limit": 100, "configurable": {"thread_id": "thread-test"}},
+    )
+
+    assert result["messages"][0].content == "final answer"
+    assert build_threads
+    assert threading.main_thread().name not in build_threads
+    assert cleanup_threads
+    assert threading.main_thread().name not in cleanup_threads
 
 
 @pytest.mark.asyncio

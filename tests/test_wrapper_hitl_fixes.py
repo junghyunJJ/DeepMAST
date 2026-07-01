@@ -19,6 +19,8 @@ Tests verify 3 fixes without LLM calls or MCP servers:
 
 import asyncio
 import json
+import threading
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pandas as pd
@@ -46,6 +48,111 @@ def _make_agent() -> DeepInterpreterWrapperAgent:
 
 
 DUMMY_CONFIG = {"configurable": {}}
+
+
+class TestLRDataPathResolution:
+    """Verify interest_sample-specific LIANA artifacts are preferred."""
+
+    def setup_method(self):
+        self.agent = _make_agent()
+
+    def test_prefers_interest_sample_lrdata_when_both_exist(self, tmp_path):
+        (tmp_path / "lrdata.h5ad").write_text("combined")
+        sample_path = tmp_path / "lrdata_V19S23-092-B1.h5ad"
+        sample_path.write_text("sample")
+
+        result = self.agent._resolve_lrdata_path(
+            str(tmp_path),
+            interest_sample="V19S23-092-B1",
+        )
+
+        assert result == str(sample_path)
+
+    def test_falls_back_to_combined_lrdata_without_interest_sample(self, tmp_path):
+        combined_path = tmp_path / "lrdata.h5ad"
+        combined_path.write_text("combined")
+
+        result = self.agent._resolve_lrdata_path(str(tmp_path))
+
+        assert result == str(combined_path)
+
+    def test_falls_back_to_combined_lrdata_when_sample_file_missing(self, tmp_path):
+        combined_path = tmp_path / "lrdata.h5ad"
+        combined_path.write_text("combined")
+
+        result = self.agent._resolve_lrdata_path(
+            str(tmp_path),
+            interest_sample="V19S23-092-B1",
+        )
+
+        assert result == str(combined_path)
+
+
+class TestLRDataPathRoles:
+    """Step 7 uses global NMF; Step 8+ uses targeted sample lrdata."""
+
+    def setup_method(self):
+        self.agent = _make_agent()
+
+    def _state(self, tmp_path):
+        return {
+            "h5ad_files": [str(tmp_path / "input.h5ad")],
+            "cluster_key": "IRIS_domain",
+            "data_directory": str(tmp_path),
+            "species": "human",
+            "sample_key": "sample",
+            "interest_sample": "V19S23-092-B1",
+            "interest_clusters": ["9", "11", "10", "13", "5"],
+        }
+
+    def test_step_7_factor_score_uses_combined_lrdata(self, tmp_path):
+        combined_path = tmp_path / "lrdata.h5ad"
+        sample_path = tmp_path / "lrdata_V19S23-092-B1.h5ad"
+        combined_path.write_text("combined")
+        sample_path.write_text("sample")
+
+        result = self.agent._build_step_args(7, self._state(tmp_path))
+
+        assert result["filename"] == str(combined_path)
+
+    def test_step_8_loadings_use_interest_sample_lrdata(self, tmp_path):
+        combined_path = tmp_path / "lrdata.h5ad"
+        sample_path = tmp_path / "lrdata_V19S23-092-B1.h5ad"
+        combined_path.write_text("combined")
+        sample_path.write_text("sample")
+
+        result = self.agent._build_step_args(8, self._state(tmp_path))
+
+        assert result["filename"] == str(sample_path)
+
+    def test_step_9_quadrant_uses_interest_sample_lrdata(self, tmp_path):
+        combined_path = tmp_path / "lrdata.h5ad"
+        sample_path = tmp_path / "lrdata_V19S23-092-B1.h5ad"
+        combined_path.write_text("combined")
+        sample_path.write_text("sample")
+
+        result = self.agent._build_step_args_9_11(
+            9,
+            self._state(tmp_path),
+            sel_factor="Factor1",
+        )
+
+        assert result["lrdata_path"] == str(sample_path)
+
+    def test_step_6_cache_requires_combined_lrdata(self, tmp_path):
+        (tmp_path / "sig_liana.csv").write_text("interaction,morans\n")
+        (tmp_path / "lrdata_V19S23-092-B1.h5ad").write_text("sample")
+        step_config = DeepInterpreterWrapperAgent.ANALYSIS_STEPS[5]
+
+        result = self.agent._check_step_outputs_exist(
+            step_config,
+            str(tmp_path),
+            step=6,
+            sample_key="sample",
+            interest_sample="V19S23-092-B1",
+        )
+
+        assert result is False
 
 
 # ===========================================================================
@@ -680,3 +787,396 @@ class TestSuggestFactorEdgeCases:
         assert isinstance(result, str)
         # Factor2 should win (Factor1 gets -inf from fillna)
         assert result == "Factor2"
+
+
+class TestAnalysisStepFailureDoesNotLoop:
+    """MCP failures should surface once and advance/terminate the step loop."""
+
+    def setup_method(self):
+        self.agent = _make_agent()
+        self.agent.ANALYSIS_STEPS = DeepInterpreterWrapperAgent.ANALYSIS_STEPS
+        self.agent.ANALYSIS_STEPS_9_11 = DeepInterpreterWrapperAgent.ANALYSIS_STEPS_9_11
+
+    @pytest.mark.asyncio
+    async def test_step_8_failure_marks_analysis_1_8_complete(self, tmp_path):
+        state = {
+            "current_analysis_step": 8,
+            "h5ad_files": [str(tmp_path / "input.h5ad")],
+            "cluster_key": "IRIS_domain",
+            "data_directory": str(tmp_path),
+            "species": "human",
+            "interest_sample": "V19S23-092-B1",
+        }
+        (tmp_path / "input.h5ad").write_text("unused")
+        (tmp_path / "lrdata_V19S23-092-B1.h5ad").write_text("sample")
+
+        with (
+            patch.dict(
+                "os.environ",
+                {
+                    "SP_ENRICH_MCP_PYTHON": "python",
+                    "SP_ENRICH_MCP_SERVER_PATH": "/tmp/sp",
+                },
+            ),
+            patch.object(self.agent, "_check_step_outputs_exist", return_value=False),
+            patch.object(self.agent, "_build_step_args", return_value={"filename": "x"}),
+            patch("src.agents.deep_interpreter.wrapper_agent.MultiServerMCPClient") as client_cls,
+        ):
+            client = AsyncMock()
+            client.get_tools.return_value = []
+            client_cls.return_value = client
+
+            result = await self.agent.run_single_analysis_step_node(state, DUMMY_CONFIG)
+
+        assert result["current_analysis_step"] == 8
+        assert result["analysis_1_8_complete"] is True
+        assert self.agent.route_after_step(result, DUMMY_CONFIG) == self.agent.get_node_name(
+            "PREPARE_RESEARCH"
+        )
+
+    @pytest.mark.asyncio
+    async def test_step_9_failure_skips_drug_target_and_advances(self, tmp_path):
+        state = {
+            "current_analysis_step": 9,
+            "data_directory": str(tmp_path),
+            "cluster_key": "IRIS_domain",
+            "interest_clusters": ["9"],
+            "sel_factor": "Factor1",
+            "interest_sample": "V19S23-092-B1",
+        }
+        (tmp_path / "lrdata_V19S23-092-B1.h5ad").write_text("sample")
+        pd.DataFrame({"interaction": ["A^B"], "Factor1": [1.0]}).to_csv(
+            tmp_path / "sig_liana.csv",
+            index=False,
+        )
+
+        with (
+            patch.dict(
+                "os.environ",
+                {
+                    "SP_ENRICH_MCP_PYTHON": "python",
+                    "SP_ENRICH_MCP_SERVER_PATH": "/tmp/sp",
+                },
+            ),
+            patch.object(self.agent, "_check_step_outputs_exist", return_value=False),
+            patch.object(self.agent, "_build_step_args_9_11", return_value={"csv_path": "x"}),
+            patch("src.agents.deep_interpreter.wrapper_agent.MultiServerMCPClient") as client_cls,
+        ):
+            client = AsyncMock()
+            client.get_tools.return_value = []
+            client_cls.return_value = client
+
+            result = await self.agent.run_single_analysis_step_9_11_node(state, DUMMY_CONFIG)
+
+        assert result["current_analysis_step"] == 10
+        assert result["drug_target_complete"] is True
+        assert "Step 9 failed" in result["drug_target_error"]
+        assert result.get("analysis_9_11_complete") is not True
+        assert self.agent.route_after_step_9_11(
+            result,
+            DUMMY_CONFIG,
+        ) == self.agent.get_node_name("RUN_SINGLE_STEP_9_11")
+
+    @pytest.mark.asyncio
+    async def test_step_9_missing_sig_liana_does_not_call_mcp(self, tmp_path):
+        state = {
+            "current_analysis_step": 9,
+            "data_directory": str(tmp_path),
+            "cluster_key": "IRIS_domain",
+            "interest_clusters": ["9"],
+            "sel_factor": "Factor1",
+            "interest_sample": "V19S23-092-B1",
+        }
+        (tmp_path / "lrdata_V19S23-092-B1.h5ad").write_text("sample")
+
+        with patch("src.agents.deep_interpreter.wrapper_agent.MultiServerMCPClient") as client_cls:
+            result = await self.agent.run_single_analysis_step_9_11_node(state, DUMMY_CONFIG)
+
+        client_cls.assert_not_called()
+        assert result["current_analysis_step"] == 9
+        assert result.get("analysis_9_11_complete") is not True
+        assert "sig_liana.csv not found" in result["messages"][0].content[0]["text"]
+
+
+class TestDrugTargetStepHandoff:
+    """Verify Step 9.5 hands selected LR pairs to Steps 10-11."""
+
+    def setup_method(self):
+        self.agent = _make_agent()
+
+    @pytest.mark.asyncio
+    async def test_overwrites_targets_and_prefers_part4_selected_lr_pairs(self, tmp_path):
+        (tmp_path / "targets.json").write_text(
+            json.dumps({"interest_celltypes": None}),
+            encoding="utf-8",
+        )
+        (tmp_path / "lr_candidates.json").write_text("stale", encoding="utf-8")
+        (tmp_path / "part4_candidate_selection.json").write_text(
+            json.dumps(
+                {
+                    "selected_lr_pairs": [
+                        {"interaction": "ICAM1^PECAM1"},
+                        {"interaction": "ICAM1^MUC1"},
+                        {"interaction": "MIF^CD74"},
+                    ]
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        def prioritize(_args):
+            assert not (tmp_path / "lr_candidates.json").exists()
+            (tmp_path / "lr_candidates.json").write_text("[]", encoding="utf-8")
+            return json.dumps({"pairs": [{"interaction": "ICAM1^PECAM1"}]})
+
+        state = {
+            "data_directory": str(tmp_path),
+            "disease": "IPF",
+            "interest_celltypes": ["AT2"],
+            "interest_clusters": ["9"],
+            "sel_factor": "Factor1",
+        }
+
+        with (
+            patch(
+                "src.agents.deep_interpreter.tools.lr_prioritizer.prioritize_top_lr_pairs"
+            ) as prioritizer,
+            patch(
+                "src.agents.drug_target.integration.run_drug_target_assessment"
+            ) as assessment,
+        ):
+            prioritizer.invoke.side_effect = prioritize
+            assessment.ainvoke = AsyncMock(
+                return_value=json.dumps(
+                    {
+                        "success": True,
+                        "target_assessment": {
+                            "druggability_matrix": [
+                                {"is_featured": True, "interaction": "OLD^PAIR"}
+                            ]
+                        },
+                    }
+                )
+            )
+
+            result = await self.agent.run_drug_target_node(state, DUMMY_CONFIG)
+
+        assert json.loads((tmp_path / "targets.json").read_text()) == {
+            "interest_celltypes": ["AT2"],
+            "interest_clusters": ["9"],
+            "sel_factor": "Factor1",
+            "data_directory": str(tmp_path),
+        }
+        assert result["featured_lr_pairs"] == [
+            "ICAM1^PECAM1",
+            "ICAM1^MUC1",
+            "MIF^CD74",
+        ]
+
+    @pytest.mark.asyncio
+    async def test_existing_drug_and_part4_outputs_skip_agent_and_delete_step10_11_figures(
+        self,
+        tmp_path,
+    ):
+        (tmp_path / "drug.md").write_text("# cached drug", encoding="utf-8")
+        (tmp_path / "part4_therapeutic_synthesis.md").write_text(
+            "# cached part4",
+            encoding="utf-8",
+        )
+        (tmp_path / "part4_candidate_selection.json").write_text(
+            json.dumps(
+                {
+                    "selected_lr_pairs": [
+                        {"interaction": "ICAM1^PECAM1"},
+                        {"interaction": "ICAM1^MUC1"},
+                        {"interaction": "GPC3^CD81"},
+                    ]
+                }
+            ),
+            encoding="utf-8",
+        )
+        fig10 = tmp_path / "10.spatial_plot_interections_V19S23-092-B1.png"
+        fig11 = tmp_path / "11.lr_interections_V19S23-092-B1.png"
+        fig10.write_text("cached fig10", encoding="utf-8")
+        fig11.write_text("cached fig11", encoding="utf-8")
+
+        state = {
+            "data_directory": str(tmp_path),
+            "disease": "IPF",
+            "interest_celltypes": ["AT2"],
+            "interest_clusters": ["9"],
+            "sel_factor": "Factor1",
+        }
+
+        with (
+            patch(
+                "src.agents.deep_interpreter.tools.lr_prioritizer.prioritize_top_lr_pairs"
+            ) as prioritizer,
+            patch(
+                "src.agents.drug_target.integration.run_drug_target_assessment"
+            ) as assessment,
+        ):
+            assessment.ainvoke = AsyncMock()
+            result = await self.agent.run_drug_target_node(state, DUMMY_CONFIG)
+
+        prioritizer.invoke.assert_not_called()
+        assessment.ainvoke.assert_not_called()
+        assert not fig10.exists()
+        assert not fig11.exists()
+        assert result["drug_target_complete"] is True
+        assert result["drug_target_error"] is None
+        assert result["featured_lr_pairs"] == [
+            "ICAM1^PECAM1",
+            "ICAM1^MUC1",
+            "GPC3^CD81",
+        ]
+        text = result["messages"][0].content[0]["text"]
+        assert "SKIPPED" in text
+        assert "Deleted cached Step 10/11 figures: 2" in text
+
+    @pytest.mark.asyncio
+    async def test_prioritizer_error_does_not_run_assessment_with_stale_candidates(
+        self,
+        tmp_path,
+    ):
+        (tmp_path / "lr_candidates.json").write_text("stale", encoding="utf-8")
+
+        state = {
+            "data_directory": str(tmp_path),
+            "disease": "IPF",
+            "interest_celltypes": ["AT2"],
+            "interest_clusters": ["9"],
+            "sel_factor": "Factor1",
+        }
+
+        with (
+            patch(
+                "src.agents.deep_interpreter.tools.lr_prioritizer.prioritize_top_lr_pairs"
+            ) as prioritizer,
+            patch(
+                "src.agents.drug_target.integration.run_drug_target_assessment"
+            ) as assessment,
+        ):
+            prioritizer.invoke.return_value = json.dumps({"error": "missing combinedscore"})
+            assessment.ainvoke = AsyncMock()
+
+            result = await self.agent.run_drug_target_node(state, DUMMY_CONFIG)
+
+        assessment.ainvoke.assert_not_called()
+        assert not (tmp_path / "lr_candidates.json").exists()
+        assert result["drug_target_complete"] is True
+        assert "prioritize_top_lr_pairs" in result["drug_target_error"]
+        routed_state = {"current_analysis_step": 10, **result}
+        assert self.agent.route_after_step_9_11(
+            routed_state,
+            DUMMY_CONFIG,
+        ) == self.agent.get_node_name("RUN_SINGLE_STEP_9_11")
+
+    @pytest.mark.asyncio
+    async def test_prioritizer_error_still_deletes_step10_11_figures(
+        self,
+        tmp_path,
+    ):
+        (tmp_path / "lr_candidates.json").write_text("stale", encoding="utf-8")
+        fig10 = tmp_path / "10.spatial_plot_interections.png"
+        fig11 = tmp_path / "11.lr_interections.png"
+        fig10.write_text("cached fig10", encoding="utf-8")
+        fig11.write_text("cached fig11", encoding="utf-8")
+
+        state = {
+            "data_directory": str(tmp_path),
+            "disease": "IPF",
+            "interest_celltypes": ["AT2"],
+            "interest_clusters": ["9"],
+            "sel_factor": "Factor1",
+        }
+
+        with (
+            patch(
+                "src.agents.deep_interpreter.tools.lr_prioritizer.prioritize_top_lr_pairs"
+            ) as prioritizer,
+            patch(
+                "src.agents.drug_target.integration.run_drug_target_assessment"
+            ) as assessment,
+        ):
+            prioritizer.invoke.return_value = json.dumps({"error": "missing combinedscore"})
+            assessment.ainvoke = AsyncMock()
+            result = await self.agent.run_drug_target_node(state, DUMMY_CONFIG)
+
+        assessment.ainvoke.assert_not_called()
+        assert not fig10.exists()
+        assert not fig11.exists()
+        assert result["drug_target_complete"] is True
+        assert "prioritize_top_lr_pairs" in result["drug_target_error"]
+        assert "Deleted cached Step 10/11 figures: 2" in result["messages"][0].content[0]["text"]
+
+    @pytest.mark.asyncio
+    async def test_stale_lr_candidates_unlink_runs_off_event_loop_thread(
+        self,
+        tmp_path,
+        monkeypatch,
+    ):
+        stale_path = tmp_path / "lr_candidates.json"
+        stale_path.write_text("stale", encoding="utf-8")
+
+        original_unlink = Path.unlink
+        unlink_threads = []
+
+        def tracking_unlink(path_self, *args, **kwargs):
+            if path_self == stale_path:
+                unlink_threads.append(threading.current_thread().name)
+            return original_unlink(path_self, *args, **kwargs)
+
+        monkeypatch.setattr(Path, "unlink", tracking_unlink)
+
+        def prioritize(_args):
+            assert not stale_path.exists()
+            stale_path.write_text("[]", encoding="utf-8")
+            return json.dumps({"pairs": [{"interaction": "ICAM1^PECAM1"}]})
+
+        state = {
+            "data_directory": str(tmp_path),
+            "disease": "IPF",
+            "interest_celltypes": ["AT2"],
+            "interest_clusters": ["9"],
+            "sel_factor": "Factor1",
+        }
+
+        with (
+            patch(
+                "src.agents.deep_interpreter.tools.lr_prioritizer.prioritize_top_lr_pairs"
+            ) as prioritizer,
+            patch(
+                "src.agents.drug_target.integration.run_drug_target_assessment"
+            ) as assessment,
+        ):
+            prioritizer.invoke.side_effect = prioritize
+            assessment.ainvoke = AsyncMock(
+                return_value=json.dumps(
+                    {
+                        "success": True,
+                        "target_assessment": {"druggability_matrix": []},
+                    }
+                )
+            )
+
+            result = await self.agent.run_drug_target_node(state, DUMMY_CONFIG)
+
+        assert unlink_threads
+        assert threading.main_thread().name not in unlink_threads
+        assert result["drug_target_complete"] is True
+        assessment.ainvoke.assert_called_once()
+
+
+class TestResearchSummaryMoransColumn:
+    """The wrapper should summarize the actual sig_liana.csv column name."""
+
+    def setup_method(self):
+        self.agent = _make_agent()
+
+    def test_morans_column_is_available_to_summary_candidates(self):
+        candidates = DeepInterpreterWrapperAgent.LIANA_MORANS_SUMMARY_COLUMNS
+
+        assert candidates[0] == "morans"
+        assert "morans_r" in candidates
+        assert "Morans_R" in candidates

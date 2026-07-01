@@ -41,6 +41,12 @@ def _normalize_virtual_path(file_path: str) -> str:
         return "/"
     if file_path.startswith("/workspace/"):
         return file_path[len("/workspace") :]
+    data_dir = str(Path(os.getenv("DEEP_INTERPRETER_DATA_DIR", _DEFAULT_DATA_DIR)).expanduser().resolve())
+    try:
+        rel = Path(file_path).expanduser().resolve().relative_to(data_dir)
+        return f"/{rel}" if str(rel) != "." else "/"
+    except (OSError, ValueError):
+        pass
     return file_path
 
 

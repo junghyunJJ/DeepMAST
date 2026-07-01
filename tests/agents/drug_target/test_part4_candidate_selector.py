@@ -100,6 +100,60 @@ def _minimal_report_data() -> dict:
     }
 
 
+def _write_lr_selection_inputs(base: Path) -> None:
+    evidence_dir = base / "evidence"
+    evidence_dir.mkdir()
+    (evidence_dir / "stage1_filter_results.csv").write_text(
+        "\n".join(
+            [
+                "ligand,receptor,passed,string_combined,census_coexpr_pvalue",
+                "APP,CD74,True,0.985,0.002145610137915366",
+                "ICAM1,EZR,True,0.998,0.0",
+                "ICAM1,MUC1,True,0.993,0.0",
+                "ICAM1,PECAM1,True,0.873,3.450783285785519e-07",
+                "MIF,CD74,True,0.999,0.0",
+                "MMP2,PECAM1,False,0.75,0.0",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (base / "lr_pairs_search.json").write_text(
+        json.dumps(
+            {
+                "pairs": [
+                    {"ligand": "APP", "receptor": "CD74", "score": 0.5413},
+                    {"ligand": "ICAM1", "receptor": "MUC1", "score": 0.7242},
+                    {"ligand": "MIF", "receptor": "CD74", "score": 0.5868},
+                    {"ligand": "ICAM1", "receptor": "PECAM1", "score": 0.8082},
+                    {"ligand": "MMP2", "receptor": "PECAM1", "score": 0.99},
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
+def test_selected_lr_pairs_use_stage1_passed_and_lr_search_score(tmp_path: Path) -> None:
+    from src.agents.drug_target.part4_candidate_selector import (
+        _selected_lr_pairs_from_outputs,
+    )
+
+    _write_lr_selection_inputs(tmp_path)
+
+    selected = _selected_lr_pairs_from_outputs(
+        tmp_path,
+        ["ICAM1", "MUC1", "CD74"],
+    )
+
+    assert [pair["interaction"] for pair in selected] == [
+        "ICAM1^PECAM1",
+        "ICAM1^MUC1",
+        "MIF^CD74",
+    ]
+    assert selected[0]["combinedscore"] == 0.8082
+    assert all(pair["stage1_passed"] is True for pair in selected)
+
+
 def test_part4_candidate_selector_enabled_by_default(monkeypatch) -> None:
     from src.agents.drug_target.part4_candidate_selector import (
         ENABLE_PART4_CANDIDATE_SELECTOR_ENV,
@@ -698,6 +752,47 @@ async def test_generate_candidate_selection_accepts_fake_provider(
         {"attempt": 1, "status": "accepted", "issues": []}
     ]
     assert payload["evidence_references"] == ["drug.md", "report_data.json"]
+
+
+@pytest.mark.asyncio
+async def test_generate_candidate_selection_includes_selected_lr_pairs(
+    tmp_path: Path,
+) -> None:
+    from src.agents.drug_target.part4_candidate_selector import (
+        PART4_CANDIDATE_SELECTION_SCHEMA_VERSION,
+        generate_part4_candidate_selection,
+    )
+
+    _write_lr_selection_inputs(tmp_path)
+
+    def provider(_prompt: str) -> str:
+        return json.dumps(
+            {
+                "schema_version": PART4_CANDIDATE_SELECTION_SCHEMA_VERSION,
+                "mode": "llm_rerank",
+                "selected_genes": ["ICAM1", "MUC1", "CD74"],
+                "selection_rationales": {
+                    "ICAM1": "ICAM1 is supported by selected interaction evidence.",
+                    "MUC1": "MUC1 is supported by selected interaction evidence.",
+                    "CD74": "CD74 is supported by selected interaction evidence.",
+                },
+                "excluded_high_score_candidates": {},
+                "evidence_references": ["drug.md"],
+            }
+        )
+
+    payload = await generate_part4_candidate_selection(
+        _minimal_report_data(),
+        deterministic_selected_genes=["ICAM1", "MUC1", "CD74"],
+        provider=provider,
+        data_dir=tmp_path,
+    )
+
+    assert [pair["interaction"] for pair in payload["selected_lr_pairs"]] == [
+        "ICAM1^PECAM1",
+        "ICAM1^MUC1",
+        "MIF^CD74",
+    ]
 
 
 @pytest.mark.parametrize(

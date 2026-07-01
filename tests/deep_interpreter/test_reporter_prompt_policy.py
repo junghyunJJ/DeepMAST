@@ -90,3 +90,73 @@ def test_reporter_think_tool_is_prompt_mandatory_not_runtime_enforced():
         REPORTER_PROMPT,
         flags=re.IGNORECASE,
     ), "REPORTER think_tool usage must remain prompt-level, not runtime-enforced."
+
+
+def _extract_phase47_block() -> str:
+    match = re.search(
+        r"### Phase 4\.7:.*?(?=### Phase 5\.0:)",
+        REPORTER_PROMPT,
+        flags=re.DOTALL,
+    )
+    assert match, "Could not locate Phase 4.7 block in REPORTER prompt"
+    return match.group(0)
+
+
+def test_reporter_phase47_reads_part4_synthesis_before_drug_md():
+    block = _extract_phase47_block()
+
+    assert "part4_therapeutic_synthesis.md" in block
+    assert "drug.md" in block
+    assert block.index("part4_therapeutic_synthesis.md") < block.index("drug.md")
+
+
+def test_reporter_phase47_reads_part4_sources_from_virtual_root():
+    block = _extract_phase47_block()
+
+    assert 'read_file("/part4_therapeutic_synthesis.md")' in block
+    assert 'read_file("/drug.md")' in block
+    assert 'read_file(f"{data_path.strip()}/part4_therapeutic_synthesis.md")' not in block
+    assert 'read_file(f"{data_path.strip()}/drug.md")' not in block
+
+
+def test_reporter_phase47_treats_part4_as_canonical_and_drug_md_as_supporting():
+    block = _extract_phase47_block().lower()
+
+    assert "canonical" in block
+    assert "supporting" in block
+    assert "prefer part4_therapeutic_synthesis.md" in block
+    assert "do not duplicate" in block
+
+
+def test_reporter_template_mode_uses_part4_synthesis_source():
+    prompt = REPORTER_PROMPT
+
+    assert '"template_mode": "comprehensive"' in prompt
+    assert "part4_therapeutic_synthesis.md" in prompt
+    assert "Therapeutic Implications tab" in prompt
+
+
+def test_reporter_phase5_uses_comprehensive_template_mode():
+    assert '"template_mode": "comprehensive"' in REPORTER_PROMPT
+    assert '"part1_html":' not in REPORTER_PROMPT
+    assert '"part2_html":' not in REPORTER_PROMPT
+    assert '"part3_html":' not in REPORTER_PROMPT
+    assert '"summary_html":' not in REPORTER_PROMPT
+    assert '"therapeutic_html":' not in REPORTER_PROMPT
+
+
+def test_reporter_phase5_keeps_therapeutic_source_tracking():
+    assert "part4_therapeutic_synthesis.md" in REPORTER_PROMPT
+    assert "canonical_source" in REPORTER_PROMPT
+    assert "supporting_source" in REPORTER_PROMPT
+
+
+def test_reporter_rag_validation_passes_explicit_data_dir():
+    prompt = REPORTER_PROMPT
+
+    assert "prepare_rag_literature(" in prompt
+    assert re.search(
+        r"validate_claim_fulltext\s*\([^)]*data_dir=data_path\.strip\(\)",
+        prompt,
+        flags=re.DOTALL,
+    ), "REPORTER validate_claim_fulltext calls must pass explicit data_dir"

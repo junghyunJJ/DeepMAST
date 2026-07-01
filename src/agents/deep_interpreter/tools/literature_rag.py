@@ -7,13 +7,21 @@ Falls back to Abstract-based approach if Docker/RAG unavailable.
 """
 
 import asyncio
+import hashlib
 import json
 import logging
 import os
 import re
+import shutil
+import subprocess
+import tempfile
+from html import unescape
+from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
+import requests
 from langchain_core.tools import tool
 
 from src.agents.deep_interpreter.tools.mcp_clients import (
@@ -97,6 +105,29 @@ def _resolve_papers_path(path: str, data_dir: str = "") -> str:
     return str(resolved)
 
 
+def _slugify_collection_component(value: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "_", str(value).lower()).strip("_")
+    return slug or "default"
+
+
+def _resolve_collection_data_dir(data_dir: str = "") -> str:
+    source = data_dir or os.getenv("DEEP_INTERPRETER_DATA_DIR", "")
+    if not source:
+        return ""
+    return str(Path(source).expanduser().resolve(strict=False))
+
+
+def _rag_collection_key(part_name: str, data_dir: str = "") -> str:
+    part = _slugify_collection_component(part_name)
+    resolved = _resolve_collection_data_dir(data_dir)
+    if not resolved:
+        return part
+
+    data_dir_name = _slugify_collection_component(Path(resolved).name)
+    digest = hashlib.sha1(resolved.encode("utf-8")).hexdigest()[:8]
+    return f"{data_dir_name}_{digest}_{part}"
+
+
 def _repair_json(raw: str) -> Any:
     """Conservative JSON repair for common LLM writing errors.
 
@@ -167,6 +198,359 @@ def _glob_files(directory: str, pattern: str) -> list[str]:
     return [str(p) for p in Path(directory).glob(pattern)]
 
 
+PAYWALL_MARKERS = (
+    "preview of subscription content",
+    "log in via an institution",
+    "buy article pdf",
+    "rent this article",
+    "access this article",
+)
+
+
+def _paper_text_quality(text: str) -> tuple[str, str]:
+    low = text[:120_000].lower()
+    size = len(text.encode("utf-8", errors="ignore"))
+    if any(marker in low[:20_000] for marker in PAYWALL_MARKERS):
+        return "not_fulltext", f"{size} bytes; paywall preview"
+    if any(
+        marker in low[:5_000]
+        for marker in ("captcha", "enable javascript", "access denied")
+    ):
+        return "blocked", f"{size} bytes; blocked page"
+
+    signals = sum(
+        marker in low
+        for marker in (
+            "abstract",
+            "introduction",
+            "method",
+            "result",
+            "discussion",
+            "conclusion",
+            "references",
+        )
+    )
+    if size >= 20_000 and signals >= 3:
+        return "likely_fulltext", f"{size} bytes; {signals} section signals"
+    if size >= 8_000 and signals >= 2:
+        return "partial_or_unclear", f"{size} bytes; {signals} section signals"
+    return "not_fulltext", f"{size} bytes; {signals} section signals"
+
+
+class _HTMLTextExtractor(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.parts: list[str] = []
+        self._skip_depth = 0
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag in {"script", "style", "noscript"}:
+            self._skip_depth += 1
+        if tag in {
+            "p",
+            "br",
+            "div",
+            "section",
+            "article",
+            "h1",
+            "h2",
+            "h3",
+            "h4",
+            "title",
+        }:
+            self.parts.append("\n")
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag in {"script", "style", "noscript"} and self._skip_depth:
+            self._skip_depth -= 1
+        if tag in {"p", "div", "section", "article", "h1", "h2", "h3", "h4"}:
+            self.parts.append("\n")
+
+    def handle_data(self, data: str) -> None:
+        if not self._skip_depth and data.strip():
+            self.parts.append(data)
+
+
+def _strip_markup(text: str) -> str:
+    parser = _HTMLTextExtractor()
+    try:
+        parser.feed(text)
+        text = " ".join(parser.parts)
+    except Exception:
+        text = re.sub(r"<[^>]+>", " ", text)
+    text = unescape(text)
+    text = re.sub(r"\r", "\n", text)
+    text = re.sub(r"[ \t]+", " ", text)
+    text = re.sub(r"\n\s*\n+", "\n\n", text)
+    return text.strip()
+
+
+def _extract_pdf_text(content: bytes) -> str:
+    if not shutil.which("pdftotext"):
+        return ""
+    with tempfile.TemporaryDirectory() as td:
+        pdf_path = Path(td) / "paper.pdf"
+        pdf_path.write_bytes(content)
+        completed = subprocess.run(
+            ["pdftotext", "-layout", str(pdf_path), "-"],
+            text=True,
+            capture_output=True,
+            timeout=60,
+            check=False,
+        )
+    return completed.stdout if completed.returncode == 0 else ""
+
+
+def _extract_text_from_response(content: bytes, content_type: str) -> str:
+    if content[:4] == b"%PDF" or "pdf" in content_type.lower():
+        return _extract_pdf_text(content)
+    decoded = content.decode("utf-8", errors="ignore") or content.decode(
+        "latin1", errors="ignore"
+    )
+    if "text/plain" in content_type.lower():
+        return decoded.strip()
+    return _strip_markup(decoded)
+
+
+def _fetch_pubmed_dois(pmids: list[str]) -> dict[str, str]:
+    if not pmids:
+        return {}
+    response = requests.get(
+        "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi",
+        params={"db": "pubmed", "id": ",".join(pmids), "retmode": "xml"},
+        timeout=30,
+        headers={
+            "User-Agent": (
+                f"DeepMAST/0.1 ({_get_pubmed_email() or 'unknown@example.com'})"
+            )
+        },
+    )
+    response.raise_for_status()
+
+    import xml.etree.ElementTree as ET
+
+    root = ET.fromstring(response.text)
+    dois: dict[str, str] = {}
+    for article in root.findall(".//PubmedArticle"):
+        pmid = article.findtext(".//PMID")
+        if not pmid:
+            continue
+        doi = None
+        for article_id in article.findall(".//PubmedData/ArticleIdList/ArticleId"):
+            if article_id.attrib.get("IdType") == "doi" and article_id.text:
+                doi = article_id.text.strip()
+                break
+        if doi is None:
+            for e_location in article.findall(".//ELocationID"):
+                if e_location.attrib.get("EIdType") == "doi" and e_location.text:
+                    doi = e_location.text.strip()
+                    break
+        if doi:
+            dois[pmid] = doi
+    return dois
+
+
+def _download_url_content(url: str) -> tuple[str, bytes] | None:
+    response = requests.get(
+        url,
+        headers={
+            "User-Agent": (
+                f"DeepMAST/0.1 ({_get_pubmed_email() or 'unknown@example.com'})"
+            )
+        },
+        timeout=60,
+        allow_redirects=True,
+    )
+    if response.status_code not in (200, 206):
+        return None
+    return response.headers.get("content-type", ""), response.content or b""
+
+
+def _save_candidate_text(
+    *,
+    pmid: str,
+    doi: str,
+    source: str,
+    source_url: str,
+    output_path: str,
+    text: str,
+    quality: str,
+    detail: str,
+    extra: str = "",
+) -> dict[str, Any]:
+    header = (
+        f"Title: {source} full-text candidate\n\n"
+        f"PMID: {pmid}\n"
+        f"DOI: {doi}\n"
+        f"Source: {source}\n"
+        f"Source URL: {source_url}\n"
+        f"Quality: {quality} ({detail})\n"
+    )
+    if extra:
+        header += extra
+    header += "\nFull Text:\n"
+    Path(output_path).write_text(header + text.strip() + "\n", encoding="utf-8")
+    return {
+        "success": True,
+        "file_path": output_path,
+        "source": source,
+        "quality": quality,
+        "message": f"Downloaded likely full text from {source}",
+    }
+
+
+def _rank_crossref_link(link: dict) -> tuple[int, int]:
+    app = str(link.get("intended-application") or "").lower()
+    content_type = str(link.get("content-type") or "").lower()
+    app_score = {
+        "text-mining": 0,
+        "syndication": 1,
+        "unspecified": 2,
+        "similarity-checking": 3,
+    }.get(app, 2)
+    type_score = {
+        "text/xml": 0,
+        "application/xml": 0,
+        "text/plain": 1,
+        "application/pdf": 2,
+        "text/html": 3,
+        "unspecified": 4,
+    }.get(content_type, 4)
+    return app_score, type_score
+
+
+def _try_crossref_fulltext(pmid: str, doi: str | None, output_path: str) -> dict[str, Any]:
+    if not doi:
+        return {"success": False, "source": "Crossref", "message": "No DOI available"}
+    try:
+        response = requests.get(
+            "https://api.crossref.org/works/" + quote(doi, safe=""),
+            timeout=15,
+            headers={
+                "User-Agent": (
+                    f"DeepMAST/0.1 ({_get_pubmed_email() or 'unknown@example.com'})"
+                )
+            },
+        )
+        if response.status_code != 200:
+            return {
+                "success": False,
+                "source": "Crossref",
+                "message": f"Crossref HTTP {response.status_code}",
+            }
+        links = sorted(
+            [
+                link
+                for link in response.json().get("message", {}).get("link", [])
+                if link.get("URL")
+            ],
+            key=_rank_crossref_link,
+        )
+        for link in links[:5]:
+            downloaded = _download_url_content(link["URL"])
+            if not downloaded:
+                continue
+            content_type, content = downloaded
+            text = _extract_text_from_response(content, content_type)
+            quality, detail = _paper_text_quality(text)
+            if quality == "likely_fulltext":
+                return _save_candidate_text(
+                    pmid=pmid,
+                    doi=doi,
+                    source="Crossref",
+                    source_url=link["URL"],
+                    output_path=output_path,
+                    text=text,
+                    quality=quality,
+                    detail=detail,
+                )
+        return {
+            "success": False,
+            "source": "Crossref",
+            "message": f"No likely full text among {len(links)} links",
+        }
+    except Exception as exc:
+        return {"success": False, "source": "Crossref", "message": str(exc)}
+
+
+def _unpaywall_candidate_urls(payload: dict) -> list[tuple[str, dict]]:
+    locations: list[dict] = []
+    best = payload.get("best_oa_location")
+    if isinstance(best, dict):
+        locations.append(best)
+    locations.extend(
+        [loc for loc in payload.get("oa_locations") or [] if isinstance(loc, dict)]
+    )
+
+    urls: list[tuple[str, dict]] = []
+    seen: set[str] = set()
+    for location in locations:
+        for key in ("url_for_pdf", "url", "url_for_landing_page"):
+            url = location.get(key)
+            if url and url not in seen:
+                seen.add(url)
+                urls.append((url, location))
+    return urls
+
+
+def _try_unpaywall_fulltext(
+    pmid: str, doi: str | None, output_path: str
+) -> dict[str, Any]:
+    if not doi:
+        return {"success": False, "source": "Unpaywall", "message": "No DOI available"}
+    email = _get_unpaywall_email()
+    if not email:
+        return {
+            "success": False,
+            "source": "Unpaywall",
+            "message": "UNPAYWALL_EMAIL or PUBMED_EMAIL is required",
+        }
+    try:
+        response = requests.get(
+            "https://api.unpaywall.org/v2/" + quote(doi, safe=""),
+            params={"email": email},
+            timeout=20,
+            headers={"User-Agent": f"DeepMAST/0.1 (mailto:{email})"},
+        )
+        if response.status_code != 200:
+            return {
+                "success": False,
+                "source": "Unpaywall",
+                "message": f"Unpaywall HTTP {response.status_code}",
+            }
+        payload = response.json()
+        candidates = _unpaywall_candidate_urls(payload)
+        for url, location in candidates[:5]:
+            downloaded = _download_url_content(url)
+            if not downloaded:
+                continue
+            content_type, content = downloaded
+            text = _extract_text_from_response(content, content_type)
+            quality, detail = _paper_text_quality(text)
+            if quality == "likely_fulltext":
+                return _save_candidate_text(
+                    pmid=pmid,
+                    doi=doi,
+                    source="Unpaywall",
+                    source_url=url,
+                    output_path=output_path,
+                    text=text,
+                    quality=quality,
+                    detail=detail,
+                    extra=(
+                        f"OA Status: {payload.get('oa_status')}\n"
+                        f"Host Type: {location.get('host_type')}\n"
+                    ),
+                )
+        return {
+            "success": False,
+            "source": "Unpaywall",
+            "message": f"No likely full text among {len(candidates)} OA URLs",
+        }
+    except Exception as exc:
+        return {"success": False, "source": "Unpaywall", "message": str(exc)}
+
+
 # =============================================================================
 # Configuration (lazy-loaded to support ASGI environments where .env
 # is loaded after module import)
@@ -185,6 +569,9 @@ def _get_ncbi_api_key() -> str | None:
 
 def _get_jina_api_key() -> str | None:
     return os.getenv("JINA_API_KEY")
+
+def _get_unpaywall_email() -> str | None:
+    return os.getenv("UNPAYWALL_EMAIL") or _get_pubmed_email()
 
 def _get_cci_rag_python() -> str | None:
     return os.getenv("CCI_RAG_PYTHON")
@@ -279,6 +666,31 @@ async def _get_cci_rag_tools() -> list:
     return await _get_cached_tools("CCI-RAG", config)
 
 
+async def _rebuild_llm_wiki_for_collection(collection_id: str, tools_map: dict) -> dict:
+    rebuild_tool = tools_map.get("rebuild_llm_wiki")
+    if rebuild_tool is None:
+        return {
+            "sni_mode": False,
+            "sni_rebuild": None,
+            "sni_message": "rebuild_llm_wiki tool not found",
+        }
+
+    try:
+        result = await rebuild_tool.ainvoke({"collection_id": collection_id})
+        return {
+            "sni_mode": True,
+            "sni_rebuild": result,
+            "sni_message": "SNI rebuild completed",
+        }
+    except Exception as e:
+        logger.warning("SNI rebuild failed: %r", e, exc_info=True)
+        return {
+            "sni_mode": False,
+            "sni_rebuild": None,
+            "sni_message": f"SNI rebuild failed: {e}",
+        }
+
+
 async def _get_pubmed_download_tools() -> list:
     """Get cached pubmed-download tools via singleton MCP client.
 
@@ -301,7 +713,10 @@ async def _get_pubmed_download_tools() -> list:
     ncbi_api_key = _get_ncbi_api_key()
     if pubmed_email:
         mcp_env["PUBMED_EMAIL"] = pubmed_email
-    if jina_api_key:
+    # Jina is slow and can save CAPTCHA/login pages that are worse than abstracts.
+    disable_jina = os.getenv("PUBMED_DISABLE_JINA", "1")
+    mcp_env["PUBMED_DISABLE_JINA"] = disable_jina
+    if jina_api_key and disable_jina.lower() not in {"1", "true", "yes"}:
         mcp_env["JINA_API_KEY"] = jina_api_key
     if ncbi_api_key:
         mcp_env["NCBI_API_KEY"] = ncbi_api_key
@@ -465,10 +880,15 @@ async def download_papers_for_rag(
         logger.debug(f"download_papers_for_rag: download_paper tool found")
 
         # Download papers with rate limiting
-        total = min(len(pmids), 30)
-        logger.debug(f"download_papers_for_rag: downloading {total} papers (max 30)")
+        total = len(pmids)
+        logger.debug(f"download_papers_for_rag: downloading {total} papers")
+        try:
+            doi_by_pmid = await asyncio.to_thread(_fetch_pubmed_dois, pmids)
+        except Exception as e:
+            logger.warning("Failed to fetch PubMed DOI batch: %s", e)
+            doi_by_pmid = {}
 
-        for i, pmid in enumerate(pmids[:30]):  # Limit to prevent rate limiting
+        for i, pmid in enumerate(pmids):
             file_path = str(Path(output_dir_abs) / f"pmid_{pmid}.txt")
 
             # Check if already downloaded (async-safe)
@@ -482,27 +902,32 @@ async def download_papers_for_rag(
                 continue
 
             try:
-                result = await download_tool.ainvoke({
+                doi = doi_by_pmid.get(pmid)
+                payload = {
                     "pmid": pmid,
                     "output_path": file_path,
                     "prefer_pmc": True,
-                })
+                }
+                if doi:
+                    payload["doi"] = doi
+                result = await download_tool.ainvoke(payload)
 
                 # Parse result based on format
                 # CRITICAL FIX: Always verify file existence first, don't trust MCP response text
                 file_exists = await asyncio.to_thread(_path_exists, file_path)
 
                 if isinstance(result, dict):
-                    # Override success based on actual file existence
                     result["success"] = file_exists
                     result["file_path"] = file_path if file_exists else None
                     results[pmid] = result
                 elif isinstance(result, list) and len(result) > 0:
-                    # BioMCP format
-                    text = result[0].get("text", "") if isinstance(result[0], dict) else str(result[0])
+                    text = (
+                        result[0].get("text", "")
+                        if isinstance(result[0], dict)
+                        else str(result[0])
+                    )
 
                     if file_exists:
-                        # File actually exists - this is a real success
                         source = "PMC" if "pmc" in text.lower() else "PubMed"
                         results[pmid] = {
                             "success": True,
@@ -510,7 +935,6 @@ async def download_papers_for_rag(
                             "source": source,
                         }
                     else:
-                        # File doesn't exist - report failure regardless of MCP response
                         results[pmid] = {
                             "success": False,
                             "file_path": None,
@@ -526,6 +950,18 @@ async def download_papers_for_rag(
                         "file_path": file_path if file_exists else None,
                         "source": "Unknown",
                     }
+
+                if file_exists:
+                    text = await asyncio.to_thread(Path(file_path).read_text, encoding="utf-8", errors="ignore")
+                    quality, _ = _paper_text_quality(text)
+                    if quality != "likely_fulltext":
+                        for direct_download in (_try_crossref_fulltext, _try_unpaywall_fulltext):
+                            direct_result = await asyncio.to_thread(
+                                direct_download, pmid, doi, file_path
+                            )
+                            if direct_result.get("success"):
+                                results[pmid] = direct_result
+                                break
 
                 status = "OK" if results[pmid].get("success") else "FAIL"
                 source = results[pmid].get("source", "Unknown")
@@ -573,7 +1009,8 @@ async def index_papers_to_vectordb(
 
     Args:
         file_paths: List of paper file paths to index
-        collection_name: Part name (e.g., "part1", "part2", "liana")
+        collection_name: Collection key suffix; this function adds the
+            deep_interpreter_ prefix.
 
     Returns:
         {"success": bool, "collection_id": str, "indexed_count": int}
@@ -598,6 +1035,8 @@ async def index_papers_to_vectordb(
                 tools_map['list'] = tool_obj
             elif 'delete_collection' in name:
                 tools_map['delete'] = tool_obj
+            elif 'rebuild_llm_wiki' in name:
+                tools_map['rebuild_llm_wiki'] = tool_obj
 
         if 'add_docs' not in tools_map:
             logger.debug(f"index_papers_to_vectordb: add_documents_from_files NOT FOUND")
@@ -667,6 +1106,9 @@ async def index_papers_to_vectordb(
                             "indexed_count": 0,
                             "chunk_ids": [],
                             "already_indexed": True,
+                            "sni_mode": False,
+                            "sni_rebuild": None,
+                            "sni_message": "Collection already exists; skipped SNI rebuild",
                             "message": f"Collection already exists: {full_collection_name}",
                         }
 
@@ -730,8 +1172,9 @@ async def index_papers_to_vectordb(
         result = await tools_map['add_docs'].ainvoke({
             "collection_id": collection_id,
             "file_paths": file_paths,
-            "chunk_size": 1000,
+            "chunk_size": 3000,
             "chunk_overlap": 200,
+            "rebuild_wiki": False,
         })
 
         # Parse indexing result
@@ -753,12 +1196,15 @@ async def index_papers_to_vectordb(
         logger.debug(f"index_papers_to_vectordb: SUCCESS - {len(file_paths)} papers, {len(chunk_ids)} chunks")
         logger.info(f"Indexed {len(file_paths)} papers to {full_collection_name}")
 
+        sni_result = await _rebuild_llm_wiki_for_collection(collection_id, tools_map)
+
         return {
             "success": True,
             "collection_id": collection_id,
             "collection_name": full_collection_name,
             "indexed_count": len(file_paths),
             "chunk_ids": chunk_ids,
+            **sni_result,
         }
 
     except Exception as e:
@@ -777,7 +1223,7 @@ async def _lookup_collection_from_db(collection_name: str) -> str | None:
     This happens after server restart when collections still exist in DB.
 
     Args:
-        collection_name: Part name (e.g., "part1", "part2")
+        collection_name: Collection key suffix used for lookup.
 
     Returns:
         Collection ID if found, None otherwise
@@ -939,6 +1385,81 @@ async def _search_single_query(
         return []
 
 
+async def _agentic_search_with_sni(
+    query: str,
+    collection_id: str,
+    limit: int,
+    search_type: str,
+) -> list[dict]:
+    tools = await _get_cci_rag_tools()
+    agentic_tool = next(
+        (
+            tool_obj
+            for tool_obj in tools
+            if hasattr(tool_obj, "name") and "agentic_search" in tool_obj.name
+        ),
+        None,
+    )
+    if agentic_tool is None:
+        return []
+
+    try:
+        raw = await agentic_tool.ainvoke(
+            {
+                "collection_id": collection_id,
+                "question": query,
+                "search_type": search_type,
+                "search_limit": limit,
+                "max_rewrites": 3,
+                "use_wiki_context": True,
+            }
+        )
+    except Exception as e:
+        logger.warning("SNI agentic search failed: %r", e, exc_info=True)
+        return []
+
+    if isinstance(raw, list) and raw and isinstance(raw[0], dict) and "text" in raw[0]:
+        raw = raw[0]["text"]
+
+    if isinstance(raw, str):
+        try:
+            payload = json.loads(raw)
+        except json.JSONDecodeError:
+            return []
+    elif isinstance(raw, dict):
+        payload = raw
+    else:
+        return []
+
+    if payload.get("error"):
+        logger.warning("SNI agentic search returned error: %s", payload.get("error"))
+        return []
+
+    results = []
+    for source in payload.get("sources", []):
+        metadata = dict(source.get("metadata") or {})
+        metadata.update(
+            {
+                "rag_backend": "agentic_search",
+                "wiki_context_status": payload.get("wiki_context_status")
+                or "disabled",
+                "selected_wiki_pages": payload.get("selected_wiki_pages", []),
+                "steps": payload.get("steps", []),
+                "rewrite_count": payload.get("rewrite_count", 0),
+            }
+        )
+        results.append(
+            {
+                "page_content": source.get("content")
+                or source.get("page_content", ""),
+                "metadata": metadata,
+                "score": source.get("score", 0),
+            }
+        )
+
+    return [r for r in results if r.get("page_content")][:limit]
+
+
 async def search_fulltext_rag(
     query: str,
     collection_name: str,
@@ -982,6 +1503,15 @@ async def search_fulltext_rag(
         return []
 
     logger.debug(f"search_fulltext_rag: Using collection_id: {collection_id}")
+
+    agentic_results = await _agentic_search_with_sni(
+        query=query,
+        collection_id=collection_id,
+        limit=limit,
+        search_type=search_type,
+    )
+    if agentic_results:
+        return agentic_results
 
     # Generate multiple search queries using LLM
     queries = await generate_multi_query(query, num_queries=5)
@@ -1125,7 +1655,7 @@ async def validate_claim_with_rag(
     Args:
         claim: The biological claim to validate
         pmid: PMID of the cited paper
-        collection_name: Part name for the collection
+        collection_name: Collection key suffix used for lookup.
 
     Returns:
         {
@@ -1362,9 +1892,14 @@ async def prepare_rag_for_interpretation(
             "message": "No papers downloaded successfully, using Abstract mode",
         }
 
-    # Index to Vector DB
-    logger.debug(f"Indexing {len(successful_paths)} papers to VectorDB...")
-    index_result = await index_papers_to_vectordb(successful_paths, part_name)
+    # Index to Vector DB. Namespace by data_dir so independent runs do not share a corpus.
+    collection_key = _rag_collection_key(part_name, data_dir)
+    logger.debug(
+        "Indexing %s papers to VectorDB collection key %s...",
+        len(successful_paths),
+        collection_key,
+    )
+    index_result = await index_papers_to_vectordb(successful_paths, collection_key)
     logger.debug(f"Index result: success={index_result.get('success')}, collection_id={index_result.get('collection_id')}")
 
     if not index_result.get("success"):
@@ -1385,10 +1920,15 @@ async def prepare_rag_for_interpretation(
     return {
         "rag_mode": True,
         "collection_id": index_result.get("collection_id"),
-        "collection_name": part_name,
+        "collection_name": index_result.get("collection_name", collection_key),
+        "collection_key": collection_key,
+        "collection_part_name": part_name,
         "papers_count": len(pmids),
         "fulltext_count": len(successful_paths),
         "fulltext_ratio": round(fulltext_ratio, 2),
+        "sni_mode": index_result.get("sni_mode", False),
+        "sni_rebuild": index_result.get("sni_rebuild"),
+        "sni_message": index_result.get("sni_message"),
         "message": f"RAG ready: {len(successful_paths)}/{len(pmids)} papers indexed",
     }
 
@@ -1461,6 +2001,7 @@ def search_literature_fulltext(
     query: str,
     part_name: str = "part1",
     limit: int = 5,
+    data_dir: str = "",
 ) -> list[dict]:
     """Search full-text papers using semantic search (RAG mode only).
 
@@ -1468,6 +2009,8 @@ def search_literature_fulltext(
         query: Search query (biological term, mechanism, etc.)
         part_name: Part identifier for collection lookup
         limit: Maximum results to return
+        data_dir: Data directory used to namespace the RAG collection.
+            Falls back to DEEP_INTERPRETER_DATA_DIR, then legacy part_name.
 
     Returns:
         List of relevant text chunks with:
@@ -1497,7 +2040,8 @@ def search_literature_fulltext(
         return []
 
     try:
-        result = run_async(search_fulltext_rag(query, part_name, limit), timeout=30)
+        collection_key = _rag_collection_key(part_name, data_dir)
+        result = run_async(search_fulltext_rag(query, collection_key, limit), timeout=300)
         logger.debug(f"search_literature_fulltext: returning {len(result)} results")
         return result
     except Exception as e:
@@ -1510,6 +2054,7 @@ def validate_claim_fulltext(
     claim: str,
     pmid: str,
     part_name: str = "part1",
+    data_dir: str = "",
 ) -> dict:
     """Validate a biological claim against full-text paper content.
 
@@ -1520,6 +2065,8 @@ def validate_claim_fulltext(
         claim: The biological claim to validate
         pmid: PMID of the cited paper
         part_name: Part identifier for collection lookup
+        data_dir: Data directory used to namespace the RAG collection.
+            Falls back to DEEP_INTERPRETER_DATA_DIR, then legacy part_name.
 
     Returns:
         Validation result with:
@@ -1556,7 +2103,8 @@ def validate_claim_fulltext(
         }
 
     try:
-        result = run_async(validate_claim_with_rag(claim, pmid, part_name), timeout=30)
+        collection_key = _rag_collection_key(part_name, data_dir)
+        result = run_async(validate_claim_with_rag(claim, pmid, collection_key), timeout=300)
         logger.debug(f"validate_claim_fulltext RESULT: valid={result.get('valid')}, "
                       f"confidence={result.get('confidence')}, source={result.get('source')}")
         return result
@@ -1599,4 +2147,3 @@ def is_rag_mode_active() -> bool:
         _RAG_STATE.get("available") is True
         and len(_RAG_STATE.get("collection_ids", {})) > 0
     )
-

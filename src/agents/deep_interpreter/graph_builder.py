@@ -44,8 +44,8 @@ def create_deep_interpreter_graph(
     - TodoListMiddleware for task tracking
     - SubAgentMiddleware for specialized subagents (4 subagents: planner, searcher, interpreter, reporter)
     - Reflection/quality policy (per-subagent):
-        * INTERPRETER: think_tool is the active reflection loop (score_threshold=0.8, max_iterations=3);
-          validate_quality(use_llm=False) is the deterministic objective checkpoint.
+        * INTERPRETER: think_tool and validate_quality(use_llm=False) are advisory only;
+          downstream report validation/repair owns hard report-level guardrails.
         * REPORTER:    think_tool x3 strategic-planning passes + think_tool quality reflection are
           prompt-mandatory (soft); validate_quality is secondary/non-gating.
         * SEARCHER:    reflection-free; guarded by tests/deep_interpreter/test_searcher_reflection_policy.py.
@@ -213,7 +213,7 @@ def create_subagent_graph(
 
     - **interpreter**: Literature-grounded interpretation
       - Reads /papers.json (ONLY citation source)
-      - Validates claims, ensures quality >= 0.7
+      - Validates claims; quality checks are advisory, not numeric retry gates
       - Outputs: /part1_final.md, /part2_final.md, /part3_final.md
 
     - **reporter**: Cross-part synthesis + HTML report

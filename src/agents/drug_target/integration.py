@@ -5,6 +5,7 @@ subagent calls to delegate the entire Step 9.5 drug target assessment
 to the DrugTargetAgent super-graph.
 """
 
+import asyncio
 import json
 import logging
 import os
@@ -43,7 +44,7 @@ async def run_drug_target_assessment(data_dir: str, disease: str) -> str:
 
     # Check prerequisite files
     lr_path = Path(resolved_dir) / "lr_candidates.json"
-    if not lr_path.exists():
+    if not await asyncio.to_thread(lr_path.exists):
         return json.dumps({
             "success": False,
             "drug_md": None,
@@ -93,10 +94,14 @@ async def run_drug_target_assessment(data_dir: str, disease: str) -> str:
                 "evidence_truncated": evidence_truncated,
             }
         else:
-            drug_md = (Path(resolved_dir) / "drug.md").read_text(encoding="utf-8")
-            target_assessment = json.loads(
-                (Path(resolved_dir) / "target_assessment.json").read_text(encoding="utf-8")
+            drug_md_path = Path(resolved_dir) / "drug.md"
+            target_assessment_path = Path(resolved_dir) / "target_assessment.json"
+            drug_md = await asyncio.to_thread(drug_md_path.read_text, encoding="utf-8")
+            target_assessment_raw = await asyncio.to_thread(
+                target_assessment_path.read_text,
+                encoding="utf-8",
             )
+            target_assessment = json.loads(target_assessment_raw)
             envelope = {
                 "success": True,
                 "drug_md": drug_md,

@@ -169,7 +169,7 @@ class WriteFileArgGuardMiddleware(AgentMiddleware):
         patched_call = cast(ToolCall, {**tool_call, "args": patched_args})
         return request.override(tool_call=patched_call)
 
-    def _blocked(self, args: dict, reason: str) -> ToolMessage:
+    def _blocked(self, args: dict, reason: str, tool_call_id: str = "") -> ToolMessage:
         """Return a BLOCKED ToolMessage with JSON content {ok: false, error: reason}."""
         raw = args.get("file_path") or args.get("path") or ""
         redacted = _redact_path(str(raw)) if raw else "<empty>"
@@ -181,11 +181,11 @@ class WriteFileArgGuardMiddleware(AgentMiddleware):
                     "path": redacted,
                 }
             ),
-            tool_call_id="",
+            tool_call_id=tool_call_id,
         )
 
     def _normalize_path(
-        self, args: dict, backend_root: str | None
+        self, args: dict, backend_root: str | None, tool_call_id: str = ""
     ) -> dict | ToolMessage:
         """Normalize the file_path in args, returning updated args or a BLOCKED ToolMessage.
 
@@ -199,14 +199,19 @@ class WriteFileArgGuardMiddleware(AgentMiddleware):
         """
         raw = args.get("file_path") or args.get("path") or ""
         if not raw or not isinstance(raw, str):
-            return self._blocked(args, "empty or non-string path")
+            return self._blocked(args, "empty or non-string path", tool_call_id)
 
         # NFC-normalize to handle macOS HFS+ NFC/NFD variation
         raw = unicodedata.normalize("NFC", raw)
         p = Path(raw)
 
         if ".." in p.parts:
-            return self._blocked(args, "path contains '..' traversal")
+            return self._blocked(args, "path contains '..' traversal", tool_call_id)
+
+        # DeepAgents virtual paths like /interpretation_guide.md resolve under
+        # backend_root; host absolute paths still go through containment below.
+        if p.is_absolute() and len(p.parts) == 2:
+            return {**args, "file_path": p.name}
 
         if backend_root is None:
             return {**args, "file_path": str(p)}
@@ -222,6 +227,7 @@ class WriteFileArgGuardMiddleware(AgentMiddleware):
                 return self._blocked(
                     args,
                     f"absolute path outside backend root: {_redact_path(str(p))}",
+                    tool_call_id,
                 )
 
         return {**args, "file_path": str(p)}
@@ -237,7 +243,11 @@ class WriteFileArgGuardMiddleware(AgentMiddleware):
         if patched.tool_call.get("name") == "write_file":
             args = patched.tool_call.get("args") or {}
             if isinstance(args, dict):
-                normalized = self._normalize_path(args, self._backend_root)
+                normalized = self._normalize_path(
+                    args,
+                    self._backend_root,
+                    patched.tool_call.get("id", ""),
+                )
                 if isinstance(normalized, ToolMessage):
                     return normalized
                 new_call = cast(ToolCall, {**patched.tool_call, "args": normalized})
@@ -255,7 +265,11 @@ class WriteFileArgGuardMiddleware(AgentMiddleware):
         if patched.tool_call.get("name") == "write_file":
             args = patched.tool_call.get("args") or {}
             if isinstance(args, dict):
-                normalized = self._normalize_path(args, self._backend_root)
+                normalized = self._normalize_path(
+                    args,
+                    self._backend_root,
+                    patched.tool_call.get("id", ""),
+                )
                 if isinstance(normalized, ToolMessage):
                     return normalized
                 new_call = cast(ToolCall, {**patched.tool_call, "args": normalized})

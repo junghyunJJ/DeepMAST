@@ -8,11 +8,16 @@ with fallback to embedded content if files are not found.
 """
 
 import base64
+import csv
+import json
 import os
+import re
 from datetime import datetime
+from html import escape
 from pathlib import Path
 from typing import Optional
 
+from jinja2 import Environment, FileSystemLoader
 from langchain_core.tools import tool
 
 
@@ -23,6 +28,7 @@ _SKILLS_ASSETS_DIR = (
     / "html-report-generator"
     / "assets"
 )
+_TEMPLATE_DIR = Path(__file__).resolve().parent.parent / "templates"
 
 
 def _load_css() -> str:
@@ -704,6 +710,352 @@ def _generate_part_content(part_data: dict) -> str:
     return "\n".join(sections) if sections else "<p>No content available</p>"
 
 
+_COMPREHENSIVE_PARTS = [
+    {
+        "id": "part1",
+        "title": "Part 1: Spatial Organization and Pathway Analysis",
+        "intro": (
+            "This section presents spatial transcriptomics patterns, cell type composition, "
+            "neighborhood enrichment, pathway activity, and spatial relationship evidence."
+        ),
+        "summary_file": "part1_final.md",
+        "sections": [
+            (
+                "1",
+                "Spatial Clustering Analysis",
+                "1.cluster_spatial.png",
+                "Spatial distribution of tissue clusters across the breast cancer sample.",
+                None,
+            ),
+            (
+                "2",
+                "Cell Type Composition Analysis",
+                "2.celltype_heatmap_analysis.png",
+                "Cell type composition across target clusters.",
+                "sig_clusterwithcelltyp.csv",
+            ),
+            (
+                "3",
+                "Neighborhood Enrichment Analysis",
+                "3.neighborhood_enrichment_squidpy.png",
+                "Spatial neighborhood enrichment between clusters.",
+                "res_nhood_enrichment.csv",
+            ),
+            (
+                "4",
+                "Spatial Pathway Enrichment Analysis",
+                "4.spatial_enrich_decoupler.png",
+                "PROGENy pathway enrichment across spatial clusters.",
+                "sig_PathwayEnrich_decoupler.csv",
+            ),
+            (
+                "5",
+                "Spatial Relationship Analysis",
+                "5.spatial_relation_MISTy.png",
+                "MISTy spatial relationship analysis across local tissue contexts.",
+                None,
+            ),
+        ],
+    },
+    {
+        "id": "part2",
+        "title": "Part 2: Cell-Cell Interaction and Intercellular Pattern Analysis",
+        "intro": (
+            "This section presents LIANA ligand-receptor screening, NMF communication "
+            "patterns, pathway-factor associations, and quadrant prioritization."
+        ),
+        "summary_file": "part2_final.md",
+        "sections": [
+            (
+                "6",
+                "Ligand-Receptor Interaction Screening",
+                "6.liana_MoransR.png",
+                "Spatially variable ligand-receptor interactions ranked by Moran's R.",
+                "sel_interest_sig_liana.csv",
+            ),
+            (
+                "7",
+                "Intercellular Communication Patterns",
+                "7.factor_spatial_NMF.png",
+                "Spatial distribution of NMF communication factors.",
+                "res_liana_cluster_factor.csv",
+            ),
+            (
+                "8",
+                "Pathway Enrichment of Intercellular Patterns",
+                "8.pathway_factor_heatmap.png",
+                "Pathway enrichment associated with NMF communication factors.",
+                "sig_liana_pathway_factor.csv",
+            ),
+            (
+                "9",
+                "Cell Type-Specific Spatially Variable Interactions",
+                "9.quadrant_analysis.png",
+                "Quadrant analysis prioritizing factor-loaded and spatially variable interactions.",
+                None,
+            ),
+        ],
+    },
+    {
+        "id": "part3",
+        "title": "Part 3: Critical Ligand-Receptor Interactions in Invasive Tumor Regions",
+        "intro": (
+            "This section presents spatial and quantitative evidence for prioritized "
+            "ligand-receptor interactions selected for invasive tumor interpretation."
+        ),
+        "summary_file": "part3_final.md",
+        "sections": [
+            (
+                "10",
+                "Spatial Visualization of Key Ligand-Receptor Pairs",
+                "10.spatial_plot_interections.png",
+                "Spatial ligand and receptor expression patterns for selected pairs.",
+                None,
+            ),
+            (
+                "11",
+                "Quantitative Analysis of Ligand-Receptor Interactions",
+                "11.lr_interections.png",
+                "Quantitative ligand-receptor interaction scores and selected gene evidence.",
+                "lr_candidates.json",
+            ),
+        ],
+    },
+]
+
+
+def _read_text_file(data_dir: str, name: str) -> str:
+    path = Path(data_dir) / name
+    if not path.exists():
+        return ""
+    return path.read_text(encoding="utf-8", errors="replace")
+
+
+def _inline_markdown_html(text: str) -> str:
+    html = _format_citations_html(escape(text))
+    return re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", html)
+
+
+def _split_markdown_table_row(line: str) -> list[str]:
+    if not line.startswith("|") or "|" not in line[1:]:
+        return []
+    return [cell.strip() for cell in line.strip().strip("|").split("|")]
+
+
+def _is_markdown_table_separator(line: str) -> bool:
+    cells = _split_markdown_table_row(line)
+    return bool(cells) and all(cell and set(cell) <= {"-", ":"} for cell in cells)
+
+
+def _markdown_table_to_html(headers: list[str], rows: list[list[str]]) -> str:
+    header_html = "".join(f"<th>{_inline_markdown_html(cell)}</th>" for cell in headers)
+    body_rows = []
+    for row in rows:
+        cells = (row + [""] * len(headers))[: len(headers)]
+        body_rows.append(
+            "<tr>"
+            + "".join(f"<td>{_inline_markdown_html(cell)}</td>" for cell in cells)
+            + "</tr>"
+        )
+    return (
+        '<div class="table-container"><table><thead><tr>'
+        + header_html
+        + "</tr></thead><tbody>"
+        + "".join(body_rows)
+        + "</tbody></table></div>"
+    )
+
+
+def _extract_markdown_section(text: str, heading: str) -> str:
+    match = re.search(rf"^(#+)\s+{re.escape(heading)}\s*$", text or "", re.M)
+    if not match:
+        return ""
+    level = len(match.group(1))
+    start = match.end()
+    next_heading = re.search(rf"^#{{1,{level}}}\s+", text[start:], re.M)
+    end = start + next_heading.start() if next_heading else len(text)
+    return text[start:end].strip()
+
+
+def _markdown_to_basic_html(text: str, *, max_chars: int = 5000) -> str:
+    text = (text or "").strip()
+    if not text:
+        return "<p>No interpretation text available.</p>"
+    text = text[:max_chars]
+    html_parts: list[str] = []
+    open_list = False
+    lines = text.splitlines()
+    i = 0
+
+    def close_list() -> None:
+        nonlocal open_list
+        if open_list:
+            html_parts.append("</ul>")
+            open_list = False
+
+    while i < len(lines):
+        raw_line = lines[i]
+        line = raw_line.strip()
+        if not line:
+            close_list()
+            i += 1
+            continue
+
+        table_headers = _split_markdown_table_row(line)
+        if (
+            table_headers
+            and i + 1 < len(lines)
+            and _is_markdown_table_separator(lines[i + 1].strip())
+        ):
+            close_list()
+            table_rows: list[list[str]] = []
+            i += 2
+            while i < len(lines):
+                row = _split_markdown_table_row(lines[i].strip())
+                if not row:
+                    break
+                table_rows.append(row)
+                i += 1
+            html_parts.append(_markdown_table_to_html(table_headers, table_rows))
+            continue
+
+        if line.startswith("### "):
+            close_list()
+            html_parts.append(f"<h4>{_inline_markdown_html(line[4:])}</h4>")
+        elif line.startswith("## "):
+            close_list()
+            html_parts.append(f"<h3>{_inline_markdown_html(line[3:])}</h3>")
+        elif line.startswith("# "):
+            close_list()
+            html_parts.append(f"<h3>{_inline_markdown_html(line[2:])}</h3>")
+        elif line.startswith(("- ", "* ")):
+            if not open_list:
+                html_parts.append("<ul>")
+                open_list = True
+            html_parts.append(f"<li>{_inline_markdown_html(line[2:])}</li>")
+        else:
+            close_list()
+            html_parts.append(f"<p>{_inline_markdown_html(line)}</p>")
+        i += 1
+    close_list()
+    return "\n".join(html_parts)
+
+
+def _read_csv_rows(data_dir: str, name: str, *, limit: int = 8) -> list[dict]:
+    path = Path(data_dir) / name
+    if not path.exists():
+        return []
+    with path.open(newline="", encoding="utf-8", errors="replace") as handle:
+        return list(csv.DictReader(handle))[:limit]
+
+
+def _read_json_table_rows(data_dir: str, name: str, *, limit: int = 8) -> list[dict]:
+    path = Path(data_dir) / name
+    if not path.exists():
+        return []
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return []
+    if isinstance(data, list):
+        return [row for row in data if isinstance(row, dict)][:limit]
+    if isinstance(data, dict):
+        for key in ("selected_genes", "top_pairs", "lr_candidates", "pairs", "results"):
+            rows = data.get(key)
+            if isinstance(rows, list):
+                return [row for row in rows if isinstance(row, dict)][:limit]
+    return []
+
+
+def _table_for_file(data_dir: str, name: str | None) -> str:
+    if not name:
+        return ""
+    rows = (
+        _read_json_table_rows(data_dir, name)
+        if name.endswith(".json")
+        else _read_csv_rows(data_dir, name)
+    )
+    return _generate_key_findings_table_html(rows)
+
+
+def _build_template_report_context(parts: dict, data_dir: str, output_path: str) -> dict:
+    title = parts.get("title", "CCI Analysis Report")
+    subtitle = parts.get("subtitle", "Comprehensive Cell-Cell Interaction Analysis")
+    quality_score = float(parts.get("quality_score", 0.0) or 0.0)
+    analysis_config = parts.get("analysis_config", {})
+    if not isinstance(analysis_config, dict):
+        analysis_config = {"Analysis Configuration": str(analysis_config)}
+
+    rendered_parts = []
+    for part in _COMPREHENSIVE_PARTS:
+        part_text = _read_text_file(data_dir, part["summary_file"])
+        sections = []
+        for number, section_title, figure_name, caption, table_name in part["sections"]:
+            figure_path = str(Path(data_dir) / figure_name)
+            sections.append(
+                {
+                    "number": number,
+                    "title": section_title,
+                    "figure_html": _generate_figure_html(figure_path, caption),
+                    "table_html": _table_for_file(data_dir, table_name),
+                    "interpretation_html": _markdown_to_basic_html(
+                        part_text, max_chars=2200
+                    ),
+                }
+            )
+        rendered_parts.append(
+            {
+                "id": part["id"],
+                "title": part["title"],
+                "intro": part["intro"],
+                "sections": sections,
+                "summary_html": _generate_part_summary_html(
+                    {
+                        "title": f"{part['title']} Summary",
+                        "findings": [part_text[:500] or "No part summary available."],
+                    }
+                ),
+            }
+        )
+
+    synthesis_text = _read_text_file(data_dir, "synthesis.md") or str(
+        parts.get("synthesis", "")
+    )
+    executive_summary_text = (
+        _extract_markdown_section(synthesis_text, "Executive Summary") or synthesis_text
+    )
+    part4_text = _read_text_file(data_dir, "part4_therapeutic_synthesis.md")
+
+    rows = "".join(
+        f"<tr><td><strong>{escape(str(k))}</strong></td><td>{escape(str(v))}</td></tr>"
+        for k, v in analysis_config.items()
+    )
+    analysis_config_html = f'<table class="analysis-config-table">{rows}</table>'
+
+    return {
+        "title": title,
+        "subtitle": subtitle,
+        "css": _load_css(),
+        "js": _load_js(),
+        "executive_summary_html": _markdown_to_basic_html(
+            executive_summary_text, max_chars=1600
+        ),
+        "analysis_config_html": analysis_config_html,
+        "parts": rendered_parts,
+        "summary_html": _markdown_to_basic_html(synthesis_text, max_chars=8000),
+        "therapeutic_html": _markdown_to_basic_html(part4_text, max_chars=8000),
+        "quality_score": quality_score,
+        "generation_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "output_path": output_path,
+    }
+
+
+def _render_comprehensive_template(parts: dict, output_path: str, data_dir: str) -> str:
+    env = Environment(loader=FileSystemLoader(str(_TEMPLATE_DIR)), autoescape=False)
+    template = env.get_template("cci_report.html.j2")
+    return template.render(**_build_template_report_context(parts, data_dir, output_path))
+
+
 def _generate_html_report_impl(
     parts: dict,
     output_path: str,
@@ -736,6 +1088,16 @@ def _generate_html_report_impl(
     Returns:
         String with report generation status and output path
     """
+    if parts.get("template_mode") == "comprehensive":
+        try:
+            html = _render_comprehensive_template(parts, output_path, data_dir)
+            output_dir = Path(output_path).parent
+            output_dir.mkdir(parents=True, exist_ok=True)
+            Path(output_path).write_text(html, encoding="utf-8")
+            return f"Report generated successfully: {output_path} ({len(html)} bytes)"
+        except Exception as e:
+            return f"Error generating report: {e}"
+
     # Extract parts with type validation
     title = parts.get("title", "CCI Analysis Report")
     subtitle = parts.get("subtitle", "Comprehensive Cell-Cell Interaction Analysis")

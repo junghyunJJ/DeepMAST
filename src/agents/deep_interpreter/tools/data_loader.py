@@ -438,6 +438,23 @@ def load_analysis_data(data_dir: str, config: dict = None) -> dict:
             target_assessment_status = "parse_error"
             logger.warning(f"Failed to parse target_assessment.json: {e}")
 
+    # Load part4_candidate_selection.json if it exists (source of selected genes for Part 3)
+    part4_candidate_selection = None
+    part4_candidate_selection_status = "missing"
+    part4_candidate_selection_path = data_path / "part4_candidate_selection.json"
+    if part4_candidate_selection_path.exists():
+        try:
+            with open(part4_candidate_selection_path) as f:
+                part4_candidate_selection = json.load(f)
+            part4_candidate_selection_status = "loaded"
+            logger.info(
+                "Loaded part4_candidate_selection.json with %d selected genes",
+                len(part4_candidate_selection.get("selected_genes", [])),
+            )
+        except Exception as e:
+            part4_candidate_selection_status = "parse_error"
+            logger.warning(f"Failed to parse part4_candidate_selection.json: {e}")
+
     return {
         "data_dir": str(data_path),
         "available_analyses": available_analyses,
@@ -465,6 +482,9 @@ def load_analysis_data(data_dir: str, config: dict = None) -> dict:
         # Target assessment from drug_target pipeline (Step 9.5, if available)
         "target_assessment": target_assessment,
         "target_assessment_status": target_assessment_status,
+        # Selected genes from Part 4 candidate selection (if available)
+        "part4_candidate_selection": part4_candidate_selection,
+        "part4_candidate_selection_status": part4_candidate_selection_status,
         # Informational: /data_path.txt is pre-written by the agent framework.
         "_DATA_PATH_INFO": {
             "data_path_txt": str(data_path),
