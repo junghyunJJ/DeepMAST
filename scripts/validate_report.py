@@ -197,6 +197,14 @@ def _find_known_tokens(text: str, known: dict[str, str]) -> set[str]:
     return found
 
 
+def _known_token_mentions(text: str, known: dict[str, str]) -> list[tuple[int, int, str]]:
+    mentions: list[tuple[int, int, str]] = []
+    for key, label in known.items():
+        for match in re.finditer(rf"(?<![A-Za-z0-9]){re.escape(label)}(?![A-Za-z0-9])", text, re.IGNORECASE):
+            mentions.append((match.start(), match.end(), key))
+    return sorted(mentions)
+
+
 def _find_known_factors(text: str, known: dict[str, str]) -> set[str]:
     found = _find_known_tokens(text, known)
     for match in FACTOR_RE.findall(text):
@@ -337,6 +345,24 @@ def _supported_factor_pathways(data_dir: Path) -> tuple[dict[str, dict[str, floa
     return supported, factor_labels, pathway_labels
 
 
+def _pathway_direction_claims(window: str, pathway_labels: dict[str, str]) -> dict[str, tuple[bool, bool]]:
+    directions: dict[str, tuple[bool, bool]] = {}
+    mentions = _known_token_mentions(window, pathway_labels)
+    for index, (start, end, pathway) in enumerate(mentions):
+        prev_end = mentions[index - 1][1] if index else 0
+        next_start = mentions[index + 1][0] if index + 1 < len(mentions) else len(window)
+        before = window[prev_end:start]
+        after = window[end:next_start]
+        local = after if FACTOR_PATHWAY_CLAIM_RE.search(after) else before
+        if not FACTOR_PATHWAY_CLAIM_RE.search(local):
+            local = window[prev_end:next_start]
+        positive = bool(FACTOR_PATHWAY_POSITIVE_RE.search(local))
+        negative = bool(FACTOR_PATHWAY_NEGATIVE_RE.search(local))
+        old_positive, old_negative = directions.get(pathway, (False, False))
+        directions[pathway] = (old_positive or positive, old_negative or negative)
+    return directions
+
+
 def _check_pathway_factor_claims(data_dir: Path, issues: list[dict[str, str]]) -> None:
     supported, factor_labels, pathway_labels = _supported_factor_pathways(data_dir)
     if not supported:
@@ -355,6 +381,7 @@ def _check_pathway_factor_claims(data_dir: Path, issues: list[dict[str, str]]) -
                 continue
             factors = _find_known_factors(window, factor_labels)
             pathways = _find_known_tokens(window, pathway_labels)
+            pathway_directions = _pathway_direction_claims(window, pathway_labels)
             for factor in sorted(factors):
                 factor_pathways = supported.get(factor, {})
                 unsupported = sorted(pathways - set(factor_pathways))
@@ -369,19 +396,20 @@ def _check_pathway_factor_claims(data_dir: Path, issues: list[dict[str, str]]) -
                             repair_instruction="Rephrase as an LR-annotation-based hypothesis, not measured pathway-factor significance.",
                         )
                     )
-                if not (FACTOR_PATHWAY_POSITIVE_RE.search(window) and not FACTOR_PATHWAY_NEGATIVE_RE.search(window)):
-                    continue
                 for pathway in sorted(pathways & set(factor_pathways)):
                     estimate = factor_pathways[pathway]
-                    if estimate is not None and estimate < 0:
+                    positive, negative = pathway_directions.get(pathway, (False, False))
+                    if estimate is None:
+                        continue
+                    if (estimate < 0 and positive and not negative) or (estimate > 0 and negative and not positive):
                         issues.append(
                             _issue(
                                 code="factor_pathway_direction_mismatch",
                                 file=path.name,
                                 section=str(section["heading"]),
                                 value=f"{factor_labels[factor]}: {pathway_labels[pathway]} estimate={estimate}",
-                                evidence="sig_liana_pathway_factor.csv has a negative estimate for the positively described factor-pathway pair.",
-                                repair_instruction="Describe the pathway as depleted/reduced or use a factor-pathway pair with a positive estimate.",
+                                evidence="sig_liana_pathway_factor.csv estimate direction conflicts with the local factor-pathway wording.",
+                                repair_instruction="Align enrichment/depletion wording with the estimate sign for this factor-pathway pair.",
                             )
                         )
 
