@@ -27,6 +27,17 @@ NEGATED_SIGNIFICANCE_RE = re.compile(
     r"\b(?:significant|significantly|enriched|enrichment)\b.{0,40}\b(?:no|not|without|lack|lacks|lacked|absent)\b",
     re.IGNORECASE,
 )
+LR_METRIC_CLAIM_RE = re.compile(
+    r"\b(?P<label>Moran's\s*R|combined\s*score|combinedscore|GenePT\s*score)\b"
+    r"\s*(?:=|:|of|is|was)?\s*"
+    r"(?P<value>[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)",
+    re.IGNORECASE,
+)
+LR_METRIC_COLUMNS = {
+    "morans": ("morans", "moransR", "morans_r"),
+    "combinedscore": ("combinedscore", "combined_rank_score"),
+    "genept_score": ("genept_score", "genept"),
+}
 
 
 def _load_json(path: Path) -> Any:
@@ -180,6 +191,92 @@ def _claim_windows(text: str) -> list[str]:
     return [part.strip() for part in re.split(r"(?<=[.!?])\s+|\n+", text) if part.strip()]
 
 
+def _lr_pair_from_row(row: dict[str, str]) -> str:
+    interaction = str(row.get("interaction") or "").strip()
+    if interaction:
+        return interaction
+    ligand = str(row.get("ligand") or "").strip()
+    receptor = str(row.get("receptor") or "").strip()
+    return f"{ligand}^{receptor}" if ligand and receptor else ""
+
+
+def _first_float(row: dict[str, str], columns: tuple[str, ...]) -> float | None:
+    for column in columns:
+        value = str(row.get(column) or "").strip()
+        if value:
+            try:
+                return float(value)
+            except ValueError:
+                return None
+    return None
+
+
+def _sig_liana_metrics(data_dir: Path) -> dict[str, dict[str, float]]:
+    path = data_dir / "sig_liana.csv"
+    if not path.exists():
+        return {}
+    metrics: dict[str, dict[str, float]] = {}
+    with path.open(newline="", encoding="utf-8") as f:
+        for row in csv.DictReader(f):
+            pair = _lr_pair_from_row(row)
+            if not pair:
+                continue
+            values = {
+                metric: value
+                for metric, columns in LR_METRIC_COLUMNS.items()
+                if (value := _first_float(row, columns)) is not None
+            }
+            if values:
+                metrics[pair] = values
+    return metrics
+
+
+def _lr_metric_from_label(label: str) -> str:
+    key = _token_key(label)
+    if key == "moransr":
+        return "morans"
+    if key == "geneptscore":
+        return "genept_score"
+    return "combinedscore"
+
+
+def _check_lr_metric_claims(data_dir: Path, issues: list[dict[str, str]]) -> None:
+    metrics = _sig_liana_metrics(data_dir)
+    if not metrics:
+        return
+    path = data_dir / "part2_final.md"
+    text = _read_text(path)
+    if not text:
+        return
+
+    for section in _sections(text):
+        for window in _claim_windows(str(section["body"])):
+            claims = list(LR_METRIC_CLAIM_RE.finditer(window))
+            if not claims:
+                continue
+            pairs = [pair for pair in metrics if _mentions_lr_pair(window, pair)]
+            for pair in pairs:
+                for claim in claims:
+                    metric = _lr_metric_from_label(claim.group("label"))
+                    expected = metrics[pair].get(metric)
+                    if expected is None:
+                        continue
+                    claimed_text = claim.group("value")
+                    claimed = float(claimed_text)
+                    if abs(claimed - expected) <= 0.001:
+                        continue
+                    issues.append(
+                        _issue(
+                            code="lr_metric_value_mismatch",
+                            file=path.name,
+                            section=str(section["heading"]),
+                            value=f"{pair} {metric}={claimed_text}",
+                            evidence=f"sig_liana.csv has {metric}={expected:.4f} for {pair}.",
+                            repair_instruction="Use the metric value from sig_liana.csv or relabel the claim to the correct LR metric.",
+                        )
+                    )
+
+
 def _supported_factor_pathways(data_dir: Path) -> tuple[dict[str, set[str]], dict[str, str], dict[str, str]]:
     path = data_dir / "sig_liana_pathway_factor.csv"
     if not path.exists():
@@ -297,6 +394,7 @@ def validate_report(data_dir: Path) -> list[dict[str, str]]:
     data_dir = data_dir.resolve()
     issues: list[dict[str, str]] = []
     _check_pmids(data_dir, issues)
+    _check_lr_metric_claims(data_dir, issues)
     _check_pathway_factor_claims(data_dir, issues)
     _check_part3_scope_and_pairs(data_dir, issues)
     return issues

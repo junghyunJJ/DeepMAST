@@ -192,3 +192,92 @@ def test_flags_part3_missing_selected_lr_pairs(tmp_path: Path) -> None:
 
     missing = [i for i in issues if i["code"] == "missing_selected_lr_pair"]
     assert {i["value"] for i in missing} == {"ICAM1^PECAM1", "ICAM1^MUC1", "MIF^CD74"}
+
+
+def test_flags_lr_metric_value_mismatch_against_sig_liana(tmp_path: Path) -> None:
+    _write_json(tmp_path / "papers.json", [])
+    _write_csv(
+        tmp_path / "sig_liana.csv",
+        [
+            {
+                "interaction": "LAMA5^ITGB4",
+                "ligand": "LAMA5",
+                "receptor": "ITGB4",
+                "morans": 0.32653028,
+                "morans_pvals": 0.0,
+                "genept_score": 0.8060191,
+                "combinedscore": 0.71706842,
+            }
+        ],
+    )
+    (tmp_path / "part2_final.md").write_text(
+        "## Analysis 2-6: LIANA Moran's R\n"
+        "### Biological Interpretation\n"
+        "LAMA5-ITGB4 exhibits a Moran's R of 0.7171.\n",
+        encoding="utf-8",
+    )
+
+    issues = validate_report.validate_report(tmp_path)
+
+    flagged = [i for i in issues if i["code"] == "lr_metric_value_mismatch"]
+    assert len(flagged) == 1
+    assert flagged[0]["file"] == "part2_final.md"
+    assert flagged[0]["section"] == "## Analysis 2-6: LIANA Moran's R"
+    assert flagged[0]["value"] == "LAMA5^ITGB4 morans=0.7171"
+    assert "sig_liana.csv has morans=0.3265" in flagged[0]["evidence"]
+
+
+def test_allows_lr_metric_value_when_claim_matches_sig_liana(tmp_path: Path) -> None:
+    _write_json(tmp_path / "papers.json", [])
+    _write_csv(
+        tmp_path / "sig_liana.csv",
+        [
+            {
+                "interaction": "LAMA5^ITGB4",
+                "ligand": "LAMA5",
+                "receptor": "ITGB4",
+                "morans": 0.32653028,
+                "morans_pvals": 0.0,
+                "genept_score": 0.8060191,
+                "combinedscore": 0.71706842,
+            }
+        ],
+    )
+    (tmp_path / "part2_final.md").write_text(
+        "## Analysis 2-6: LIANA Moran's R\n"
+        "### Biological Interpretation\n"
+        "LAMA5-ITGB4 has Moran's R = 0.3265 and combined score = 0.7171.\n",
+        encoding="utf-8",
+    )
+
+    issues = validate_report.validate_report(tmp_path)
+
+    assert not any(i["code"] == "lr_metric_value_mismatch" for i in issues)
+
+
+def test_ignores_morans_r_without_apostrophe_as_lr_metric_label(tmp_path: Path) -> None:
+    _write_json(tmp_path / "papers.json", [])
+    _write_csv(
+        tmp_path / "sig_liana.csv",
+        [
+            {
+                "interaction": "LAMA5^ITGB4",
+                "ligand": "LAMA5",
+                "receptor": "ITGB4",
+                "morans": 0.32653028,
+                "morans_pvals": 0.0,
+                "genept_score": 0.8060191,
+                "combinedscore": 0.71706842,
+            }
+        ],
+    )
+    (tmp_path / "part2_final.md").write_text(
+        "## Analysis 2-6: LIANA Moran's R\n"
+        "### Biological Interpretation\n"
+        "LAMA5-ITGB4 exhibits Morans R of 0.7171.\n",
+        encoding="utf-8",
+    )
+
+    issues = validate_report.validate_report(tmp_path)
+
+    assert not any(i["code"] == "lr_metric_value_mismatch" for i in issues)
