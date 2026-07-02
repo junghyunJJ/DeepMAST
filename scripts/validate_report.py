@@ -59,7 +59,8 @@ FACTOR_PATHWAY_CLAIM_RE = re.compile(
 FACTOR_PATHWAY_CONNECTOR_RE = re.compile(r"\b(?:and|but|while|whereas)\b", re.IGNORECASE)
 FACTOR_RE = re.compile(r"\bFactor\s*\d+\b", re.IGNORECASE)
 HYPOTHESIS_RE = re.compile(
-    r"\b(may|might|could|hypothesis|inferred|suggests?|consistent with|not pathway-factor significance)\b",
+    r"\b(may|might|could|hypothes(?:is|i[sz]ed)|hypothetical|inferred|suggests?|consistent with|"
+    r"not pathway-factor significance)\b",
     re.IGNORECASE,
 )
 NEGATED_SIGNIFICANCE_RE = re.compile(
@@ -239,6 +240,15 @@ def _find_known_factors(text: str, known: dict[str, str]) -> set[str]:
         if key in known:
             found.add(key)
     return found
+
+
+def _known_factor_mentions(text: str, known: dict[str, str]) -> list[tuple[int, int, str]]:
+    mentions = _known_token_mentions(text, known)
+    for match in FACTOR_RE.finditer(text):
+        key = _factor_key(match.group(0))
+        if key in known:
+            mentions.append((match.start(), match.end(), key))
+    return sorted(set(mentions))
 
 
 def _claim_windows(text: str) -> list[str]:
@@ -443,6 +453,49 @@ def _pathway_direction_claims(window: str, pathway_labels: dict[str, str]) -> di
     return directions
 
 
+def _local_factor_pathway_windows(
+    window: str,
+    factor_labels: dict[str, str],
+    pathway_labels: dict[str, str],
+) -> dict[str, tuple[str, set[str]]]:
+    chunks: dict[str, list[tuple[str, set[str]]]] = {}
+    context_factors: set[str] = set()
+    context_text = ""
+    for clause in re.finditer(r"[^,;]+", window):
+        text = clause.group(0)
+        factor_mentions = _known_factor_mentions(text, factor_labels)
+        pathway_mentions = _known_token_mentions(text, pathway_labels)
+        factors = {factor for _, _, factor in factor_mentions}
+        pathways = {pathway for _, _, pathway in pathway_mentions}
+        if factors:
+            context_factors = factors
+            context_text = text
+        if pathways and not factors and context_factors:
+            for factor in context_factors:
+                chunks.setdefault(factor, []).append((f"{context_text} {text}", pathways))
+            continue
+        if not factors or not pathways:
+            continue
+        if len(factors) == 1:
+            chunks.setdefault(next(iter(factors)), []).append((text, pathways))
+            continue
+        if len(pathways) == 1:
+            for factor in factors:
+                chunks.setdefault(factor, []).append((text, pathways))
+            continue
+        for pathway_start, pathway_end, pathway in pathway_mentions:
+            factor = min(
+                factor_mentions,
+                key=lambda mention: min(abs(pathway_start - mention[1]), abs(mention[0] - pathway_end)),
+            )[2]
+            chunks.setdefault(factor, []).append((text, {pathway}))
+
+    return {
+        factor: (" ".join(text for text, _ in parts), set().union(*(pathways for _, pathways in parts)))
+        for factor, parts in chunks.items()
+    }
+
+
 def _add_pathway_group_directions(
     window: str,
     mentions: list[tuple[int, int, str]],
@@ -475,13 +528,12 @@ def _check_pathway_factor_claims(data_dir: Path, issues: list[dict[str, str]]) -
         for window in _claim_windows(str(section["body"])):
             if not (FACTOR_PATHWAY_CLAIM_RE.search(window) and not HYPOTHESIS_RE.search(window)):
                 continue
-            factors = _find_known_factors(window, factor_labels)
-            pathways = _find_known_tokens(window, pathway_labels)
-            pathway_directions = _pathway_direction_claims(window, pathway_labels)
-            for factor in sorted(factors):
+            local_windows = _local_factor_pathway_windows(window, factor_labels, pathway_labels)
+            for factor, (local_window, pathways) in sorted(local_windows.items()):
                 factor_pathways = supported.get(factor, {})
+                pathway_directions = _pathway_direction_claims(local_window, pathway_labels)
                 unsupported = sorted(pathways - set(factor_pathways))
-                if unsupported and not NEGATED_SIGNIFICANCE_RE.search(window):
+                if unsupported and not NEGATED_SIGNIFICANCE_RE.search(local_window):
                     issues.append(
                         _issue(
                             code="unsupported_pathway_factor_significance",

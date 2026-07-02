@@ -198,6 +198,117 @@ def test_flags_factor_pathway_direction_mismatch_for_negative_estimate(tmp_path:
     assert flagged[0]["value"] == "Factor3: EGFR estimate=-2.897"
 
 
+def test_allows_multi_factor_sentence_when_local_factor_pathway_pairs_match(tmp_path: Path) -> None:
+    _write_json(tmp_path / "papers.json", [])
+    _write_csv(
+        tmp_path / "sig_liana_pathway_factor.csv",
+        [
+            {"factor": "Factor2", "pathway": "Hypoxia", "estimate": 2.1, "pval": 0.004, "adj_pval": 0.028},
+            {"factor": "Factor3", "pathway": "Estrogen", "estimate": -1.7, "pval": 0.004, "adj_pval": 0.028},
+            {"factor": "Factor1", "pathway": "TGFb", "estimate": 1.4, "pval": 0.004, "adj_pval": 0.028},
+        ],
+    )
+    (tmp_path / "part2_final.md").write_text(
+        "## Analysis 2-8: Pathway-Factor\n"
+        "### Biological Interpretation\n"
+        "Proposed patterns include a Hypoxia alignment in Factor2, potential Estrogen signaling depletion in "
+        "Factor3, and TGFb alignment in Factor1.\n",
+        encoding="utf-8",
+    )
+
+    issues = validate_report.validate_report(tmp_path)
+
+    assert not any(
+        i["code"] in {"unsupported_pathway_factor_significance", "factor_pathway_direction_mismatch"}
+        for i in issues
+    )
+
+
+def test_flags_unsupported_pathway_in_factor_continuation_clause(tmp_path: Path) -> None:
+    _write_json(tmp_path / "papers.json", [])
+    _write_csv(
+        tmp_path / "sig_liana_pathway_factor.csv",
+        [{"factor": "Factor2", "pathway": "NFkB", "estimate": 2.1, "pval": 0.004, "adj_pval": 0.028}],
+    )
+    _write_csv(
+        tmp_path / "sig_PathwayEnrich_decoupler.csv",
+        [{"group": "4", "reference": "rest", "name": "EGFR", "stat": 33.0, "meanchange": 3.7, "pval": 0.0, "fdr": 0.0}],
+    )
+    (tmp_path / "part2_final.md").write_text(
+        "## Analysis 2-8: Pathway-Factor\n"
+        "### Biological Interpretation\n"
+        "Factor2 showed significant enrichment, including NFkB and EGFR.\n",
+        encoding="utf-8",
+    )
+
+    issues = validate_report.validate_report(tmp_path)
+
+    flagged = [i for i in issues if i["code"] == "unsupported_pathway_factor_significance"]
+    assert len(flagged) == 1
+    assert flagged[0]["value"] == "Factor2: EGFR"
+
+
+def test_flags_direction_mismatch_in_factor_continuation_clause(tmp_path: Path) -> None:
+    _write_json(tmp_path / "papers.json", [])
+    _write_csv(
+        tmp_path / "sig_liana_pathway_factor.csv",
+        [{"factor": "Factor2", "pathway": "NFkB", "estimate": 2.1, "pval": 0.004, "adj_pval": 0.028}],
+    )
+    (tmp_path / "part2_final.md").write_text(
+        "## Analysis 2-8: Pathway-Factor\n"
+        "### Biological Interpretation\n"
+        "Factor2 showed significant depletion, including NFkB.\n",
+        encoding="utf-8",
+    )
+
+    issues = validate_report.validate_report(tmp_path)
+
+    flagged = [i for i in issues if i["code"] == "factor_pathway_direction_mismatch"]
+    assert len(flagged) == 1
+    assert flagged[0]["value"] == "Factor2: NFkB estimate=2.1"
+
+
+def test_flags_shared_pathway_direction_mismatch_for_each_factor(tmp_path: Path) -> None:
+    _write_json(tmp_path / "papers.json", [])
+    _write_csv(
+        tmp_path / "sig_liana_pathway_factor.csv",
+        [
+            {"factor": "Factor1", "pathway": "TGFb", "estimate": 1.4, "pval": 0.004, "adj_pval": 0.028},
+            {"factor": "Factor2", "pathway": "TGFb", "estimate": -2.1, "pval": 0.004, "adj_pval": 0.028},
+        ],
+    )
+    (tmp_path / "part2_final.md").write_text(
+        "## Analysis 2-8: Pathway-Factor\n"
+        "### Biological Interpretation\n"
+        "TGFb activity is enriched in Factor1 and Factor2.\n",
+        encoding="utf-8",
+    )
+
+    issues = validate_report.validate_report(tmp_path)
+
+    flagged = [i for i in issues if i["code"] == "factor_pathway_direction_mismatch"]
+    assert len(flagged) == 1
+    assert flagged[0]["value"] == "Factor2: TGFb estimate=-2.1"
+
+
+def test_allows_hypothetical_factor_pathway_language(tmp_path: Path) -> None:
+    _write_json(tmp_path / "papers.json", [])
+    _write_csv(
+        tmp_path / "sig_liana_pathway_factor.csv",
+        [{"factor": "Factor2", "pathway": "NFkB", "estimate": -3.28, "p": 0.001, "adj_p": 0.025}],
+    )
+    (tmp_path / "part2_final.md").write_text(
+        "## Analysis 2-8: Pathway Factor Heatmap\n"
+        "### Biological Interpretation\n"
+        "Factor1 has a hypothesized TGFb enrichment, hypothesised MAPK activation, and hypothetical PI3K activation.\n",
+        encoding="utf-8",
+    )
+
+    issues = validate_report.validate_report(tmp_path)
+
+    assert not any(i["code"] == "unsupported_pathway_factor_significance" for i in issues)
+
+
 def test_flags_factor_pathway_direction_mismatch_for_positive_estimate_written_as_depletion(tmp_path: Path) -> None:
     _write_json(tmp_path / "papers.json", [])
     _write_csv(
