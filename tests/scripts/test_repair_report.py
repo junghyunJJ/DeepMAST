@@ -285,4 +285,4 @@ def test_repair_prompt_requires_association_language_for_mechanistic_issues(tmp_
     )
 
     assert "Rewrite causal or mechanistic report-derived claims as associations or hypotheses." in prompt
-    assert "Do not claim treatment sensitivity, resistance, patient stratification, or therapeutic vulnerability" in prompt
+    assert "Do not claim treatment sensitivity, resistance, patient stratification, or therapeutic vulnerability unless the validation issue provides direct support for that exact claim." in prompt
