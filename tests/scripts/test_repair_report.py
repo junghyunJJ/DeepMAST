@@ -267,3 +267,22 @@ def test_repair_skips_issue_file_outside_data_dir(tmp_path: Path) -> None:
 
     assert changed == 0
     assert "significant enrichment" in outside.read_text(encoding="utf-8")
+
+
+def test_repair_prompt_requires_association_language_for_mechanistic_issues(tmp_path: Path) -> None:
+    issue = {
+        "code": "unsupported_mechanistic_interpretation",
+        "severity": "error",
+        "file": "part1_final.md",
+        "section": "## Analysis 1-5: MISTy",
+        "value": "drives",
+    }
+    prompt = repair_report._build_prompt(
+        issue,
+        "## Analysis 1-5: MISTy\n"
+        "### Biological Interpretation\n"
+        "The MISTy association confirms that hypoxia drives tumor behavior.\n",
+    )
+
+    assert "Rewrite causal or mechanistic report-derived claims as associations or hypotheses." in prompt
+    assert "Do not claim treatment sensitivity, resistance, patient stratification, or therapeutic vulnerability" in prompt
