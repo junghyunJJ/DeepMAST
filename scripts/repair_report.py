@@ -93,6 +93,8 @@ def _build_prompt(issue: dict[str, Any], section_text: str) -> str:
 
 Keep the same section heading. Keep evidence-grounded scientific tone.
 Rewrite causal or mechanistic report-derived claims as associations or hypotheses.
+For mechanistic_interpretation_warning or unsupported_mechanistic_interpretation, do not delete the scientific context; rewrite it as an observation-grounded association.
+If a mechanistic or therapeutic interpretation remains, end it with: "This remains a hypothesis requiring validation."
 Do not claim treatment sensitivity, resistance, patient stratification, or therapeutic vulnerability unless the validation issue provides direct support for that exact claim.
 Do not invent new PMIDs, p-values, scores, files, or pathway significance.
 Do not add therapeutic/druggability conclusions to Part3.
