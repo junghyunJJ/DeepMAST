@@ -353,6 +353,8 @@ def _pathway_direction_claims(window: str, pathway_labels: dict[str, str]) -> di
         next_start = mentions[index + 1][0] if index + 1 < len(mentions) else len(window)
         before = window[prev_end:start]
         after = window[end:next_start]
+        if index + 1 < len(mentions):
+            after = re.split(r"\b(?:and|but|while|whereas)\b", after, maxsplit=1, flags=re.IGNORECASE)[0]
         local = after if FACTOR_PATHWAY_CLAIM_RE.search(after) else before
         if not FACTOR_PATHWAY_CLAIM_RE.search(local):
             local = window[prev_end:next_start]

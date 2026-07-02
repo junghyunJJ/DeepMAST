@@ -257,6 +257,27 @@ def test_allows_mixed_factor_pathway_sentence_when_local_directions_match(tmp_pa
     assert not any(i["code"] == "factor_pathway_direction_mismatch" for i in issues)
 
 
+def test_allows_mixed_factor_pathway_sentence_with_direction_before_pathway(tmp_path: Path) -> None:
+    _write_json(tmp_path / "papers.json", [])
+    _write_csv(
+        tmp_path / "sig_liana_pathway_factor.csv",
+        [
+            {"factor": "Factor3", "pathway": "EGFR", "estimate": 2.897, "pval": 0.004, "adj_pval": 0.028},
+            {"factor": "Factor3", "pathway": "MAPK", "estimate": -1.5, "pval": 0.004, "adj_pval": 0.028},
+        ],
+    )
+    (tmp_path / "part2_final.md").write_text(
+        "## Analysis 2-8: Pathway-Factor\n"
+        "### Biological Interpretation\n"
+        "Factor3 shows enrichment of EGFR and depletion of MAPK.\n",
+        encoding="utf-8",
+    )
+
+    issues = validate_report.validate_report(tmp_path)
+
+    assert not any(i["code"] == "factor_pathway_direction_mismatch" for i in issues)
+
+
 def test_allows_positive_factor_pathway_when_written_as_enrichment_not_depletion(tmp_path: Path) -> None:
     _write_json(tmp_path / "papers.json", [])
     _write_csv(
