@@ -120,3 +120,86 @@ def test_run_report_guardrail_records_remaining_errors_without_raising(
     assert result["final_error_count"] == 1
     final = json.loads((tmp_path / "report_validation_final.json").read_text(encoding="utf-8"))
     assert final["issues"] == [{"severity": "error", "code": "still_bad"}]
+
+
+def test_report_guardrail_middleware_returns_message_when_guardrail_runs(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.agents.deep_interpreter.middleware.report_guardrail import ReportGuardrailMiddleware
+
+    def fake_run(data_dir: Path, *, provider: str | None = None) -> dict[str, object]:
+        assert data_dir == tmp_path
+        assert provider == "ollama"
+        return {
+            "status": "passed",
+            "initial_issue_count": 1,
+            "initial_error_count": 1,
+            "changed_sections": 1,
+            "final_issue_count": 0,
+            "final_error_count": 0,
+        }
+
+    monkeypatch.setattr(
+        "src.agents.deep_interpreter.middleware.report_guardrail.run_report_guardrail",
+        fake_run,
+    )
+
+    result = ReportGuardrailMiddleware(data_dir=tmp_path, provider="ollama").after_agent({}, None)
+
+    assert result is not None
+    [message] = result["messages"]
+    assert isinstance(message, AIMessage)
+    payload = json.loads(str(message.content))
+    assert payload["report_guardrail"]["status"] == "passed"
+    assert payload["report_guardrail"]["changed_sections"] == 1
+
+
+def test_report_guardrail_middleware_is_silent_when_guardrail_skips(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.agents.deep_interpreter.middleware.report_guardrail import ReportGuardrailMiddleware
+
+    def fake_run(data_dir: Path, *, provider: str | None = None) -> dict[str, object]:
+        return {"status": "skipped", "missing": ["part3_final.md"]}
+
+    monkeypatch.setattr(
+        "src.agents.deep_interpreter.middleware.report_guardrail.run_report_guardrail",
+        fake_run,
+    )
+
+    result = ReportGuardrailMiddleware(data_dir=tmp_path).after_agent({}, None)
+
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_report_guardrail_middleware_async_hook_uses_same_runner(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.agents.deep_interpreter.middleware.report_guardrail import ReportGuardrailMiddleware
+
+    def fake_run(data_dir: Path, *, provider: str | None = None) -> dict[str, object]:
+        assert data_dir == tmp_path
+        return {
+            "status": "failed",
+            "initial_issue_count": 1,
+            "initial_error_count": 1,
+            "changed_sections": 0,
+            "final_issue_count": 1,
+            "final_error_count": 1,
+        }
+
+    monkeypatch.setattr(
+        "src.agents.deep_interpreter.middleware.report_guardrail.run_report_guardrail",
+        fake_run,
+    )
+
+    result = await ReportGuardrailMiddleware(data_dir=tmp_path).aafter_agent({}, None)
+
+    assert result is not None
+    payload = json.loads(str(result["messages"][0].content))
+    assert payload["report_guardrail"]["status"] == "failed"
+    assert payload["report_guardrail"]["final_error_count"] == 1
