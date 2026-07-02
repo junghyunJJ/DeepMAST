@@ -30,6 +30,10 @@ def _load_issues(path: Path) -> list[dict[str, str]]:
     return [i for i in issues if isinstance(i, dict)]
 
 
+def _is_repairable_issue(issue: dict[str, str]) -> bool:
+    return issue.get("severity") == "error" or issue.get("code") == "mechanistic_interpretation_warning"
+
+
 def _find_section(text: str, heading: str) -> tuple[int, int, str] | None:
     for match in SECTION_RE.finditer(text):
         if match.group(1).strip() == heading.strip():
@@ -122,7 +126,7 @@ def repair_report(
     section_issues: dict[tuple[str, str], list[dict[str, str]]] = {}
 
     for issue in issues:
-        if issue.get("severity") != "error":
+        if not _is_repairable_issue(issue):
             continue
         if _repair_pmid_issue(data_dir, issue):
             changed += 1
