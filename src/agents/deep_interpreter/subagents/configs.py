@@ -16,7 +16,10 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.tools import BaseTool
 
 from src.agents.deep_interpreter.subagents.prompts import SUBAGENT_PROMPTS
-from src.agents.deep_interpreter.middleware import WriteFileArgGuardMiddleware
+from src.agents.deep_interpreter.middleware import (
+    ReportGuardrailMiddleware,
+    WriteFileArgGuardMiddleware,
+)
 from src.agents.deep_interpreter.tools import (
     load_analysis_data,
     create_literature_handoff,
@@ -214,6 +217,8 @@ def get_subagents(
     for subagent in subagents:
         middleware = list(subagent.get("middleware", []))
         middleware.insert(0, WriteFileArgGuardMiddleware(backend_root=data_dir))
+        if subagent["name"] == "interpreter":
+            middleware.append(ReportGuardrailMiddleware(data_dir=data_dir))
         subagent["middleware"] = middleware
 
     # Apply skills AFTER WriteFileArgGuardMiddleware (harness appended at end).

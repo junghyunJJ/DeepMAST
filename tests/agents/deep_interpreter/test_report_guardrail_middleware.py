@@ -234,3 +234,20 @@ async def test_report_guardrail_middleware_async_hook_uses_same_runner(
     payload = json.loads(str(result["messages"][0].content))
     assert payload["report_guardrail"]["status"] == "failed"
     assert payload["report_guardrail"]["final_error_count"] == 1
+
+
+def test_get_subagents_attaches_report_guardrail_only_to_interpreter() -> None:
+    from src.agents.deep_interpreter.middleware import ReportGuardrailMiddleware
+    from src.agents.deep_interpreter.subagents.configs import get_subagents
+
+    subagents = get_subagents(data_dir="/tmp/deepmast-report-guardrail-test")
+    by_name = {subagent["name"]: subagent for subagent in subagents}
+
+    interpreter_middleware = by_name["interpreter"]["middleware"]
+    assert any(isinstance(middleware, ReportGuardrailMiddleware) for middleware in interpreter_middleware)
+
+    for name in ("planner", "searcher", "reporter"):
+        assert not any(
+            isinstance(middleware, ReportGuardrailMiddleware)
+            for middleware in by_name[name].get("middleware", [])
+        )
