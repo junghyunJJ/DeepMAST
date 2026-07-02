@@ -30,10 +30,6 @@ def _load_issues(path: Path) -> list[dict[str, str]]:
     return [i for i in issues if isinstance(i, dict)]
 
 
-def _is_repairable_issue(issue: dict[str, str]) -> bool:
-    return issue.get("severity") == "error" or issue.get("code") == "mechanistic_interpretation_warning"
-
-
 def _find_section(text: str, heading: str) -> tuple[int, int, str] | None:
     for match in SECTION_RE.finditer(text):
         if match.group(1).strip() == heading.strip():
@@ -93,8 +89,6 @@ def _build_prompt(issue: dict[str, Any], section_text: str) -> str:
 
 Keep the same section heading. Keep evidence-grounded scientific tone.
 Rewrite causal or mechanistic report-derived claims as associations or hypotheses.
-For mechanistic_interpretation_warning or unsupported_mechanistic_interpretation, do not delete the scientific context; rewrite it as an observation-grounded association.
-If a mechanistic or therapeutic interpretation remains, end it with: "This remains a hypothesis requiring validation."
 Do not claim treatment sensitivity, resistance, patient stratification, or therapeutic vulnerability unless the validation issue provides direct support for that exact claim.
 Do not invent new PMIDs, p-values, scores, files, or pathway significance.
 Do not add therapeutic/druggability conclusions to Part3.
@@ -128,7 +122,7 @@ def repair_report(
     section_issues: dict[tuple[str, str], list[dict[str, str]]] = {}
 
     for issue in issues:
-        if not _is_repairable_issue(issue):
+        if issue.get("severity") != "error":
             continue
         if _repair_pmid_issue(data_dir, issue):
             changed += 1

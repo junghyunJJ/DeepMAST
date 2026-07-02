@@ -136,50 +136,6 @@ def test_repair_groups_multiple_issues_for_same_section(tmp_path: Path) -> None:
     assert llm.calls == 1
 
 
-def test_repair_includes_mechanistic_warning(tmp_path: Path) -> None:
-    (tmp_path / "part1_final.md").write_text(
-        "## Analysis 1-2: Cell Type Composition\n"
-        "### Biological Interpretation\n"
-        "The tumor population may drive tumor progression.\n",
-        encoding="utf-8",
-    )
-    issues_path = tmp_path / "issues.json"
-    issues_path.write_text(
-        json.dumps(
-            {
-                "issues": [
-                    {
-                        "code": "mechanistic_interpretation_warning",
-                        "severity": "warning",
-                        "file": "part1_final.md",
-                        "section": "## Analysis 1-2: Cell Type Composition",
-                        "value": "The tumor population may drive tumor progression.",
-                        "repair_instruction": "Rewrite as observation-grounded hypothesis.",
-                    }
-                ]
-            }
-        ),
-        encoding="utf-8",
-    )
-
-    class FakeLLM:
-        def invoke(self, prompt: str) -> str:
-            assert "mechanistic_interpretation_warning" in prompt
-            return (
-                "## Analysis 1-2: Cell Type Composition\n"
-                "### Biological Interpretation\n"
-                "The tumor population is observed in this region. "
-                "This remains a hypothesis requiring validation."
-            )
-
-    changed = repair_report.repair_report(tmp_path, issues_path, llm=FakeLLM())
-
-    repaired = (tmp_path / "part1_final.md").read_text(encoding="utf-8")
-    assert changed == 1
-    assert "may drive tumor progression" not in repaired
-    assert "This remains a hypothesis requiring validation." in repaired
-
-
 def test_repair_skips_unknown_file_level_issue_without_section(tmp_path: Path) -> None:
     report = tmp_path / "part1_final.md"
     report.write_text("Fake PMID:99999999\n", encoding="utf-8")
@@ -329,6 +285,4 @@ def test_repair_prompt_requires_association_language_for_mechanistic_issues(tmp_
     )
 
     assert "Rewrite causal or mechanistic report-derived claims as associations or hypotheses." in prompt
-    assert "For mechanistic_interpretation_warning or unsupported_mechanistic_interpretation" in prompt
-    assert "This remains a hypothesis requiring validation." in prompt
     assert "Do not claim treatment sensitivity, resistance, patient stratification, or therapeutic vulnerability unless the validation issue provides direct support for that exact claim." in prompt
