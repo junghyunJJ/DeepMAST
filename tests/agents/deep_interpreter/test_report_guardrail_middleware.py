@@ -1,0 +1,122 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import pytest
+from langchain_core.messages import AIMessage
+
+
+def _write_required_files(data_dir: Path) -> None:
+    (data_dir / "papers.json").write_text('{"papers": []}', encoding="utf-8")
+    (data_dir / "part1_final.md").write_text("## Part 1\n", encoding="utf-8")
+    (data_dir / "part2_final.md").write_text("## Part 2\n", encoding="utf-8")
+    (data_dir / "part3_final.md").write_text("## Part 3\n", encoding="utf-8")
+
+
+def test_run_report_guardrail_skips_when_parts_are_incomplete(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    (tmp_path / "papers.json").write_text('{"papers": []}', encoding="utf-8")
+    (tmp_path / "part1_final.md").write_text("## Part 1\n", encoding="utf-8")
+
+    def fail_validate(_data_dir: Path) -> list[dict[str, str]]:
+        raise AssertionError("validate_report must not run before all required files exist")
+
+    monkeypatch.setattr(report_guardrails.validate_report_script, "validate_report", fail_validate)
+
+    result = report_guardrails.run_report_guardrail(tmp_path, provider="ollama")
+
+    assert result["status"] == "skipped"
+    assert result["missing"] == ["part2_final.md", "part3_final.md"]
+    assert not (tmp_path / "report_validation_initial.json").exists()
+    assert not (tmp_path / "report_validation_final.json").exists()
+
+
+def test_run_report_guardrail_repairs_error_issues_once(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    _write_required_files(tmp_path)
+    calls: list[str] = []
+
+    def fake_validate(_data_dir: Path) -> list[dict[str, str]]:
+        calls.append("validate")
+        if calls.count("validate") == 1:
+            return [
+                {
+                    "severity": "error",
+                    "code": "pmid_not_in_papers",
+                    "file": "part1_final.md",
+                    "section": "",
+                    "value": "999",
+                }
+            ]
+        return [
+            {
+                "severity": "warning",
+                "code": "mechanistic_overclaim",
+                "file": "part1_final.md",
+                "section": "## Part 1",
+                "value": "hypothesis",
+            }
+        ]
+
+    def fake_repair(
+        data_dir: Path, issues_path: Path, *, provider: str | None = None, llm=None
+    ) -> int:
+        calls.append("repair")
+        assert data_dir == tmp_path.resolve()
+        assert issues_path == tmp_path.resolve() / "report_validation_initial.json"
+        assert provider == "ollama"
+        assert llm is None
+        return 1
+
+    monkeypatch.setattr(report_guardrails.validate_report_script, "validate_report", fake_validate)
+    monkeypatch.setattr(report_guardrails.repair_report_script, "repair_report", fake_repair)
+
+    result = report_guardrails.run_report_guardrail(tmp_path, provider="ollama")
+
+    assert calls == ["validate", "repair", "validate"]
+    assert result == {
+        "status": "passed",
+        "initial_issue_count": 1,
+        "initial_error_count": 1,
+        "changed_sections": 1,
+        "final_issue_count": 1,
+        "final_error_count": 0,
+    }
+    initial = json.loads((tmp_path / "report_validation_initial.json").read_text(encoding="utf-8"))
+    final = json.loads((tmp_path / "report_validation_final.json").read_text(encoding="utf-8"))
+    assert initial["issue_count"] == 1
+    assert final["issue_count"] == 1
+    assert final["issues"][0]["severity"] == "warning"
+
+
+def test_run_report_guardrail_records_remaining_errors_without_raising(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    _write_required_files(tmp_path)
+
+    def fake_validate(_data_dir: Path) -> list[dict[str, str]]:
+        return [{"severity": "error", "code": "still_bad"}]
+
+    def fake_repair(
+        data_dir: Path, issues_path: Path, *, provider: str | None = None, llm=None
+    ) -> int:
+        return 0
+
+    monkeypatch.setattr(report_guardrails.validate_report_script, "validate_report", fake_validate)
+    monkeypatch.setattr(report_guardrails.repair_report_script, "repair_report", fake_repair)
+
+    result = report_guardrails.run_report_guardrail(tmp_path)
+
+    assert result["status"] == "failed"
+    assert result["final_error_count"] == 1
+    final = json.loads((tmp_path / "report_validation_final.json").read_text(encoding="utf-8"))
+    assert final["issues"] == [{"severity": "error", "code": "still_bad"}]
