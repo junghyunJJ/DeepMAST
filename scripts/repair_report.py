@@ -37,7 +37,54 @@ def _find_section(text: str, heading: str) -> tuple[int, int, str] | None:
     return None
 
 
-def _build_prompt(issue: dict[str, str], section_text: str) -> str:
+def _known_pmids(data_dir: Path) -> set[str]:
+    path = data_dir / "papers.json"
+    if not path.exists() or not path.is_file():
+        return set()
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return set()
+    rows = data.get("papers") if isinstance(data, dict) else data
+    if not isinstance(rows, list):
+        return set()
+    return {str(row["pmid"]) for row in rows if isinstance(row, dict) and row.get("pmid")}
+
+
+def _one_digit_pmid_match(value: str, known: set[str]) -> str | None:
+    matches = [
+        pmid
+        for pmid in known
+        if len(pmid) == len(value) and sum(a != b for a, b in zip(pmid, value)) == 1
+    ]
+    return matches[0] if len(matches) == 1 else None
+
+
+def _remove_pmid(text: str, pmid: str) -> str:
+    text = re.sub(rf"(?m)^[-*]\s*PMID[:\s]*{re.escape(pmid)}\b.*(?:\n|$)", "", text)
+    text = re.sub(rf"\s*\(\s*PMID[:\s]*{re.escape(pmid)}\s*\)", "", text, flags=re.IGNORECASE)
+    return re.sub(rf"\bPMID[:\s]*{re.escape(pmid)}\b", "", text, flags=re.IGNORECASE)
+
+
+def _repair_pmid_issue(data_dir: Path, issue: dict[str, str]) -> bool:
+    if issue.get("code") != "pmid_not_in_papers":
+        return False
+    filename = issue.get("file") or ""
+    pmid = str(issue.get("value") or "")
+    path = (data_dir / filename).resolve()
+    if not pmid or not path.is_relative_to(data_dir) or path.suffix != ".md" or not path.exists():
+        return False
+
+    text = path.read_text(encoding="utf-8")
+    replacement = _one_digit_pmid_match(pmid, _known_pmids(data_dir))
+    repaired = text.replace(pmid, replacement) if replacement else _remove_pmid(text, pmid)
+    if repaired == text:
+        return False
+    path.write_text(repaired, encoding="utf-8")
+    return True
+
+
+def _build_prompt(issue: dict[str, Any], section_text: str) -> str:
     return f"""Rewrite only this markdown section to fix the validation issue.
 
 Keep the same section heading. Keep evidence-grounded scientific tone.
@@ -70,14 +117,21 @@ def repair_report(
     issues = _load_issues(issues_path)
     model = llm
     changed = 0
+    section_issues: dict[tuple[str, str], list[dict[str, str]]] = {}
 
     for issue in issues:
         if issue.get("severity") != "error":
+            continue
+        if _repair_pmid_issue(data_dir, issue):
+            changed += 1
             continue
         section = issue.get("section") or ""
         filename = issue.get("file") or ""
         if not section or not filename:
             continue
+        section_issues.setdefault((filename, section), []).append(issue)
+
+    for (filename, section), grouped_issues in section_issues.items():
         path = (data_dir / filename).resolve()
         if not path.is_relative_to(data_dir) or path.suffix != ".md" or not path.exists():
             continue
@@ -89,7 +143,10 @@ def repair_report(
         start, end, section_text = found
         if model is None:
             model = _create_model(provider)
-        replacement = _content(model.invoke(_build_prompt(issue, section_text))).strip()
+        issue_payload: dict[str, Any] = (
+            grouped_issues[0] if len(grouped_issues) == 1 else {"issues": grouped_issues}
+        )
+        replacement = _content(model.invoke(_build_prompt(issue_payload, section_text))).strip()
         if not replacement.startswith(section.strip()):
             replacement = section.strip() + "\n" + replacement
         path.write_text(text[:start] + replacement.rstrip() + "\n" + text[end:], encoding="utf-8")

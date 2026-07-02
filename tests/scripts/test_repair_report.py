@@ -34,6 +34,27 @@ class FailLLM:
         raise AssertionError(f"LLM should not be called: {prompt}")
 
 
+class CountingLLM:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def invoke(self, prompt: str):
+        self.calls += 1
+        assert "first issue" in prompt
+        assert "second issue" in prompt
+        return type(
+            "Msg",
+            (),
+            {
+                "content": (
+                    "## Analysis 2-8: Pathway Factor Heatmap\n"
+                    "### Biological Interpretation\n"
+                    "Factor1 may reflect pathway activity inferred from LR annotations."
+                )
+            },
+        )()
+
+
 def test_repair_replaces_only_flagged_section(tmp_path: Path) -> None:
     report = tmp_path / "part2_final.md"
     report.write_text(
@@ -76,7 +97,46 @@ def test_repair_replaces_only_flagged_section(tmp_path: Path) -> None:
     assert "not pathway-factor significance" in text
 
 
-def test_repair_skips_file_level_issue_without_section(tmp_path: Path) -> None:
+def test_repair_groups_multiple_issues_for_same_section(tmp_path: Path) -> None:
+    report = tmp_path / "part2_final.md"
+    report.write_text(
+        "## Analysis 2-8: Pathway Factor Heatmap\n"
+        "Factor1 showed significant enrichment for MAPK and EGFR.\n",
+        encoding="utf-8",
+    )
+    issues_path = tmp_path / "issues.json"
+    issues_path.write_text(
+        json.dumps(
+            {
+                "issues": [
+                    {
+                        "code": "unsupported_pathway_factor_significance",
+                        "severity": "error",
+                        "file": "part2_final.md",
+                        "section": "## Analysis 2-8: Pathway Factor Heatmap",
+                        "value": "first issue",
+                    },
+                    {
+                        "code": "unsupported_pathway_factor_significance",
+                        "severity": "error",
+                        "file": "part2_final.md",
+                        "section": "## Analysis 2-8: Pathway Factor Heatmap",
+                        "value": "second issue",
+                    },
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    llm = CountingLLM()
+
+    changed = repair_report.repair_report(tmp_path, issues_path, llm=llm)
+
+    assert changed == 1
+    assert llm.calls == 1
+
+
+def test_repair_skips_unknown_file_level_issue_without_section(tmp_path: Path) -> None:
     report = tmp_path / "part1_final.md"
     report.write_text("Fake PMID:99999999\n", encoding="utf-8")
     issues_path = tmp_path / "issues.json"
@@ -85,7 +145,7 @@ def test_repair_skips_file_level_issue_without_section(tmp_path: Path) -> None:
             {
                 "issues": [
                     {
-                        "code": "pmid_not_in_papers",
+                        "code": "unknown_file_level_issue",
                         "severity": "error",
                         "file": "part1_final.md",
                         "section": "",
@@ -103,6 +163,77 @@ def test_repair_skips_file_level_issue_without_section(tmp_path: Path) -> None:
 
     assert changed == 0
     assert report.read_text(encoding="utf-8") == "Fake PMID:99999999\n"
+
+
+def test_repair_corrects_one_digit_pmid_typo_without_llm(tmp_path: Path) -> None:
+    (tmp_path / "papers.json").write_text(
+        json.dumps([{"pmid": "20498641", "title": "known"}]),
+        encoding="utf-8",
+    )
+    report = tmp_path / "part2_final.md"
+    report.write_text(
+        "- PMID: 20498643 - ErbB3 coexpression evidence.\n",
+        encoding="utf-8",
+    )
+    issues_path = tmp_path / "issues.json"
+    issues_path.write_text(
+        json.dumps(
+            {
+                "issues": [
+                    {
+                        "code": "pmid_not_in_papers",
+                        "severity": "error",
+                        "file": "part2_final.md",
+                        "section": "",
+                        "value": "20498643",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    changed = repair_report.repair_report(tmp_path, issues_path, llm=FailLLM())
+
+    assert changed == 1
+    assert "20498641" in report.read_text(encoding="utf-8")
+    assert "20498643" not in report.read_text(encoding="utf-8")
+
+
+def test_repair_removes_unsupported_pmid_when_no_unique_close_match(tmp_path: Path) -> None:
+    (tmp_path / "papers.json").write_text(json.dumps([{"pmid": "11111111"}]), encoding="utf-8")
+    report = tmp_path / "part2_final.md"
+    report.write_text(
+        "Supported text.\n"
+        "- PMID: 99999999 - fabricated evidence line.\n"
+        "Inline unsupported citation (PMID:99999999) should be removed.\n",
+        encoding="utf-8",
+    )
+    issues_path = tmp_path / "issues.json"
+    issues_path.write_text(
+        json.dumps(
+            {
+                "issues": [
+                    {
+                        "code": "pmid_not_in_papers",
+                        "severity": "error",
+                        "file": "part2_final.md",
+                        "section": "",
+                        "value": "99999999",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    changed = repair_report.repair_report(tmp_path, issues_path, llm=FailLLM())
+
+    text = report.read_text(encoding="utf-8")
+    assert changed == 1
+    assert "99999999" not in text
+    assert "fabricated evidence line" not in text
+    assert "Supported text." in text
 
 
 def test_repair_skips_issue_file_outside_data_dir(tmp_path: Path) -> None:

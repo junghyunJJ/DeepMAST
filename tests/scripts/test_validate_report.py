@@ -72,42 +72,50 @@ def test_flags_papers_json_when_malformed(tmp_path: Path) -> None:
     assert any(i["code"] == "papers_json_malformed" for i in issues)
 
 
-def test_flags_factor1_significance_when_pathway_csv_lacks_factor1(tmp_path: Path) -> None:
+def test_flags_factor_pathway_significance_when_csv_lacks_claimed_pair(tmp_path: Path) -> None:
     _write_json(tmp_path / "papers.json", [])
     _write_csv(
         tmp_path / "sig_liana_pathway_factor.csv",
-        [{"factor": "Factor2", "pathway": "NFkB", "estimate": -3.28, "p": 0.001, "adj_p": 0.025}],
+        [
+            {"factor": "Factor2", "pathway": "NFkB", "estimate": -3.28, "p": 0.001, "adj_p": 0.025},
+            {"factor": "Factor3", "pathway": "EGFR", "estimate": 2.5, "p": 0.001, "adj_p": 0.025},
+        ],
     )
     (tmp_path / "part2_final.md").write_text(
         "## Analysis 2-8: Pathway Factor Heatmap\n"
         "### Biological Interpretation\n"
-        "Factor1 showed significant enrichment for TGFb/MAPK/PI3K/Hypoxia.\n",
+        "Factor2 showed significant enrichment for NFkB and EGFR.\n",
         encoding="utf-8",
     )
 
     issues = validate_report.validate_report(tmp_path)
 
-    assert any(i["code"] == "unsupported_factor1_pathway_significance" for i in issues)
-
-
-def test_flags_only_unsupported_factor1_claimed_pathways(tmp_path: Path) -> None:
-    _write_json(tmp_path / "papers.json", [])
-    _write_csv(
-        tmp_path / "sig_liana_pathway_factor.csv",
-        [{"factor": "Factor1", "pathway": "Hypoxia", "estimate": 2.1, "p": 0.001, "adj_p": 0.025}],
-    )
-    (tmp_path / "part2_final.md").write_text(
-        "## Analysis 2-8: Pathway Factor Heatmap\n"
-        "### Biological Interpretation\n"
-        "Factor1 showed significant enrichment for MAPK and Hypoxia.\n",
-        encoding="utf-8",
-    )
-
-    issues = validate_report.validate_report(tmp_path)
-
-    flagged = [i for i in issues if i["code"] == "unsupported_factor1_pathway_significance"]
+    flagged = [i for i in issues if i["code"] == "unsupported_pathway_factor_significance"]
     assert len(flagged) == 1
-    assert flagged[0]["value"] == "MAPK"
+    assert flagged[0]["value"] == "Factor2: EGFR"
+
+
+def test_flags_only_unsupported_claimed_pathways_for_same_factor(tmp_path: Path) -> None:
+    _write_json(tmp_path / "papers.json", [])
+    _write_csv(
+        tmp_path / "sig_liana_pathway_factor.csv",
+        [
+            {"factor": "Factor4", "pathway": "Hypoxia", "estimate": 2.1, "p": 0.001, "adj_p": 0.025},
+            {"factor": "Factor8", "pathway": "MAPK", "estimate": 2.1, "p": 0.001, "adj_p": 0.025},
+        ],
+    )
+    (tmp_path / "part2_final.md").write_text(
+        "## Analysis 2-8: Pathway Factor Heatmap\n"
+        "### Biological Interpretation\n"
+        "Factor4 showed significant enrichment for MAPK and Hypoxia.\n",
+        encoding="utf-8",
+    )
+
+    issues = validate_report.validate_report(tmp_path)
+
+    flagged = [i for i in issues if i["code"] == "unsupported_pathway_factor_significance"]
+    assert len(flagged) == 1
+    assert flagged[0]["value"] == "Factor4: MAPK"
 
 
 def test_ignores_negated_factor1_pathway_significance(tmp_path: Path) -> None:
@@ -125,7 +133,7 @@ def test_ignores_negated_factor1_pathway_significance(tmp_path: Path) -> None:
 
     issues = validate_report.validate_report(tmp_path)
 
-    assert not any(i["code"] == "unsupported_factor1_pathway_significance" for i in issues)
+    assert not any(i["code"] == "unsupported_pathway_factor_significance" for i in issues)
 
 
 def test_allows_factor1_hypothesis_language(tmp_path: Path) -> None:
@@ -143,7 +151,7 @@ def test_allows_factor1_hypothesis_language(tmp_path: Path) -> None:
 
     issues = validate_report.validate_report(tmp_path)
 
-    assert not any(i["code"] == "unsupported_factor1_pathway_significance" for i in issues)
+    assert not any(i["code"] == "unsupported_pathway_factor_significance" for i in issues)
 
 
 def test_flags_part3_therapeutic_spillover(tmp_path: Path) -> None:

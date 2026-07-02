@@ -17,8 +17,7 @@ THERAPEUTIC_RE = re.compile(
     re.IGNORECASE,
 )
 SIGNIFICANCE_RE = re.compile(r"\b(significant|significantly|enriched|enrichment)\b", re.IGNORECASE)
-FACTOR1_RE = re.compile(r"\bFactor\s*1\b|\bFactor1\b", re.IGNORECASE)
-PATHWAY_RE = re.compile(r"\b(TGFb|TGF-beta|MAPK|PI3K|Hypoxia)\b", re.IGNORECASE)
+FACTOR_RE = re.compile(r"\bFactor\s*\d+\b", re.IGNORECASE)
 HYPOTHESIS_RE = re.compile(
     r"\b(may|might|could|hypothesis|inferred|suggests?|consistent with|not pathway-factor significance)\b",
     re.IGNORECASE,
@@ -148,69 +147,92 @@ def _check_pmids(data_dir: Path, issues: list[dict[str, str]]) -> None:
                 )
 
 
-def _pathway_key(value: str) -> str:
-    normalized = value.lower().replace("-", "").replace("_", "").replace(" ", "")
-    if normalized in {"tgfb", "tgfbeta"}:
-        return "TGFb"
-    if normalized == "mapk":
-        return "MAPK"
-    if normalized == "pi3k":
-        return "PI3K"
-    if normalized == "hypoxia":
-        return "Hypoxia"
-    return value
+def _token_key(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "", value.lower())
 
 
-def _mentioned_pathways(text: str) -> set[str]:
-    return {_pathway_key(match) for match in PATHWAY_RE.findall(text)}
+def _factor_key(value: str) -> str:
+    return re.sub(r"\s+", "", value).lower()
+
+
+def _factor_label(value: str) -> str:
+    return re.sub(r"\s+", "", value.strip())
+
+
+def _find_known_tokens(text: str, known: dict[str, str]) -> set[str]:
+    found: set[str] = set()
+    for key, label in known.items():
+        if re.search(rf"(?<![A-Za-z0-9]){re.escape(label)}(?![A-Za-z0-9])", text, re.IGNORECASE):
+            found.add(key)
+    return found
+
+
+def _find_known_factors(text: str, known: dict[str, str]) -> set[str]:
+    found = _find_known_tokens(text, known)
+    for match in FACTOR_RE.findall(text):
+        key = _factor_key(match)
+        if key in known:
+            found.add(key)
+    return found
 
 
 def _claim_windows(text: str) -> list[str]:
     return [part.strip() for part in re.split(r"(?<=[.!?])\s+|\n+", text) if part.strip()]
 
 
-def _factor1_supported_pathways(data_dir: Path) -> set[str]:
+def _supported_factor_pathways(data_dir: Path) -> tuple[dict[str, set[str]], dict[str, str], dict[str, str]]:
     path = data_dir / "sig_liana_pathway_factor.csv"
     if not path.exists():
-        return set()
-    supported: set[str] = set()
+        return {}, {}, {}
+    supported: dict[str, set[str]] = {}
+    factor_labels: dict[str, str] = {}
+    pathway_labels: dict[str, str] = {}
     with path.open(newline="", encoding="utf-8") as f:
         for row in csv.DictReader(f):
             factor = str(row.get("factor") or row.get("Factor") or "")
             pathway = str(row.get("pathway") or row.get("Pathway") or "")
-            if FACTOR1_RE.search(factor) and PATHWAY_RE.search(pathway):
-                supported.update(_mentioned_pathways(pathway))
-    return supported
+            if not factor.strip() or not pathway.strip():
+                continue
+            factor_key = _factor_key(factor)
+            pathway_key = _token_key(pathway)
+            supported.setdefault(factor_key, set()).add(pathway_key)
+            factor_labels.setdefault(factor_key, _factor_label(factor))
+            pathway_labels.setdefault(pathway_key, pathway.strip())
+    return supported, factor_labels, pathway_labels
 
 
-def _check_factor1_pathway_claims(data_dir: Path, issues: list[dict[str, str]]) -> None:
-    supported = _factor1_supported_pathways(data_dir)
+def _check_pathway_factor_claims(data_dir: Path, issues: list[dict[str, str]]) -> None:
+    supported, factor_labels, pathway_labels = _supported_factor_pathways(data_dir)
+    if not supported:
+        return
     path = data_dir / "part2_final.md"
     text = _read_text(path)
     if not text:
         return
     for section in _sections(text):
         for window in _claim_windows(str(section["body"])):
-            claimed = _mentioned_pathways(window)
-            unsupported = sorted(claimed - supported)
             if not (
-                FACTOR1_RE.search(window)
-                and unsupported
-                and SIGNIFICANCE_RE.search(window)
+                SIGNIFICANCE_RE.search(window)
                 and not NEGATED_SIGNIFICANCE_RE.search(window)
                 and not HYPOTHESIS_RE.search(window)
             ):
                 continue
-            issues.append(
-                _issue(
-                    code="unsupported_factor1_pathway_significance",
-                    file=path.name,
-                    section=str(section["heading"]),
-                    value=", ".join(unsupported),
-                    evidence="sig_liana_pathway_factor.csv lacks Factor1 support for the claimed pathway(s).",
-                    repair_instruction="Rephrase as an LR-annotation-based hypothesis, not measured pathway-factor significance.",
+            factors = _find_known_factors(window, factor_labels)
+            pathways = _find_known_tokens(window, pathway_labels)
+            for factor in sorted(factors):
+                unsupported = sorted(pathways - supported.get(factor, set()))
+                if not unsupported:
+                    continue
+                issues.append(
+                    _issue(
+                        code="unsupported_pathway_factor_significance",
+                        file=path.name,
+                        section=str(section["heading"]),
+                        value=", ".join(f"{factor_labels[factor]}: {pathway_labels[p]}" for p in unsupported),
+                        evidence="sig_liana_pathway_factor.csv lacks the claimed factor-pathway support.",
+                        repair_instruction="Rephrase as an LR-annotation-based hypothesis, not measured pathway-factor significance.",
+                    )
                 )
-            )
 
 
 def _selected_lr_pairs(data_dir: Path) -> list[str]:
@@ -275,7 +297,7 @@ def validate_report(data_dir: Path) -> list[dict[str, str]]:
     data_dir = data_dir.resolve()
     issues: list[dict[str, str]] = []
     _check_pmids(data_dir, issues)
-    _check_factor1_pathway_claims(data_dir, issues)
+    _check_pathway_factor_claims(data_dir, issues)
     _check_part3_scope_and_pairs(data_dir, issues)
     return issues
 
