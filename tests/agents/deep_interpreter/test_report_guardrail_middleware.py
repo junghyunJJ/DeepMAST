@@ -2,9 +2,15 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 import pytest
+from langchain.agents.middleware import AgentState
 from langchain_core.messages import AIMessage
+
+
+def _agent_state() -> AgentState[Any]:
+    return {"messages": []}
 
 
 def _write_required_files(data_dir: Path) -> None:
@@ -145,7 +151,9 @@ def test_report_guardrail_middleware_returns_message_when_guardrail_runs(
         fake_run,
     )
 
-    result = ReportGuardrailMiddleware(data_dir=tmp_path, provider="ollama").after_agent({}, None)
+    result = ReportGuardrailMiddleware(data_dir=tmp_path, provider="ollama").after_agent(
+        _agent_state(), None
+    )
 
     assert result is not None
     [message] = result["messages"]
@@ -169,7 +177,7 @@ def test_report_guardrail_middleware_is_silent_when_guardrail_skips(
         fake_run,
     )
 
-    result = ReportGuardrailMiddleware(data_dir=tmp_path).after_agent({}, None)
+    result = ReportGuardrailMiddleware(data_dir=tmp_path).after_agent(_agent_state(), None)
 
     assert result is None
 
@@ -199,7 +207,7 @@ def test_report_guardrail_middleware_export_uses_env_data_dir(
         fake_run,
     )
 
-    result = ReportGuardrailMiddleware().after_agent({}, None)
+    result = ReportGuardrailMiddleware().after_agent(_agent_state(), None)
 
     assert result is not None
     assert seen == [tmp_path]
@@ -228,7 +236,7 @@ async def test_report_guardrail_middleware_async_hook_uses_same_runner(
         fake_run,
     )
 
-    result = await ReportGuardrailMiddleware(data_dir=tmp_path).aafter_agent({}, None)
+    result = await ReportGuardrailMiddleware(data_dir=tmp_path).aafter_agent(_agent_state(), None)
 
     assert result is not None
     payload = json.loads(str(result["messages"][0].content))
