@@ -20,7 +20,7 @@ Use a conservative claim boundary. Do not argue that prior systems lack harness 
 
 **Model notation**
 
-Use manuscript-facing model names as `Qwen3.5-9B`, `Qwen3.5-35B`, and `Qwen3.5-122B` where each appears. Avoid capability-adjective labels for model-size groups in prose. Raw runtime tags should not be used in manuscript-facing prose.
+Use manuscript-facing model names as `Qwen3.5-9B`, `Qwen3.5-35B`, and `Qwen3.5-122B` where each appears. Avoid capability-adjective labels such as `weak` and `strong` for model-size groups in prose. When Figure 2 requires model-scale labels, use `small model (Qwen3.5-35B)` and `large model (Qwen3.5-122B)`; these labels denote model size rather than an a priori performance ranking. Raw runtime tags should not be used in manuscript-facing prose.
 
 **Operational definition**
 
@@ -233,15 +233,9 @@ Figure 1. DeepMAST architecture for evidence-governed spatial transcriptomics in
 
 ---
 
-이 섹션은 Results 원고로 사용합니다. Reference paper 구조는 MEDEA와 SPARK처럼 system overview 뒤에 validation benchmark를 배치하고, SpatialAgent와 STAgent처럼 figure 중심으로 benchmark endpoint를 먼저 설명한 뒤 claim boundary를 닫는 방식으로 맞춥니다.
-
 ## 2. Benchmarking evidence acquisition and source-grounded retrieval controls
 
-Having defined DeepMAST as an evidence-governed biological harness, we next asked whether its retrieval-side control layer improved the evidence available for downstream interpretation before any biological or therapeutic claim was written. We evaluated two evidence-input controls in Figure 2. The first benchmark tested whether a literature-retrieval skill broadened citable biological context for ligand-receptor interpretation in 30 breast cancer Visium cell-cell interaction cases (GSE243280) [48,49]. The second benchmark tested whether Summary-Guided Chunk Promotion RAG (SGCP-RAG) improved retrieval of source-bearing chunks in a 2,556-case MultiHop-RAG benchmark [62]. Because MultiHop-RAG organizes English news articles into a topic- and entity-overlapping multi-document evidence graph rather than duplicated article copies, it provided a direct stress test of whether SGCP-RAG could navigate related source documents while preserving chunk-level grounding. Together, these experiments evaluate the evidence entering the harness rather than the final biological interpretation itself.
-
-In the ligand-receptor retrieval benchmark, DeepMAST used coverage validation to identify missing gene, pathway, and cell-type context, then routed the search back through targeted gap-filling queries before handoff to downstream interpretation (Figure 2a). Gene coverage was already saturated in both skill-off and skill-on arms after citable filtering, indicating that the benchmark was not limited by failure to retrieve ligand or receptor names. The retrieval skill instead improved cell-type context coverage, which is the evidence class needed to interpret spatially localized ligand-receptor signals in their tumor microenvironment context. In the Qwen3.5-35B setting, citable cell-type coverage increased from 27.7% to 38.7% (p = 1.44e-03). In the Qwen3.5-122B setting, citable cell-type coverage increased from 26.8% to 46.4% (p = 1.30e-04). The same pattern was visible in the all-retrieved paper analysis shown in Supplementary Figure S4A, where cell-type coverage increased from 42.6% to 63.2% for Qwen3.5-35B and from 40.4% to 65.1% for Qwen3.5-122B, while pathway coverage increased directionally but was underpowered because only 11 cases contained pathway annotations. These results show that the literature-retrieval skill primarily broadened biologically citable context rather than merely adding more direct ligand-receptor papers.
-
-We then evaluated source-grounded retrieval at the chunk level using SGCP-RAG, a summary-guided source-navigation control that promotes linked source documents before chunk retrieval and grading (Figure 2b). The generated summaries were used only as non-authoritative navigation memory and were not injected as evidence into the answer context. In the Qwen3.5-35B model, SGCP-RAG increased exact-answer containment from 26.3% to 34.9% (+8.6 percentage points, McNemar p = 6.30e-38) and increased evidence recall from 0.155 to 0.256 (Wilcoxon p = 1.50e-78). In the Qwen3.5-122B model, SGCP-RAG increased exact-answer containment from 28.1% to 31.7% (+3.7 percentage points, McNemar p = 2.20e-06) and increased evidence recall from 0.192 to 0.258 (Wilcoxon p = 1.60e-31). After SGCP-RAG, evidence recall was nearly identical in Qwen3.5-35B and Qwen3.5-122B (0.256 versus 0.258), and exact-answer containment was higher in Qwen3.5-35B (34.9% versus 31.7%). The larger gain in Qwen3.5-35B suggests that summary-guided source navigation is especially useful when the base retriever or generator has less capacity, while the significant Qwen3.5-122B gains indicate that the control is not limited to a smaller-model rescue effect. SGCP-RAG also reduced no-relevant-context failures, although this improvement came with an approximately 29-31 s latency increase. Thus, SGCP-RAG represents an accuracy and recall tradeoff that is appropriate when source-grounded evidence is more important than minimal retrieval latency.
+이 섹션은 Results 원고로 사용합니다. Reference paper 구조는 MEDEA와 SPARK처럼 system overview 뒤에 validation benchmark를 배치하고, SpatialAgent와 STAgent처럼 figure 중심으로 benchmark endpoint를 먼저 설명한 뒤 claim boundary를 닫는 방식으로 맞춥니다.
 
 Figure 2 핵심 구성
 - Figure 2a shows literature-retrieval skill coverage in 30 breast cancer Visium ligand-receptor cases (GSE243280) [48,49] using the citable set (direct + context), with citable cell-type context coverage as the primary endpoint. Source path - `benchmarks/lr_retrieval_relevance/figures/figure2d_lr_retrieval_citable_set.svg`.
@@ -250,15 +244,27 @@ Figure 2 핵심 구성
 - Supplementary Figure S4A should show the literature-retrieval coverage supplement across Qwen3.5-35B and Qwen3.5-122B, including the all-retrieved paper view that complements the Figure 2a citable set (direct + context). Source path - `benchmarks/lr_retrieval_relevance/figures/sfigure2d_lr_retrieval_citable_set.svg`.
 - The full SGCP-RAG graph remains in Supplementary Figure S3 so that the main figure can focus on the benchmark endpoint.
 
-Figure 2 legend draft
-
-Figure 2. Evidence acquisition and source-grounded retrieval controls. a, Literature-retrieval skill benchmark for 30 breast cancer Visium ligand-receptor cases (GSE243280) [48,49]. The workflow evaluates whether coverage validation and targeted retrieval loops broaden citable biological context before downstream interpretation. Panel a reports the interpreter-facing citable set (direct + context), rather than all retrieved papers. Bar plots compare skill-off and skill-on retrieval across Qwen3.5-35B and Qwen3.5-122B models for ligand-receptor, pathway, and cell-type context. All-retrieved paper coverage is shown in Supplementary Figure S4A. b, SGCP-RAG retrieval benchmark on the MultiHop-RAG dataset [62]. SGCP-RAG uses generated summaries as non-authoritative navigation memory to promote linked source documents before chunk retrieval and grading. Exact-answer containment and evidence recall are shown for baseline retrieval and SGCP-RAG-enabled retrieval in Qwen3.5-35B and Qwen3.5-122B models. Statistical tests use paired comparisons within the same benchmark cases.
-
 Claim boundary
 - This section supports retrieval-stage evidence acquisition and source-grounded retrieval claims.
 - It does not directly claim that final biological interpretation quality improved.
 - Pathway coverage should be described as directional because only 11 ligand-receptor cases had pathway annotations.
 - SGCP-RAG should be described as source-navigation control, not as a method that uses generated summaries as evidence.
+
+Paper-ready Results draft
+
+```text
+Having defined DeepMAST as an evidence-governed biological harness, we next asked whether its retrieval-side control layer improved the evidence available for downstream interpretation before any biological or therapeutic claim was written. We evaluated two evidence-input controls in Figure 2. Both benchmarks compared a small-model setting (Qwen3.5-35B) with a large-model setting (Qwen3.5-122B), where small and large denote model scale rather than an a priori performance ranking. The first benchmark tested whether a literature-retrieval skill broadened citable biological context for ligand-receptor interpretation in 30 breast cancer Visium cell-cell interaction cases (GSE243280) [48,49]. The second benchmark tested whether Summary-Guided Chunk Promotion RAG (SGCP-RAG) improved retrieval of source-bearing chunks in a 2,556-case MultiHop-RAG benchmark [62]. MultiHop-RAG therefore served as a multi-document source-navigation stress test for chunk-level grounding. Together, these experiments evaluate the evidence entering the harness rather than the final biological interpretation itself.
+
+In the ligand-receptor retrieval benchmark, DeepMAST used coverage validation to identify missing gene, pathway, and cell-type context, then routed the search back through targeted gap-filling queries before handoff to downstream interpretation (Fig. 2A). We evaluated the interpreter-facing citable set, defined as direct ligand-receptor evidence plus receptor/pathway context papers after the same handoff filter was applied to skill-on and skill-off arms (see Methods). Gene coverage was already saturated in both arms after citable filtering, indicating that the benchmark was not limited by failure to retrieve ligand or receptor names. The retrieval skill instead improved cell-type context coverage, which is the evidence class needed to interpret spatially localized ligand-receptor signals in their tumor microenvironment context. In the small-model setting, citable cell-type coverage increased from 27.7% to 38.7% (p = 1.44e-03). In the large-model setting, citable cell-type coverage increased from 26.8% to 46.4% (p = 1.30e-04). The same pattern was visible in the all-retrieved paper analysis (Figure S4A), where cell-type coverage increased from 42.6% to 63.2% in the small-model setting and from 40.4% to 65.1% in the large-model setting, while pathway coverage increased directionally but was underpowered because only 11 cases contained pathway annotations. These results show that the literature-retrieval skill primarily broadened biologically citable context rather than merely adding more direct ligand-receptor papers.
+
+We then evaluated source-grounded retrieval at the chunk level using SGCP-RAG, a summary-guided source-navigation control that promotes linked source documents before chunk retrieval and grading (Fig. 2B). The generated summaries were used only as non-authoritative navigation memory and were not injected as evidence into the answer context. In the small-model setting, SGCP-RAG increased exact-answer containment from 26.3% to 34.9% (+8.6 percentage points, McNemar p = 6.30e-38) and increased evidence recall from 0.155 to 0.256 (Wilcoxon p = 1.50e-78). In the large-model setting, SGCP-RAG increased exact-answer containment from 28.1% to 31.7% (+3.7 percentage points, McNemar p = 2.20e-06) and increased evidence recall from 0.192 to 0.258 (Wilcoxon p = 1.60e-31). After SGCP-RAG, evidence recall converged across model sizes (0.256 in the small-model setting and 0.258 in the large-model setting), whereas the absolute exact-answer containment gain was larger in the small-model setting than in the large-model setting (+8.6 versus +3.7 percentage points). SGCP-RAG also reduced no-relevant-context failures in both models, with mean latency increases of 30.6 s and 29.0 s, respectively. Across Figure 2, model-size effects were endpoint-specific: the large-model setting showed the larger citable cell-type gain in Figure 2A, whereas the small-model setting showed the larger SGCP-RAG exact-answer containment gain in Figure 2B. These results show that query-conditioned source navigation improved chunk-level evidence availability and answer containment, with a measurable retrieval-latency cost.
+```
+
+Paper-ready figure legend draft
+
+```text
+Figure 2. Evidence acquisition and source-grounded retrieval controls. A, Literature-retrieval skill benchmark for 30 breast cancer Visium ligand-receptor cases (GSE243280) [48,49]. The workflow evaluates whether coverage validation and targeted retrieval loops broaden citable biological context before downstream interpretation. Panel A reports the interpreter-facing citable set (direct + context), rather than all retrieved papers. Bar plots compare skill-off and skill-on retrieval for ligand-receptor, pathway, and cell-type context. All-retrieved paper coverage is shown in Supplementary Figure S4A. B, SGCP-RAG retrieval benchmark on the MultiHop-RAG dataset [62]. SGCP-RAG uses generated summaries as non-authoritative navigation memory to promote linked source documents before chunk retrieval and grading. Exact-answer containment and evidence recall are shown for baseline retrieval and SGCP-RAG-enabled retrieval. Both panels compare small-model (Qwen3.5-35B) and large-model (Qwen3.5-122B) settings; small and large denote model scale rather than an a priori performance ranking. Statistical tests use paired comparisons within the same benchmark cases.
+```
 
 ---
 
@@ -986,36 +992,36 @@ Claim boundary:
 
 This section mirrors the Introduction deployment argument and adds the Discussion-level takeaway that future biomedical agents should not default every step to frontier cloud models. DeepMAST should be framed as using local Qwen3.5 models across task difficulty levels, while reserving frontier models such as GPT-5.4 or Sonnet 4.6 for selected judging, auditing, or high-difficulty review roles when needed.
 
-Evidence anchors:
-- Figure 2A / coverage summary: Qwen3.5-122B showed the larger absolute citable cell-type coverage gain in the interpreter-facing set: 26.8% to 46.4% (+19.6 pp), while Qwen3.5-35B increased from 27.7% to 38.7% (+11.0 pp). In the all-retrieved set, Qwen3.5-122B also had the larger cell-type gain (+24.7 pp vs +20.6 pp). This supports stronger-model benefit for this retrieval-breadth endpoint.
-- Figure 2B / SGCP-RAG: Qwen3.5-35B showed larger SGCP gains than Qwen3.5-122B in exact-answer accuracy (+8.6 pp vs +3.7 pp) and evidence recall (+10.1 pp vs +6.6 pp), and after SGCP exact-answer accuracy was higher in Qwen3.5-35B (34.9% vs 31.7%) while evidence recall was nearly tied (25.6% vs 25.8%).
-- `INTERPRETATION_KO.md`: final content utility in the clean retrieval-only run was model-dependent and neutral overall; Qwen3.5-122B showed a positive real-use signal, whereas Qwen3.5-35B did not.
-- Deployment rationale: Qwen3.5-9B and Qwen3.5-35B can be discussed as candidates for routine extraction, classification, schema-following, and constrained reasoning; Qwen3.5-122B can be discussed for broader retrieval, synthesis, validation-sensitive stages, selected high-difficulty generation, judging, or audit roles when used.
+Evidence anchors
+- Figure 2A coverage summary. The large-model setting showed the larger absolute citable cell-type coverage gain in the interpreter-facing set, increasing from 26.8% to 46.4% (+19.6 pp), whereas the small-model setting increased from 27.7% to 38.7% (+11.0 pp). In the all-retrieved set, the large-model setting also had the larger cell-type gain (+24.7 pp versus +20.6 pp). This supports a model-scale effect for the retrieval-breadth endpoint, not a general model-ranking claim.
+- Figure 2B SGCP-RAG. The small-model setting showed larger SGCP-RAG gains than the large-model setting in exact-answer containment (+8.6 pp versus +3.7 pp) and evidence recall (+10.1 pp versus +6.6 pp). After SGCP-RAG, exact-answer containment was higher in the small-model setting (34.9% versus 31.7%), whereas evidence recall was nearly tied (25.6% versus 25.8%).
+- `INTERPRETATION_KO.md` final content utility in the clean retrieval-only run was model-dependent and neutral overall. The large-model setting showed a positive real-use signal, whereas the small-model setting did not.
+- Deployment rationale. Qwen3.5-9B and the small-model Qwen3.5-35B setting can be discussed as candidates for routine extraction, classification, schema following, and constrained reasoning. The large-model Qwen3.5-122B setting can be discussed for broader retrieval, synthesis, validation-sensitive stages, selected high-difficulty generation, judging, or audit roles when used.
 
-Recommended interpretation:
+Recommended interpretation
 
 ```text
-These results argue against treating model size as a monotonic proxy for scientific reliability. In DeepMAST, model choice interacts with the stage objective: larger local models can improve broader context acquisition in some retrieval settings, whereas smaller or more literal local models may benefit more from structured retrieval controls and may be useful for contract-following stages after evidence is constrained. This supports a practical agent-design principle in which sensitive or routine work can remain on local Qwen3.5 models, while frontier models are reserved for selected review, judging, or high-difficulty synthesis roles rather than used as the default substrate for every model call.
+These results argue against treating model size as a monotonic proxy for scientific reliability. In DeepMAST, model behavior depended on the stage objective. The large-model setting produced the larger gain for citable context acquisition, whereas the small-model setting benefited more from SGCP-RAG for exact-answer containment. This pattern supports a stage-specific model-matching principle in which model scale, retrieval control, output constraints, and validation gates are selected together rather than assuming that the largest model is optimal for every agent step.
 ```
 
-Do not write:
+Do not write
 - "Qwen3.5-35B is better than Qwen3.5-122B."
 - "Large models are not useful."
-- "Weak model outperforms strong model" without specifying endpoint and context.
+- "The small model outperforms the large model" without specifying endpoint and context.
 
-Better wording:
-
-```text
-The safer conclusion is stage-specific complementarity: Qwen3.5-9B and Qwen3.5-35B can support routine or constrained steps, Qwen3.5-122B remains useful for broader retrieval and synthesis, and frontier systems can be reserved for selected high-difficulty review or benchmarking roles. DeepMAST therefore benefits from matching model behavior to the evidence-governance stage rather than selecting the largest or most expensive model by default.
-```
-
-Paper-ready Discussion paragraph:
+Better wording
 
 ```text
-A further implication is that biomedical agents should be designed as governed systems of model calls rather than as frontier-model-only pipelines. Frontier systems remain valuable for difficult synthesis, independent judging, and stress-testing claim boundaries, but routine extraction, classification, retrieval control, schema following, and constrained reasoning can often be assigned to local models selected by task difficulty [18-20]. This point is practical as well as scientific. Local Qwen3.5 deployment can reduce privacy exposure, cost, and latency, while the harness determines whether any model output has enough evidence support to enter the final report. In this view, DeepMAST's use of Qwen3.5-9B, Qwen3.5-35B, and Qwen3.5-122B is not a model-ranking claim; it is a control-layer design choice that matches model capacity to step complexity and reserves frontier or larger models for stages where their additional reasoning or review capacity is justified.
+The safer conclusion is stage-specific complementarity. Qwen3.5-9B and the small-model Qwen3.5-35B setting can support routine, constrained, or retrieval-control steps, whereas the large-model Qwen3.5-122B setting remains useful for broader retrieval, synthesis, validation-sensitive generation, and selected review roles. DeepMAST therefore benefits from matching model behavior to the evidence-governance stage rather than selecting the largest or most expensive model by default.
 ```
 
-External citation support:
+Paper-ready Discussion paragraph
+
+```text
+A further implication is that biomedical agents should be designed as governed systems of model calls rather than as frontier-model-only pipelines. Figure 2 showed that model-scale effects were endpoint-specific. The large-model setting (Qwen3.5-122B) produced the larger gain in citable biological context, whereas the small-model setting (Qwen3.5-35B) showed the larger SGCP-RAG gain in exact-answer containment. This pattern does not imply that one model size is generally superior. Instead, it suggests that model scale should be matched to the evidence-governance stage, with smaller local models supporting routine extraction, retrieval control, schema following, and constrained reasoning, and larger or frontier models reserved for broader synthesis, independent judging, or validation-sensitive review [18-20]. In this view, DeepMAST's use of Qwen3.5-9B, Qwen3.5-35B, and Qwen3.5-122B is not a model-ranking claim. It is a control-layer design choice that combines model capacity with retrieval controls, output contracts, and claim-support validation before biological conclusions enter the final report.
+```
+
+External citation support
 - Small-language-model, task-level model selection, and hybrid local-large deployment work supports the broader deployment argument that many agent steps need not use the largest model [18-20].
 - Agent skills as reusable procedural artifacts that coordinate tools, memory, and runtime context [27,94].
 - Structured-output reliability can depend on constraints and output contracts rather than model size alone [95].
