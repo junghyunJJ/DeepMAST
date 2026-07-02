@@ -13,8 +13,24 @@ from typing import Any
 
 PMID_RE = re.compile(r"\bPMID[:\s]*(\d{6,9})\b", re.IGNORECASE)
 SECTION_RE = re.compile(r"(^## .+?$)(.*?)(?=^## |\Z)", re.MULTILINE | re.DOTALL)
+BIOLOGICAL_INTERPRETATION_RE = re.compile(
+    r"^###\s+Biological Interpretation\s*$\n?(.*?)(?=^### |\Z)",
+    re.MULTILINE | re.DOTALL,
+)
 THERAPEUTIC_RE = re.compile(
     r"\b(therapeutic|druggability|drug ranking|clinical prioritization|high-confidence therapeutic target)\b",
+    re.IGNORECASE,
+)
+REPORT_EVIDENCE_RE = re.compile(
+    r"\b(MISTy|Moran|co[-\s]?locali[zs]ation|spatial|Factor\s*\d+|FactorN|clusters?|importance|"
+    r"z[-\s]?score|FDR|enrichment|NMF|LIANA|Decoupler|regions?)\b",
+    re.IGNORECASE,
+)
+MECHANISTIC_TRIGGER_RE = re.compile(
+    r"\b(confirms?|proves?|demonstrates?\s+that|drives?|driving|directly\s+causes?|"
+    r"represents\s+a\s+fundamental\s+mechanism|would\s+be\s+particularly\s+sensitive\s+to|"
+    r"therapy[-\s]+resistant\s+subpopulation|attempting\s+to\s+suppress|appears\s+compromised|"
+    r"most\s+effective)\b",
     re.IGNORECASE,
 )
 FACTOR_PATHWAY_POSITIVE_RE = re.compile(
@@ -223,6 +239,41 @@ def _find_known_factors(text: str, known: dict[str, str]) -> set[str]:
 
 def _claim_windows(text: str) -> list[str]:
     return [part.strip() for part in re.split(r"(?<=[.!?])\s+|\n+", text) if part.strip()]
+
+
+def _biological_interpretation_blocks(section_body: str) -> list[str]:
+    return [match.group(1) for match in BIOLOGICAL_INTERPRETATION_RE.finditer(section_body)]
+
+
+def _check_mechanistic_interpretations(data_dir: Path, issues: list[dict[str, str]]) -> None:
+    for path in sorted(data_dir.glob("part*_final.md")):
+        text = _read_text(path)
+        if not text:
+            continue
+        for section in _sections(text):
+            for block in _biological_interpretation_blocks(str(section["body"])):
+                for window in _claim_windows(block):
+                    if not (REPORT_EVIDENCE_RE.search(window) and MECHANISTIC_TRIGGER_RE.search(window)):
+                        continue
+                    warning = bool(HYPOTHESIS_RE.search(window))
+                    issues.append(
+                        _issue(
+                            code=(
+                                "mechanistic_interpretation_warning"
+                                if warning
+                                else "unsupported_mechanistic_interpretation"
+                            ),
+                            file=path.name,
+                            section=str(section["heading"]),
+                            value=window,
+                            severity="warning" if warning else "error",
+                            evidence="Report-derived spatial/statistical evidence was written as a mechanistic or causal claim.",
+                            repair_instruction=(
+                                "Rewrite as an association or hypothesis unless direct experimental evidence is cited "
+                                "for this exact report-derived claim."
+                            ),
+                        )
+                    )
 
 
 def _lr_pair_from_row(row: dict[str, str]) -> str:
@@ -514,6 +565,7 @@ def validate_report(data_dir: Path) -> list[dict[str, str]]:
     _check_pmids(data_dir, issues)
     _check_lr_metric_claims(data_dir, issues)
     _check_pathway_factor_claims(data_dir, issues)
+    _check_mechanistic_interpretations(data_dir, issues)
     _check_part3_scope_and_pairs(data_dir, issues)
     return issues
 

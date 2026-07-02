@@ -584,3 +584,52 @@ def test_flags_lr_metric_value_mismatch_with_morans_r_value_of(tmp_path: Path) -
     flagged = [i for i in issues if i["code"] == "lr_metric_value_mismatch"]
     assert len(flagged) == 1
     assert flagged[0]["value"] == "LAMA5^ITGB4 morans=0.7171"
+
+
+def test_flags_unhedged_mechanistic_overclaim_in_biological_interpretation(tmp_path: Path) -> None:
+    _write_json(tmp_path / "papers.json", [])
+    (tmp_path / "part1_final.md").write_text(
+        "## Analysis 1-5: MISTy\n"
+        "### Biological Interpretation\n"
+        "The MISTy association confirms that hypoxic conditions drive proliferative tumor cell behavior.\n",
+        encoding="utf-8",
+    )
+
+    issues = validate_report.validate_report(tmp_path)
+
+    flagged = [i for i in issues if i["code"] == "unsupported_mechanistic_interpretation"]
+    assert len(flagged) == 1
+    assert flagged[0]["severity"] == "error"
+    assert flagged[0]["section"] == "## Analysis 1-5: MISTy"
+
+
+def test_warns_on_hedged_mechanistic_interpretation(tmp_path: Path) -> None:
+    _write_json(tmp_path / "papers.json", [])
+    (tmp_path / "part2_final.md").write_text(
+        "## Analysis 2-6: LIANA Moran's R\n"
+        "### Biological Interpretation\n"
+        "The spatial co-localization suggests that LRIG1-expressing cells may be attempting to suppress ERBB2 signaling.\n",
+        encoding="utf-8",
+    )
+
+    issues = validate_report.validate_report(tmp_path)
+
+    flagged = [i for i in issues if i["code"] == "mechanistic_interpretation_warning"]
+    assert len(flagged) == 1
+    assert flagged[0]["severity"] == "warning"
+    assert not any(i["code"] == "unsupported_mechanistic_interpretation" for i in issues)
+
+
+def test_ignores_general_literature_mechanism_without_report_evidence_terms(tmp_path: Path) -> None:
+    _write_json(tmp_path / "papers.json", [])
+    (tmp_path / "part1_final.md").write_text(
+        "## Analysis 1-4: Decoupler Pathway\n"
+        "### Biological Interpretation\n"
+        "The MAPK pathway drives cell cycle progression through ERK-mediated transcription.\n",
+        encoding="utf-8",
+    )
+
+    issues = validate_report.validate_report(tmp_path)
+
+    assert not any(i["code"] == "unsupported_mechanistic_interpretation" for i in issues)
+    assert not any(i["code"] == "mechanistic_interpretation_warning" for i in issues)
