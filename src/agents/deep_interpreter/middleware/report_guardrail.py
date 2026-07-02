@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-from langchain.agents.middleware import AgentMiddleware
+from langchain.agents.middleware import AgentMiddleware, AgentState
 from langchain_core.messages import AIMessage
 from langgraph.runtime import Runtime
 
@@ -48,10 +48,12 @@ class ReportGuardrailMiddleware(AgentMiddleware):
             ]
         }
 
-    def after_agent(self, state: dict[str, Any], runtime: Runtime | None) -> dict[str, Any] | None:
+    def after_agent(
+        self, state: AgentState[Any], runtime: Runtime[Any] | None
+    ) -> dict[str, Any] | None:
         return self._run()
 
     async def aafter_agent(
-        self, state: dict[str, Any], runtime: Runtime | None
+        self, state: AgentState[Any], runtime: Runtime[Any] | None
     ) -> dict[str, Any] | None:
         return await asyncio.to_thread(self._run)

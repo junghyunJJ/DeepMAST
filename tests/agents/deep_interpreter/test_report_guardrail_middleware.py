@@ -174,6 +174,37 @@ def test_report_guardrail_middleware_is_silent_when_guardrail_skips(
     assert result is None
 
 
+def test_report_guardrail_middleware_export_uses_env_data_dir(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.agents.deep_interpreter.middleware import ReportGuardrailMiddleware
+
+    seen: list[Path] = []
+
+    def fake_run(data_dir: Path, *, provider: str | None = None) -> dict[str, object]:
+        seen.append(data_dir)
+        return {
+            "status": "passed",
+            "initial_issue_count": 0,
+            "initial_error_count": 0,
+            "changed_sections": 0,
+            "final_issue_count": 0,
+            "final_error_count": 0,
+        }
+
+    monkeypatch.setenv("DEEP_INTERPRETER_DATA_DIR", str(tmp_path))
+    monkeypatch.setattr(
+        "src.agents.deep_interpreter.middleware.report_guardrail.run_report_guardrail",
+        fake_run,
+    )
+
+    result = ReportGuardrailMiddleware().after_agent({}, None)
+
+    assert result is not None
+    assert seen == [tmp_path]
+
+
 @pytest.mark.asyncio
 async def test_report_guardrail_middleware_async_hook_uses_same_runner(
     tmp_path: Path,
