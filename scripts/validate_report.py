@@ -17,15 +17,31 @@ THERAPEUTIC_RE = re.compile(
     r"\b(therapeutic|druggability|drug ranking|clinical prioritization|high-confidence therapeutic target)\b",
     re.IGNORECASE,
 )
-SIGNIFICANCE_RE = re.compile(r"\b(significant|significantly|enriched|enrichment)\b", re.IGNORECASE)
+FACTOR_PATHWAY_POSITIVE_RE = re.compile(
+    r"\b(enriched|enrichment|activation|activated|active|higher|increased|positive)\b",
+    re.IGNORECASE,
+)
+FACTOR_PATHWAY_NEGATIVE_RE = re.compile(
+    r"\b(depleted|depletion|negative|lower|reduced|attenuated|suppressed)\b",
+    re.IGNORECASE,
+)
+FACTOR_PATHWAY_CLAIM_RE = re.compile(
+    r"\b(significant|significantly|enriched|enrichment|activation|activated|active|higher|increased|positive|"
+    r"depleted|depletion|negative|lower|reduced|attenuated|suppressed)\b",
+    re.IGNORECASE,
+)
 FACTOR_RE = re.compile(r"\bFactor\s*\d+\b", re.IGNORECASE)
 HYPOTHESIS_RE = re.compile(
     r"\b(may|might|could|hypothesis|inferred|suggests?|consistent with|not pathway-factor significance)\b",
     re.IGNORECASE,
 )
 NEGATED_SIGNIFICANCE_RE = re.compile(
-    r"\b(?:no|not|without|lack|lacks|lacked|absent)\b.{0,40}\b(?:significant|significantly|enriched|enrichment)\b|"
-    r"\b(?:significant|significantly|enriched|enrichment)\b.{0,40}\b(?:no|not|without|lack|lacks|lacked|absent)\b",
+    r"\b(?:no|not|without|lack|lacks|lacked|absent)\b.{0,40}\b(?:significant|significantly|"
+    r"enriched|enrichment|activation|activated|active|higher|increased|positive|depleted|depletion|negative|"
+    r"lower|reduced|attenuated|suppressed)\b|"
+    r"\b(?:significant|significantly|enriched|enrichment|activation|activated|active|higher|increased|positive|"
+    r"depleted|depletion|negative|lower|reduced|attenuated|suppressed)\b.{0,40}\b(?:no|not|without|lack|"
+    r"lacks|lacked|absent)\b",
     re.IGNORECASE,
 )
 LR_METRIC_CLAIM_RE = re.compile(
@@ -293,11 +309,11 @@ def _check_lr_metric_claims(data_dir: Path, issues: list[dict[str, str]]) -> Non
                     )
 
 
-def _supported_factor_pathways(data_dir: Path) -> tuple[dict[str, set[str]], dict[str, str], dict[str, str]]:
+def _supported_factor_pathways(data_dir: Path) -> tuple[dict[str, dict[str, float | None]], dict[str, str], dict[str, str]]:
     path = data_dir / "sig_liana_pathway_factor.csv"
     if not path.exists():
         return {}, {}, {}
-    supported: dict[str, set[str]] = {}
+    supported: dict[str, dict[str, float | None]] = {}
     factor_labels: dict[str, str] = {}
     pathway_labels: dict[str, str] = {}
     with path.open(newline="", encoding="utf-8") as f:
@@ -308,9 +324,16 @@ def _supported_factor_pathways(data_dir: Path) -> tuple[dict[str, set[str]], dic
                 continue
             factor_key = _factor_key(factor)
             pathway_key = _token_key(pathway)
-            supported.setdefault(factor_key, set()).add(pathway_key)
+            supported.setdefault(factor_key, {})[pathway_key] = _first_float(row, ("estimate", "Estimate"))
             factor_labels.setdefault(factor_key, _factor_label(factor))
             pathway_labels.setdefault(pathway_key, pathway.strip())
+    decoupler_path = data_dir / "sig_PathwayEnrich_decoupler.csv"
+    if decoupler_path.exists():
+        with decoupler_path.open(newline="", encoding="utf-8") as f:
+            for row in csv.DictReader(f):
+                pathway = str(row.get("name") or row.get("pathway") or row.get("Pathway") or "")
+                if pathway.strip():
+                    pathway_labels.setdefault(_token_key(pathway), pathway.strip())
     return supported, factor_labels, pathway_labels
 
 
@@ -325,7 +348,7 @@ def _check_pathway_factor_claims(data_dir: Path, issues: list[dict[str, str]]) -
     for section in _sections(text):
         for window in _claim_windows(str(section["body"])):
             if not (
-                SIGNIFICANCE_RE.search(window)
+                FACTOR_PATHWAY_CLAIM_RE.search(window)
                 and not NEGATED_SIGNIFICANCE_RE.search(window)
                 and not HYPOTHESIS_RE.search(window)
             ):
@@ -333,19 +356,34 @@ def _check_pathway_factor_claims(data_dir: Path, issues: list[dict[str, str]]) -
             factors = _find_known_factors(window, factor_labels)
             pathways = _find_known_tokens(window, pathway_labels)
             for factor in sorted(factors):
-                unsupported = sorted(pathways - supported.get(factor, set()))
-                if not unsupported:
-                    continue
-                issues.append(
-                    _issue(
-                        code="unsupported_pathway_factor_significance",
-                        file=path.name,
-                        section=str(section["heading"]),
-                        value=", ".join(f"{factor_labels[factor]}: {pathway_labels[p]}" for p in unsupported),
-                        evidence="sig_liana_pathway_factor.csv lacks the claimed factor-pathway support.",
-                        repair_instruction="Rephrase as an LR-annotation-based hypothesis, not measured pathway-factor significance.",
+                factor_pathways = supported.get(factor, {})
+                unsupported = sorted(pathways - set(factor_pathways))
+                if unsupported:
+                    issues.append(
+                        _issue(
+                            code="unsupported_pathway_factor_significance",
+                            file=path.name,
+                            section=str(section["heading"]),
+                            value=", ".join(f"{factor_labels[factor]}: {pathway_labels[p]}" for p in unsupported),
+                            evidence="sig_liana_pathway_factor.csv lacks the claimed factor-pathway support.",
+                            repair_instruction="Rephrase as an LR-annotation-based hypothesis, not measured pathway-factor significance.",
+                        )
                     )
-                )
+                if not (FACTOR_PATHWAY_POSITIVE_RE.search(window) and not FACTOR_PATHWAY_NEGATIVE_RE.search(window)):
+                    continue
+                for pathway in sorted(pathways & set(factor_pathways)):
+                    estimate = factor_pathways[pathway]
+                    if estimate is not None and estimate < 0:
+                        issues.append(
+                            _issue(
+                                code="factor_pathway_direction_mismatch",
+                                file=path.name,
+                                section=str(section["heading"]),
+                                value=f"{factor_labels[factor]}: {pathway_labels[pathway]} estimate={estimate}",
+                                evidence="sig_liana_pathway_factor.csv has a negative estimate for the positively described factor-pathway pair.",
+                                repair_instruction="Describe the pathway as depleted/reduced or use a factor-pathway pair with a positive estimate.",
+                            )
+                        )
 
 
 def _selected_lr_pairs(data_dir: Path) -> list[str]:
