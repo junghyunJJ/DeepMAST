@@ -620,6 +620,38 @@ def test_warns_on_hedged_mechanistic_interpretation(tmp_path: Path) -> None:
     assert not any(i["code"] == "unsupported_mechanistic_interpretation" for i in issues)
 
 
+def test_flags_unhedged_mechanistic_overclaim_even_when_inferred_is_present(tmp_path: Path) -> None:
+    _write_json(tmp_path / "papers.json", [])
+    (tmp_path / "part1_final.md").write_text(
+        "## Analysis 1-5: MISTy\n"
+        "### Biological Interpretation\n"
+        "MISTy-inferred spatial pattern confirms that hypoxia drives tumor behavior.\n",
+        encoding="utf-8",
+    )
+
+    issues = validate_report.validate_report(tmp_path)
+
+    flagged = [i for i in issues if i["code"] == "unsupported_mechanistic_interpretation"]
+    assert len(flagged) == 1
+    assert flagged[0]["severity"] == "error"
+    assert not any(i["code"] == "mechanistic_interpretation_warning" for i in issues)
+
+
+def test_ignores_mechanistic_trigger_outside_biological_interpretation(tmp_path: Path) -> None:
+    _write_json(tmp_path / "papers.json", [])
+    (tmp_path / "part1_final.md").write_text(
+        "## Analysis 1-5: MISTy\n"
+        "### Results\n"
+        "MISTy-inferred spatial pattern confirms that hypoxia drives tumor behavior.\n",
+        encoding="utf-8",
+    )
+
+    issues = validate_report.validate_report(tmp_path)
+
+    assert not any(i["code"] == "unsupported_mechanistic_interpretation" for i in issues)
+    assert not any(i["code"] == "mechanistic_interpretation_warning" for i in issues)
+
+
 def test_ignores_general_literature_mechanism_without_report_evidence_terms(tmp_path: Path) -> None:
     _write_json(tmp_path / "papers.json", [])
     (tmp_path / "part1_final.md").write_text(

@@ -33,6 +33,10 @@ MECHANISTIC_TRIGGER_RE = re.compile(
     r"most\s+effective)\b",
     re.IGNORECASE,
 )
+MECHANISTIC_HEDGE_RE = re.compile(
+    r"\b(may|might|could|suggests?|hypothesis|potential(?:ly)?|possibly|consistent with)\b",
+    re.IGNORECASE,
+)
 FACTOR_PATHWAY_POSITIVE_RE = re.compile(
     r"\b(enriched|enrichment|activation|activated|active|higher|increased|positive)\b",
     re.IGNORECASE,
@@ -255,7 +259,7 @@ def _check_mechanistic_interpretations(data_dir: Path, issues: list[dict[str, st
                 for window in _claim_windows(block):
                     if not (REPORT_EVIDENCE_RE.search(window) and MECHANISTIC_TRIGGER_RE.search(window)):
                         continue
-                    warning = bool(HYPOTHESIS_RE.search(window))
+                    warning = bool(MECHANISTIC_HEDGE_RE.search(window))
                     issues.append(
                         _issue(
                             code=(
