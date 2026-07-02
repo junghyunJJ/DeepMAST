@@ -6,6 +6,7 @@ import csv
 import json
 import re
 import sys
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
@@ -29,8 +30,10 @@ NEGATED_SIGNIFICANCE_RE = re.compile(
 )
 LR_METRIC_CLAIM_RE = re.compile(
     r"\b(?P<label>Moran's\s*R|combined\s*score|combinedscore|GenePT\s*score)\b"
-    r"\s*(?:=|:|of|is|was)?\s*"
-    r"(?P<value>[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)",
+    r"(?:\s+(?:score|value))?"
+    r"\s*(?:=|:|of|is|was)?\s*\(?\s*"
+    r"(?P<value>[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)"
+    r"\s*\)?",
     re.IGNORECASE,
 )
 LR_METRIC_COLUMNS = {
@@ -240,6 +243,21 @@ def _lr_metric_from_label(label: str) -> str:
     return "combinedscore"
 
 
+def _lr_pair_pattern(pair: str) -> str:
+    ligand, sep, receptor = pair.partition("^")
+    if not sep:
+        return rf"\b{re.escape(pair)}\b"
+    return rf"\b{re.escape(ligand)}\s*(?:\^|[-–/])\s*{re.escape(receptor)}\b"
+
+
+def _lr_pair_mentions(text: str, pairs: Iterable[str]) -> list[tuple[int, int, str]]:
+    mentions: list[tuple[int, int, str]] = []
+    for pair in pairs:
+        for match in re.finditer(_lr_pair_pattern(str(pair)), text, re.IGNORECASE):
+            mentions.append((match.start(), match.end(), str(pair)))
+    return sorted(mentions)
+
+
 def _check_lr_metric_claims(data_dir: Path, issues: list[dict[str, str]]) -> None:
     metrics = _sig_liana_metrics(data_dir)
     if not metrics:
@@ -251,12 +269,10 @@ def _check_lr_metric_claims(data_dir: Path, issues: list[dict[str, str]]) -> Non
 
     for section in _sections(text):
         for window in _claim_windows(str(section["body"])):
-            claims = list(LR_METRIC_CLAIM_RE.finditer(window))
-            if not claims:
-                continue
-            pairs = [pair for pair in metrics if _mentions_lr_pair(window, pair)]
-            for pair in pairs:
-                for claim in claims:
+            pair_mentions = _lr_pair_mentions(window, metrics.keys())
+            for index, (_, pair_end, pair) in enumerate(pair_mentions):
+                phrase_end = pair_mentions[index + 1][0] if index + 1 < len(pair_mentions) else len(window)
+                for claim in LR_METRIC_CLAIM_RE.finditer(window, pair_end, phrase_end):
                     metric = _lr_metric_from_label(claim.group("label"))
                     expected = metrics[pair].get(metric)
                     if expected is None:
@@ -347,12 +363,7 @@ def _selected_lr_pairs(data_dir: Path) -> list[str]:
 
 
 def _mentions_lr_pair(text: str, pair: str) -> bool:
-    if pair in text:
-        return True
-    ligand, sep, receptor = pair.partition("^")
-    if not sep:
-        return False
-    return bool(re.search(rf"\b{re.escape(ligand)}\s*[-–/]\s*{re.escape(receptor)}\b", text))
+    return bool(re.search(_lr_pair_pattern(pair), text))
 
 
 def _check_part3_scope_and_pairs(data_dir: Path, issues: list[dict[str, str]]) -> None:
