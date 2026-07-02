@@ -73,7 +73,7 @@ NEGATED_SIGNIFICANCE_RE = re.compile(
     re.IGNORECASE,
 )
 LR_METRIC_CLAIM_RE = re.compile(
-    r"\b(?P<label>Moran's\s*R|combined\s*score|combinedscore|GenePT\s*score)\b"
+    r"\b(?P<label>Moran(?:'s|s)?\s*[RI]|combined\s*score|combinedscore|GenePT\s*score)\b"
     r"(?:\s+(?:score|value))?"
     r"\s*(?:=|:|of|is|was)?\s*\(?\s*"
     r"(?P<value>[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)"
@@ -332,7 +332,7 @@ def _sig_liana_metrics(data_dir: Path) -> dict[str, dict[str, float]]:
 
 def _lr_metric_from_label(label: str) -> str:
     key = _token_key(label)
-    if key == "moransr":
+    if key in {"moranr", "moransr", "morani", "moransi"}:
         return "morans"
     if key == "geneptscore":
         return "genept_score"
@@ -358,35 +358,35 @@ def _check_lr_metric_claims(data_dir: Path, issues: list[dict[str, str]]) -> Non
     metrics = _sig_liana_metrics(data_dir)
     if not metrics:
         return
-    path = data_dir / "part2_final.md"
-    text = _read_text(path)
-    if not text:
-        return
 
-    for section in _sections(text):
-        for window in _claim_windows(str(section["body"])):
-            pair_mentions = _lr_pair_mentions(window, metrics.keys())
-            for index, (_, pair_end, pair) in enumerate(pair_mentions):
-                phrase_end = pair_mentions[index + 1][0] if index + 1 < len(pair_mentions) else len(window)
-                for claim in LR_METRIC_CLAIM_RE.finditer(window, pair_end, phrase_end):
-                    metric = _lr_metric_from_label(claim.group("label"))
-                    expected = metrics[pair].get(metric)
-                    if expected is None:
-                        continue
-                    claimed_text = claim.group("value")
-                    claimed = float(claimed_text)
-                    if abs(claimed - expected) <= 0.001:
-                        continue
-                    issues.append(
-                        _issue(
-                            code="lr_metric_value_mismatch",
-                            file=path.name,
-                            section=str(section["heading"]),
-                            value=f"{pair} {metric}={claimed_text}",
-                            evidence=f"sig_liana.csv has {metric}={expected:.4f} for {pair}.",
-                            repair_instruction="Use the metric value from sig_liana.csv or relabel the claim to the correct LR metric.",
+    for path in sorted(data_dir.glob("part*_final.md")):
+        text = _read_text(path)
+        if not text:
+            continue
+        for section in _sections(text):
+            for window in _claim_windows(str(section["body"])):
+                pair_mentions = _lr_pair_mentions(window, metrics.keys())
+                for index, (_, pair_end, pair) in enumerate(pair_mentions):
+                    phrase_end = pair_mentions[index + 1][0] if index + 1 < len(pair_mentions) else len(window)
+                    for claim in LR_METRIC_CLAIM_RE.finditer(window, pair_end, phrase_end):
+                        metric = _lr_metric_from_label(claim.group("label"))
+                        expected = metrics[pair].get(metric)
+                        if expected is None:
+                            continue
+                        claimed_text = claim.group("value")
+                        claimed = float(claimed_text)
+                        if abs(claimed - expected) <= 0.001:
+                            continue
+                        issues.append(
+                            _issue(
+                                code="lr_metric_value_mismatch",
+                                file=path.name,
+                                section=str(section["heading"]),
+                                value=f"{pair} {metric}={claimed_text}",
+                                evidence=f"sig_liana.csv has {metric}={expected:.4f} for {pair}.",
+                                repair_instruction="Use the metric value from sig_liana.csv or relabel the claim to the correct LR metric.",
+                            )
                         )
-                    )
 
 
 def _supported_factor_pathways(data_dir: Path) -> tuple[dict[str, dict[str, float | None]], dict[str, str], dict[str, str]]:
