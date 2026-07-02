@@ -25,11 +25,18 @@ FACTOR_PATHWAY_NEGATIVE_RE = re.compile(
     r"\b(depleted|depletion|negative|lower|reduced|attenuated|suppressed)\b",
     re.IGNORECASE,
 )
+FACTOR_PATHWAY_NEGATED_DIRECTION_RE = re.compile(
+    r"\b(?:no|not|without|lack|lacks|lacked|absent)\b(?:\s+\w+){0,2}\s+"
+    r"\b(?:enriched|enrichment|activation|activated|active|higher|increased|positive|"
+    r"depleted|depletion|negative|lower|reduced|attenuated|suppressed)\b",
+    re.IGNORECASE,
+)
 FACTOR_PATHWAY_CLAIM_RE = re.compile(
     r"\b(significant|significantly|enriched|enrichment|activation|activated|active|higher|increased|positive|"
     r"depleted|depletion|negative|lower|reduced|attenuated|suppressed)\b",
     re.IGNORECASE,
 )
+FACTOR_PATHWAY_CONNECTOR_RE = re.compile(r"\b(?:and|but|while|whereas)\b", re.IGNORECASE)
 FACTOR_RE = re.compile(r"\bFactor\s*\d+\b", re.IGNORECASE)
 HYPOTHESIS_RE = re.compile(
     r"\b(may|might|could|hypothesis|inferred|suggests?|consistent with|not pathway-factor significance)\b",
@@ -345,24 +352,60 @@ def _supported_factor_pathways(data_dir: Path) -> tuple[dict[str, dict[str, floa
     return supported, factor_labels, pathway_labels
 
 
+def _direction_flags(text: str) -> tuple[bool, bool]:
+    text = FACTOR_PATHWAY_NEGATED_DIRECTION_RE.sub("", text)
+    return bool(FACTOR_PATHWAY_POSITIVE_RE.search(text)), bool(FACTOR_PATHWAY_NEGATIVE_RE.search(text))
+
+
+def _split_direction_gap(text: str) -> tuple[str, str]:
+    matches = list(FACTOR_PATHWAY_CONNECTOR_RE.finditer(text))
+    if not matches:
+        return text, ""
+    match = matches[-1]
+    return text[: match.start()], text[match.end() :]
+
+
 def _pathway_direction_claims(window: str, pathway_labels: dict[str, str]) -> dict[str, tuple[bool, bool]]:
     directions: dict[str, tuple[bool, bool]] = {}
     mentions = _known_token_mentions(window, pathway_labels)
-    for index, (start, end, pathway) in enumerate(mentions):
-        prev_end = mentions[index - 1][1] if index else 0
-        next_start = mentions[index + 1][0] if index + 1 < len(mentions) else len(window)
-        before = window[prev_end:start]
-        after = window[end:next_start]
-        if index + 1 < len(mentions):
-            after = re.split(r"\b(?:and|but|while|whereas)\b", after, maxsplit=1, flags=re.IGNORECASE)[0]
-        local = after if FACTOR_PATHWAY_CLAIM_RE.search(after) else before
-        if not FACTOR_PATHWAY_CLAIM_RE.search(local):
-            local = window[prev_end:next_start]
-        positive = bool(FACTOR_PATHWAY_POSITIVE_RE.search(local))
-        negative = bool(FACTOR_PATHWAY_NEGATIVE_RE.search(local))
+    if not mentions:
+        return directions
+
+    gaps: list[tuple[str, str, bool]] = []
+    for index in range(len(mentions) - 1):
+        gap = window[mentions[index][1] : mentions[index + 1][0]]
+        left, right = _split_direction_gap(gap)
+        positive, negative = _direction_flags(f"{left} {right}")
+        gaps.append((left, right, positive or negative))
+
+    group_start = 0
+    for index, (_, _, has_direction) in enumerate(gaps):
+        if not has_direction:
+            continue
+        _add_pathway_group_directions(window, mentions, gaps, group_start, index, directions)
+        group_start = index + 1
+    _add_pathway_group_directions(window, mentions, gaps, group_start, len(mentions) - 1, directions)
+    return directions
+
+
+def _add_pathway_group_directions(
+    window: str,
+    mentions: list[tuple[int, int, str]],
+    gaps: list[tuple[str, str, bool]],
+    group_start: int,
+    group_end: int,
+    directions: dict[str, tuple[bool, bool]],
+) -> None:
+    prefix = window[: mentions[0][0]] if group_start == 0 else gaps[group_start - 1][1]
+    suffix = window[mentions[-1][1] :] if group_end == len(mentions) - 1 else gaps[group_end][0]
+    prefix_positive, prefix_negative = _direction_flags(prefix)
+    suffix_positive, suffix_negative = _direction_flags(suffix)
+    positive = prefix_positive or suffix_positive
+    negative = prefix_negative or suffix_negative
+    for index in range(group_start, group_end + 1):
+        pathway = mentions[index][2]
         old_positive, old_negative = directions.get(pathway, (False, False))
         directions[pathway] = (old_positive or positive, old_negative or negative)
-    return directions
 
 
 def _check_pathway_factor_claims(data_dir: Path, issues: list[dict[str, str]]) -> None:
@@ -375,11 +418,7 @@ def _check_pathway_factor_claims(data_dir: Path, issues: list[dict[str, str]]) -
         return
     for section in _sections(text):
         for window in _claim_windows(str(section["body"])):
-            if not (
-                FACTOR_PATHWAY_CLAIM_RE.search(window)
-                and not NEGATED_SIGNIFICANCE_RE.search(window)
-                and not HYPOTHESIS_RE.search(window)
-            ):
+            if not (FACTOR_PATHWAY_CLAIM_RE.search(window) and not HYPOTHESIS_RE.search(window)):
                 continue
             factors = _find_known_factors(window, factor_labels)
             pathways = _find_known_tokens(window, pathway_labels)
@@ -387,7 +426,7 @@ def _check_pathway_factor_claims(data_dir: Path, issues: list[dict[str, str]]) -
             for factor in sorted(factors):
                 factor_pathways = supported.get(factor, {})
                 unsupported = sorted(pathways - set(factor_pathways))
-                if unsupported:
+                if unsupported and not NEGATED_SIGNIFICANCE_RE.search(window):
                     issues.append(
                         _issue(
                             code="unsupported_pathway_factor_significance",
