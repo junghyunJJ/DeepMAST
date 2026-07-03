@@ -103,6 +103,10 @@ def _output_status(data_dir: Path, outputs: list[str]) -> dict[str, bool]:
     return {name: (data_dir / name).exists() for name in outputs}
 
 
+def _missing_outputs(data_dir: Path, outputs: list[str]) -> list[str]:
+    return [name for name in outputs if not (data_dir / name).exists()]
+
+
 def _build_subagent_message(subagent: str, data_dir: Path, targets: dict[str, Any], part: int | None) -> str:
     if subagent == "planner":
         return _build_initial_message(data_dir, targets)
@@ -123,14 +127,19 @@ Do not run interpreter or reporter."""
             1: "Interpret Part 1 ONLY. Output /part1_final.md.",
             2: "Interpret Part 2 ONLY. Connect CCI findings to Part 1 where relevant. Output /part2_final.md.",
             3: (
-                "Interpret Part 3 ONLY. Read part4_candidate_selection.json via load_analysis_data. "
-                "Use selected_genes as the fixed gene-section list. Use selected_lr_pairs as the source "
-                "of truth for 3-10 and 3-11 direct L-R evidence when present; fall back to selected_genes "
-                "only if selected_lr_pairs is missing. Integrate each selected pair's spatial and "
-                "quantitative L-R evidence into the relevant selected gene subsection. Connect L-R "
-                "evidence back to both Part 1 spatial patterns and Part 2 NMF/pathway results. Do not "
-                "read or summarize part4_therapeutic_synthesis.md; therapeutic synthesis, druggability, "
-                "drug ranking, and clinical prioritization belong to Part 4. Output /part3_final.md."
+                "Interpret Part 3 ONLY. This is not a generic PPI network summary. "
+                "Interpret Part 3 ligand-receptor details only. Read "
+                "part4_candidate_selection.json via load_analysis_data. Use selected_genes "
+                "as the fixed gene-section list. Use selected_lr_pairs as the source of "
+                "truth for 3-10 and 3-11 direct L-R evidence when present; fall back to "
+                "selected_genes only if selected_lr_pairs is missing. Integrate each "
+                "selected pair's spatial and quantitative L-R evidence into the relevant "
+                "selected gene subsection. Connect L-R evidence back to both Part 1 "
+                "spatial patterns and Part 2 NMF/pathway results. Do not read or summarize "
+                "part4_therapeutic_synthesis.md; therapeutic synthesis, druggability, "
+                "drug ranking, and clinical prioritization belong to Part 4. You MUST call "
+                "write_file with file_path=\"/part3_final.md\" and complete markdown "
+                "content. A chat response only is incomplete."
             ),
         }
         return f"""Run INTERPRETER for {data_dir}.
@@ -144,7 +153,12 @@ Validate citations and do not run planner, searcher, or reporter."""
         return f"""Run REPORTER only for the CCI analysis in {data_dir}.
 
 Read /part1_final.md, /part2_final.md, /part3_final.md, /part4_therapeutic_synthesis.md if present, and /drug.md if present.
-Write /synthesis.md, /synthesis_validation.json, /synthesis_targets.json, and CCI_Analysis_Report.html.
+Use existing /papers.json-backed RAG retrieval only; do not run new literature searches or create reporter-specific paper artifacts.
+Call write_file("/synthesis.md", ...) with the complete integrated narrative as Markdown, not HTML.
+Then call generate_html_report with parts={{"template_mode": "comprehensive", ...}},
+output_path="CCI_Analysis_Report.html", and data_dir from /data_path.txt.
+generate_html_report writes synthesis_validation.json and synthesis_targets.json automatically after running the synthesis guardrail.
+Do not hand-author part1_html, part2_html, part3_html, summary_html, or therapeutic_html.
 Do not run planner, searcher, or interpreter."""
     raise ValueError(f"Unknown subagent: {subagent}")
 
@@ -223,7 +237,11 @@ async def run(args: argparse.Namespace) -> int:
         import deepagents.graph as deepagents_graph
 
         # ponytail: test-only bypass for deepagents/langchain summarization API drift.
-        deepagents_graph.create_summarization_middleware = lambda *_args, **_kwargs: AgentMiddleware()
+        setattr(
+            deepagents_graph,
+            "create_summarization_middleware",
+            lambda *_args, **_kwargs: AgentMiddleware(),
+        )
 
     if args.subagent:
         _seed_standalone_files(data_dir, targets)
@@ -283,15 +301,19 @@ async def run(args: argparse.Namespace) -> int:
         return 1
 
     messages = result.get("messages", []) if isinstance(result, dict) else []
+    outputs = _output_status(data_dir, expected_outputs)
+    missing_outputs = _missing_outputs(data_dir, expected_outputs)
     summary = {
-        "event": "invoke_complete",
+        "event": "invoke_incomplete" if missing_outputs else "invoke_complete",
         "message_count": len(messages),
         "last_message": _jsonable_message(messages[-1]) if messages else None,
         "result_keys": sorted(result.keys()) if isinstance(result, dict) else [],
-        "outputs": _output_status(data_dir, expected_outputs),
+        "outputs": outputs,
     }
+    if missing_outputs:
+        summary["missing_outputs"] = missing_outputs
     print(json.dumps(summary, indent=2, sort_keys=True, ensure_ascii=False))
-    return 0
+    return 1 if missing_outputs else 0
 
 
 def main(argv: list[str] | None = None) -> int:

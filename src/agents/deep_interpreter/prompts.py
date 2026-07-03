@@ -165,9 +165,9 @@ Use the **reporter** subagent to:
 - Read all /partN_final.md files
 - Identify emergent cross-part themes
 - Synthesize findings into coherent biological narrative
-- Validate synthesis claims with independent literature search
+- Validate synthesis claims with existing /papers.json-backed RAG retrieval
 - Generate HTML report
-- Output: /synthesis.md, /synthesis_papers.json, CCI_Analysis_Report.html
+- Output: /synthesis.md, /synthesis_validation.json, /synthesis_targets.json, CCI_Analysis_Report.html
 
 ## Important Guidelines
 
@@ -224,7 +224,7 @@ Use the **reporter** subagent to:
 | **planner** | Target confirmation + data assessment + interpretation guide | /targets.json (from message) | /interpretation_guide.md |
 | **searcher** | Context extraction + unified literature search | /data_path.txt, search_context (all Parts) | /papers_raw.json, /citation_candidates.json, filtered /papers.json |
 | **interpreter** | Part 1/2/3 interpretation with inline validation | filtered /papers.json, /interpretation_guide.md | /part1_final.md, /part2_final.md, /part3_final.md |
-| **reporter** | Cross-part synthesis + emergent themes + HTML report | /partN_final.md, /interpretation_guide.md | /synthesis.md, /synthesis_papers.json, CCI_Analysis_Report.html |
+| **reporter** | Cross-part synthesis + emergent themes + HTML report | /partN_final.md, /interpretation_guide.md, /papers.json | /synthesis.md, /synthesis_validation.json, /synthesis_targets.json, CCI_Analysis_Report.html |
 
 ## Workflow Diagram
 
@@ -275,9 +275,10 @@ Use the **reporter** subagent to:
 │ REPORTER                                                                     │
 │  - Read all /partN_final.md                                                 │
 │  - Identify emergent cross-part themes                                      │
-│  - Validate synthesis claims with independent literature search             │
+│  - Validate synthesis claims with existing /papers.json-backed RAG          │
 │  - Generate HTML report                                                     │
-│  → /synthesis.md, /synthesis_papers.json, CCI_Analysis_Report.html          │
+│  → /synthesis.md, /synthesis_validation.json, /synthesis_targets.json,      │
+│    CCI_Analysis_Report.html                                                 │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 

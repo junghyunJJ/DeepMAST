@@ -2,7 +2,7 @@
 
 Resumes from existing synthesis.md and therapeutic_targets.json to:
 1. Add Therapeutic Implications section to synthesis.md (Phase 4.7 Step 3-4)
-2. Write synthesis_targets.json
+2. Let generate_html_report create synthesis_targets.json when missing
 3. Generate CCI_Analysis_Report.html (Phase 5)
 
 Prerequisites:
@@ -19,8 +19,10 @@ Usage:
 import asyncio
 import json
 import os
+import re
 import sys
 from pathlib import Path
+from typing import Literal, cast
 
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
@@ -32,7 +34,8 @@ from dotenv import load_dotenv  # noqa: E402
 
 load_dotenv(PROJECT_ROOT / ".env")
 
-PROVIDER = os.getenv("REPORTER_PROVIDER", "openai")
+Provider = Literal["openai", "google", "ollama", "ollama-openai", "vllm", "claude", "openrouter"]
+PROVIDER = cast(Provider, os.getenv("REPORTER_PROVIDER", "openai"))
 
 # Focused message: skip Phase 1-4.5, resume from Phase 4.7 Step 3
 PHASE5_MESSAGE = {
@@ -44,7 +47,6 @@ PHASE5_MESSAGE = {
                 "Your task is to complete Phase 4.7 (Steps 3-4) and Phase 5 ONLY.\n\n"
                 "## Already completed (DO NOT redo):\n"
                 "- synthesis.md written (Phase 1-4.5)\n"
-                "- synthesis_papers.json written\n"
                 "- synthesis_validation.json written\n"
                 "- therapeutic_targets.json written by assess_therapeutic_potential\n\n"
                 "## Your tasks:\n\n"
@@ -70,33 +72,37 @@ PHASE5_MESSAGE = {
                 "#### Novel Opportunities\n"
                 "#### Safety Considerations\n"
                 "Then write_file('/synthesis.md', ...) with the COMPLETE updated content.\n\n"
-                "### Step 4: Write synthesis_targets.json\n"
-                "Extract from therapeutic_targets.json and write a structured summary:\n"
-                "```json\n"
-                '{"druggable_targets": [...], "known_drugs": [...], '
-                '"novel_targets": [...], "summary": {...}}\n'
-                "```\n"
-                "write_file('/synthesis_targets.json', ...)\n\n"
+                "### Step 4: Hand off source tracking to report tool\n"
+                "Do not write /synthesis_targets.json manually. generate_html_report detects\n"
+                "part4_therapeutic_synthesis.md, drug.md, and therapeutic_targets.json and\n"
+                "creates synthesis_targets.json when it is missing.\n\n"
                 "### Step 5: Generate HTML Report (Phase 5)\n"
                 "Call generate_html_report with:\n"
-                "- parts dict containing title, subtitle, executive_summary\n"
-                "- part1/part2/part3 dicts with figure_path and interpretation\n"
+                "- parts dict containing template_mode='comprehensive', title, subtitle, executive_summary\n"
                 "- synthesis (full updated synthesis.md content)\n"
-                "- therapeutic_html (LLM-generated HTML for the Therapeutic tab)\n"
                 "- quality_score, references\n"
                 "- output_path='CCI_Analysis_Report.html'\n"
                 "- data_dir from /data_path.txt\n\n"
                 "## CRITICAL RULES:\n"
                 "- MUST call write_file('/synthesis.md', ...) with updated content\n"
-                "- MUST call write_file('/synthesis_targets.json', ...)\n"
                 "- MUST call generate_html_report to create CCI_Analysis_Report.html\n"
+                "- generate_html_report creates synthesis_validation.json and synthesis_targets.json when missing\n"
                 "- Do NOT re-run literature search or assess_therapeutic_potential\n"
+                "- Do NOT hand-author part1_html, part2_html, part3_html, summary_html, or therapeutic_html\n"
                 "- Do NOT skip the HTML report generation\n\n"
                 "Begin now."
             ),
         }
     ]
 }
+
+
+def test_phase5_message_delegates_bookkeeping_artifacts_to_report_tool():
+    content = PHASE5_MESSAGE["messages"][0]["content"]
+
+    assert "generate_html_report creates synthesis_validation.json and synthesis_targets.json" in content
+    assert not re.search(r"write_file\(['\"]/synthesis_targets\.json", content)
+    assert "therapeutic_html (LLM-generated HTML" not in content
 
 
 async def run_reporter_phase5():

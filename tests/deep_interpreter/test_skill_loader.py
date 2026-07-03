@@ -119,7 +119,9 @@ def test_biomedical_literature_search_role_modes_load() -> None:
         "not the current SEARCHER Production handoff cap"
     ) in retrieval_normalized
 
-    assert "synthesis_papers_raw.json" in reporter
-    assert "synthesis_citation_candidates.json" in reporter
-    assert "synthesis_papers.json" in reporter
+    assert "papers.json" in reporter
+    assert "search_literature_fulltext" in reporter
+    assert "synthesis_papers_raw.json" not in reporter
+    assert "synthesis_citation_candidates.json" not in reporter
+    assert "synthesis_papers.json" not in reporter
     assert "Do not write or overwrite canonical papers.json" in reporter_normalized

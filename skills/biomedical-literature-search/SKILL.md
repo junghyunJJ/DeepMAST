@@ -1,6 +1,6 @@
 ---
 name: biomedical-literature-search
-description: Role-specific PubMed literature workflow for ligand-receptor claims. Use SEARCHER Production mode for canonical INTERPRETER handoff artifacts, PLANNER mode for lightweight feasibility search, SEARCHER Retrieval-Only Benchmark mode to isolate retrieval effects, and REPORTER mode for supplemental synthesis searches.
+description: Role-specific literature workflow for ligand-receptor claims. Use SEARCHER Production mode for canonical INTERPRETER handoff artifacts, PLANNER mode for lightweight feasibility search, SEARCHER Retrieval-Only Benchmark mode to isolate retrieval effects, and REPORTER mode for existing papers.json plus part_name="all" RAG synthesis validation.
 metadata:
   author: Junghyun Jung
   version: 2.1.0
@@ -219,19 +219,18 @@ Purpose: isolate retrieval skill effects.
 
 ## REPORTER Mode
 
-Purpose: synthesis search only when the existing SEARCHER handoff lacks support
-for report-level synthesis.
+Purpose: synthesize using the existing SEARCHER evidence handoff.
 
-- Save raw synthesis retrieval to `synthesis_papers_raw.json`.
-- If grading/filtering is needed, write `synthesis_citation_candidates.json` and
-  `synthesis_papers.json`.
+- Use canonical `papers.json` as the REPORTER citation universe.
+- Use `search_literature_fulltext` with `part_name="all"` for existing RAG retrieval.
+- Do not run PubMed retrieval from REPORTER.
+- Do not write reporter-specific paper retrieval artifacts.
 - Do not write or overwrite canonical `papers.json`.
-- Do not replace SEARCHER's INTERPRETER citation authority.
-- Use direct/context bucket filtering for synthesis citations when producing
-  `synthesis_papers.json`.
+- If existing RAG does not support a synthesis claim, caveat it or mark it as
+  hypothesis/needs validation.
 
-PLANNER and REPORTER must not overwrite canonical `papers.json`. REPORTER
-synthesis search is a separate workflow from SEARCHER evidence handoff.
+PLANNER and REPORTER must not overwrite canonical `papers.json`. REPORTER uses
+the SEARCHER evidence handoff; it does not create a separate synthesis evidence set.
 
 ## Evidence Matching Rules
 

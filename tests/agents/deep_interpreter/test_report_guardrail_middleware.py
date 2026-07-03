@@ -20,6 +20,18 @@ def _write_required_files(data_dir: Path) -> None:
     (data_dir / "part3_final.md").write_text("## Part 3\n", encoding="utf-8")
 
 
+def _write_synthesis_required_files(data_dir: Path) -> None:
+    (data_dir / "papers.json").write_text(
+        json.dumps({"papers": [{"pmid": "12345678", "title": "Supported paper"}]}),
+        encoding="utf-8",
+    )
+    (data_dir / "synthesis.md").write_text(
+        "## Executive Summary\n\n"
+        "MISTy spatial evidence drives a therapy-resistant subpopulation (PMID: 87654321).\n",
+        encoding="utf-8",
+    )
+
+
 def test_run_report_guardrail_skips_when_parts_are_incomplete(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -39,6 +51,169 @@ def test_run_report_guardrail_skips_when_parts_are_incomplete(
     assert result["missing"] == ["part2_final.md", "part3_final.md"]
     assert not (tmp_path / "report_validation_initial.json").exists()
     assert not (tmp_path / "report_validation_final.json").exists()
+
+
+def test_run_synthesis_guardrail_skips_until_synthesis_ready(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    (tmp_path / "papers.json").write_text('{"papers": []}', encoding="utf-8")
+
+    def fail_validate(_data_dir: Path) -> list[dict[str, str]]:
+        raise AssertionError("part-level validate_report must not run for synthesis guardrail")
+
+    monkeypatch.setattr(report_guardrails.validate_report_script, "validate_report", fail_validate)
+
+    result = report_guardrails.run_synthesis_guardrail(tmp_path)
+
+    assert result == {"status": "skipped", "missing": ["synthesis.md"]}
+    assert not (tmp_path / "synthesis_guardrail_initial.json").exists()
+    assert not (tmp_path / "synthesis_guardrail_final.json").exists()
+
+
+def test_run_synthesis_guardrail_repairs_invalid_pmid_and_softens_overclaim(
+    tmp_path: Path,
+) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    _write_synthesis_required_files(tmp_path)
+
+    result = report_guardrails.run_synthesis_guardrail(tmp_path)
+
+    synthesis = (tmp_path / "synthesis.md").read_text(encoding="utf-8")
+    initial = json.loads((tmp_path / "synthesis_guardrail_initial.json").read_text(encoding="utf-8"))
+    final = json.loads((tmp_path / "synthesis_guardrail_final.json").read_text(encoding="utf-8"))
+
+    assert result["status"] == "passed"
+    assert result["artifact"] == "synthesis.md"
+    assert result["initial_error_count"] >= 1
+    assert result["changed_claims"] >= 1
+    assert result["final_error_count"] == 0
+    assert "87654321" not in synthesis
+    assert "hypothesis requiring validation" in synthesis.lower()
+    assert initial["issue_count"] >= 1
+    assert final["issue_count"] >= 1
+    assert all(issue["severity"] != "error" for issue in final["issues"])
+
+
+def test_run_synthesis_guardrail_rejects_html_fragment_synthesis(
+    tmp_path: Path,
+) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    (tmp_path / "papers.json").write_text('{"papers": []}', encoding="utf-8")
+    (tmp_path / "synthesis.md").write_text(
+        '<div class="summary-box"><p>HTML belongs in the rendered report.</p></div>\n',
+        encoding="utf-8",
+    )
+
+    result = report_guardrails.run_synthesis_guardrail(tmp_path)
+    final = json.loads((tmp_path / "synthesis_guardrail_final.json").read_text(encoding="utf-8"))
+
+    assert result["status"] == "failed"
+    assert result["final_error_count"] == 1
+    assert final["issues"][0]["code"] == "synthesis_not_markdown"
+
+
+def test_run_synthesis_guardrail_allows_neutral_clinical_context(
+    tmp_path: Path,
+) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    (tmp_path / "papers.json").write_text(
+        json.dumps({"papers": [{"pmid": "12345678", "title": "Supported paper"}]}),
+        encoding="utf-8",
+    )
+    synthesis = (
+        "## Executive Summary\n\n"
+        "MISTy spatial analysis used clinical metadata from the treatment cohort "
+        "(PMID: 12345678).\n"
+    )
+    (tmp_path / "synthesis.md").write_text(synthesis, encoding="utf-8")
+
+    result = report_guardrails.run_synthesis_guardrail(tmp_path)
+
+    assert result["status"] == "passed"
+    assert result["changed_claims"] == 0
+    assert result["initial_error_count"] == 0
+    assert result["final_error_count"] == 0
+    assert (tmp_path / "synthesis.md").read_text(encoding="utf-8") == synthesis
+
+
+def test_run_synthesis_guardrail_repairs_duplicate_overclaims_once_each(
+    tmp_path: Path,
+) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    (tmp_path / "papers.json").write_text(
+        json.dumps({"papers": [{"pmid": "12345678", "title": "Supported paper"}]}),
+        encoding="utf-8",
+    )
+    claim = "MISTy spatial evidence drives a therapy-resistant subpopulation (PMID: 12345678)."
+    (tmp_path / "synthesis.md").write_text(
+        f"## Executive Summary\n\n{claim}\n\n{claim}\n",
+        encoding="utf-8",
+    )
+
+    result = report_guardrails.run_synthesis_guardrail(tmp_path)
+    synthesis = (tmp_path / "synthesis.md").read_text(encoding="utf-8")
+
+    assert result["status"] == "passed"
+    assert result["changed_claims"] == 2
+    assert synthesis.count("hypothesis requiring validation") == 2
+    assert f"{claim} this remains a hypothesis requiring validation. this remains" not in synthesis
+
+
+def test_run_synthesis_guardrail_allows_negated_therapeutic_limitation(
+    tmp_path: Path,
+) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    (tmp_path / "papers.json").write_text(
+        json.dumps({"papers": [{"pmid": "12345678", "title": "Supported paper"}]}),
+        encoding="utf-8",
+    )
+    synthesis = (
+        "## Limitations\n\n"
+        "MISTy spatial evidence does not establish a therapeutic vulnerability "
+        "(PMID: 12345678).\n"
+    )
+    (tmp_path / "synthesis.md").write_text(synthesis, encoding="utf-8")
+
+    result = report_guardrails.run_synthesis_guardrail(tmp_path)
+
+    assert result["status"] == "passed"
+    assert result["changed_claims"] == 0
+    assert result["initial_error_count"] == 0
+    assert result["final_error_count"] == 0
+    assert (tmp_path / "synthesis.md").read_text(encoding="utf-8") == synthesis
+
+
+def test_run_synthesis_guardrail_allows_negated_therapeutic_proof_limitation(
+    tmp_path: Path,
+) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    (tmp_path / "papers.json").write_text(
+        json.dumps({"papers": [{"pmid": "12345678", "title": "Supported paper"}]}),
+        encoding="utf-8",
+    )
+    synthesis = (
+        "## Limitations\n\n"
+        "MISTy spatial evidence does not prove therapeutic vulnerability "
+        "(PMID: 12345678).\n"
+    )
+    (tmp_path / "synthesis.md").write_text(synthesis, encoding="utf-8")
+
+    result = report_guardrails.run_synthesis_guardrail(tmp_path)
+
+    assert result["status"] == "passed"
+    assert result["changed_claims"] == 0
+    assert result["initial_error_count"] == 0
+    assert result["final_error_count"] == 0
+    assert (tmp_path / "synthesis.md").read_text(encoding="utf-8") == synthesis
 
 
 def test_run_report_guardrail_repairs_error_issues_once(

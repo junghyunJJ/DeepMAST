@@ -21,6 +21,9 @@ def test_standalone_seed_files_and_expected_outputs(tmp_path):
     assert json.loads((tmp_path / "targets.json").read_text(encoding="utf-8")) == targets
     assert run_script._expected_outputs("interpreter", 3) == ["part3_final.md"]
     assert "papers.json" in run_script._expected_outputs("searcher", None)
+    assert run_script._missing_outputs(tmp_path, ["data_path.txt", "missing.md"]) == [
+        "missing.md"
+    ]
 
 
 def test_interpreter_subagent_message_requires_part(tmp_path):
@@ -40,6 +43,10 @@ def test_interpreter_part3_message_is_single_part(tmp_path):
     assert "selected_genes" in message
     assert "selected_lr_pairs" in message
     assert "/part3_final.md" in message
+    assert "This is not a generic PPI network summary" in message
+    assert "Part 3 ligand-receptor details only" in message
+    assert 'write_file with file_path="/part3_final.md"' in message
+    assert "chat response only" in message
 
 
 def test_searcher_message_requests_lr_aware_full_search(tmp_path):
@@ -51,3 +58,13 @@ def test_searcher_message_requests_lr_aware_full_search(tmp_path):
     assert "coverage_weighted_sort=True" in message
     assert "Do not pass lr_pairs to create_literature_handoff" in message
     assert "auto-load lr_candidates.json" in message
+
+
+def test_reporter_message_delegates_reporter_artifacts_to_html_tool(tmp_path):
+    message = run_script._build_subagent_message("reporter", tmp_path, {}, None)
+
+    assert 'write_file("/synthesis.md"' in message
+    assert 'write_file("/synthesis_validation.json"' not in message
+    assert 'write_file("/synthesis_targets.json"' not in message
+    assert '"template_mode": "comprehensive"' in message
+    assert "generate_html_report writes synthesis_validation.json and synthesis_targets.json" in message
