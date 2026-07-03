@@ -107,6 +107,22 @@ def _missing_outputs(data_dir: Path, outputs: list[str]) -> list[str]:
     return [name for name in outputs if not (data_dir / name).exists()]
 
 
+def _should_retry_part3_save(args: argparse.Namespace, missing_outputs: list[str]) -> bool:
+    return args.subagent == "interpreter" and args.part == 3 and missing_outputs == ["part3_final.md"]
+
+
+def _build_part3_save_retry_message(data_dir: Path) -> str:
+    return f"""Retry Part 3 output creation for {data_dir}.
+
+Do not copy or save the previous chat-only response.
+Re-read /data_path.txt, /interpretation_guide.md, and /papers.json, then call load_analysis_data for the data directory.
+Run Part 3 ligand-receptor interpretation only.
+Use selected_genes and selected_lr_pairs from part4_candidate_selection.json.
+Avoid therapeutic synthesis, druggability, drug ranking, and clinical prioritization.
+Your final action MUST be write_file(file_path="/part3_final.md", content=<complete markdown Part 3 report>).
+A chat response without that tool call is incomplete."""
+
+
 def _build_subagent_message(subagent: str, data_dir: Path, targets: dict[str, Any], part: int | None) -> str:
     if subagent == "planner":
         return _build_initial_message(data_dir, targets)
@@ -303,6 +319,48 @@ async def run(args: argparse.Namespace) -> int:
     messages = result.get("messages", []) if isinstance(result, dict) else []
     outputs = _output_status(data_dir, expected_outputs)
     missing_outputs = _missing_outputs(data_dir, expected_outputs)
+    recovery: dict[str, Any] = {}
+    if _should_retry_part3_save(args, missing_outputs):
+        print(
+            json.dumps(
+                {"event": "part3_save_retry_start", "missing_outputs": missing_outputs},
+                indent=2,
+                sort_keys=True,
+                ensure_ascii=False,
+            )
+        )
+        try:
+            result = await agent.ainvoke(
+                {
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": _build_part3_save_retry_message(data_dir),
+                        }
+                    ]
+                },
+                config=None,
+            )
+            messages = result.get("messages", []) if isinstance(result, dict) else []
+            outputs = _output_status(data_dir, expected_outputs)
+            missing_outputs = _missing_outputs(data_dir, expected_outputs)
+            recovery["part3_save_retry"] = {
+                "event": (
+                    "part3_save_retry_complete"
+                    if not missing_outputs
+                    else "part3_save_retry_incomplete"
+                ),
+                "outputs": outputs,
+                "missing_outputs": missing_outputs,
+            }
+        except Exception as exc:
+            if args.traceback:
+                traceback.print_exc()
+            recovery["part3_save_retry_error"] = {
+                "exception_type": type(exc).__name__,
+                "exception_repr": repr(exc),
+            }
+
     summary = {
         "event": "invoke_incomplete" if missing_outputs else "invoke_complete",
         "message_count": len(messages),
@@ -310,6 +368,8 @@ async def run(args: argparse.Namespace) -> int:
         "result_keys": sorted(result.keys()) if isinstance(result, dict) else [],
         "outputs": outputs,
     }
+    if recovery:
+        summary["recovery"] = recovery
     if missing_outputs:
         summary["missing_outputs"] = missing_outputs
     print(json.dumps(summary, indent=2, sort_keys=True, ensure_ascii=False))

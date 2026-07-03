@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import asyncio
 import importlib.util
 import json
+import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 
 SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "run_deep_interpreter_agent.py"
@@ -68,3 +71,98 @@ def test_reporter_message_delegates_reporter_artifacts_to_html_tool(tmp_path):
     assert 'write_file("/synthesis_targets.json"' not in message
     assert '"template_mode": "comprehensive"' in message
     assert "generate_html_report writes synthesis_validation.json and synthesis_targets.json" in message
+
+
+def test_part3_save_retry_only_applies_to_missing_part3_output():
+    args = SimpleNamespace(subagent="interpreter", part=3)
+
+    assert run_script._should_retry_part3_save(args, ["part3_final.md"])
+    assert not run_script._should_retry_part3_save(args, [])
+    assert not run_script._should_retry_part3_save(args, ["part3_final.md", "other.md"])
+    assert not run_script._should_retry_part3_save(
+        SimpleNamespace(subagent="interpreter", part=2),
+        ["part3_final.md"],
+    )
+    assert not run_script._should_retry_part3_save(
+        SimpleNamespace(subagent="reporter", part=3),
+        ["part3_final.md"],
+    )
+
+
+def test_part3_save_retry_message_does_not_save_generic_chat_response(tmp_path):
+    message = run_script._build_part3_save_retry_message(tmp_path)
+
+    assert "Do not copy or save the previous chat-only response" in message
+    assert "/data_path.txt" in message
+    assert "/interpretation_guide.md" in message
+    assert "/papers.json" in message
+    assert "call load_analysis_data for the data directory" in message
+    assert "Part 3 ligand-receptor interpretation only" in message
+    assert "selected_genes and selected_lr_pairs" in message
+    assert "therapeutic synthesis, druggability, drug ranking, and clinical prioritization" in message
+    assert (
+        'write_file(file_path="/part3_final.md", content=<complete markdown Part 3 report>)'
+        in message
+    )
+    assert "A chat response without that tool call is incomplete." in message
+
+
+class _Part3RetryAgent:
+    def __init__(self, data_dir: Path):
+        self.data_dir = data_dir
+        self.calls = 0
+
+    async def ainvoke(self, payload, config=None):
+        self.calls += 1
+        if self.calls == 2:
+            (self.data_dir / "part3_final.md").write_text("# Part 3\n", encoding="utf-8")
+        return {"messages": [{"content": payload["messages"][0]["content"]}]}
+
+
+def _args(tmp_path: Path, part: int) -> SimpleNamespace:
+    return SimpleNamespace(
+        provider="openai",
+        data_dir=str(tmp_path),
+        targets_json=None,
+        interest_clusters=None,
+        interest_celltypes=None,
+        sel_factor=None,
+        message=None,
+        subagent="interpreter",
+        part=part,
+        dry_run=False,
+        disable_summarization=False,
+        traceback=False,
+    )
+
+
+def test_run_retries_part3_once_when_expected_output_is_missing(tmp_path, monkeypatch, capsys):
+    fake_agent = _Part3RetryAgent(tmp_path)
+    monkeypatch.setitem(
+        sys.modules,
+        "src.agents.deep_interpreter.graph_builder",
+        SimpleNamespace(create_subagent_graph=lambda *_args, **_kwargs: fake_agent),
+    )
+
+    exit_code = asyncio.run(run_script.run(_args(tmp_path, 3)))
+
+    stdout = capsys.readouterr().out
+    assert exit_code == 0
+    assert fake_agent.calls == 2
+    assert "part3_save_retry_start" in stdout
+    assert "invoke_complete" in stdout
+    assert (tmp_path / "part3_final.md").exists()
+
+
+def test_run_does_not_retry_part2_missing_output(tmp_path, monkeypatch):
+    fake_agent = _Part3RetryAgent(tmp_path)
+    monkeypatch.setitem(
+        sys.modules,
+        "src.agents.deep_interpreter.graph_builder",
+        SimpleNamespace(create_subagent_graph=lambda *_args, **_kwargs: fake_agent),
+    )
+
+    exit_code = asyncio.run(run_script.run(_args(tmp_path, 2)))
+
+    assert exit_code == 1
+    assert fake_agent.calls == 1
