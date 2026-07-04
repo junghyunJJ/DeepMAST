@@ -1131,6 +1131,25 @@ Your customized pipeline is ready to use!
                 traceback.print_exc()
             raise
 
+    @staticmethod
+    def _message_content_to_text(content: object) -> str:
+        """Convert LangChain message content into text for keyword scanning."""
+        if isinstance(content, str):
+            return content
+
+        if isinstance(content, list):
+            parts: list[str] = []
+            for part in content:
+                if isinstance(part, str):
+                    parts.append(part)
+                elif isinstance(part, dict):
+                    text = part.get("text")
+                    if isinstance(text, str):
+                        parts.append(text)
+            return " ".join(parts)
+
+        return str(content)
+
     def _extract_pipeline_updates(self, messages) -> Optional[PipelineConfig]:
         """Extract pipeline configuration updates from RAG search results.
 
@@ -1145,7 +1164,7 @@ Your customized pipeline is ready to use!
             if not hasattr(msg, 'content'):
                 continue
 
-            content = msg.content.lower()
+            content = self._message_content_to_text(msg.content).lower()
 
             # Check if this message contains pipeline recommendations
             if any(keyword in content for keyword in ['normalization', 'deconvolution', 'annotation', 'clustering']):
