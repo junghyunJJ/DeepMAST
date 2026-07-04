@@ -53,9 +53,10 @@ IMPORTANT: MUST use the 'server-sequential-thinking' tool :
 
 SEARCH GUIDELINES:
 1. Use `list_collections` to find the 'pipeline' collection ID
-2. Use `multi_query` to generate at least 3 sub-questions for each pipeline step
-3. Search all queries using hybrid search type
-4. Build the pipeline based on found tools
+2. Use one broad hybrid `search_documents` query per non-fixed pipeline step first, with limit=20
+3. Use detail follow-up searches for installation, compatibility, or computational requirements with limit=10
+4. Keep the total search budget to 12-15 total search calls
+5. Build the pipeline based on found tools
 
 IMPORTANT NOTES:
 - Target Collection: pipeline
@@ -73,7 +74,7 @@ OUTPUT REQUIREMENTS:
 
 STOP CONDITIONS:
 - STOP searching once you have found suitable tools for all 3 steps
-- STOP if you've made more than 10 search queries total
+- STOP if you've made 12-15 total search calls
 - STOP and provide recommendations based on what you've found so far if searches are not yielding results
 - Focus on efficiency - don't search endlessly for perfect tools
 

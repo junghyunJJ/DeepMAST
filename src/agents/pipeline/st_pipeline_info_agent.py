@@ -31,6 +31,8 @@ SINGLE_CELL_PLATFORMS = {
     "merfish", "xenium", "cosmx", "seqfish", "hdst", "resolve"
 }
 
+PIPELINE_SELECTION_RECURSION_LIMIT = 60
+
 
 # Pipeline configuration model
 class PipelineConfig(BaseModel):
@@ -1087,7 +1089,7 @@ Your customized pipeline is ready to use!
         try:
             # Create a config with higher recursion limit for complex RAG searches
             react_config = {
-                "recursion_limit": 30,  # Increased for comprehensive RAG searches
+                "recursion_limit": PIPELINE_SELECTION_RECURSION_LIMIT,
                 "configurable": {
                     "thread_id": config.get("configurable", {}).get("thread_id", "default")
                 }
