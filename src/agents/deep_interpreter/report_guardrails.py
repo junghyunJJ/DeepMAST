@@ -16,6 +16,7 @@ REQUIRED_REPORT_FILES = (
     "part3_final.md",
 )
 SYNTHESIS_REQUIRED_FILES = ("papers.json", "synthesis.md")
+MAX_GUARDRAIL_REPAIR_PASSES = 3
 SYNTHESIS_GUARDRAIL_SENTENCE = "this remains a hypothesis requiring validation."
 SYNTHESIS_THERAPEUTIC_OVERCLAIM_RE = re.compile(
     r"\b(high-confidence therapeutic target|clinical prioritization|most effective|"
@@ -208,15 +209,29 @@ def run_report_guardrail(data_dir: str | Path, *, provider: str | None = None) -
     _write_issues(initial_path, initial_issues)
     initial_error_count = _error_count(initial_issues)
 
+    current_issues = initial_issues
+    issues_path = initial_path
     changed_sections = 0
-    if initial_error_count:
-        changed_sections = repair_report_script.repair_report(
+    repair_attempt_count = 0
+
+    while (
+        _error_count(current_issues)
+        and repair_attempt_count < MAX_GUARDRAIL_REPAIR_PASSES
+    ):
+        changed = repair_report_script.repair_report(
             data_dir,
-            initial_path,
+            issues_path,
             provider=provider,
         )
+        repair_attempt_count += 1
+        changed_sections += changed
+        current_issues = validate_report_script.validate_report(data_dir)
+        _write_issues(final_path, current_issues)
+        if changed == 0:
+            break
+        issues_path = final_path
 
-    final_issues = validate_report_script.validate_report(data_dir)
+    final_issues = current_issues
     _write_issues(final_path, final_issues)
     final_error_count = _error_count(final_issues)
 
@@ -224,6 +239,7 @@ def run_report_guardrail(data_dir: str | Path, *, provider: str | None = None) -
         "status": "failed" if final_error_count else "passed",
         "initial_issue_count": len(initial_issues),
         "initial_error_count": initial_error_count,
+        "repair_attempt_count": repair_attempt_count,
         "changed_sections": changed_sections,
         "final_issue_count": len(final_issues),
         "final_error_count": final_error_count,
@@ -244,9 +260,22 @@ def run_synthesis_guardrail(data_dir: str | Path, *, provider: str | None = None
     _write_issues(initial_path, initial_issues)
     initial_error_count = _error_count(initial_issues)
 
-    changed_claims = repair_synthesis_report(data_dir, initial_issues) if initial_error_count else 0
+    current_issues = initial_issues
+    changed_claims = 0
+    repair_attempt_count = 0
 
-    final_issues = validate_synthesis_report(data_dir)
+    while (
+        _error_count(current_issues)
+        and repair_attempt_count < MAX_GUARDRAIL_REPAIR_PASSES
+    ):
+        changed = repair_synthesis_report(data_dir, current_issues)
+        repair_attempt_count += 1
+        changed_claims += changed
+        current_issues = validate_synthesis_report(data_dir)
+        if changed == 0:
+            break
+
+    final_issues = current_issues
     _write_issues(final_path, final_issues)
     final_error_count = _error_count(final_issues)
 
@@ -255,6 +284,7 @@ def run_synthesis_guardrail(data_dir: str | Path, *, provider: str | None = None
         "artifact": "synthesis.md",
         "initial_issue_count": len(initial_issues),
         "initial_error_count": initial_error_count,
+        "repair_attempt_count": repair_attempt_count,
         "changed_claims": changed_claims,
         "final_issue_count": len(final_issues),
         "final_error_count": final_error_count,

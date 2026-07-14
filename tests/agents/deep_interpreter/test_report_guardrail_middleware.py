@@ -89,6 +89,7 @@ def test_run_synthesis_guardrail_repairs_invalid_pmid_and_softens_overclaim(
     assert result["status"] == "passed"
     assert result["artifact"] == "synthesis.md"
     assert result["initial_error_count"] >= 1
+    assert result["repair_attempt_count"] == 1
     assert result["changed_claims"] >= 1
     assert result["final_error_count"] == 0
     assert "87654321" not in synthesis
@@ -113,6 +114,7 @@ def test_run_synthesis_guardrail_rejects_html_fragment_synthesis(
     final = json.loads((tmp_path / "synthesis_guardrail_final.json").read_text(encoding="utf-8"))
 
     assert result["status"] == "failed"
+    assert result["repair_attempt_count"] == 1
     assert result["final_error_count"] == 1
     assert final["issues"][0]["code"] == "synthesis_not_markdown"
 
@@ -137,6 +139,7 @@ def test_run_synthesis_guardrail_allows_neutral_clinical_context(
 
     assert result["status"] == "passed"
     assert result["changed_claims"] == 0
+    assert result["repair_attempt_count"] == 0
     assert result["initial_error_count"] == 0
     assert result["final_error_count"] == 0
     assert (tmp_path / "synthesis.md").read_text(encoding="utf-8") == synthesis
@@ -216,7 +219,40 @@ def test_run_synthesis_guardrail_allows_negated_therapeutic_proof_limitation(
     assert (tmp_path / "synthesis.md").read_text(encoding="utf-8") == synthesis
 
 
-def test_run_report_guardrail_repairs_error_issues_once(
+def test_run_synthesis_guardrail_retries_up_to_three_repairs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    _write_synthesis_required_files(tmp_path)
+    validate_count = 0
+    repair_count = 0
+
+    def fake_validate(_data_dir: Path) -> list[dict[str, str]]:
+        nonlocal validate_count
+        validate_count += 1
+        severity = "warning" if validate_count == 4 else "error"
+        return [{"severity": severity, "code": "bounded_synthesis_retry"}]
+
+    def fake_repair(_data_dir: Path, _issues: list[dict[str, str]]) -> int:
+        nonlocal repair_count
+        repair_count += 1
+        return 1
+
+    monkeypatch.setattr(report_guardrails, "validate_synthesis_report", fake_validate)
+    monkeypatch.setattr(report_guardrails, "repair_synthesis_report", fake_repair)
+
+    result = report_guardrails.run_synthesis_guardrail(tmp_path)
+
+    assert validate_count == 4
+    assert repair_count == 3
+    assert result["status"] == "passed"
+    assert result["repair_attempt_count"] == 3
+    assert result["changed_claims"] == 3
+    assert result["final_error_count"] == 0
+
+
+def test_run_report_guardrail_stops_after_first_successful_repair(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from src.agents.deep_interpreter import report_guardrails
@@ -266,6 +302,7 @@ def test_run_report_guardrail_repairs_error_issues_once(
         "status": "passed",
         "initial_issue_count": 1,
         "initial_error_count": 1,
+        "repair_attempt_count": 1,
         "changed_sections": 1,
         "final_issue_count": 1,
         "final_error_count": 0,
@@ -277,19 +314,69 @@ def test_run_report_guardrail_repairs_error_issues_once(
     assert final["issues"][0]["severity"] == "warning"
 
 
+def test_run_report_guardrail_retries_up_to_three_repairs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    _write_required_files(tmp_path)
+    calls: list[str] = []
+
+    def fake_validate(_data_dir: Path) -> list[dict[str, str]]:
+        calls.append("validate")
+        severity = "warning" if calls.count("validate") == 4 else "error"
+        return [{"severity": severity, "code": "bounded_retry"}]
+
+    def fake_repair(
+        data_dir: Path, issues_path: Path, *, provider: str | None = None, llm=None
+    ) -> int:
+        calls.append("repair")
+        assert data_dir == tmp_path.resolve()
+        assert issues_path in {
+            tmp_path.resolve() / "report_validation_initial.json",
+            tmp_path.resolve() / "report_validation_final.json",
+        }
+        return 1
+
+    monkeypatch.setattr(report_guardrails.validate_report_script, "validate_report", fake_validate)
+    monkeypatch.setattr(report_guardrails.repair_report_script, "repair_report", fake_repair)
+
+    result = report_guardrails.run_report_guardrail(tmp_path, provider="ollama")
+
+    assert calls == [
+        "validate",
+        "repair",
+        "validate",
+        "repair",
+        "validate",
+        "repair",
+        "validate",
+    ]
+    assert result["status"] == "passed"
+    assert result["repair_attempt_count"] == 3
+    assert result["changed_sections"] == 3
+    assert result["final_error_count"] == 0
+
+
 def test_run_report_guardrail_records_remaining_errors_without_raising(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from src.agents.deep_interpreter import report_guardrails
 
     _write_required_files(tmp_path)
+    validate_count = 0
+    repair_count = 0
 
     def fake_validate(_data_dir: Path) -> list[dict[str, str]]:
+        nonlocal validate_count
+        validate_count += 1
         return [{"severity": "error", "code": "still_bad"}]
 
     def fake_repair(
         data_dir: Path, issues_path: Path, *, provider: str | None = None, llm=None
     ) -> int:
+        nonlocal repair_count
+        repair_count += 1
         return 0
 
     monkeypatch.setattr(report_guardrails.validate_report_script, "validate_report", fake_validate)
@@ -297,7 +384,10 @@ def test_run_report_guardrail_records_remaining_errors_without_raising(
 
     result = report_guardrails.run_report_guardrail(tmp_path)
 
+    assert validate_count == 2
+    assert repair_count == 1
     assert result["status"] == "failed"
+    assert result["repair_attempt_count"] == 1
     assert result["final_error_count"] == 1
     final = json.loads((tmp_path / "report_validation_final.json").read_text(encoding="utf-8"))
     assert final["issues"] == [{"severity": "error", "code": "still_bad"}]
