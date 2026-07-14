@@ -108,13 +108,14 @@ def test_part3_save_retry_message_does_not_save_generic_chat_response(tmp_path):
 
 
 class _Part3RetryAgent:
-    def __init__(self, data_dir: Path):
+    def __init__(self, data_dir: Path, *, write_on_call: int | None):
         self.data_dir = data_dir
+        self.write_on_call = write_on_call
         self.calls = 0
 
     async def ainvoke(self, payload, config=None):
         self.calls += 1
-        if self.calls == 2:
+        if self.calls == self.write_on_call:
             (self.data_dir / "part3_final.md").write_text("# Part 3\n", encoding="utf-8")
         return {"messages": [{"content": payload["messages"][0]["content"]}]}
 
@@ -136,8 +137,49 @@ def _args(tmp_path: Path, part: int) -> SimpleNamespace:
     )
 
 
-def test_run_retries_part3_once_when_expected_output_is_missing(tmp_path, monkeypatch, capsys):
-    fake_agent = _Part3RetryAgent(tmp_path)
+def test_run_retries_part3_until_third_total_attempt(tmp_path, monkeypatch, capsys):
+    fake_agent = _Part3RetryAgent(tmp_path, write_on_call=3)
+    monkeypatch.setitem(
+        sys.modules,
+        "src.agents.deep_interpreter.graph_builder",
+        SimpleNamespace(create_subagent_graph=lambda *_args, **_kwargs: fake_agent),
+    )
+
+    exit_code = asyncio.run(run_script.run(_args(tmp_path, 3)))
+
+    stdout = capsys.readouterr().out
+    assert exit_code == 0
+    assert fake_agent.calls == 3
+    assert stdout.count('"event": "part3_save_retry_start"') == 2
+    assert '"invoke_attempt_count": 3' in stdout
+    assert '"retry_attempt_count": 2' in stdout
+    assert "invoke_complete" in stdout
+    assert (tmp_path / "part3_final.md").exists()
+
+
+def test_run_stops_after_three_part3_attempts_when_output_remains_missing(
+    tmp_path, monkeypatch, capsys
+):
+    fake_agent = _Part3RetryAgent(tmp_path, write_on_call=None)
+    monkeypatch.setitem(
+        sys.modules,
+        "src.agents.deep_interpreter.graph_builder",
+        SimpleNamespace(create_subagent_graph=lambda *_args, **_kwargs: fake_agent),
+    )
+
+    exit_code = asyncio.run(run_script.run(_args(tmp_path, 3)))
+
+    stdout = capsys.readouterr().out
+    assert exit_code == 1
+    assert fake_agent.calls == 3
+    assert stdout.count('"event": "part3_save_retry_start"') == 2
+    assert '"invoke_attempt_count": 3' in stdout
+    assert "invoke_incomplete" in stdout
+    assert not (tmp_path / "part3_final.md").exists()
+
+
+def test_run_stops_part3_retry_as_soon_as_output_exists(tmp_path, monkeypatch, capsys):
+    fake_agent = _Part3RetryAgent(tmp_path, write_on_call=2)
     monkeypatch.setitem(
         sys.modules,
         "src.agents.deep_interpreter.graph_builder",
@@ -149,13 +191,12 @@ def test_run_retries_part3_once_when_expected_output_is_missing(tmp_path, monkey
     stdout = capsys.readouterr().out
     assert exit_code == 0
     assert fake_agent.calls == 2
-    assert "part3_save_retry_start" in stdout
-    assert "invoke_complete" in stdout
-    assert (tmp_path / "part3_final.md").exists()
+    assert stdout.count('"event": "part3_save_retry_start"') == 1
+    assert '"invoke_attempt_count": 2' in stdout
 
 
 def test_run_does_not_retry_part2_missing_output(tmp_path, monkeypatch):
-    fake_agent = _Part3RetryAgent(tmp_path)
+    fake_agent = _Part3RetryAgent(tmp_path, write_on_call=2)
     monkeypatch.setitem(
         sys.modules,
         "src.agents.deep_interpreter.graph_builder",

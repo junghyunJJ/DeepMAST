@@ -24,6 +24,7 @@ from typing import Any
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 ENV_FILE = REPO_ROOT / ".env"
+MAX_PART3_INVOKE_ATTEMPTS = 3
 
 from dotenv import load_dotenv
 
@@ -320,15 +321,28 @@ async def run(args: argparse.Namespace) -> int:
     outputs = _output_status(data_dir, expected_outputs)
     missing_outputs = _missing_outputs(data_dir, expected_outputs)
     recovery: dict[str, Any] = {}
-    if _should_retry_part3_save(args, missing_outputs):
+    invoke_attempt_count = 1
+    retry_history: list[dict[str, Any]] = []
+
+    for retry_number in range(1, MAX_PART3_INVOKE_ATTEMPTS):
+        if not _should_retry_part3_save(args, missing_outputs):
+            break
+
         print(
             json.dumps(
-                {"event": "part3_save_retry_start", "missing_outputs": missing_outputs},
+                {
+                    "event": "part3_save_retry_start",
+                    "retry_number": retry_number,
+                    "max_invoke_attempts": MAX_PART3_INVOKE_ATTEMPTS,
+                    "missing_outputs": missing_outputs,
+                },
                 indent=2,
                 sort_keys=True,
                 ensure_ascii=False,
             )
         )
+        invoke_attempt_count += 1
+        attempt: dict[str, Any] = {"retry_number": retry_number}
         try:
             result = await agent.ainvoke(
                 {
@@ -344,25 +358,39 @@ async def run(args: argparse.Namespace) -> int:
             messages = result.get("messages", []) if isinstance(result, dict) else []
             outputs = _output_status(data_dir, expected_outputs)
             missing_outputs = _missing_outputs(data_dir, expected_outputs)
-            recovery["part3_save_retry"] = {
-                "event": (
-                    "part3_save_retry_complete"
-                    if not missing_outputs
-                    else "part3_save_retry_incomplete"
-                ),
-                "outputs": outputs,
-                "missing_outputs": missing_outputs,
-            }
+            attempt.update(
+                {
+                    "event": (
+                        "part3_save_retry_complete"
+                        if not missing_outputs
+                        else "part3_save_retry_incomplete"
+                    ),
+                    "outputs": outputs,
+                    "missing_outputs": missing_outputs,
+                }
+            )
         except Exception as exc:
             if args.traceback:
                 traceback.print_exc()
-            recovery["part3_save_retry_error"] = {
-                "exception_type": type(exc).__name__,
-                "exception_repr": repr(exc),
-            }
+            attempt.update(
+                {
+                    "event": "part3_save_retry_error",
+                    "exception_type": type(exc).__name__,
+                    "exception_repr": repr(exc),
+                }
+            )
+        retry_history.append(attempt)
+
+    if retry_history:
+        recovery["part3_save_retry"] = {
+            "retry_attempt_count": len(retry_history),
+            "max_invoke_attempts": MAX_PART3_INVOKE_ATTEMPTS,
+            "attempts": retry_history,
+        }
 
     summary = {
         "event": "invoke_incomplete" if missing_outputs else "invoke_complete",
+        "invoke_attempt_count": invoke_attempt_count,
         "message_count": len(messages),
         "last_message": _jsonable_message(messages[-1]) if messages else None,
         "result_keys": sorted(result.keys()) if isinstance(result, dict) else [],
