@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import json
+import importlib
+import sys
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -524,3 +527,58 @@ def test_get_subagents_attaches_report_guardrail_only_to_interpreter() -> None:
             isinstance(middleware, ReportGuardrailMiddleware)
             for middleware in by_name[name].get("middleware", [])
         )
+
+
+def test_standalone_subagent_graph_uses_configured_middleware(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[dict[str, Any]] = []
+
+    class FakeAgent:
+        def with_config(self, config: dict[str, int]) -> SimpleNamespace:
+            return SimpleNamespace(config=config)
+
+    def fake_create_agent(*_args: Any, **kwargs: Any) -> FakeAgent:
+        calls.append(kwargs)
+        return FakeAgent()
+
+    monkeypatch.setenv("DEEP_INTERPRETER_DATA_DIR", str(tmp_path))
+    monkeypatch.setattr("langchain.agents.create_agent", fake_create_agent)
+    monkeypatch.setattr(
+        "src.agents.deep_interpreter.agent.create_deep_interpreter_agent",
+        lambda *_args, **_kwargs: SimpleNamespace(),
+    )
+    monkeypatch.setattr(
+        "src.agents.deep_interpreter.wrapper_agent.DeepInterpreterWrapperAgent",
+        lambda *_args, **_kwargs: SimpleNamespace(graph=SimpleNamespace()),
+    )
+    monkeypatch.setattr(
+        "src.agents.model.create_llm",
+        lambda *_args, **_kwargs: object(),
+    )
+
+    sys.modules.pop("src.agents.deep_interpreter.graph_builder", None)
+    graph_builder = importlib.import_module("src.agents.deep_interpreter.graph_builder")
+    from src.agents.deep_interpreter.middleware import (
+        ReportGuardrailMiddleware,
+        WriteFileArgGuardMiddleware,
+    )
+
+    graph = graph_builder.create_subagent_graph("interpreter", provider="ollama")
+
+    call = calls[-1]
+    middleware = call["middleware"]
+    assert graph.config == {"recursion_limit": 200}
+    assert any(isinstance(item, WriteFileArgGuardMiddleware) for item in middleware)
+    report_guardrails = [item for item in middleware if isinstance(item, ReportGuardrailMiddleware)]
+    assert len(report_guardrails) == 1
+    assert report_guardrails[0]._resolved_data_dir() == tmp_path.resolve()
+
+    graph = graph_builder.create_subagent_graph("reporter", provider="ollama")
+
+    call = calls[-1]
+    middleware = call["middleware"]
+    assert graph.config == {"recursion_limit": 200}
+    assert any(isinstance(item, WriteFileArgGuardMiddleware) for item in middleware)
+    assert not any(isinstance(item, ReportGuardrailMiddleware) for item in middleware)
