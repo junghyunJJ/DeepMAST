@@ -9,8 +9,7 @@ from scripts import repair_report as repair_report_script
 from scripts import validate_report as validate_report_script
 
 
-REQUIRED_REPORT_FILES = (
-    "papers.json",
+REQUIRED_PART_FILES = (
     "part1_final.md",
     "part2_final.md",
     "part3_final.md",
@@ -53,7 +52,7 @@ def _error_count(issues: list[dict[str, str]]) -> int:
 
 
 def _missing_required_files(data_dir: Path) -> list[str]:
-    return [name for name in REQUIRED_REPORT_FILES if not (data_dir / name).exists()]
+    return [name for name in REQUIRED_PART_FILES if not (data_dir / name).exists()]
 
 
 def _missing_synthesis_required_files(data_dir: Path) -> list[str]:
