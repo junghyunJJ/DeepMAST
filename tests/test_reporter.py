@@ -22,6 +22,7 @@ import os
 import re
 import sys
 from pathlib import Path
+from typing import Literal, cast
 
 # Project root
 PROJECT_ROOT = Path(__file__).parent.parent
@@ -39,7 +40,8 @@ load_dotenv(PROJECT_ROOT / ".env")
 # ── Provider selection ────────────────────────────────────────────────────────
 # Use openai (gpt-4.1-mini) by default for REPORTER — needs structured output.
 # Override: REPORTER_PROVIDER=openrouter python tests/test_reporter.py
-PROVIDER = os.getenv("REPORTER_PROVIDER", "openai")
+Provider = Literal["openai", "google", "ollama", "ollama-openai", "vllm", "claude", "openrouter"]
+PROVIDER = cast(Provider, os.getenv("REPORTER_PROVIDER", "openai"))
 
 
 # ── REPORTER invocation message ──────────────────────────────────────────────
@@ -67,19 +69,17 @@ REPORTER_MESSAGE = {
                 "- Theme 4: Disease Mechanism\n"
                 "- Identify emergent themes\n"
                 "- **write_file('/synthesis.md', content=...)** — MUST call this\n\n"
-                "### Phase 4.5: Validate Synthesis with Literature\n"
-                "1. Extract synthesis context (genes, pathways, celltypes from themes)\n"
-                "2. Strategic planning with think_tool (3 thoughts)\n"
-                "3. search_literature_dynamic with integration-focused terms, output_path='synthesis_papers.json'\n"
-                "4. Quality reflection (think_tool)\n"
-                "5. Validate claims and write:\n"
-                "   - Update /synthesis.md with validated claims\n"
-                "   - write_file('/synthesis_validation.json', ...) — validation results\n\n"
+                "### Phase 4.5: Retrieve Synthesis Support from Existing RAG\n"
+                "1. prepare_rag_literature(papers_json_path='/papers.json', part_name='all')\n"
+                "2. search_literature_fulltext for each cross-part theme with part_name='all'\n"
+                "3. validate_claim_fulltext for cited claims with part_name='all'\n"
+                "4. Update /synthesis.md with supported, caveated, or hypothesis language\n"
+                "5. Do not write /synthesis_validation.json manually; generate_html_report creates it\n\n"
                 "### Phase 4.7: Part 4 Therapeutic Synthesis\n"
                 "1. read_file('/part4_therapeutic_synthesis.md') as the canonical Part 4 narrative\n"
                 "2. read_file('/drug.md') only as supporting therapeutic assessment detail\n"
                 "3. Add a concise Therapeutic Implications section to /synthesis.md\n"
-                "4. write_file('/synthesis_targets.json', ...) with canonical/supporting source tracking\n\n"
+                "4. Do not write /synthesis_targets.json manually; generate_html_report records source tracking\n\n"
                 "### Phase 5: Generate HTML Report\n"
                 "Call generate_html_report with parts dict containing:\n"
                 "- template_mode='comprehensive'\n"
@@ -88,9 +88,9 @@ REPORTER_MESSAGE = {
                 "- data_dir from /data_path.txt\n\n"
                 "## CRITICAL RULES:\n"
                 "- You MUST call write_file to save /synthesis.md\n"
-                "- You MUST call write_file to save /synthesis_validation.json\n"
-                "- You MUST call write_file to save /synthesis_targets.json\n"
                 "- You MUST call generate_html_report to create the HTML report\n"
+                "- generate_html_report creates synthesis_validation.json and synthesis_targets.json when missing\n"
+                "- Do NOT run new literature searches or create reporter-specific paper artifacts\n"
                 "- Do NOT generate part1_html/part2_html/part3_html/summary_html/therapeutic_html; use template_mode='comprehensive'\n"
                 "- Do NOT just output text — all outputs must be persisted to disk\n"
                 "- synthesis.md MUST include: Executive Summary, Cross-Part Themes 1-4, "
@@ -100,6 +100,14 @@ REPORTER_MESSAGE = {
         }
     ]
 }
+
+
+def test_reporter_message_delegates_bookkeeping_artifacts_to_report_tool():
+    content = REPORTER_MESSAGE["messages"][0]["content"]
+
+    assert "generate_html_report creates synthesis_validation.json and synthesis_targets.json" in content
+    assert not re.search(r"write_file\(['\"]/synthesis_validation\.json", content)
+    assert not re.search(r"write_file\(['\"]/synthesis_targets\.json", content)
 
 
 # ── Runner ────────────────────────────────────────────────────────────────────
@@ -165,7 +173,6 @@ def verify_output():
     data_dir = Path(DATA_DIR)
     synthesis_path = data_dir / "synthesis.md"
     html_path = data_dir / "CCI_Analysis_Report.html"
-    synthesis_papers_path = data_dir / "synthesis_papers.json"
     synthesis_validation_path = data_dir / "synthesis_validation.json"
     synthesis_targets_path = data_dir / "synthesis_targets.json"
 
@@ -258,26 +265,7 @@ def verify_output():
         print("[FAIL] CCI_Analysis_Report.html NOT FOUND")
         issues.append("CCI_Analysis_Report.html not found")
 
-    # ── 3. synthesis_papers.json ─────────────────────────────────────────
-    print("\n--- synthesis_papers.json ---")
-    if synthesis_papers_path.exists():
-        try:
-            papers_data = json.loads(synthesis_papers_path.read_text(encoding="utf-8"))
-            if isinstance(papers_data, list):
-                paper_count = len(papers_data)
-            elif isinstance(papers_data, dict):
-                paper_count = len(papers_data.get("papers", papers_data.get("results", [])))
-            else:
-                paper_count = 0
-            print(f"[OK] synthesis_papers.json exists  ({paper_count} papers)")
-        except json.JSONDecodeError as e:
-            print(f"[WARN] synthesis_papers.json parse error: {e}")
-            issues.append("synthesis_papers.json invalid JSON")
-    else:
-        print("[WARN] synthesis_papers.json not found (Phase 4.5 may have been skipped)")
-        # Not a hard failure — search may fail due to API limits
-
-    # ── 4. synthesis_validation.json ─────────────────────────────────────
+    # ── 3. synthesis_validation.json ─────────────────────────────────────
     print("\n--- synthesis_validation.json ---")
     if synthesis_validation_path.exists():
         try:
@@ -293,7 +281,7 @@ def verify_output():
         print("[WARN] synthesis_validation.json not found")
         # Soft warning — validation may fail due to RAG unavailability
 
-    # ── 5. synthesis_targets.json ────────────────────────────────────────
+    # ── 4. synthesis_targets.json ────────────────────────────────────────
     print("\n--- synthesis_targets.json ---")
     if synthesis_targets_path.exists():
         try:
@@ -328,8 +316,8 @@ def verify_output():
     # ── Summary ──────────────────────────────────────────────────────────
     # Hard requirements: synthesis.md + HTML report
     hard_pass = synthesis_path.exists() and html_path.exists()
-    # Soft requirements: papers, validation, targets
-    soft_pass = synthesis_papers_path.exists() and synthesis_validation_path.exists()
+    # Soft requirements: validation + therapeutic source tracking
+    soft_pass = synthesis_validation_path.exists() and synthesis_targets_path.exists()
 
     print(f"\n{'=' * 60}")
     if hard_pass and not issues:
@@ -350,7 +338,6 @@ def verify_output():
         "issues": issues,
         "synthesis_exists": synthesis_path.exists(),
         "html_exists": html_path.exists(),
-        "papers_exists": synthesis_papers_path.exists(),
         "validation_exists": synthesis_validation_path.exists(),
         "targets_exists": synthesis_targets_path.exists(),
     }
@@ -366,7 +353,6 @@ async def main():
     output_paths = [
         synthesis_path,
         html_path,
-        data_dir / "synthesis_papers.json",
         data_dir / "synthesis_validation.json",
         data_dir / "synthesis_targets.json",
     ]

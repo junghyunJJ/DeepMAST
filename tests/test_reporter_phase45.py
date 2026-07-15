@@ -1,29 +1,28 @@
-"""Unit tests for REPORTER Phase 4.5: Synthesis Validation.
+"""Unit tests for REPORTER Phase 4.5: Synthesis validation from existing RAG.
 
 Tests:
 1. Tool registration - REPORTER config has Phase 4.5 tools
 2. Prompt loading - REPORTER_PROMPT contains Phase 4.5 section
-3. Tool invocation - search_literature_dynamic, prepare_rag_literature
-4. Context extraction - Parse mock synthesis.md for search terms
+3. Context extraction - Parse mock synthesis.md for retrieval terms
 """
 
 import json
-import pytest
 import re
-from pathlib import Path
 
 # =============================================================================
 # Test 1: Tool Registration
 # =============================================================================
 
 
-def test_reporter_has_phase45_tools():
+def test_reporter_has_existing_rag_tools():
     """Verify REPORTER config includes all Phase 4.5 tools."""
     from src.agents.deep_interpreter.subagents.configs import SUBAGENT_CONFIGS
     from src.agents.deep_interpreter.tools import (
-        search_literature_dynamic,
-        search_literature,
         prepare_rag_literature,
+        search_literature,
+        search_literature_dynamic,
+        search_literature_fulltext,
+        search_pubmed_advanced,
         validate_claim_fulltext,
         think_tool,
     )
@@ -31,19 +30,16 @@ def test_reporter_has_phase45_tools():
     reporter_config = SUBAGENT_CONFIGS["reporter"]
     tools = reporter_config["tools"]
 
-    # Phase 4.5 required tools
-    required_tools = [
-        search_literature_dynamic,
-        search_literature,
+    for tool in [
         prepare_rag_literature,
+        search_literature_fulltext,
         validate_claim_fulltext,
         think_tool,
-    ]
+    ]:
+        assert tool in tools, f"Missing tool: {getattr(tool, 'name', str(tool))}"
 
-    for tool in required_tools:
-        assert tool in tools, f"Missing tool: {tool.__name__}"
-
-    print(f"✅ REPORTER has all {len(required_tools)} Phase 4.5 tools")
+    for tool in [search_literature_dynamic, search_literature, search_pubmed_advanced]:
+        assert tool not in tools, f"REPORTER must not expose search tool: {tool.name}"
 
 
 def test_reporter_tool_count():
@@ -53,9 +49,7 @@ def test_reporter_tool_count():
     reporter_config = SUBAGENT_CONFIGS["reporter"]
     tools = reporter_config["tools"]
 
-    # Expected: load_analysis_data, generate_html_report + Phase 4.5 tools
-    # 7 tools total (2 core + 5 Phase 4.5: search_literature_dynamic, search_literature,
-    # prepare_rag_literature, validate_claim_fulltext, think_tool)
+    # Expected: core tools + existing-RAG validation tools.
     assert len(tools) >= 7, f"Expected >= 7 tools, got {len(tools)}"
 
     tool_names = [t.__name__ if hasattr(t, "__name__") else str(t) for t in tools]
@@ -76,19 +70,25 @@ def test_reporter_prompt_has_phase45():
     # Phase 4.5 key sections
     required_sections = [
         "Phase 4.5",
-        "VALIDATE SYNTHESIS WITH LITERATURE",
-        "synthesis_search_context.json",
-        "synthesis_papers.json",
+        "RETRIEVE SYNTHESIS SUPPORT FROM EXISTING RAG",
         "synthesis_validation.json",
-        "search_literature_dynamic",
+        "search_literature_fulltext",
         "prepare_rag_literature",
         "validate_claim_fulltext",
+        'part_name="all"',
     ]
 
     for section in required_sections:
         assert section in reporter_prompt, f"Missing section: {section}"
 
-    print(f"✅ REPORTER prompt contains all {len(required_sections)} Phase 4.5 sections")
+    for forbidden in [
+        "synthesis_papers.json",
+        "search_literature_dynamic",
+        "search_pubmed_advanced",
+        'part_name="synthesis"',
+        "NEW literature search",
+    ]:
+        assert forbidden not in reporter_prompt, f"Forbidden legacy search text: {forbidden}"
 
 
 def test_reporter_prompt_5step_workflow():
@@ -97,77 +97,34 @@ def test_reporter_prompt_5step_workflow():
 
     reporter_prompt = SUBAGENT_PROMPTS["reporter"]
 
-    # 5 steps of Phase 4.5
     steps = [
-        "Step 1: Extract Synthesis Context",
-        "Step 2: Strategic Planning",
-        "Step 3: Search Literature",
-        "Step 4: Quality Reflection",
-        "Step 5: RAG Validate & Write",
+        "Step 1: Prepare Existing RAG",
+        "Step 2: Retrieve Theme Support",
+        "Step 3: Validate Cited Claims",
+        "Step 4: Update synthesis.md",
+        "Step 5: Hand off validation metadata to report tool",
     ]
 
     for step in steps:
         assert step in reporter_prompt, f"Missing step: {step}"
+    assert 'write_file("/synthesis_validation.json"' not in reporter_prompt
 
     print(f"✅ REPORTER prompt contains all 5 Phase 4.5 steps")
 
 
 # =============================================================================
-# Test 3: Tool Invocation - search_literature_dynamic
+# Test 3: Existing RAG tool availability
 # =============================================================================
 
 
-@pytest.mark.asyncio
-async def test_search_literature_dynamic_invocation():
-    """Test search_literature_dynamic with integration-focused terms."""
-    from src.agents.deep_interpreter.tools.literature import search_literature_dynamic
+def test_search_literature_fulltext_import():
+    """Verify existing-RAG retrieval tool can be imported."""
+    from src.agents.deep_interpreter.tools.literature_rag import search_literature_fulltext
 
-    # Integration-focused search (Phase 4.5 style)
-    result = await search_literature_dynamic.ainvoke(
-        {
-            "genes": ["TGFB1", "CDH1"],
-            "pathways": ["EMT", "TGFb signaling"],
-            "celltypes": ["Fibroblast", "Epithelial"],
-            "disease": "breast cancer",
-            "max_results": 5,
-        }
+    assert search_literature_fulltext is not None
+    assert hasattr(search_literature_fulltext, "invoke") or hasattr(
+        search_literature_fulltext, "ainvoke"
     )
-
-    # Parse result - can be dict or string
-    assert result is not None
-
-    if isinstance(result, dict):
-        # Dict format: check for papers key or error handling
-        assert "papers" in result or "error" in result or "coverage" in result
-        print(f"✅ search_literature_dynamic returned dict result")
-        print(f"   Keys: {list(result.keys())}")
-        if "papers" in result:
-            print(f"   Papers count: {len(result['papers'])}")
-    else:
-        # String format
-        assert "error" not in result.lower() or "papers" in result.lower()
-        print(f"✅ search_literature_dynamic returned string result")
-        print(f"   Result preview: {str(result)[:200]}...")
-
-
-@pytest.mark.asyncio
-async def test_search_literature_dynamic_fallback():
-    """Test search_literature_dynamic handles edge cases gracefully."""
-    from src.agents.deep_interpreter.tools.literature import search_literature_dynamic
-
-    # Minimal input
-    result = await search_literature_dynamic.ainvoke(
-        {
-            "genes": ["BRCA1"],
-            "pathways": [],
-            "celltypes": [],
-            "disease": "cancer",
-            "max_results": 3,
-        }
-    )
-
-    assert result is not None
-    print(f"✅ search_literature_dynamic handles minimal input")
 
 
 # =============================================================================
@@ -186,47 +143,8 @@ def test_prepare_rag_literature_import():
     print("✅ prepare_rag_literature imported successfully")
 
 
-@pytest.mark.asyncio
-async def test_prepare_rag_literature_synthesis_mode():
-    """Test prepare_rag_literature with synthesis part_name."""
-    from src.agents.deep_interpreter.tools.literature_rag import prepare_rag_literature
-
-    # Create mock papers JSON
-    mock_papers = {
-        "papers": [
-            {
-                "pmid": "12345678",
-                "title": "Test paper for synthesis validation",
-                "abstract": "This is a test abstract.",
-            }
-        ],
-        "coverage": {"total_papers": 1},
-    }
-
-    # Write to temp location
-    temp_dir = Path("/tmp/test_reporter_phase45")
-    temp_dir.mkdir(exist_ok=True)
-    papers_path = temp_dir / "synthesis_papers.json"
-    papers_path.write_text(json.dumps(mock_papers))
-
-    try:
-        # Test with synthesis part_name
-        result = await prepare_rag_literature.ainvoke(
-            {"papers_json_path": str(papers_path), "part_name": "synthesis"}
-        )
-
-        # Should return result (may fail if Docker not available)
-        assert result is not None
-        print(f"✅ prepare_rag_literature executed with part_name='synthesis'")
-        print(f"   Result: {result[:200] if len(result) > 200 else result}")
-    except Exception as e:
-        # RAG may require Docker - this is acceptable for unit test
-        print(f"⚠️  prepare_rag_literature raised exception (Docker may be unavailable): {e}")
-        pytest.skip("RAG infrastructure not available")
-
-
 # =============================================================================
-# Test 5: Mock Synthesis Context Extraction
+# Test 4: Mock Synthesis Context Extraction
 # =============================================================================
 
 
@@ -351,8 +269,8 @@ def extract_synthesis_context(synthesis_md: str) -> dict:
         r"signaling (axis|pathway)",
     ]
     for pattern in integration_patterns:
-        if re.search(pattern, synthesis_md, re.IGNORECASE):
-            match = re.search(pattern, synthesis_md, re.IGNORECASE)
+        match = re.search(pattern, synthesis_md, re.IGNORECASE)
+        if match:
             context["integration_keywords"].append(match.group(0))
     context["integration_keywords"] = list(set(context["integration_keywords"]))
 
@@ -366,10 +284,9 @@ def extract_synthesis_context(synthesis_md: str) -> dict:
         r"glioblastoma",
     ]
     for pattern in disease_patterns:
-        if re.search(pattern, synthesis_md, re.IGNORECASE):
-            context["disease_context"] = re.search(
-                pattern, synthesis_md, re.IGNORECASE
-            ).group(0)
+        match = re.search(pattern, synthesis_md, re.IGNORECASE)
+        if match:
+            context["disease_context"] = match.group(0)
             break
 
     return context
@@ -434,14 +351,14 @@ if __name__ == "__main__":
 
     # Sync tests
     print("\n--- Test 1: Tool Registration ---")
-    test_reporter_has_phase45_tools()
+    test_reporter_has_existing_rag_tools()
     test_reporter_tool_count()
 
     print("\n--- Test 2: Prompt Loading ---")
     test_reporter_prompt_has_phase45()
     test_reporter_prompt_5step_workflow()
 
-    print("\n--- Test 5: Context Extraction ---")
+    print("\n--- Test 4: Context Extraction ---")
     test_extract_synthesis_context()
     test_synthesis_context_json_output()
 

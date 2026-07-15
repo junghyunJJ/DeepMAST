@@ -11,8 +11,10 @@ Architecture:
 from src.agents.deep_interpreter.middleware.skills_middleware import SkillsMiddleware
 from src.agents.deep_interpreter.middleware.write_file_guard import WriteFileArgGuardMiddleware
 from src.agents.deep_interpreter.middleware.load import list_skills, SkillMetadata
+from src.agents.deep_interpreter.middleware.report_guardrail import ReportGuardrailMiddleware
 
 __all__ = [
+    "ReportGuardrailMiddleware",
     "SkillsMiddleware",
     "WriteFileArgGuardMiddleware",
     "list_skills",

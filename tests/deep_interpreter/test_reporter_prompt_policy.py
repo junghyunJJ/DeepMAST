@@ -1,10 +1,4 @@
-"""Prompt policy tests for the REPORTER subagent.
-
-Verifies that REPORTER's Phase 4.5 prompt keeps think_tool as the active
-reflection/planning mechanism (Step 2 strategic planning + Step 4 quality
-reflection) AND that validate_quality is NOT promoted to a mandatory
-completion gate.
-"""
+"""Prompt policy tests for the REPORTER subagent."""
 
 from __future__ import annotations
 
@@ -29,23 +23,19 @@ def _extract_phase45_step_block(step_header: str) -> str:
     return match.group(0)
 
 
-def test_phase45_step2_strategic_planning_uses_think_tool():
-    block = _extract_phase45_step_block("Step 2: Strategic Planning (think_tool x3)")
-    assert "think_tool" in block, (
-        "Phase 4.5 Step 2 must keep think_tool as the strategic-planning mechanism."
-    )
-    # At least 3 invocations implied by 'x3' title; confirm multiple references.
-    assert block.count("think_tool") >= 3, (
-        f"Phase 4.5 Step 2 title says 'think_tool x3' but block contains "
-        f"{block.count('think_tool')} references."
-    )
+def test_phase45_step2_retrieves_from_existing_rag():
+    block = _extract_phase45_step_block("Step 2: Retrieve Theme Support")
+    assert "search_literature_fulltext" in block
+    assert 'part_name="all"' in block
+    assert "search_literature_dynamic" not in block
+    assert "synthesis_papers.json" not in block
 
 
-def test_phase45_step4_quality_reflection_uses_think_tool():
-    block = _extract_phase45_step_block("Step 4: Quality Reflection (think_tool)")
-    assert "think_tool" in block, (
-        "Phase 4.5 Step 4 must keep think_tool as the quality reflection mechanism."
-    )
+def test_phase45_step4_downgrades_unsupported_claims():
+    block = _extract_phase45_step_block("Step 4: Update synthesis.md")
+    assert "Hypothesis" in block
+    assert "Needs Validation" in block
+    assert "new literature" not in block.lower()
 
 
 def test_reporter_does_not_mandate_validate_quality_gate():
@@ -78,13 +68,9 @@ def test_reporter_still_references_validate_quality_as_secondary():
     )
 
 
-def test_reporter_think_tool_is_prompt_mandatory_not_runtime_enforced():
-    """Both strategic-planning and quality-reflection think_tool calls remain prompt-level."""
-    # Sanity: the prompt contains the two key think_tool usages and does not
-    # reference a middleware/hook that would hard-enforce them.
-    assert "think_tool" in _extract_phase45_step_block("Step 2: Strategic Planning (think_tool x3)")
-    assert "think_tool" in _extract_phase45_step_block("Step 4: Quality Reflection (think_tool)")
-    # No middleware/gate language around think_tool in REPORTER.
+def test_reporter_think_tool_is_available_not_runtime_enforced():
+    """think_tool remains optional prompt-level support, not runtime-enforced."""
+    assert "think_tool" in REPORTER_PROMPT
     assert not re.search(
         r"middleware[^.\n]{0,40}think_tool|think_tool[^.\n]{0,40}middleware",
         REPORTER_PROMPT,
@@ -99,6 +85,16 @@ def _extract_phase47_block() -> str:
         flags=re.DOTALL,
     )
     assert match, "Could not locate Phase 4.7 block in REPORTER prompt"
+    return match.group(0)
+
+
+def _extract_phase5_block() -> str:
+    match = re.search(
+        r"### Phase 5\.0:.*?(?=### Phase 6:)",
+        REPORTER_PROMPT,
+        flags=re.DOTALL,
+    )
+    assert match, "Could not locate Phase 5.0 block in REPORTER prompt"
     return match.group(0)
 
 
@@ -147,8 +143,8 @@ def test_reporter_phase5_uses_comprehensive_template_mode():
 
 def test_reporter_phase5_keeps_therapeutic_source_tracking():
     assert "part4_therapeutic_synthesis.md" in REPORTER_PROMPT
-    assert "canonical_source" in REPORTER_PROMPT
-    assert "supporting_source" in REPORTER_PROMPT
+    assert "canonical source" in REPORTER_PROMPT.lower()
+    assert "supporting" in REPORTER_PROMPT.lower()
 
 
 def test_reporter_rag_validation_passes_explicit_data_dir():
@@ -156,7 +152,36 @@ def test_reporter_rag_validation_passes_explicit_data_dir():
 
     assert "prepare_rag_literature(" in prompt
     assert re.search(
-        r"validate_claim_fulltext\s*\([^)]*data_dir=data_path\.strip\(\)",
+        r"search_literature_fulltext\s*\([^)]*part_name=\"all\"[^)]*data_dir=data_path\.strip\(\)",
+        prompt,
+        flags=re.DOTALL,
+    ), "REPORTER search_literature_fulltext calls must pass explicit data_dir"
+    assert re.search(
+        r"validate_claim_fulltext\s*\([^)]*part_name=\"all\"[^)]*data_dir=data_path\.strip\(\)",
         prompt,
         flags=re.DOTALL,
     ), "REPORTER validate_claim_fulltext calls must pass explicit data_dir"
+
+
+def test_reporter_phase5_states_synthesis_guardrail_runs_before_html():
+    block = _extract_phase5_block()
+
+    assert "synthesis guardrail" in block.lower()
+    assert "generate_html_report" in block
+    assert block.lower().index("synthesis guardrail") < block.index("generate_html_report")
+
+
+def test_reporter_phase5_delegates_bookkeeping_artifacts_to_report_tool():
+    block = _extract_phase5_block()
+
+    assert "generate_html_report" in block
+    assert "writes `/synthesis_validation.json` and `/synthesis_targets.json`" in block
+    assert 'write_file("/synthesis_validation.json"' not in block
+    assert 'write_file("/synthesis_targets.json"' not in block
+
+
+def test_reporter_never_hand_writes_reporter_bookkeeping_artifacts():
+    assert 'write_file("/synthesis_validation.json"' not in REPORTER_PROMPT
+    assert 'write_file("/synthesis_targets.json"' not in REPORTER_PROMPT
+    assert "Step 5: Write synthesis_validation.json" not in REPORTER_PROMPT
+    assert "Step 3: Write /synthesis_targets.json" not in REPORTER_PROMPT

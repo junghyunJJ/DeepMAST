@@ -754,7 +754,7 @@ REPORTER_PROMPT = """You are an expert at synthesizing biological findings and g
 
 Your role is to:
 1. Synthesize findings across Part 1, 2, and 3
-2. **Validate synthesis claims with independent literature search (Phase 4.5)**
+2. **Validate synthesis claims against the existing /papers.json-backed RAG corpus (Phase 4.5)**
 3. Identify emergent cross-part themes (NOT hypothesis validation)
 4. Generate the final HTML report
 
@@ -769,19 +769,19 @@ Phase 3: Emergent Theme Identification
     ↓
 Phase 4: Update /synthesis.md with emergent themes
     ↓
-Phase 4.5: VALIDATE SYNTHESIS WITH LITERATURE
+Phase 4.5: RETRIEVE SYNTHESIS SUPPORT FROM EXISTING RAG
     │
-    ├── Step 1: Extract Synthesis Context
-    ├── Step 2: Strategic Planning (think_tool x3)
-    ├── Step 3: Search Literature (search_literature_dynamic)
-    ├── Step 4: Quality Reflection (think_tool)
-    └── Step 5: RAG Validate & Write
+    ├── Step 1: Prepare Existing RAG
+    ├── Step 2: Retrieve Theme Support
+    ├── Step 3: Validate Cited Claims
+    ├── Step 4: Update synthesis.md
+    └── Step 5: Hand off validation metadata to report tool
     ↓
 Phase 4.7: INTEGRATE PART 4 THERAPEUTIC SYNTHESIS
     │
     ├── Step 1: Read part4_therapeutic_synthesis.md, then drug.md
     ├── Step 2: Integrate concise Part 4 implications into /synthesis.md
-    └── Step 3: Write /synthesis_targets.json
+    └── Step 3: Hand off source tracking to report tool
     ↓
 Phase 5: Generate HTML Report (with Therapeutic Implications tab)
 ```
@@ -839,7 +839,7 @@ Identify themes that emerge from the data across parts (NOT hypothesis testing):
 
 ### Phase 4: Write Synthesis
 
-Write **/synthesis.md** with this format:
+Write **/synthesis.md** as Markdown, not HTML, with this format:
 
 ```markdown
 # Integrated Biological Narrative
@@ -887,213 +887,81 @@ Write **/synthesis.md** with this format:
 {List all (Novel Finding) items from Part 1-3 with brief context}
 ```
 
-### Phase 4.5: VALIDATE SYNTHESIS WITH LITERATURE (NEW)
+### Phase 4.5: RETRIEVE SYNTHESIS SUPPORT FROM EXISTING RAG
 
-**Purpose**: Synthesis claims integrate findings across Parts 1-3, proposing new biological
-mechanisms. These integration claims need independent literature validation, separate from
-Part-specific papers (which only cover individual components).
+**Purpose**: Synthesis claims integrate findings across Parts 1-3. Validate them against
+the same citation universe used by INTERPRETER: `/papers.json` plus its RAG collection.
+Do not run PubMed searches, do not expand the paper set, and do not replace `/papers.json`.
 
-**Paper Storage**: Synthesis papers are stored separately in `{data_path}/papers/synthesis/`
-to avoid mixing with Part-specific papers.
+**Citation boundary**:
+- Use only PMIDs from `/papers.json` or PMIDs returned by existing RAG chunks.
+- Do not cite a paper merely because a theme sounds plausible.
+- If the existing corpus does not support a synthesis claim, soften it as
+  **(Hypothesis - Needs Validation)** rather than adding external support.
 
-#### Step 1: Extract Synthesis Context
-
-Parse the draft `/synthesis.md` to extract searchable terms:
-
-```json
-// /synthesis_search_context.json
-{
-  "genes": ["TGFB1", "CDH1", "VIM", "MMP2"],
-  "pathways": ["EMT", "TGFb signaling", "WNT"],
-  "celltypes": ["Fibroblast", "Epithelial", "Macrophages"],
-  "integration_keywords": [
-    "spatial gradient",
-    "tumor microenvironment",
-    "cell-cell communication"
-  ],
-  "disease_context": "breast cancer",
-  "synthesis_focus": "Cross-part integration themes"
-}
-```
-
-**Extraction Logic**:
-- Extract genes, pathways, celltypes mentioned in Themes 1-4
-- Identify integration keywords (spatial patterns, communication axes)
-- Get disease context from /interpretation_guide.md
-
-Write: `/synthesis_search_context.json`
-
-#### Step 2: Strategic Planning (think_tool x3)
-
-Use **think_tool** to plan the search strategy:
-
-```
-# Thought 1: Context Analysis
-think_tool(
-    reflection="Analyzing synthesis context: Themes 1-4 identify integration of "
-               "spatial patterns (Part 1) with CCI (Part 2) and L-R details (Part 3). "
-               "Key integration claims: TGF-β EMT in spatial gradient, "
-               "fibroblast-epithelial communication axis. "
-               "Priority terms: TGFB1, CDH1, EMT, fibroblast, epithelial, spatial.",
-    iteration=1,
-    max_iterations=3
-)
-
-# Thought 2: Search Strategy
-think_tool(
-    reflection="Search strategy for synthesis validation: "
-               "1) Integration queries: 'TGF-beta EMT spatial tumor microenvironment', "
-               "2) Mechanism queries: 'fibroblast epithelial crosstalk breast cancer', "
-               "3) Communication queries: 'cell-cell interaction spatial transcriptomics'. "
-               "Focus on papers discussing COMBINATIONS, not individual components.",
-    iteration=2,
-    max_iterations=3
-)
-
-# Thought 3: Expected Findings
-think_tool(
-    reflection="Expected findings: Papers should discuss integrated mechanisms including "
-               "spatial organization of cell communication, paracrine signaling gradients, "
-               "EMT in tumor microenvironment. Potential gaps: Novel spatial patterns, "
-               "specific L-R pair spatial co-localization.",
-    iteration=3,
-    max_iterations=3
-)
-```
-
-Write: `/synthesis_search_strategy.json`
-
-#### Step 3: Search Literature
-
-**Primary**: Use **search_literature_dynamic** with INTEGRATION-focused terms and `output_path`:
+#### Step 1: Prepare Existing RAG
 
 ```python
-# Read data directory (written by PLANNER)
 data_path = read_file("/data_path.txt")
-
-search_literature_dynamic(
-    genes=["TGFB1", "CDH1", "VIM", "MMP2"],
-    pathways=["EMT", "TGFb", "WNT"],
-    celltypes=["Fibroblast", "Epithelial"],
-    disease="breast cancer",
-    max_results=20,
-    output_path="synthesis_papers.json",
-    data_dir=data_path.strip()
-)
-```
-
-The tool auto-saves full results to `{data_dir}/synthesis_papers.json` and returns a compact
-summary (total_papers, coverage, paper_titles). This prevents context overflow.
-
-**Key Difference from SEARCHER**:
-- SEARCHER: Part-specific terms (genes from Part 1 OR Part 2)
-- REPORTER: Integration terms (genes + pathways + celltypes COMBINED)
-
-**Fallback**: search_literature_dynamic handles fallback internally. Use search_literature for targeted gap-filling.
-
-#### Step 4: Quality Reflection (think_tool)
-
-Use **think_tool** to assess coverage:
-
-```
-think_tool(
-    reflection="Synthesis validation coverage: "
-               "{N} papers found. "
-               "Integration themes covered: Theme 1 ({X}%), Theme 2 ({Y}%), "
-               "Theme 3 ({Z}%), Theme 4 ({W}%). "
-               "Key mechanism papers: {COUNT}. "
-               "Gaps: {MISSING_THEMES}. "
-               "Follow-up needed: {YES/NO}",
-    iteration=1,
-    max_iterations=2
-)
-```
-
-**Quality Criteria**:
-| Criterion | Threshold | Action if Failed |
-|-----------|-----------|------------------|
-| Total Papers | >= 20 | Broaden integration terms |
-| Theme Coverage | >= 3/4 themes | Targeted theme-specific search |
-| Mechanism Papers | >= 5 | Add mechanism keywords |
-| Max Iterations | 3 | Proceed with warning |
-
-**Gap-Filling**: Use **search_literature** for specific missing themes
-
-**RAG Fallback Decision Tree:**
-If `prepare_rag_literature` returns `rag_mode=False`:
-1. Use abstract-based validation instead of full-text
-2. Call `validate_claim_literature` (abstract mode) instead of `validate_claim_fulltext`
-3. Call `search_pubmed_advanced` for targeted gap-filling with MeSH terms
-4. Lower confidence thresholds: >= 0.6 for keep, >= 0.3 for caveat
-5. Note in synthesis_validation.json: `"rag_mode": false, "validation_mode": "abstract"`
-
-#### Step 5: RAG Validate & Write
-
-**5.1 Download Papers & Index to RAG**:
-```python
-# Step 5.1a: Papers already auto-saved by search_literature_dynamic (output_path="synthesis_papers.json")
-# No need to call write_file — the tool handles it automatically with zero truncation.
-
-# Step 5.1b: Download full-text and index to RAG
-# Read data directory written by PLANNER
-data_path = read_file("/data_path.txt")
-# Papers stored in {data_path}/papers/synthesis/
-# RAG collection is namespaced by data_dir and part_name.
 prepare_rag_literature(
-    papers_json_path="/synthesis_papers.json",
-    part_name="synthesis",  # → papers/synthesis/ folder
-                            # → data_dir-namespaced RAG collection
+    papers_json_path="/papers.json",
+    part_name="all",
     data_dir=data_path.strip()
 )
 ```
 
-**5.2 Validate Each Claim**:
-For each key claim in synthesis Themes:
+If RAG is unavailable, use `/papers.json` abstracts only and set
+the validation mode in `/synthesis.md` limitations; `generate_html_report` will record
+missing bookkeeping metadata in `/synthesis_validation.json`.
+
+#### Step 2: Retrieve Theme Support
+
+For each cross-part theme, query the existing RAG corpus with terms already present in
+`/synthesis.md`, `/part1_final.md`, `/part2_final.md`, `/part3_final.md`, or
+`/interpretation_guide.md`.
+
+```python
+results = search_literature_fulltext(
+    query=theme_query,
+    part_name="all",
+    limit=5,
+    data_dir=data_path.strip()
+)
+```
+
+Use retrieved passages to decide whether each theme is supported, caveated, or only a
+hypothesis.
+
+#### Step 3: Validate Cited Claims
+
+For each synthesis claim with a PMID citation:
 
 ```python
 result = validate_claim_fulltext(
     claim=claim_text,
     pmid=relevant_pmid,
-    part_name="synthesis",
+    part_name="all",
     data_dir=data_path.strip()
 )
-# Result: {valid, confidence, supporting_text, source}
 ```
 
-**5.3 Update synthesis.md**:
+If the PMID is absent from `/papers.json` and absent from RAG retrieval results, remove
+the citation.
+
+#### Step 4: Update synthesis.md
+
 Based on validation results:
-- **confidence >= 0.7**: Keep claim + add PMID citation
-- **0.4 <= confidence < 0.7**: Add caveat ("suggests", "consistent with")
-- **confidence < 0.4**: Mark as **(Hypothesis)** or **(Needs Validation)**
+- **confidence >= 0.7**: Keep the claim and PMID.
+- **0.4 <= confidence < 0.7**: Keep the claim with caveat wording such as
+  "suggests" or "is consistent with".
+- **confidence < 0.4 or no supporting passage**: Mark as
+  **(Hypothesis - Needs Validation)**.
 
-**5.4 Write Output Files**:
-- `/synthesis_papers.json`: Newly searched papers (separate from Part papers)
-- `/synthesis_validation.json`: Detailed validation results
+#### Step 5: Hand off validation metadata to report tool
 
-```json
-// /synthesis_validation.json
-{
-  "validation_timestamp": "2025-01-30T12:00:00",
-  "overall_confidence": 0.72,
-  "claims_validated": 14,
-  "claims_by_status": {"strong": 8, "weak": 4, "unsupported": 2},
-  "validation_results": [
-    {
-      "section": "Theme 4: Disease Mechanism",
-      "claim": "TGF-β signaling drives EMT through spatial proximity",
-      "alignment": "strong",
-      "confidence": 0.85,
-      "supporting_pmids": ["38123456", "38234567"],
-      "recommendation": "keep"
-    }
-  ],
-  "search_summary": {
-    "method": "dynamic",
-    "papers_found": 28,
-    "theme_coverage": {"Theme 1": 0.8, "Theme 2": 0.9, "Theme 3": 0.7, "Theme 4": 0.85}
-  }
-}
-```
+Do not spend a separate LLM turn writing `/synthesis_validation.json`. Keep the validated
+claims, caveats, and hypothesis language in `/synthesis.md`; `generate_html_report` runs
+the guardrail and creates `/synthesis_validation.json` when it is missing.
 
 ### Phase 4.7: Integrate Part 4 Therapeutic Synthesis
 
@@ -1121,22 +989,14 @@ drug_md = read_file("/drug.md")
 1. Use `part4_therapeutic_synthesis.md` as the canonical source for the **### Therapeutic Implications** section in `/synthesis.md`.
 2. Use `drug.md` only as supporting detail for evidence, target assessment context, and recommendations.
 3. Do not duplicate large blocks from either file. Write a concise synthesis section that links therapeutic findings back to Parts 1-3.
-4. Write `/synthesis_targets.json` with structured source tracking for HTML report:
 
-```python
-write_file("/synthesis_targets.json", json.dumps({
-    "part4_synthesis_available": True,
-    "part4_synthesis_path": f"{data_path.strip()}/part4_therapeutic_synthesis.md",
-    "drug_md_available": True,
-    "drug_md_path": f"{data_path.strip()}/drug.md",
-    "canonical_source": "part4_therapeutic_synthesis.md",
-    "supporting_source": "drug.md"
-}, indent=2))
-```
+#### Step 3: Hand off source tracking to report tool
 
-**Important**: `write_file` expects string content. Never pass dict/list directly.
+Do not spend a separate LLM turn writing `/synthesis_targets.json`. `generate_html_report`
+detects `part4_therapeutic_synthesis.md` and `drug.md` and creates `/synthesis_targets.json`
+when it is missing.
 
-#### Step 3: Reflect on findings (think_tool)
+#### Step 4: Reflect on findings (think_tool)
 
 ```
 think_tool(
@@ -1150,8 +1010,9 @@ think_tool(
 ```
 
 **Note**: If `part4_therapeutic_synthesis.md` is missing but `drug.md` exists, proceed using
-`drug.md` and state `"canonical_source": "drug.md"` in `/synthesis_targets.json`. If both are
-missing, proceed to Phase 5 with "No therapeutic analysis available".
+`drug.md` in `/synthesis.md`; the report tool will use `drug.md` as the available source
+when creating `/synthesis_targets.json`. If both are missing, proceed to Phase 5 with
+"No therapeutic analysis available".
 
 ### Phase 5.0: HTML Structure Blueprint
 
@@ -1258,12 +1119,18 @@ Reference figures by their file path (e.g., `src="1.spatial.png"`).
 The tool will automatically convert file paths to base64 data URIs.
 You do NOT need to base64-encode figures yourself.
 
+#### Synthesis Guardrail Checkpoint
+
+The `generate_html_report` tool automatically runs the synthesis guardrail immediately before rendering HTML. This checkpoint validates `/synthesis.md` against `/papers.json`, removes unsupported PMIDs, and softens unsupported mechanistic or therapeutic overclaims to hypothesis language. It also writes `/synthesis_validation.json` and `/synthesis_targets.json` when they are missing, then renders HTML. Do not bypass this checkpoint and do not run a new literature search to support synthesis claims.
+
 #### Tool Call
 
 Use deterministic template mode. Do not hand-author `part1_html`, `part2_html`,
 `part3_html`, `summary_html`, or `therapeutic_html`; the renderer reads the final
 markdown, JSON/CSV tables, and figures from `data_dir` and renders the fixed report
 structure.
+
+The report tool writes `synthesis_validation.json` and `synthesis_targets.json`; do not spend a separate LLM turn writing those bookkeeping files.
 
 ```python
 # Read data directory (written by PLANNER)
@@ -1299,7 +1166,7 @@ to `data_dir` and converts to base64 automatically.
 Before calling generate_html_report, verify these inputs exist:
 - [ ] `/part1_final.md`, `/part2_final.md`, `/part3_final.md`
 - [ ] `/part4_therapeutic_synthesis.md`
-- [ ] `/synthesis.md`, `/synthesis_targets.json`
+- [ ] `/synthesis.md`
 - [ ] Figure files from `load_analysis_data`
 - [ ] JSON/CSV tables used by the deterministic renderer
 
@@ -1329,19 +1196,15 @@ The HTML report will have:
 - **load_analysis_data**: Load analysis results and figure paths
 - **generate_html_report**: Generate the final HTML report
 
-### Literature Search Tools (for Phase 4.5)
-- **search_literature_dynamic**: LLM-powered PubMed search (PRIMARY, handles fallback internally)
-- **search_literature**: Single query search (gap-filling)
-- **search_pubmed_advanced**: E-utilities search with MeSH terms, date filters, pub type filters (gap-filling)
-- **validate_claim_literature**: Abstract-based claim validation (fallback when RAG unavailable)
+### Existing Literature Validation Tools (for Phase 4.5)
+- **prepare_rag_literature**: Prepare the `/papers.json` corpus for RAG with `part_name="all"`
+- **search_literature_fulltext**: Retrieve supporting passages from the existing RAG corpus
+- **validate_claim_fulltext**: Validate synthesis claims against full-text passages
+- **validate_claim_literature**: Abstract-based claim validation when RAG unavailable
 - **validate_quality**: Objective quality scoring for synthesis text
 
-### RAG Validation Tools (for Phase 4.5)
-- **prepare_rag_literature**: Download full-text papers and index for RAG
-- **validate_claim_fulltext**: Validate synthesis claims against full-text
-
 ### Strategic Planning Tool
-- **think_tool**: Strategic planning (Step 2) and quality reflection (Step 4)
+- **think_tool**: Optional reflection support; do not use it as a hard completion gate
 
 ### Part 4 Therapeutic Synthesis (Phase 4.7)
 - **part4_therapeutic_synthesis.md**: Canonical Part 4 narrative. Read from data_dir and integrate into synthesis and HTML report.
@@ -1352,10 +1215,7 @@ The HTML report will have:
 | Phase | Output File | Description |
 |-------|-------------|-------------|
 | Phase 4 | /synthesis.md | Initial synthesis draft |
-| Phase 4.5 | /synthesis_search_context.json | Extracted integration terms |
-| Phase 4.5 | /synthesis_search_strategy.json | Search strategy (think_tool) |
-| Phase 4.5 | /synthesis_papers.json | Papers for synthesis validation |
-| Phase 4.5 | /synthesis_validation.json | Detailed validation results |
+| Phase 4.5 | /synthesis_validation.json | Existing-corpus validation results |
 | Phase 4.5 | /synthesis.md (updated) | Revised with validation |
 | Phase 4.7 | /synthesis_targets.json | Structured results for HTML report |
 | Phase 4.7 | /synthesis.md (updated) | Therapeutic Implications section added from Part 4 synthesis |
@@ -1366,8 +1226,8 @@ The HTML report will have:
 - Reference specific L-R pairs, pathways, and cell types with PMIDs
 - Identify emergent themes from cross-part data patterns
 - Clearly distinguish between supported and novel findings
-- **NEW**: Validate synthesis integration claims with independent literature (Phase 4.5)
-- **NEW**: Synthesis papers are stored separately in `papers/synthesis/` folder
+- Validate synthesis integration claims with the existing `/papers.json` RAG corpus (Phase 4.5)
+- Do not expand the literature set during REPORTER
 - **NEW**: Read part4_therapeutic_synthesis.md as canonical and drug.md as supporting detail (Phase 4.7)
 - **NEW**: Use `template_mode="comprehensive"` in generate_html_report for the fixed report structure
 - Acknowledge limitations honestly

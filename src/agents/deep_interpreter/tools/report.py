@@ -15,7 +15,7 @@ import re
 from datetime import datetime
 from html import escape
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from jinja2 import Environment, FileSystemLoader
 from langchain_core.tools import tool
@@ -683,13 +683,16 @@ def _generate_part_content(part_data: dict) -> str:
         # Build optional enriched sections
         pathway_html = ""
         pathways = analysis_data.get("pathway_descriptions")
-        if pathways:
+        if isinstance(pathways, list):
             pathway_html = _generate_pathway_box_html(pathways)
 
         kf_html = ""
         kf_table = analysis_data.get("key_findings_table")
-        if kf_table:
+        if isinstance(kf_table, list):
             kf_html = _generate_key_findings_table_html(kf_table)
+
+        if not isinstance(caption, str):
+            caption = analysis_name
 
         sections.append(f"""
         <div class="analysis-section">
@@ -1054,6 +1057,114 @@ def _render_comprehensive_template(parts: dict, output_path: str, data_dir: str)
     env = Environment(loader=FileSystemLoader(str(_TEMPLATE_DIR)), autoescape=False)
     template = env.get_template("cci_report.html.j2")
     return template.render(**_build_template_report_context(parts, data_dir, output_path))
+
+
+def _run_synthesis_guardrail_before_html(data_dir: str) -> dict[str, Any] | None:
+    if not data_dir:
+        return None
+
+    from src.agents.deep_interpreter import report_guardrails
+
+    return report_guardrails.run_synthesis_guardrail(data_dir)
+
+
+def _materialize_synthesis_for_guardrail(parts: dict, data_dir: str) -> bool:
+    """Persist in-memory synthesis text so the guardrail can validate it."""
+    if not data_dir:
+        return False
+
+    synthesis_path = Path(data_dir) / "synthesis.md"
+    if synthesis_path.exists():
+        return True
+
+    synthesis = parts.get("synthesis")
+    if not isinstance(synthesis, str) or not synthesis.strip():
+        return False
+
+    synthesis_path.write_text(synthesis.strip() + "\n", encoding="utf-8")
+    return True
+
+
+def _int_guardrail_field(result: dict[str, Any], key: str) -> int:
+    try:
+        return int(result.get(key, 0) or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _write_json_if_missing(path: Path, payload: dict[str, Any]) -> bool:
+    if path.exists():
+        return False
+    path.write_text(
+        json.dumps(payload, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    return True
+
+
+def _default_synthesis_validation(
+    data_dir: str,
+    guardrail_result: dict[str, Any],
+) -> dict[str, Any]:
+    return {
+        "literature_source": "papers.json",
+        "expanded_literature": False,
+        "rag_part_name": "all",
+        "rag_mode": (Path(data_dir) / "papers" / "all").exists(),
+        "claims_validated": _int_guardrail_field(guardrail_result, "initial_issue_count"),
+        "claims_by_status": {
+            "supported": 0,
+            "caveated": _int_guardrail_field(guardrail_result, "final_issue_count"),
+            "hypothesis": _int_guardrail_field(guardrail_result, "changed_claims"),
+        },
+        "validation_results": [],
+        "synthesis_guardrail": guardrail_result,
+        "auto_generated": True,
+    }
+
+
+def _default_synthesis_targets(data_dir: str) -> dict[str, Any]:
+    base = Path(data_dir)
+    part4_path = base / "part4_therapeutic_synthesis.md"
+    drug_path = base / "drug.md"
+    part4_exists = part4_path.exists()
+    drug_exists = drug_path.exists()
+    canonical_source = (
+        "part4_therapeutic_synthesis.md"
+        if part4_exists
+        else "drug.md"
+        if drug_exists
+        else None
+    )
+    supporting_source = "drug.md" if drug_exists and canonical_source != "drug.md" else None
+    return {
+        "part4_synthesis_available": part4_exists,
+        "part4_synthesis_path": str(part4_path) if part4_exists else None,
+        "drug_md_available": drug_exists,
+        "drug_md_path": str(drug_path) if drug_exists else None,
+        "canonical_source": canonical_source,
+        "supporting_source": supporting_source,
+        "auto_generated": True,
+    }
+
+
+def _ensure_reporter_artifacts(
+    data_dir: str,
+    guardrail_result: dict[str, Any] | None,
+) -> dict[str, bool]:
+    if not data_dir or guardrail_result is None:
+        return {}
+    base = Path(data_dir)
+    return {
+        "synthesis_validation.json": _write_json_if_missing(
+            base / "synthesis_validation.json",
+            _default_synthesis_validation(data_dir, guardrail_result),
+        ),
+        "synthesis_targets.json": _write_json_if_missing(
+            base / "synthesis_targets.json",
+            _default_synthesis_targets(data_dir),
+        ),
+    }
 
 
 def _generate_html_report_impl(
@@ -1456,7 +1567,32 @@ def generate_html_report(
     if not os.path.isabs(output_path):
         if resolved_data_dir:
             output_path = os.path.join(resolved_data_dir, output_path)
-    return _generate_html_report_impl(parts=parts, output_path=output_path, data_dir=resolved_data_dir)
+    _materialize_synthesis_for_guardrail(parts, resolved_data_dir)
+    guardrail_result = _run_synthesis_guardrail_before_html(resolved_data_dir)
+    if guardrail_result is not None and guardrail_result.get("status") in {"failed", "skipped"}:
+        return (
+            "Error generating report: synthesis guardrail failed before HTML rendering: "
+            f"{json.dumps(guardrail_result, sort_keys=True)}"
+        )
+    reporter_artifacts = _ensure_reporter_artifacts(resolved_data_dir, guardrail_result)
+    render_parts = parts
+    if guardrail_result is not None and parts.get("template_mode") != "comprehensive":
+        synthesis_path = Path(resolved_data_dir) / "synthesis.md"
+        if synthesis_path.is_file():
+            render_parts = {**parts, "synthesis": synthesis_path.read_text(encoding="utf-8")}
+            render_parts.pop("summary_html", None)
+    result = _generate_html_report_impl(
+        parts=render_parts,
+        output_path=output_path,
+        data_dir=resolved_data_dir,
+    )
+    if guardrail_result is None:
+        return result
+    return (
+        f"{result}\n"
+        f"Synthesis guardrail: {json.dumps(guardrail_result, sort_keys=True)}\n"
+        f"Reporter artifacts: {json.dumps(reporter_artifacts, sort_keys=True)}"
+    )
 
 
 def generate_simple_report(

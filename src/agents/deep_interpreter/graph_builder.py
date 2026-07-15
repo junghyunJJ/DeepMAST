@@ -11,11 +11,12 @@ Graph variants available:
 
 import os
 from pathlib import Path
-from typing import Literal
+from typing import Literal, cast
 
 from dotenv import load_dotenv
+from langchain.agents import create_agent
+from langchain_core.language_models import BaseChatModel
 from langchain_core.runnables import Runnable
-from langgraph.prebuilt import create_react_agent
 
 # Load .env file before any os.getenv() calls
 # This ensures environment variables are available at module import time
@@ -30,9 +31,11 @@ from src.agents.deep_interpreter.wrapper_agent import (  # noqa: E402
 )
 from src.agents.model import create_llm  # noqa: E402
 
+Provider = Literal["openai", "google", "ollama", "ollama-openai", "vllm", "claude", "openrouter"]
+
 
 def create_deep_interpreter_graph(
-    provider: Literal["openai", "google", "ollama", "ollama-openai", "vllm", "claude", "openrouter"] = "ollama",
+    provider: Provider = "ollama",
     data_dir: str = "",
     use_checkpointer: bool = True,
     is_debug: bool = False,
@@ -88,7 +91,7 @@ def _get_deep_interpreter_graph() -> Runnable:
     Returns:
         Compiled Deep Agent runnable
     """
-    provider = os.getenv("LLM_PROVIDER", "openai")
+    provider = cast(Provider, os.getenv("LLM_PROVIDER", "openai"))
     data_dir = os.getenv("DEEP_INTERPRETER_DATA_DIR", "/tmp/deep_interpreter_workspace")
     return create_deep_interpreter_graph(
         provider=provider,
@@ -99,11 +102,11 @@ def _get_deep_interpreter_graph() -> Runnable:
 
 
 def create_deep_interpreter_graph_wrapped(
-    provider: Literal["openai", "google", "ollama", "ollama-openai", "vllm", "claude", "openrouter"] = "ollama",
+    provider: Provider = "ollama",
     data_dir: str = "",
     use_checkpointer: bool = False,
     is_debug: bool = False,
-    subagent_models: dict[str, str] | None = None,
+    subagent_models: dict[str, BaseChatModel | str] | None = None,
 ) -> Runnable:
     """Create wrapped Deep Interpreter graph with HITL target collection.
 
@@ -167,7 +170,7 @@ def _get_deep_interpreter_graph_wrapped() -> Runnable:
     Returns:
         Compiled Wrapper Agent runnable
     """
-    provider = os.getenv("LLM_PROVIDER", "openai")
+    provider = cast(Provider, os.getenv("LLM_PROVIDER", "openai"))
     data_dir = os.getenv("DEEP_INTERPRETER_DATA_DIR", "/tmp/deep_interpreter_workspace")
     return create_deep_interpreter_graph_wrapped(
         provider=provider,
@@ -195,7 +198,7 @@ deep_interpreter_wrapped_graph = _get_deep_interpreter_graph_wrapped()
 
 def create_subagent_graph(
     subagent_name: Literal["planner", "searcher", "interpreter", "reporter"],
-    provider: Literal["openai", "google", "ollama", "ollama-openai", "vllm", "claude", "openrouter"] = "openai",
+    provider: Provider = "openai",
 ) -> Runnable:
     """Create standalone subagent graph for testing.
 
@@ -227,15 +230,15 @@ def create_subagent_graph(
     Returns:
         Compiled React Agent runnable for the specified subagent
     """
-    from src.agents.deep_interpreter.subagents.configs import SUBAGENT_CONFIGS
-    from src.agents.deep_interpreter.subagents.prompts import SUBAGENT_PROMPTS
+    from src.agents.deep_interpreter.subagents.configs import get_subagents
     from src.agents.deep_interpreter.tools.standalone_fs import write_file, read_file
 
     # Ensure DEEP_INTERPRETER_DATA_DIR is absolute for tool fallback.
     # In embedded mode, agent.py:182 normalizes this. In standalone mode, we must do it here.
     _standalone_data_dir = os.getenv("DEEP_INTERPRETER_DATA_DIR", "")
     if _standalone_data_dir:
-        os.environ["DEEP_INTERPRETER_DATA_DIR"] = str(Path(_standalone_data_dir).expanduser().resolve())
+        data_dir = str(Path(_standalone_data_dir).expanduser().resolve())
+        os.environ["DEEP_INTERPRETER_DATA_DIR"] = data_dir
     else:
         import warnings
         warnings.warn(
@@ -243,9 +246,11 @@ def create_subagent_graph(
             "/tmp/deep_interpreter_workspace. Set this in .env for proper file resolution.",
             UserWarning, stacklevel=2,
         )
+        data_dir = "/tmp/deep_interpreter_workspace"
 
     # Get subagent config
-    config = SUBAGENT_CONFIGS[subagent_name]
+    subagents = get_subagents(data_dir=data_dir, provider=provider)
+    config = next(subagent for subagent in subagents if subagent["name"] == subagent_name)
 
     # Create LLM
     llm = create_llm(provider=provider)
@@ -254,14 +259,12 @@ def create_subagent_graph(
     # (In embedded mode, FilesystemMiddleware injects these; standalone needs them explicitly)
     tools = list(config["tools"]) + [write_file, read_file]
 
-    # Get system prompt
-    system_prompt = SUBAGENT_PROMPTS[subagent_name]
-
-    # Create React agent with subagent config
-    agent = create_react_agent(
+    # Create agent with subagent config
+    agent = create_agent(
         model=llm,
         tools=tools,
-        prompt=system_prompt,
+        system_prompt=config["system_prompt"],
+        middleware=config.get("middleware", ()),
     )
 
     # Apply per-subagent recursion limits.
@@ -283,7 +286,7 @@ def create_subagent_graph(
 # -----------------------------------------------------------------------------
 def _get_planner_subagent_graph() -> Runnable:
     """Standalone PLANNER subagent graph - for LangGraph CLI."""
-    provider = os.getenv("LLM_PROVIDER", "openai")
+    provider = cast(Provider, os.getenv("LLM_PROVIDER", "openai"))
     return create_subagent_graph("planner", provider=provider)
 
 
@@ -295,7 +298,7 @@ planner_subagent_graph = _get_planner_subagent_graph()
 # -----------------------------------------------------------------------------
 def _get_searcher_subagent_graph() -> Runnable:
     """Standalone SEARCHER subagent graph - for LangGraph CLI."""
-    provider = os.getenv("LLM_PROVIDER", "openai")
+    provider = cast(Provider, os.getenv("LLM_PROVIDER", "openai"))
     return create_subagent_graph("searcher", provider=provider)
 
 
@@ -307,7 +310,7 @@ searcher_subagent_graph = _get_searcher_subagent_graph()
 # -----------------------------------------------------------------------------
 def _get_interpreter_subagent_graph() -> Runnable:
     """Standalone INTERPRETER subagent graph - for LangGraph CLI."""
-    provider = os.getenv("LLM_PROVIDER", "openai")
+    provider = cast(Provider, os.getenv("LLM_PROVIDER", "openai"))
     return create_subagent_graph("interpreter", provider=provider)
 
 
@@ -319,7 +322,7 @@ interpreter_subagent_graph = _get_interpreter_subagent_graph()
 # -----------------------------------------------------------------------------
 def _get_reporter_subagent_graph() -> Runnable:
     """Standalone REPORTER subagent graph - for LangGraph CLI."""
-    provider = os.getenv("LLM_PROVIDER", "openai")
+    provider = cast(Provider, os.getenv("LLM_PROVIDER", "openai"))
     return create_subagent_graph("reporter", provider=provider)
 
 

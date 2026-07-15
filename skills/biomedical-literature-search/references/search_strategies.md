@@ -12,7 +12,7 @@ into deterministic citation buckets.
 | PLANNER | Lightweight context search for feasibility and planning. | `max_results=10` to `20` | `planner_papers.json` | `papers.json`, `citation_candidates.json`; do not call `create_literature_handoff`. |
 | SEARCHER Production | Canonical INTERPRETER evidence handoff. | Broad raw retrieval with `max_results=100` | `papers_raw.json`, `citation_candidates.json`, filtered `papers.json` | Do not put `disease_only_background` or `rejected_weak_evidence` in `papers.json`. |
 | SEARCHER Retrieval-Only Benchmark | Isolate retrieval skill effects. | Same retrieval strategy as SEARCHER Production Mode | `papers_raw.json` | `papers.json`, `citation_candidates.json`; do not call `create_literature_handoff`. |
-| REPORTER | Supplemental synthesis search when SEARCHER handoff lacks report-level support. | Synthesis-focused retrieval | `synthesis_papers_raw.json`; when graded, `synthesis_citation_candidates.json` and `synthesis_papers.json` | Canonical `papers.json`; do not replace SEARCHER citation authority. |
+| REPORTER | Cross-part synthesis using SEARCHER evidence handoff. | Existing RAG retrieval with `search_literature_fulltext(part_name="all")` | `synthesis_validation.json` | Canonical `papers.json`; do not create a separate synthesis evidence set. |
 
 `papers.json` is the canonical SEARCHER-to-INTERPRETER citation source only in
 SEARCHER Production Mode. PLANNER and REPORTER must not overwrite it. Retrieval-
@@ -20,8 +20,8 @@ only benchmark runs leave filtering to the benchmark runner. Legacy retrieval-
 only diagnostics may apply the same direct/context cap-40 filter to skill ON and
 skill OFF arms after retrieval; this benchmark-local filter is not the current
 SEARCHER Production handoff cap.
-REPORTER synthesis citations should use the same direct/context bucket filtering
-when producing `synthesis_papers.json`.
+REPORTER synthesis citations must stay within `papers.json` and the existing
+RAG collection for `part_name="all"`.
 
 ## SEARCHER Production Tool Call
 

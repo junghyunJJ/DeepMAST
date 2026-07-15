@@ -24,6 +24,7 @@ from typing import Any
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 ENV_FILE = REPO_ROOT / ".env"
+MAX_PART3_INVOKE_ATTEMPTS = 3
 
 from dotenv import load_dotenv
 
@@ -103,6 +104,26 @@ def _output_status(data_dir: Path, outputs: list[str]) -> dict[str, bool]:
     return {name: (data_dir / name).exists() for name in outputs}
 
 
+def _missing_outputs(data_dir: Path, outputs: list[str]) -> list[str]:
+    return [name for name in outputs if not (data_dir / name).exists()]
+
+
+def _should_retry_part3_save(args: argparse.Namespace, missing_outputs: list[str]) -> bool:
+    return args.subagent == "interpreter" and args.part == 3 and missing_outputs == ["part3_final.md"]
+
+
+def _build_part3_save_retry_message(data_dir: Path) -> str:
+    return f"""Retry Part 3 output creation for {data_dir}.
+
+Do not copy or save the previous chat-only response.
+Re-read /data_path.txt, /interpretation_guide.md, and /papers.json, then call load_analysis_data for the data directory.
+Run Part 3 ligand-receptor interpretation only.
+Use selected_genes and selected_lr_pairs from part4_candidate_selection.json.
+Avoid therapeutic synthesis, druggability, drug ranking, and clinical prioritization.
+Your final action MUST be write_file(file_path="/part3_final.md", content=<complete markdown Part 3 report>).
+A chat response without that tool call is incomplete."""
+
+
 def _build_subagent_message(subagent: str, data_dir: Path, targets: dict[str, Any], part: int | None) -> str:
     if subagent == "planner":
         return _build_initial_message(data_dir, targets)
@@ -123,14 +144,19 @@ Do not run interpreter or reporter."""
             1: "Interpret Part 1 ONLY. Output /part1_final.md.",
             2: "Interpret Part 2 ONLY. Connect CCI findings to Part 1 where relevant. Output /part2_final.md.",
             3: (
-                "Interpret Part 3 ONLY. Read part4_candidate_selection.json via load_analysis_data. "
-                "Use selected_genes as the fixed gene-section list. Use selected_lr_pairs as the source "
-                "of truth for 3-10 and 3-11 direct L-R evidence when present; fall back to selected_genes "
-                "only if selected_lr_pairs is missing. Integrate each selected pair's spatial and "
-                "quantitative L-R evidence into the relevant selected gene subsection. Connect L-R "
-                "evidence back to both Part 1 spatial patterns and Part 2 NMF/pathway results. Do not "
-                "read or summarize part4_therapeutic_synthesis.md; therapeutic synthesis, druggability, "
-                "drug ranking, and clinical prioritization belong to Part 4. Output /part3_final.md."
+                "Interpret Part 3 ONLY. This is not a generic PPI network summary. "
+                "Interpret Part 3 ligand-receptor details only. Read "
+                "part4_candidate_selection.json via load_analysis_data. Use selected_genes "
+                "as the fixed gene-section list. Use selected_lr_pairs as the source of "
+                "truth for 3-10 and 3-11 direct L-R evidence when present; fall back to "
+                "selected_genes only if selected_lr_pairs is missing. Integrate each "
+                "selected pair's spatial and quantitative L-R evidence into the relevant "
+                "selected gene subsection. Connect L-R evidence back to both Part 1 "
+                "spatial patterns and Part 2 NMF/pathway results. Do not read or summarize "
+                "part4_therapeutic_synthesis.md; therapeutic synthesis, druggability, "
+                "drug ranking, and clinical prioritization belong to Part 4. You MUST call "
+                "write_file with file_path=\"/part3_final.md\" and complete markdown "
+                "content. A chat response only is incomplete."
             ),
         }
         return f"""Run INTERPRETER for {data_dir}.
@@ -144,7 +170,12 @@ Validate citations and do not run planner, searcher, or reporter."""
         return f"""Run REPORTER only for the CCI analysis in {data_dir}.
 
 Read /part1_final.md, /part2_final.md, /part3_final.md, /part4_therapeutic_synthesis.md if present, and /drug.md if present.
-Write /synthesis.md, /synthesis_validation.json, /synthesis_targets.json, and CCI_Analysis_Report.html.
+Use existing /papers.json-backed RAG retrieval only; do not run new literature searches or create reporter-specific paper artifacts.
+Call write_file("/synthesis.md", ...) with the complete integrated narrative as Markdown, not HTML.
+Then call generate_html_report with parts={{"template_mode": "comprehensive", ...}},
+output_path="CCI_Analysis_Report.html", and data_dir from /data_path.txt.
+generate_html_report writes synthesis_validation.json and synthesis_targets.json automatically after running the synthesis guardrail.
+Do not hand-author part1_html, part2_html, part3_html, summary_html, or therapeutic_html.
 Do not run planner, searcher, or interpreter."""
     raise ValueError(f"Unknown subagent: {subagent}")
 
@@ -223,7 +254,11 @@ async def run(args: argparse.Namespace) -> int:
         import deepagents.graph as deepagents_graph
 
         # ponytail: test-only bypass for deepagents/langchain summarization API drift.
-        deepagents_graph.create_summarization_middleware = lambda *_args, **_kwargs: AgentMiddleware()
+        setattr(
+            deepagents_graph,
+            "create_summarization_middleware",
+            lambda *_args, **_kwargs: AgentMiddleware(),
+        )
 
     if args.subagent:
         _seed_standalone_files(data_dir, targets)
@@ -283,15 +318,90 @@ async def run(args: argparse.Namespace) -> int:
         return 1
 
     messages = result.get("messages", []) if isinstance(result, dict) else []
+    outputs = _output_status(data_dir, expected_outputs)
+    missing_outputs = _missing_outputs(data_dir, expected_outputs)
+    recovery: dict[str, Any] = {}
+    invoke_attempt_count = 1
+    retry_history: list[dict[str, Any]] = []
+
+    for retry_number in range(1, MAX_PART3_INVOKE_ATTEMPTS):
+        if not _should_retry_part3_save(args, missing_outputs):
+            break
+
+        print(
+            json.dumps(
+                {
+                    "event": "part3_save_retry_start",
+                    "retry_number": retry_number,
+                    "max_invoke_attempts": MAX_PART3_INVOKE_ATTEMPTS,
+                    "missing_outputs": missing_outputs,
+                },
+                indent=2,
+                sort_keys=True,
+                ensure_ascii=False,
+            )
+        )
+        invoke_attempt_count += 1
+        attempt: dict[str, Any] = {"retry_number": retry_number}
+        try:
+            result = await agent.ainvoke(
+                {
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": _build_part3_save_retry_message(data_dir),
+                        }
+                    ]
+                },
+                config=None,
+            )
+            messages = result.get("messages", []) if isinstance(result, dict) else []
+            outputs = _output_status(data_dir, expected_outputs)
+            missing_outputs = _missing_outputs(data_dir, expected_outputs)
+            attempt.update(
+                {
+                    "event": (
+                        "part3_save_retry_complete"
+                        if not missing_outputs
+                        else "part3_save_retry_incomplete"
+                    ),
+                    "outputs": outputs,
+                    "missing_outputs": missing_outputs,
+                }
+            )
+        except Exception as exc:
+            if args.traceback:
+                traceback.print_exc()
+            attempt.update(
+                {
+                    "event": "part3_save_retry_error",
+                    "exception_type": type(exc).__name__,
+                    "exception_repr": repr(exc),
+                }
+            )
+        retry_history.append(attempt)
+
+    if retry_history:
+        recovery["part3_save_retry"] = {
+            "retry_attempt_count": len(retry_history),
+            "max_invoke_attempts": MAX_PART3_INVOKE_ATTEMPTS,
+            "attempts": retry_history,
+        }
+
     summary = {
-        "event": "invoke_complete",
+        "event": "invoke_incomplete" if missing_outputs else "invoke_complete",
+        "invoke_attempt_count": invoke_attempt_count,
         "message_count": len(messages),
         "last_message": _jsonable_message(messages[-1]) if messages else None,
         "result_keys": sorted(result.keys()) if isinstance(result, dict) else [],
-        "outputs": _output_status(data_dir, expected_outputs),
+        "outputs": outputs,
     }
+    if recovery:
+        summary["recovery"] = recovery
+    if missing_outputs:
+        summary["missing_outputs"] = missing_outputs
     print(json.dumps(summary, indent=2, sort_keys=True, ensure_ascii=False))
-    return 0
+    return 1 if missing_outputs else 0
 
 
 def main(argv: list[str] | None = None) -> int:
