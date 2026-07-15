@@ -88,6 +88,8 @@ def _build_prompt(issue: dict[str, Any], section_text: str) -> str:
     return f"""Rewrite only this markdown section to fix the validation issue.
 
 Keep the same section heading. Keep evidence-grounded scientific tone.
+For claim_rag_* issues, use only the evidence in the validation issue.
+Do not replace the cited paper or add a new PMID to rescue a claim.
 Rewrite causal or mechanistic report-derived claims as associations or hypotheses.
 Do not claim treatment sensitivity, resistance, patient stratification, or therapeutic vulnerability unless the validation issue provides direct support for that exact claim.
 Do not invent new PMIDs, p-values, scores, files, or pathway significance.

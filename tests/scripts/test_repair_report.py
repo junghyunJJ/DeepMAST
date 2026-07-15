@@ -286,3 +286,21 @@ def test_repair_prompt_requires_association_language_for_mechanistic_issues(tmp_
 
     assert "Rewrite causal or mechanistic report-derived claims as associations or hypotheses." in prompt
     assert "Do not claim treatment sensitivity, resistance, patient stratification, or therapeutic vulnerability unless the validation issue provides direct support for that exact claim." in prompt
+
+
+def test_claim_rag_repair_prompt_forbids_new_evidence() -> None:
+    prompt = repair_report._build_prompt(
+        {
+            "code": "claim_rag_overclaimed",
+            "severity": "error",
+            "file": "part1_final.md",
+            "section": "## Analysis 1-1",
+            "value": "TGFB drives fibrosis.",
+            "evidence": "PMID 11111111 supports association only.",
+            "repair_instruction": "Rewrite as association.",
+        },
+        "## Analysis 1-1\nTGFB drives fibrosis.\n",
+    )
+
+    assert "use only the evidence in the validation issue" in prompt.lower()
+    assert "do not replace the cited paper" in prompt.lower()

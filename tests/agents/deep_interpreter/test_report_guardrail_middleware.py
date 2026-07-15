@@ -16,6 +16,17 @@ def _agent_state() -> AgentState[Any]:
     return {"messages": []}
 
 
+@pytest.fixture(autouse=True)
+def _stub_claim_rag_validation(monkeypatch: pytest.MonkeyPatch) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    monkeypatch.setattr(
+        report_guardrails.claim_rag_validation,
+        "validate_claims",
+        lambda *_args, **_kwargs: {"claims": [], "issues": []},
+    )
+
+
 def _write_required_files(data_dir: Path) -> None:
     (data_dir / "papers.json").write_text('{"papers": []}', encoding="utf-8")
     (data_dir / "part1_final.md").write_text("## Part 1\n", encoding="utf-8")
@@ -332,6 +343,74 @@ def test_run_report_guardrail_stops_after_first_successful_repair(
     assert initial["issue_count"] == 1
     assert final["issue_count"] == 1
     assert final["issues"][0]["severity"] == "warning"
+
+
+def test_run_report_guardrail_merges_claim_errors_and_revalidates_after_repair(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    _write_required_files(tmp_path)
+    claim_calls = 0
+
+    monkeypatch.setattr(
+        report_guardrails.validate_report_script,
+        "validate_report",
+        lambda _data_dir: [],
+    )
+
+    def fake_claim_validate(*_args, **_kwargs):
+        nonlocal claim_calls
+        claim_calls += 1
+        if claim_calls == 1:
+            return {
+                "claims": [{"status": "overclaimed", "claim": "TGFB drives fibrosis."}],
+                "issues": [
+                    {
+                        "code": "claim_rag_overclaimed",
+                        "severity": "error",
+                        "file": "part1_final.md",
+                        "section": "## Part 1",
+                        "value": "TGFB drives fibrosis.",
+                        "evidence": "The paper supports association only.",
+                        "repair_instruction": "Rewrite as association.",
+                    }
+                ],
+            }
+        return {
+            "claims": [{"status": "supported", "claim": "TGFB is associated with fibrosis."}],
+            "issues": [],
+        }
+
+    repair_calls = 0
+
+    def fake_repair(*_args, **_kwargs):
+        nonlocal repair_calls
+        repair_calls += 1
+        return 1
+
+    monkeypatch.setattr(
+        report_guardrails.claim_rag_validation, "validate_claims", fake_claim_validate
+    )
+    monkeypatch.setattr(
+        report_guardrails.repair_report_script, "repair_report", fake_repair
+    )
+
+    result = report_guardrails.run_report_guardrail(tmp_path, provider="ollama")
+
+    initial = json.loads(
+        (tmp_path / "report_validation_initial.json").read_text(encoding="utf-8")
+    )
+    final = json.loads(
+        (tmp_path / "report_validation_final.json").read_text(encoding="utf-8")
+    )
+    assert result["status"] == "passed"
+    assert result["repair_attempt_count"] == 1
+    assert claim_calls == 2
+    assert repair_calls == 1
+    assert initial["issues"][0]["code"] == "claim_rag_overclaimed"
+    assert initial["claim_validation"][0]["status"] == "overclaimed"
+    assert final["claim_validation"][0]["status"] == "supported"
 
 
 def test_run_report_guardrail_retries_up_to_three_repairs(

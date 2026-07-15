@@ -7,6 +7,7 @@ from typing import Any
 
 from scripts import repair_report as repair_report_script
 from scripts import validate_report as validate_report_script
+from src.agents.deep_interpreter import claim_rag_validation
 
 
 REQUIRED_PART_FILES = (
@@ -36,13 +37,28 @@ SYNTHESIS_HTML_FRAGMENT_RE = re.compile(
 )
 
 
-def _issue_payload(issues: list[dict[str, str]]) -> dict[str, Any]:
-    return {"issue_count": len(issues), "issues": issues}
+def _issue_payload(
+    issues: list[dict[str, str]],
+    claim_validation: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {"issue_count": len(issues), "issues": issues}
+    if claim_validation is not None:
+        payload["claim_validation"] = claim_validation
+    return payload
 
 
-def _write_issues(path: Path, issues: list[dict[str, str]]) -> None:
+def _write_issues(
+    path: Path,
+    issues: list[dict[str, str]],
+    claim_validation: list[dict[str, Any]] | None = None,
+) -> None:
     path.write_text(
-        json.dumps(_issue_payload(issues), indent=2, ensure_ascii=False) + "\n",
+        json.dumps(
+            _issue_payload(issues, claim_validation),
+            indent=2,
+            ensure_ascii=False,
+        )
+        + "\n",
         encoding="utf-8",
     )
 
@@ -100,6 +116,22 @@ def _synthesis_issue(
         "evidence": evidence,
         "repair_instruction": repair_instruction,
     }
+
+
+def _validate_part_reports(
+    data_dir: Path,
+    *,
+    provider: str | None,
+    claim_cache: dict[str, list[dict[str, Any]]],
+) -> tuple[list[dict[str, str]], list[dict[str, Any]]]:
+    deterministic = validate_report_script.validate_report(data_dir)
+    semantic = claim_rag_validation.validate_claims(
+        data_dir,
+        REQUIRED_PART_FILES,
+        provider=provider,
+        cache=claim_cache,
+    )
+    return deterministic + semantic["issues"], semantic["claims"]
 
 
 def validate_synthesis_report(data_dir: str | Path) -> list[dict[str, str]]:
@@ -204,11 +236,17 @@ def run_report_guardrail(data_dir: str | Path, *, provider: str | None = None) -
     initial_path = data_dir / "report_validation_initial.json"
     final_path = data_dir / "report_validation_final.json"
 
-    initial_issues = validate_report_script.validate_report(data_dir)
-    _write_issues(initial_path, initial_issues)
+    claim_cache: dict[str, list[dict[str, Any]]] = {}
+    initial_issues, initial_claims = _validate_part_reports(
+        data_dir,
+        provider=provider,
+        claim_cache=claim_cache,
+    )
+    _write_issues(initial_path, initial_issues, initial_claims)
     initial_error_count = _error_count(initial_issues)
 
     current_issues = initial_issues
+    current_claims = initial_claims
     issues_path = initial_path
     changed_sections = 0
     repair_attempt_count = 0
@@ -224,14 +262,18 @@ def run_report_guardrail(data_dir: str | Path, *, provider: str | None = None) -
         )
         repair_attempt_count += 1
         changed_sections += changed
-        current_issues = validate_report_script.validate_report(data_dir)
-        _write_issues(final_path, current_issues)
+        current_issues, current_claims = _validate_part_reports(
+            data_dir,
+            provider=provider,
+            claim_cache=claim_cache,
+        )
+        _write_issues(final_path, current_issues, current_claims)
         if changed == 0:
             break
         issues_path = final_path
 
     final_issues = current_issues
-    _write_issues(final_path, final_issues)
+    _write_issues(final_path, final_issues, current_claims)
     final_error_count = _error_count(final_issues)
 
     return {
