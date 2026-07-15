@@ -63,7 +63,7 @@ outcome_colors <- c(
   "Tie" = "#c6dbef",
   "Baseline" = "#6baed6"
 )
-main_condition_order <- c("DTH-guided", "Baseline")
+main_condition_order <- c("Skills-guided", "Baseline")
 
 base_theme <- theme_bw() +
   theme(
@@ -404,6 +404,7 @@ readr::write_csv(judge_total_scores, file.path(table_dir, "dth_judge_total_score
 readr::write_csv(judge_win_rates, file.path(table_dir, "dth_figs3d_judge_win_rates.csv"))
 readr::write_csv(judge_summary, file.path(table_dir, "dth_blind_judge_summary.csv"))
 
+coverage_summary$condition_label <- factor(coverage_summary$condition_label, labels = c("Skills-guided","Baseline"))
 fig3a <- ggplot() +
   geom_col(
     data = coverage_summary,
@@ -433,6 +434,7 @@ fig3a <- ggplot() +
   base_theme
 fig3a
 
+claim_boundary_aggregate_summary$condition_label <- factor(claim_boundary_aggregate_summary$condition_label, labels = c("Skills-guided","Baseline"))
 fig3b <- ggplot(claim_boundary_aggregate_summary, aes(x = condition_label, y = mean_score, fill = condition)) +
   geom_col(
     # width = 0.78,

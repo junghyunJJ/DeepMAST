@@ -27,7 +27,7 @@ summary_df <- read_csv(file.path(tdir, "coverage_group_summary.csv"), show_col_t
 sig_df     <- read_csv(file.path(tdir, "coverage_sig.csv"), show_col_types = FALSE)
 
 set_levels <- c(raw = "All retrieved papers", filtered = "Citable set (direct + context)")
-strength_levels <- c(weak = "Strong model (qwen3.5:122b)", strong = "Weak model (qwen3.5:35b)")
+strength_levels <- c(weak = "Small-model (Qwen3.5-35B)", strong = "Large-model (Qwen3.5-122B)")
 metric_levels <- c(genes = "Genes\n(LR pair)", pathways = "Pathways", celltypes = "Cell types")
 arm_levels <- c(ON = "Skill ON", OFF = "Skill OFF")
 

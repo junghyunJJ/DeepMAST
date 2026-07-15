@@ -186,10 +186,10 @@ summaries$metric <- factor(
   levels = c("Exact-answer accuracy", "Evidence recall")
 )
 model_facet_labels <- c(
-  "122B" = "Strong model (qwen3.5:122b)",
-  "35B" = "Weak model (qwen3.5:35b)"
+  "122B" = "Large-model (Qwen3.5-122B)",
+  "35B" = "Small-model (Qwen3.5-35B)"
 )
-model_facet_levels <- unname(model_facet_labels[c("122B", "35B")])
+model_facet_levels <- unname(model_facet_labels[c("35B", "122B")])
 
 off <- summaries[summaries$condition == "wiki_off", ]
 routing <- summaries[summaries$condition == "wiki_doc_routing", ]
