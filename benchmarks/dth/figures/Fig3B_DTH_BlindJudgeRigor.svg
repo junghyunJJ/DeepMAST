@@ -78,7 +78,7 @@
 <polyline points='25.50,34.92 28.24,34.92 ' style='stroke-width: 1.07; stroke: #333333; stroke-linecap: butt;' />
 <polyline points='91.70,300.98 91.70,298.24 ' style='stroke-width: 1.07; stroke: #333333; stroke-linecap: butt;' />
 <polyline points='197.46,300.98 197.46,298.24 ' style='stroke-width: 1.07; stroke: #333333; stroke-linecap: butt;' />
-<text x='91.70' y='309.47' text-anchor='middle' style='font-size: 8.80px; font-family: "Arial";' textLength='47.42px' lengthAdjust='spacingAndGlyphs'>DTH-guided</text>
+<text x='91.70' y='309.47' text-anchor='middle' style='font-size: 8.80px; font-family: "Arial";' textLength='49.88px' lengthAdjust='spacingAndGlyphs'>Skills-guided</text>
 <text x='197.46' y='309.47' text-anchor='middle' style='font-size: 8.80px; font-family: "Arial";' textLength='33.75px' lengthAdjust='spacingAndGlyphs'>Baseline</text>
 <text transform='translate(13.36,151.86) rotate(-90)' text-anchor='middle' style='font-size: 11.00px; font-family: "Arial";' textLength='176.72px' lengthAdjust='spacingAndGlyphs'>Claim-boundary restraint score (0-5)</text>
 </g>
