@@ -191,6 +191,65 @@ class FakeStructuredModel:
         )
 
 
+class BatchLimitedStructuredModel:
+    def __init__(self) -> None:
+        self.batch_sizes: list[int] = []
+
+    def with_structured_output(self, _schema):
+        return self
+
+    def invoke(self, messages):
+        payload = json.loads(
+            messages[0].content.split("Claims and evidence:\n", maxsplit=1)[1]
+        )
+        self.batch_sizes.append(len(payload))
+        if len(payload) > 5:
+            raise RuntimeError("structured output batch is too large")
+        return claim_rag_validation.ClaimJudgmentBatch(
+            judgments=[
+                claim_rag_validation.ClaimJudgment(
+                    claim_index=item["claim_index"],
+                    status="supported",
+                    reason="The supplied evidence directly supports the claim.",
+                    supporting_pmids=["11111111"],
+                    evidence_quote="Evidence supports the claim.",
+                )
+                for item in payload
+            ]
+        )
+
+
+def test_judge_group_splits_large_sections_into_bounded_batches() -> None:
+    model = BatchLimitedStructuredModel()
+    group = {
+        "file": "synthesis.md",
+        "section": "## Therapeutic Implications",
+        "claims": [
+            {
+                "index": index,
+                "claim": f"Claim {index} is supported.",
+                "candidate_pmids": ["11111111"],
+                "hedged": False,
+                "file": "synthesis.md",
+                "section": "## Therapeutic Implications",
+                "evidence": [
+                    {
+                        "pmid": "11111111",
+                        "source": "abstract",
+                        "text": "Evidence supports the claim.",
+                    }
+                ],
+            }
+            for index in range(25)
+        ],
+    }
+
+    results = claim_rag_validation._judge_group(group, model)
+
+    assert model.batch_sizes == [5, 5, 5, 5, 5]
+    assert [result["status"] for result in results] == ["supported"] * 25
+
+
 def test_validate_claims_maps_overclaim_to_repairable_issue(
     tmp_path: Path, monkeypatch
 ) -> None:

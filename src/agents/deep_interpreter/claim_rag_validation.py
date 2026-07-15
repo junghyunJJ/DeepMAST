@@ -25,6 +25,7 @@ EXPLICIT_HYPOTHESIS_RE = re.compile(
     r"\b(hypothesis|hypothesized|needs validation|requiring validation|novel finding)\b",
     re.IGNORECASE,
 )
+MAX_CLAIMS_PER_JUDGMENT = 5
 
 
 class ClaimJudgment(BaseModel):
@@ -253,22 +254,33 @@ def _judge_group(group: dict[str, Any], model: Any) -> list[dict[str, Any]]:
     if not evidence_items:
         return [missing[item["index"]] for item in group["claims"]]
 
-    judged_group = {**group, "claims": evidence_items}
-    try:
-        response = model.with_structured_output(ClaimJudgmentBatch).invoke(
-            [HumanMessage(content=_judgment_prompt(judged_group))]
-        )
-        judgments = {item.claim_index: item for item in response.judgments}
-    except Exception as exc:
-        return [
-            _unverifiable(item, f"Claim judge failed: {type(exc).__name__}.")
-            for item in group["claims"]
-        ]
+    judgments: dict[int, ClaimJudgment] = {}
+    failed: dict[int, dict[str, Any]] = {}
+    structured_model = model.with_structured_output(ClaimJudgmentBatch)
+    for start in range(0, len(evidence_items), MAX_CLAIMS_PER_JUDGMENT):
+        batch = evidence_items[start : start + MAX_CLAIMS_PER_JUDGMENT]
+        try:
+            response = structured_model.invoke(
+                [HumanMessage(content=_judgment_prompt({**group, "claims": batch}))]
+            )
+            judgments.update({item.claim_index: item for item in response.judgments})
+        except Exception as exc:
+            failed.update(
+                {
+                    item["index"]: _unverifiable(
+                        item, f"Claim judge failed: {type(exc).__name__}."
+                    )
+                    for item in batch
+                }
+            )
 
     results: list[dict[str, Any]] = []
     for item in group["claims"]:
         if item["index"] in missing:
             results.append(missing[item["index"]])
+            continue
+        if item["index"] in failed:
+            results.append(failed[item["index"]])
             continue
         judgment = judgments.get(item["index"])
         if judgment is None:
