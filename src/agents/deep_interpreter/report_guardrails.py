@@ -35,6 +35,12 @@ SYNTHESIS_HTML_FRAGMENT_RE = re.compile(
     r"</(?:article|div|h[1-6]|li|ol|p|section|table|ul)>",
     re.IGNORECASE | re.MULTILINE,
 )
+PAPERS_JSON_LOAD_ERROR_CODES = {
+    "papers_json_missing",
+    "papers_json_unreadable",
+    "papers_json_malformed",
+    "papers_json_invalid",
+}
 
 
 def _issue_payload(
@@ -125,6 +131,8 @@ def _validate_part_reports(
     claim_cache: dict[str, list[dict[str, Any]]],
 ) -> tuple[list[dict[str, str]], list[dict[str, Any]]]:
     deterministic = validate_report_script.validate_report(data_dir)
+    if any(issue.get("code") in PAPERS_JSON_LOAD_ERROR_CODES for issue in deterministic):
+        return deterministic, []
     semantic = claim_rag_validation.validate_claims(
         data_dir,
         REQUIRED_PART_FILES,

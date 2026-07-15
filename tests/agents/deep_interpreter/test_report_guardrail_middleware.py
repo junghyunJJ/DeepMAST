@@ -67,11 +67,22 @@ def test_run_report_guardrail_skips_when_parts_are_incomplete(
     assert not (tmp_path / "report_validation_final.json").exists()
 
 
-def test_run_report_guardrail_fails_when_papers_json_is_missing(tmp_path: Path) -> None:
+def test_run_report_guardrail_fails_when_papers_json_is_missing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     from src.agents.deep_interpreter import report_guardrails
 
     _write_required_files(tmp_path)
     (tmp_path / "papers.json").unlink()
+
+    def fail_claim_validate(*_args: Any, **_kwargs: Any) -> dict[str, Any]:
+        raise AssertionError("claim validation must not run without papers.json")
+
+    monkeypatch.setattr(
+        report_guardrails.claim_rag_validation,
+        "validate_claims",
+        fail_claim_validate,
+    )
 
     result = report_guardrails.run_report_guardrail(tmp_path, provider="ollama")
 
@@ -82,6 +93,8 @@ def test_run_report_guardrail_fails_when_papers_json_is_missing(tmp_path: Path) 
     assert result["final_error_count"] == 1
     assert initial["issues"][0]["code"] == "papers_json_missing"
     assert final["issues"][0]["code"] == "papers_json_missing"
+    assert initial["claim_validation"] == []
+    assert final["claim_validation"] == []
 
 
 def test_run_synthesis_guardrail_skips_until_synthesis_ready(
