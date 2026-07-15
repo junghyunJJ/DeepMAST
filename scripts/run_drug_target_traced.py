@@ -111,6 +111,7 @@ MOCK_SELECTED_TOP3 = [
 DEFAULT_OLLAMA_PORT = 11434
 LOCAL_OPENAI_COMPAT_PROVIDERS = {"ollama-openai", "vllm"}
 LOCAL_PORT_PROVIDERS = {"ollama", *LOCAL_OPENAI_COMPAT_PROVIDERS}
+LOCAL_PORT_SUBAGENTS = ("EVIDENCE_ASSESSOR", "HYPOTHESIS_WRITER")
 
 
 class _CleanupBackend(Protocol):
@@ -296,6 +297,11 @@ def _configure_ollama_port_override(args: argparse.Namespace) -> str | None:
     os.environ["OLLAMA_BASE_URL"] = base_url
     if provider == "ollama":
         os.environ["OLLAMA_HOST"] = base_url
+    for subagent in LOCAL_PORT_SUBAGENTS:
+        provider_key = f"SUBAGENT_{subagent}_PROVIDER"
+        subagent_provider = os.getenv(provider_key, provider).strip().lower()
+        if subagent_provider in LOCAL_PORT_PROVIDERS:
+            os.environ[f"SUBAGENT_{subagent}_BASE_URL"] = base_url
     return base_url
 
 
