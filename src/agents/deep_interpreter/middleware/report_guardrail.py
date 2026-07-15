@@ -35,6 +35,13 @@ class ReportGuardrailMiddleware(AgentMiddleware):
         result = run_report_guardrail(data_dir, provider=self._provider)
         if result.get("status") == "skipped":
             return None
+        if result.get("status") == "failed":
+            final_error_count = result.get("final_error_count", "unknown")
+            validation_path = data_dir / "report_validation_final.json"
+            raise RuntimeError(
+                "Report guardrail failed with "
+                f"{final_error_count} hard error(s); see {validation_path}"
+            )
 
         return {
             "messages": [

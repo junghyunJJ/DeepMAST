@@ -450,6 +450,36 @@ def test_report_guardrail_middleware_is_silent_when_guardrail_skips(
     assert result is None
 
 
+def _failed_guardrail_result() -> dict[str, object]:
+    return {
+        "status": "failed",
+        "initial_issue_count": 1,
+        "initial_error_count": 1,
+        "repair_attempt_count": 3,
+        "changed_sections": 0,
+        "final_issue_count": 1,
+        "final_error_count": 1,
+    }
+
+
+def test_report_guardrail_middleware_raises_when_hard_errors_remain(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.agents.deep_interpreter.middleware.report_guardrail import ReportGuardrailMiddleware
+
+    monkeypatch.setattr(
+        "src.agents.deep_interpreter.middleware.report_guardrail.run_report_guardrail",
+        lambda *_args, **_kwargs: _failed_guardrail_result(),
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match=r"Report guardrail failed with 1 hard error\(s\).*report_validation_final\.json",
+    ):
+        ReportGuardrailMiddleware(data_dir=tmp_path).after_agent(_agent_state(), None)
+
+
 def test_report_guardrail_middleware_export_uses_env_data_dir(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -482,34 +512,22 @@ def test_report_guardrail_middleware_export_uses_env_data_dir(
 
 
 @pytest.mark.asyncio
-async def test_report_guardrail_middleware_async_hook_uses_same_runner(
+async def test_report_guardrail_middleware_async_hook_raises_when_hard_errors_remain(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from src.agents.deep_interpreter.middleware.report_guardrail import ReportGuardrailMiddleware
 
-    def fake_run(data_dir: Path, *, provider: str | None = None) -> dict[str, object]:
-        assert data_dir == tmp_path
-        return {
-            "status": "failed",
-            "initial_issue_count": 1,
-            "initial_error_count": 1,
-            "changed_sections": 0,
-            "final_issue_count": 1,
-            "final_error_count": 1,
-        }
-
     monkeypatch.setattr(
         "src.agents.deep_interpreter.middleware.report_guardrail.run_report_guardrail",
-        fake_run,
+        lambda *_args, **_kwargs: _failed_guardrail_result(),
     )
 
-    result = await ReportGuardrailMiddleware(data_dir=tmp_path).aafter_agent(_agent_state(), None)
-
-    assert result is not None
-    payload = json.loads(str(result["messages"][0].content))
-    assert payload["report_guardrail"]["status"] == "failed"
-    assert payload["report_guardrail"]["final_error_count"] == 1
+    with pytest.raises(
+        RuntimeError,
+        match=r"Report guardrail failed with 1 hard error\(s\).*report_validation_final\.json",
+    ):
+        await ReportGuardrailMiddleware(data_dir=tmp_path).aafter_agent(_agent_state(), None)
 
 
 def test_get_subagents_attaches_report_guardrail_only_to_interpreter() -> None:
