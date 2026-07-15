@@ -169,6 +169,7 @@ def get_subagents(
     skills_sources: list[str] | None = None,
     skill_registry: dict[str, str] | None = None,
     data_dir: str | None = None,
+    provider: str | None = None,
 ) -> list[dict]:
     """Get the subagent configurations for Deep Interpreter.
 
@@ -185,6 +186,7 @@ def get_subagents(
             (e.g. "openai:gpt-4.1-mini") or BaseChatModel instances.
         skills_sources: Skill discovery paths for planner, searcher, and reporter.
         skill_registry: Skill name → directory path mapping for SkillActivator.
+        provider: LLM provider used by report guardrail repairs.
 
     Returns:
         List of subagent configuration dictionaries
@@ -215,7 +217,7 @@ def get_subagents(
         middleware = list(subagent.get("middleware", []))
         middleware.insert(0, WriteFileArgGuardMiddleware(backend_root=data_dir))
         if subagent["name"] == "interpreter":
-            middleware.append(ReportGuardrailMiddleware(data_dir=data_dir))
+            middleware.append(ReportGuardrailMiddleware(data_dir=data_dir, provider=provider))
         subagent["middleware"] = middleware
 
     # Apply skills AFTER WriteFileArgGuardMiddleware (harness appended at end).

@@ -1575,7 +1575,17 @@ def generate_html_report(
             f"{json.dumps(guardrail_result, sort_keys=True)}"
         )
     reporter_artifacts = _ensure_reporter_artifacts(resolved_data_dir, guardrail_result)
-    result = _generate_html_report_impl(parts=parts, output_path=output_path, data_dir=resolved_data_dir)
+    render_parts = parts
+    if guardrail_result is not None and parts.get("template_mode") != "comprehensive":
+        synthesis_path = Path(resolved_data_dir) / "synthesis.md"
+        if synthesis_path.is_file():
+            render_parts = {**parts, "synthesis": synthesis_path.read_text(encoding="utf-8")}
+            render_parts.pop("summary_html", None)
+    result = _generate_html_report_impl(
+        parts=render_parts,
+        output_path=output_path,
+        data_dir=resolved_data_dir,
+    )
     if guardrail_result is None:
         return result
     return (

@@ -278,6 +278,7 @@ def create_deep_interpreter_agent(
         skills_sources=skills_sources,
         skill_registry=skill_registry,
         data_dir=resolved_data_dir,
+        provider=config.provider,
     )
 
     # Add custom subagents

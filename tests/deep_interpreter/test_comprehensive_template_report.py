@@ -185,6 +185,46 @@ def test_generate_html_report_runs_synthesis_guardrail_before_comprehensive_rend
     assert seen == ["guardrail", ("render", "## Executive Summary\n\nRepaired synthesis.\n")]
 
 
+def test_generate_html_report_renders_repaired_synthesis_in_structured_mode(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    _write_fixture_data(tmp_path)
+    output = tmp_path / "CCI_Analysis_Report.html"
+
+    def fake_guardrail(data_dir: str | Path, *, provider: str | None = None) -> dict[str, object]:
+        del provider
+        Path(data_dir, "synthesis.md").write_text(
+            "Repaired structured synthesis.",
+            encoding="utf-8",
+        )
+        return {
+            "status": "passed",
+            "artifact": "synthesis.md",
+            "initial_error_count": 1,
+            "final_error_count": 0,
+        }
+
+    monkeypatch.setattr(report_guardrails, "run_synthesis_guardrail", fake_guardrail)
+
+    result = report_tool.generate_html_report.invoke(
+        {
+            "parts": {
+                "title": "CCI Analysis Report",
+                "synthesis": "Original unsupported synthesis.",
+                "summary_html": "<p>Original unsupported synthesis.</p>",
+            },
+            "output_path": str(output),
+            "data_dir": str(tmp_path),
+        }
+    )
+
+    html = output.read_text(encoding="utf-8")
+    assert "Report generated successfully" in result
+    assert "Repaired structured synthesis." in html
+    assert "Original unsupported synthesis." not in html
+
+
 def test_generate_html_report_persists_parts_synthesis_before_guardrail(
     tmp_path: Path,
     monkeypatch,

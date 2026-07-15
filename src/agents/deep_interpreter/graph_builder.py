@@ -249,7 +249,7 @@ def create_subagent_graph(
         data_dir = "/tmp/deep_interpreter_workspace"
 
     # Get subagent config
-    subagents = get_subagents(data_dir=data_dir)
+    subagents = get_subagents(data_dir=data_dir, provider=provider)
     config = next(subagent for subagent in subagents if subagent["name"] == subagent_name)
 
     # Create LLM

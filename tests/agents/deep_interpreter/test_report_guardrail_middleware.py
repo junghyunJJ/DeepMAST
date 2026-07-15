@@ -534,11 +534,20 @@ def test_get_subagents_attaches_report_guardrail_only_to_interpreter() -> None:
     from src.agents.deep_interpreter.middleware import ReportGuardrailMiddleware
     from src.agents.deep_interpreter.subagents.configs import get_subagents
 
-    subagents = get_subagents(data_dir="/tmp/deepmast-report-guardrail-test")
+    subagents = get_subagents(
+        data_dir="/tmp/deepmast-report-guardrail-test",
+        provider="ollama",
+    )
     by_name = {subagent["name"]: subagent for subagent in subagents}
 
     interpreter_middleware = by_name["interpreter"]["middleware"]
-    assert any(isinstance(middleware, ReportGuardrailMiddleware) for middleware in interpreter_middleware)
+    report_guardrails = [
+        middleware
+        for middleware in interpreter_middleware
+        if isinstance(middleware, ReportGuardrailMiddleware)
+    ]
+    assert len(report_guardrails) == 1
+    assert report_guardrails[0]._provider == "ollama"
 
     for name in ("planner", "searcher", "reporter"):
         assert not any(
@@ -592,6 +601,7 @@ def test_standalone_subagent_graph_uses_configured_middleware(
     report_guardrails = [item for item in middleware if isinstance(item, ReportGuardrailMiddleware)]
     assert len(report_guardrails) == 1
     assert report_guardrails[0]._resolved_data_dir() == tmp_path.resolve()
+    assert report_guardrails[0]._provider == "ollama"
 
     graph = graph_builder.create_subagent_graph("reporter", provider="ollama")
 
