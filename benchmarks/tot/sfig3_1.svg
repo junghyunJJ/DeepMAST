@@ -148,7 +148,7 @@
 </defs>
 <g clip-path='url(#cpMzguNDZ8MjI5Ljc1fDUuNDh8MjIuNjk=)'>
 <rect x='38.46' y='5.48' width='191.29' height='17.21' style='stroke-width: 1.07; stroke: none; fill: #FFFFFF;' />
-<text x='134.10' y='17.23' text-anchor='middle' style='font-size: 8.80px; font-weight: bold;fill: #1A1A1A; font-family: "Arial";' textLength='122.64px' lengthAdjust='spacingAndGlyphs'>Strong model (qwen3.5:122b)</text>
+<text x='134.10' y='17.23' text-anchor='middle' style='font-size: 8.80px; font-weight: bold;fill: #1A1A1A; font-family: "Arial";' textLength='115.81px' lengthAdjust='spacingAndGlyphs'>Small-model (Qwen3.5-35B)</text>
 </g>
 <g clip-path='url(#cpMC4wMHwxMDgwLjAwfDAuMDB8MzI0LjAw)'>
 </g>
@@ -159,7 +159,7 @@
 </defs>
 <g clip-path='url(#cpMjM1LjIzfDQyNi41Mnw1LjQ4fDIyLjY5)'>
 <rect x='235.23' y='5.48' width='191.29' height='17.21' style='stroke-width: 1.07; stroke: none; fill: #FFFFFF;' />
-<text x='330.88' y='17.23' text-anchor='middle' style='font-size: 8.80px; font-weight: bold;fill: #1A1A1A; font-family: "Arial";' textLength='112.22px' lengthAdjust='spacingAndGlyphs'>Weak model (qwen3.5:35b)</text>
+<text x='330.88' y='17.23' text-anchor='middle' style='font-size: 8.80px; font-weight: bold;fill: #1A1A1A; font-family: "Arial";' textLength='121.19px' lengthAdjust='spacingAndGlyphs'>Large-model (Qwen3.5-122B)</text>
 </g>
 <g clip-path='url(#cpMC4wMHwxMDgwLjAwfDAuMDB8MzI0LjAw)'>
 <polyline points='74.33,244.58 74.33,241.84 ' style='stroke-width: 1.07; stroke: #333333; stroke-linecap: butt;' />

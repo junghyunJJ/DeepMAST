@@ -20,14 +20,14 @@ e0 <- ggdraw()
 e <- readRDS('benchmarks/tot/fig2e.rds')
 
 dd <- plot_grid(d0, d,
-  rel_heights = c(0.65, 0.35),
+  rel_heights = c(0.7, 0.3),
   nrow=2
 )
 dd
 
 
 ee <- plot_grid(e0, e,
-  rel_heights = c(0.65, 0.35),
+  rel_heights = c(0.7, 0.3),
   nrow=2
 )
 ee

@@ -157,7 +157,7 @@
 <polyline points='179.72,11.63 182.46,11.63 ' style='stroke-width: 1.07; stroke: #333333; stroke-linecap: butt;' />
 <polyline points='209.75,219.44 209.75,216.71 ' style='stroke-width: 1.07; stroke: #333333; stroke-linecap: butt;' />
 <polyline points='255.23,219.44 255.23,216.71 ' style='stroke-width: 1.07; stroke: #333333; stroke-linecap: butt;' />
-<text transform='translate(214.20,226.09) rotate(-45)' text-anchor='end' style='font-size: 8.80px; font-family: "Arial";' textLength='47.42px' lengthAdjust='spacingAndGlyphs'>DTH-guided</text>
+<text transform='translate(214.20,226.09) rotate(-45)' text-anchor='end' style='font-size: 8.80px; font-family: "Arial";' textLength='49.88px' lengthAdjust='spacingAndGlyphs'>Skills-guided</text>
 <text transform='translate(259.69,226.09) rotate(-45)' text-anchor='end' style='font-size: 8.80px; font-family: "Arial";' textLength='33.75px' lengthAdjust='spacingAndGlyphs'>Baseline</text>
 <text transform='translate(157.36,111.09) rotate(-90)' text-anchor='middle' style='font-size: 11.00px; font-family: "Arial";' textLength='113.78px' lengthAdjust='spacingAndGlyphs'>Evidence coverage (%)</text>
 <text x='149.05' y='15.03' style='font-size: 14.00px; font-weight: bold; font-family: "Arial";' textLength='10.11px' lengthAdjust='spacingAndGlyphs'>C</text>
@@ -222,7 +222,7 @@
 <polyline points='313.71,26.72 316.45,26.72 ' style='stroke-width: 1.07; stroke: #333333; stroke-linecap: butt;' />
 <polyline points='346.47,219.44 346.47,216.71 ' style='stroke-width: 1.07; stroke: #333333; stroke-linecap: butt;' />
 <polyline points='396.50,219.44 396.50,216.71 ' style='stroke-width: 1.07; stroke: #333333; stroke-linecap: butt;' />
-<text transform='translate(350.93,226.09) rotate(-45)' text-anchor='end' style='font-size: 8.80px; font-family: "Arial";' textLength='47.42px' lengthAdjust='spacingAndGlyphs'>DTH-guided</text>
+<text transform='translate(350.93,226.09) rotate(-45)' text-anchor='end' style='font-size: 8.80px; font-family: "Arial";' textLength='49.88px' lengthAdjust='spacingAndGlyphs'>Skills-guided</text>
 <text transform='translate(400.96,226.09) rotate(-45)' text-anchor='end' style='font-size: 8.80px; font-family: "Arial";' textLength='33.75px' lengthAdjust='spacingAndGlyphs'>Baseline</text>
 <text transform='translate(301.36,111.09) rotate(-90)' text-anchor='middle' style='font-size: 11.00px; font-family: "Arial";' textLength='176.72px' lengthAdjust='spacingAndGlyphs'>Claim-boundary restraint score (0-5)</text>
 </g>
