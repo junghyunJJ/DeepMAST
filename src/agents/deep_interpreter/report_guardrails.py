@@ -211,7 +211,11 @@ def repair_synthesis_report(data_dir: str | Path, issues: list[dict[str, str]]) 
     current = path.read_text(encoding="utf-8")
     cursor = 0
     for issue in issues:
-        if issue.get("severity") != "error" or issue.get("code") != "unsupported_synthesis_overclaim":
+        if issue.get("severity") != "error" or issue.get("code") not in {
+            "unsupported_synthesis_overclaim",
+            "claim_rag_overclaimed",
+            "claim_rag_unsupported",
+        }:
             continue
         claim = issue.get("value") or ""
         if not claim or SYNTHESIS_GUARDRAIL_SENTENCE in claim.lower():
@@ -233,6 +237,32 @@ def repair_synthesis_report(data_dir: str | Path, issues: list[dict[str, str]]) 
         if repair_report_script._repair_pmid_issue(data_dir, issue):
             changed_claims += 1
     return changed_claims
+
+
+def _claim_status_counts(claims: list[dict[str, Any]]) -> dict[str, int]:
+    statuses = ("supported", "overclaimed", "unsupported", "unverifiable")
+    return {
+        status: sum(1 for claim in claims if claim.get("status") == status)
+        for status in statuses
+    }
+
+
+def _validate_synthesis_with_claims(
+    data_dir: Path,
+    *,
+    provider: str | None,
+    claim_cache: dict[str, list[dict[str, Any]]],
+) -> tuple[list[dict[str, str]], list[dict[str, Any]]]:
+    deterministic = validate_synthesis_report(data_dir)
+    if any(issue.get("code") in PAPERS_JSON_LOAD_ERROR_CODES for issue in deterministic):
+        return deterministic, []
+    semantic = claim_rag_validation.validate_claims(
+        data_dir,
+        ("synthesis.md",),
+        provider=provider,
+        cache=claim_cache,
+    )
+    return deterministic + semantic["issues"], semantic["claims"]
 
 
 def run_report_guardrail(data_dir: str | Path, *, provider: str | None = None) -> dict[str, Any]:
@@ -296,7 +326,6 @@ def run_report_guardrail(data_dir: str | Path, *, provider: str | None = None) -
 
 
 def run_synthesis_guardrail(data_dir: str | Path, *, provider: str | None = None) -> dict[str, Any]:
-    _ = provider
     data_dir = Path(data_dir).expanduser().resolve()
     missing = _missing_synthesis_required_files(data_dir)
     if missing:
@@ -305,11 +334,17 @@ def run_synthesis_guardrail(data_dir: str | Path, *, provider: str | None = None
     initial_path = data_dir / "synthesis_guardrail_initial.json"
     final_path = data_dir / "synthesis_guardrail_final.json"
 
-    initial_issues = validate_synthesis_report(data_dir)
-    _write_issues(initial_path, initial_issues)
+    claim_cache: dict[str, list[dict[str, Any]]] = {}
+    initial_issues, initial_claims = _validate_synthesis_with_claims(
+        data_dir,
+        provider=provider,
+        claim_cache=claim_cache,
+    )
+    _write_issues(initial_path, initial_issues, initial_claims)
     initial_error_count = _error_count(initial_issues)
 
     current_issues = initial_issues
+    current_claims = initial_claims
     changed_claims = 0
     repair_attempt_count = 0
 
@@ -320,12 +355,16 @@ def run_synthesis_guardrail(data_dir: str | Path, *, provider: str | None = None
         changed = repair_synthesis_report(data_dir, current_issues)
         repair_attempt_count += 1
         changed_claims += changed
-        current_issues = validate_synthesis_report(data_dir)
+        current_issues, current_claims = _validate_synthesis_with_claims(
+            data_dir,
+            provider=provider,
+            claim_cache=claim_cache,
+        )
         if changed == 0:
             break
 
     final_issues = current_issues
-    _write_issues(final_path, final_issues)
+    _write_issues(final_path, final_issues, current_claims)
     final_error_count = _error_count(final_issues)
 
     return {
@@ -337,4 +376,7 @@ def run_synthesis_guardrail(data_dir: str | Path, *, provider: str | None = None
         "changed_claims": changed_claims,
         "final_issue_count": len(final_issues),
         "final_error_count": final_error_count,
+        "claims_validated": len(current_claims),
+        "claims_by_status": _claim_status_counts(current_claims),
+        "validation_results": current_claims,
     }

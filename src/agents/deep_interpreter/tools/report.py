@@ -1106,18 +1106,36 @@ def _default_synthesis_validation(
     data_dir: str,
     guardrail_result: dict[str, Any],
 ) -> dict[str, Any]:
+    raw_counts = guardrail_result.get("claims_by_status")
+    if not isinstance(raw_counts, dict):
+        raw_counts = {}
+    validation_results = guardrail_result.get("validation_results")
+    if not isinstance(validation_results, list):
+        validation_results = []
+    has_claim_results = "claims_validated" in guardrail_result
     return {
         "literature_source": "papers.json",
         "expanded_literature": False,
         "rag_part_name": "all",
         "rag_mode": (Path(data_dir) / "papers" / "all").exists(),
-        "claims_validated": _int_guardrail_field(guardrail_result, "initial_issue_count"),
+        "claims_validated": (
+            _int_guardrail_field(guardrail_result, "claims_validated")
+            if has_claim_results
+            else _int_guardrail_field(guardrail_result, "initial_issue_count")
+        ),
         "claims_by_status": {
+            "supported": int(raw_counts.get("supported", 0) or 0),
+            "caveated": int(raw_counts.get("overclaimed", 0) or 0),
+            "hypothesis": int(raw_counts.get("unsupported", 0) or 0),
+            "unverifiable": int(raw_counts.get("unverifiable", 0) or 0),
+        }
+        if has_claim_results
+        else {
             "supported": 0,
             "caveated": _int_guardrail_field(guardrail_result, "final_issue_count"),
             "hypothesis": _int_guardrail_field(guardrail_result, "changed_claims"),
         },
-        "validation_results": [],
+        "validation_results": validation_results,
         "synthesis_guardrail": guardrail_result,
         "auto_generated": True,
     }

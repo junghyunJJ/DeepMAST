@@ -143,6 +143,65 @@ def test_run_synthesis_guardrail_repairs_invalid_pmid_and_softens_overclaim(
     assert all(issue["severity"] != "error" for issue in final["issues"])
 
 
+def test_run_synthesis_guardrail_softens_claim_rag_error_and_records_results(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    (tmp_path / "papers.json").write_text(
+        json.dumps({"papers": [{"pmid": "11111111", "abstract": "association"}]}),
+        encoding="utf-8",
+    )
+    claim = "TGFB drives fibrosis (PMID: 11111111)."
+    (tmp_path / "synthesis.md").write_text(
+        f"## Cross-Part Themes\n\n{claim}\n",
+        encoding="utf-8",
+    )
+    claim_calls = 0
+
+    def fake_claim_validate(*_args, **_kwargs):
+        nonlocal claim_calls
+        claim_calls += 1
+        hedged = claim_calls > 1
+        return {
+            "claims": [
+                {
+                    "status": "overclaimed",
+                    "claim": claim,
+                    "hedged": hedged,
+                }
+            ],
+            "issues": [
+                {
+                    "code": "claim_rag_hypothesis_warning" if hedged else "claim_rag_overclaimed",
+                    "severity": "warning" if hedged else "error",
+                    "file": "synthesis.md",
+                    "section": "## Cross-Part Themes",
+                    "value": claim,
+                    "evidence": "Association only.",
+                    "repair_instruction": "Mark as hypothesis.",
+                }
+            ],
+        }
+
+    monkeypatch.setattr(
+        report_guardrails.claim_rag_validation, "validate_claims", fake_claim_validate
+    )
+
+    result = report_guardrails.run_synthesis_guardrail(tmp_path, provider="ollama")
+
+    final = json.loads(
+        (tmp_path / "synthesis_guardrail_final.json").read_text(encoding="utf-8")
+    )
+    synthesis = (tmp_path / "synthesis.md").read_text(encoding="utf-8")
+    assert result["status"] == "passed"
+    assert result["repair_attempt_count"] == 1
+    assert result["claims_validated"] == 1
+    assert result["claims_by_status"]["overclaimed"] == 1
+    assert final["claim_validation"][0]["hedged"] is True
+    assert "hypothesis requiring validation" in synthesis.lower()
+
+
 def test_run_synthesis_guardrail_rejects_html_fragment_synthesis(
     tmp_path: Path,
 ) -> None:
