@@ -72,6 +72,8 @@ def test_parse_args_allows_non_ollama_provider_without_explicit_port():
 def test_configure_ollama_port_override_sets_env(monkeypatch):
     monkeypatch.delenv("OLLAMA_BASE_URL", raising=False)
     monkeypatch.delenv("OLLAMA_HOST", raising=False)
+    monkeypatch.setenv("SUBAGENT_HYPOTHESIS_WRITER_PROVIDER", "ollama")
+    monkeypatch.setenv("SUBAGENT_HYPOTHESIS_WRITER_BASE_URL", "http://localhost:11434")
 
     args = argparse.Namespace(provider="ollama", port=6000)
     base_url = traced._configure_ollama_port_override(args)
@@ -79,6 +81,10 @@ def test_configure_ollama_port_override_sets_env(monkeypatch):
     assert base_url == "http://localhost:6000"
     assert traced.os.environ["OLLAMA_BASE_URL"] == "http://localhost:6000"
     assert traced.os.environ["OLLAMA_HOST"] == "http://localhost:6000"
+    assert (
+        traced.os.environ["SUBAGENT_HYPOTHESIS_WRITER_BASE_URL"]
+        == "http://localhost:6000"
+    )
 
 
 def test_configure_ollama_port_override_defaults_to_ollama_default(monkeypatch):
