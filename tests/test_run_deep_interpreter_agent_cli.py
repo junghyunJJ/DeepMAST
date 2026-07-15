@@ -120,6 +120,14 @@ class _Part3RetryAgent:
         return {"messages": [{"content": payload["messages"][0]["content"]}]}
 
 
+class _GuardrailFailureAgent:
+    async def ainvoke(self, payload, config=None):
+        raise RuntimeError(
+            "Report guardrail failed with 1 hard error(s); "
+            "see /tmp/report_validation_final.json"
+        )
+
+
 def _args(tmp_path: Path, part: int) -> SimpleNamespace:
     return SimpleNamespace(
         provider="openai",
@@ -193,6 +201,28 @@ def test_run_stops_part3_retry_as_soon_as_output_exists(tmp_path, monkeypatch, c
     assert fake_agent.calls == 2
     assert stdout.count('"event": "part3_save_retry_start"') == 1
     assert '"invoke_attempt_count": 2' in stdout
+
+
+def test_run_returns_nonzero_when_report_guardrail_raises(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    fake_agent = _GuardrailFailureAgent()
+    monkeypatch.setitem(
+        sys.modules,
+        "src.agents.deep_interpreter.graph_builder",
+        SimpleNamespace(create_subagent_graph=lambda *_args, **_kwargs: fake_agent),
+    )
+
+    exit_code = asyncio.run(run_script.run(_args(tmp_path, 3)))
+
+    captured = capsys.readouterr()
+    assert exit_code == 1
+    assert '"event": "invoke_error"' in captured.err
+    assert '"exception_type": "RuntimeError"' in captured.err
+    assert "Report guardrail failed with 1 hard error" in captured.err
+    assert "part3_save_retry_start" not in captured.out
 
 
 def test_run_does_not_retry_part2_missing_output(tmp_path, monkeypatch):
