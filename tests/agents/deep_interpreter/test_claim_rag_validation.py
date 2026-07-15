@@ -69,6 +69,25 @@ def test_synthesis_claim_without_inline_pmid_uses_papers_universe(tmp_path: Path
     ]
 
 
+def test_synthesis_references_do_not_narrow_non_inline_pmid_pool(tmp_path: Path) -> None:
+    _write_papers(tmp_path / "papers.json")
+    (tmp_path / "synthesis.md").write_text(
+        "## Cross-Part Themes\n\n"
+        "TGFB and CXCL12 form a coordinated disease-associated program.\n"
+        "### References\n"
+        "- PMID: 11111111\n",
+        encoding="utf-8",
+    )
+
+    [group] = claim_rag_validation._extract_claim_groups(tmp_path, ("synthesis.md",))
+
+    assert group["claims"][0]["candidate_pmids"] == [
+        "11111111",
+        "22222222",
+        "33333333",
+    ]
+
+
 def test_inline_pmid_outside_papers_json_is_not_an_evidence_candidate(
     tmp_path: Path,
 ) -> None:

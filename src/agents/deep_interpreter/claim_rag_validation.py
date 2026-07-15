@@ -112,7 +112,7 @@ def _extract_claim_groups(
             section_body = str(section["body"])
             if filename == "synthesis.md":
                 claims = _clean_claims(section_body)
-                fallback_pmids = _reference_pmids(section_body) or paper_pmids
+                fallback_pmids = paper_pmids
             else:
                 blocks = validate_report_script._biological_interpretation_blocks(
                     section_body
