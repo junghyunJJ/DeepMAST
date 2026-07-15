@@ -120,3 +120,191 @@ def test_explicit_hypothesis_marker_is_not_extracted_as_asserted_claim(tmp_path:
 
     assert groups[0]["claims"][0]["claim"] == "TGFB coordinates all observed interactions."
     assert groups[0]["claims"][0]["hedged"] is True
+
+
+def test_evidence_filter_rejects_results_outside_allowed_pmids(
+    tmp_path: Path, monkeypatch
+) -> None:
+    _write_papers(tmp_path / "papers.json")
+
+    monkeypatch.setattr(
+        claim_rag_validation.search_literature_fulltext,
+        "invoke",
+        lambda _args: [
+            {
+                "page_content": "Unrelated ERBB evidence.",
+                "metadata": {"filename": "pmid_33333333.txt"},
+                "score": 0.99,
+            },
+            {
+                "page_content": "TGFB is associated with fibrosis.",
+                "metadata": {"filename": "pmid_11111111.txt"},
+                "score": 0.80,
+            },
+        ],
+    )
+
+    evidence = claim_rag_validation._retrieve_evidence(
+        "TGFB drives fibrosis.", ["11111111"], tmp_path
+    )
+
+    assert [item["pmid"] for item in evidence] == ["11111111"]
+    assert evidence[0]["source"] == "full_text"
+
+
+def test_abstract_fallback_is_limited_to_allowed_pmids(tmp_path: Path, monkeypatch) -> None:
+    _write_papers(tmp_path / "papers.json")
+    monkeypatch.setattr(
+        claim_rag_validation.search_literature_fulltext,
+        "invoke",
+        lambda _args: [],
+    )
+
+    evidence = claim_rag_validation._retrieve_evidence(
+        "CXCL12 regulates immune migration.", ["22222222"], tmp_path
+    )
+
+    assert evidence == [
+        {
+            "pmid": "22222222",
+            "source": "abstract",
+            "text": "CXCL12 regulates immune migration.",
+        }
+    ]
+
+
+class FakeStructuredModel:
+    def with_structured_output(self, _schema):
+        return self
+
+    def invoke(self, _messages):
+        return claim_rag_validation.ClaimJudgmentBatch(
+            judgments=[
+                claim_rag_validation.ClaimJudgment(
+                    claim_index=0,
+                    status="overclaimed",
+                    reason="The evidence supports association, not causation.",
+                    supporting_pmids=["11111111"],
+                    evidence_quote="TGFB is associated with fibrosis.",
+                )
+            ]
+        )
+
+
+def test_validate_claims_maps_overclaim_to_repairable_issue(
+    tmp_path: Path, monkeypatch
+) -> None:
+    _write_papers(tmp_path / "papers.json")
+    (tmp_path / "part1_final.md").write_text(
+        "## Analysis 1-1\n"
+        "### Biological Interpretation\n"
+        "TGFB drives fibrosis (PMID: 11111111).\n"
+        "### References\n"
+        "- PMID: 11111111\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        claim_rag_validation.search_literature_fulltext,
+        "invoke",
+        lambda _args: [
+            {
+                "page_content": "TGFB is associated with fibrosis.",
+                "metadata": {"filename": "pmid_11111111.txt"},
+                "score": 0.8,
+            }
+        ],
+    )
+
+    result = claim_rag_validation.validate_claims(
+        tmp_path,
+        ("part1_final.md",),
+        llm=FakeStructuredModel(),
+    )
+
+    assert result["claims"][0]["status"] == "overclaimed"
+    assert result["issues"] == [
+        {
+            "code": "claim_rag_overclaimed",
+            "severity": "error",
+            "file": "part1_final.md",
+            "section": "## Analysis 1-1",
+            "value": "TGFB drives fibrosis (PMID: 11111111).",
+            "evidence": (
+                "The evidence supports association, not causation. "
+                "PMIDs: 11111111. Evidence: TGFB is associated with fibrosis."
+            ),
+            "repair_instruction": (
+                "Rewrite only this claim to match the supported association; do not add a new PMID."
+            ),
+        }
+    ]
+
+
+def test_missing_evidence_becomes_warning_without_model_call(
+    tmp_path: Path, monkeypatch
+) -> None:
+    _write_papers(tmp_path / "papers.json")
+    (tmp_path / "part1_final.md").write_text(
+        "## Analysis 1-1\n"
+        "### Biological Interpretation\n"
+        "An uncited disease mechanism is asserted here.\n"
+        "### References\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        claim_rag_validation.search_literature_fulltext,
+        "invoke",
+        lambda _args: [],
+    )
+
+    class FailModel:
+        def with_structured_output(self, _schema):
+            raise AssertionError("No evidence must not invoke the judge")
+
+    result = claim_rag_validation.validate_claims(
+        tmp_path, ("part1_final.md",), llm=FailModel()
+    )
+
+    assert result["claims"][0]["status"] == "unverifiable"
+    assert result["issues"][0]["severity"] == "warning"
+
+
+def test_section_cache_skips_unchanged_retrieval_and_judgment(
+    tmp_path: Path, monkeypatch
+) -> None:
+    _write_papers(tmp_path / "papers.json")
+    (tmp_path / "part1_final.md").write_text(
+        "## Analysis 1-1\n"
+        "### Biological Interpretation\n"
+        "TGFB drives fibrosis (PMID: 11111111).\n"
+        "### References\n"
+        "- PMID: 11111111\n",
+        encoding="utf-8",
+    )
+    search_calls = 0
+
+    def fake_search(_args):
+        nonlocal search_calls
+        search_calls += 1
+        return [
+            {
+                "page_content": "TGFB is associated with fibrosis.",
+                "metadata": {"filename": "pmid_11111111.txt"},
+                "score": 0.8,
+            }
+        ]
+
+    monkeypatch.setattr(
+        claim_rag_validation.search_literature_fulltext, "invoke", fake_search
+    )
+    cache: dict[str, list[dict]] = {}
+
+    first = claim_rag_validation.validate_claims(
+        tmp_path, ("part1_final.md",), llm=FakeStructuredModel(), cache=cache
+    )
+    second = claim_rag_validation.validate_claims(
+        tmp_path, ("part1_final.md",), llm=FakeStructuredModel(), cache=cache
+    )
+
+    assert first == second
+    assert search_calls == 1
