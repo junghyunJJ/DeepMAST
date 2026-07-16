@@ -648,6 +648,16 @@ successful report generation. The configured provider request timeout did not
 preempt this Ollama OpenAI-compatible call; investigate model-side first-token
 latency before relabeling this invocation as verified.
 
+**Traced bounded reproduction (2026-07-16):** a fresh breast-cancer evidence
+copy with `--request-timeout-seconds 90` and `--run-timeout-seconds 120`
+completed two model calls plus `read_skill_file` and `load_lr_candidates`.
+The last JSONL boundary was `tool_start` for `build_evidence_summary`, with no
+matching `tool_end`; no guarded artifacts were left in the data directory.
+This is a tool-level stall, not evidence that the initial Qwen request,
+available tool schemas, or accumulated tool context is the bottleneck. Measure
+and shrink only `build_evidence_summary`'s returned payload before considering
+report-writer subagent splitting.
+
 ---
 
 ## 8. Production Reporter integration: Step 9.5
