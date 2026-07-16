@@ -144,14 +144,17 @@ async def test_writer_only_uses_direct_factory_with_existing_evidence_context_an
     writer = _Writer(callback=lambda: _passed_artifacts(tmp_path))
 
     monkeypatch.setattr(runner, "parse_args", lambda: _args(tmp_path, model="qwen3.5:122b"))
-    monkeypatch.setattr(
-        runner,
-        "create_guarded_report_writer",
-        lambda config: seen.setdefault("config", config) and writer,
-    )
+
+    def factory(config):
+        seen["factory_calls"] = seen.get("factory_calls", 0) + 1
+        seen["config"] = config
+        return writer
+
+    monkeypatch.setattr(runner, "create_guarded_report_writer", factory)
 
     assert await runner.main() == 0
     assert "DRUG_TARGET_SKIP_EVIDENCE_ASSESSOR" not in inspect.getsource(runner)
+    assert seen["factory_calls"] == 1
     config = seen["config"]
     assert config.provider == "ollama"
     assert config.model == "qwen3.5:122b"
@@ -213,6 +216,7 @@ async def test_invalid_deadlines_fail_before_writer_creation(tmp_path, monkeypat
 async def test_writer_timeout_cancels_and_rejects_stale_success_artifacts(tmp_path, monkeypatch, capsys):
     _evidence_ready(tmp_path)
     _passed_artifacts(tmp_path)
+    (tmp_path / "report_sections.json").write_text("{}")
     writer = _HangingWriter()
     monkeypatch.setattr(
         runner,

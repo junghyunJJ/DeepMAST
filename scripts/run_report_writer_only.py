@@ -13,6 +13,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.agents.drug_target.agent import DrugTargetConfig, create_guarded_report_writer
+from src.agents.drug_target.hybrid_report_sections import REPORT_SECTIONS_FILENAME
 from src.agents.drug_target.report_guardrails import clear_derived_report_artifacts
 
 REQUIRED_GUARDED_ARTIFACTS = (
@@ -84,6 +85,7 @@ async def main() -> int:
         include_audits=True,
         include_sources=True,
     )
+    (data_dir / REPORT_SECTIONS_FILENAME).unlink(missing_ok=True)
     config = DrugTargetConfig(
         provider=args.provider,
         model=args.model,
