@@ -2284,8 +2284,10 @@ def render_hybrid_report(
     if not (base / "target_assessment.json").exists():
         raise ValueError("hybrid report rendering requires target_assessment.json")
 
+    # Hybrid reports intentionally omit broad legacy interpretation prose.
     markdown = render_report_markdown(
         report_data,
+        interpretations=None,
         pipeline_recommendations=recommendations,
     )
     (base / "drug.md").write_text(markdown, encoding="utf-8")

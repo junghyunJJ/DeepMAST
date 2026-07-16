@@ -476,3 +476,38 @@ def test_hybrid_renderer_uses_canonical_sections_with_host_owned_provenance(
     }
     assert "UNANCHORED_SENTENCE" not in finding_types
     assert "FABRICATED_DRUG_NAME" not in finding_types
+
+
+def test_hybrid_renderer_explicitly_omits_legacy_interpretations(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    from src.agents.drug_target import deterministic_report
+
+    evidence_dir = _write_renderer_evidence(tmp_path)
+    canonical, errors = canonicalize_report_sections(
+        _payload(),
+        evidence_dir,
+        _source_paths(),
+        _report_data(),
+    )
+
+    assert errors == []
+    assert canonical is not None
+    captured: dict[str, object] = {}
+
+    def capture_render(
+        _report_data: object,
+        **kwargs: object,
+    ) -> str:
+        captured.update(kwargs)
+        return ""
+
+    monkeypatch.setattr(deterministic_report, "render_report_markdown", capture_render)
+
+    deterministic_report.render_hybrid_report(str(tmp_path), "IPF", canonical)
+
+    assert captured == {
+        "interpretations": None,
+        "pipeline_recommendations": canonical["pipeline_recommendations"],
+    }
