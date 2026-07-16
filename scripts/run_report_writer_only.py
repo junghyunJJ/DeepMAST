@@ -114,8 +114,10 @@ async def _stop_child_process(process: Any) -> bool:
 
 async def _require_child_stop(process: Any, data_dir: Path) -> None:
     if not await _stop_child_process(process):
-        await asyncio.to_thread(clear_guarded_report_run_artifacts, data_dir)
-        _force_exit()
+        try:
+            await asyncio.to_thread(clear_guarded_report_run_artifacts, data_dir)
+        finally:
+            _force_exit()
 
 
 def _run_guarded_writer_child(

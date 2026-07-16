@@ -430,6 +430,27 @@ async def test_force_exit_clears_guarded_outputs_when_kill_is_ineffective(
     assert not staging.exists()
 
 
+@pytest.mark.asyncio
+async def test_force_exit_runs_when_last_resort_cleanup_raises(tmp_path, monkeypatch):
+    process = _KillIneffectiveProcess(tmp_path)
+    cleanup_calls = []
+
+    def failing_cleanup(data_dir):
+        cleanup_calls.append(data_dir)
+        raise OSError("cleanup failed")
+
+    monkeypatch.setattr(runner, "clear_guarded_report_run_artifacts", failing_cleanup)
+    monkeypatch.setattr(runner, "_force_exit", lambda: (_ for _ in ()).throw(_ForcedExit()))
+
+    with pytest.raises(_ForcedExit):
+        await runner._require_child_stop(process, tmp_path)
+
+    assert cleanup_calls == [tmp_path]
+    assert process.terminated is True
+    assert process.killed is True
+    assert process.is_alive() is True
+
+
 @pytest.mark.parametrize(
     ("artifact", "phase"),
     [
