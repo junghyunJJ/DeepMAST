@@ -330,10 +330,13 @@ def test_legacy_guardrail_keeps_direct_markdown_repair_fallback(
     assert calls == ["markdown", "publish"]
 
 
-def test_guarded_middleware_fails_closed_without_report_sections(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize("sections_contents", [None, ""], ids=["missing", "empty"])
+def test_guarded_middleware_fails_closed_without_nonempty_report_sections(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, sections_contents: str | None
 ) -> None:
     _write_sources(tmp_path)
+    if sections_contents is not None:
+        (tmp_path / REPORT_SECTIONS_FILENAME).write_text(sections_contents, encoding="utf-8")
     calls: list[str] = []
     monkeypatch.setattr(
         report_guardrails,
