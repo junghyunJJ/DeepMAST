@@ -4,13 +4,21 @@ import argparse
 import asyncio
 import inspect
 import json
+import multiprocessing
 import sys
+import time
+from pathlib import Path
 
 import pytest
 
 from scripts import run_drug_target_agent_bc as bc_runner
 from scripts import run_drug_target_e2e as e2e_runner
 from scripts import run_report_writer_only as runner
+
+
+@pytest.fixture(autouse=True)
+def _use_fork_for_runner_monkeypatches(monkeypatch):
+    monkeypatch.setattr(runner, "_process_context", lambda: multiprocessing.get_context("fork"))
 
 
 class _Writer:
@@ -26,15 +34,106 @@ class _Writer:
 
 
 class _HangingWriter:
-    def __init__(self) -> None:
-        self.cancelled = False
+    async def ainvoke(self, _writer_input):
+        await asyncio.sleep(60)
+
+
+class _ThreadHangingWriter:
+    def __init__(self, data_dir) -> None:
+        self.data_dir = data_dir
 
     async def ainvoke(self, _writer_input):
-        try:
-            await asyncio.sleep(60)
-        except asyncio.CancelledError:
-            self.cancelled = True
-            raise
+        (self.data_dir / "report_data.json").write_text("partial")
+
+        def publish_late() -> None:
+            time.sleep(0.5)
+            (self.data_dir / "drug_report_render.json").write_text("late")
+
+        await asyncio.to_thread(publish_late)
+
+
+class _ResultQueue:
+    def close(self) -> None:
+        return None
+
+    def join_thread(self) -> None:
+        return None
+
+
+class _TerminationResistantProcess:
+    def __init__(self) -> None:
+        self.alive = True
+        self.terminated = False
+        self.killed = False
+        self.join_timeouts: list[float | None] = []
+
+    def start(self) -> None:
+        return None
+
+    def is_alive(self) -> bool:
+        return self.alive
+
+    def terminate(self) -> None:
+        self.terminated = True
+
+    def kill(self) -> None:
+        self.killed = True
+        self.alive = False
+
+    def join(self, timeout: float | None = None) -> None:
+        self.join_timeouts.append(timeout)
+        if timeout is None:
+            time.sleep(0.3 if self.terminated else 0.05)
+
+
+class _CliLifecycleProcess(_TerminationResistantProcess):
+    def join(self, timeout: float | None = None) -> None:
+        self.join_timeouts.append(timeout)
+        if timeout is None:
+            time.sleep(0.3)
+
+
+class _KillIneffectiveProcess(_TerminationResistantProcess):
+    def __init__(self, data_dir) -> None:
+        super().__init__()
+        self.data_dir = data_dir
+        self.wrote_partial_outputs = False
+
+    def join(self, timeout: float | None = None) -> None:
+        self.join_timeouts.append(timeout)
+        if not self.wrote_partial_outputs:
+            self.wrote_partial_outputs = True
+            (self.data_dir / "drug.md").write_text("partial")
+            (self.data_dir / "report_sections.json").write_text("{}")
+            (self.data_dir / "report_data.json").write_text("partial")
+            (self.data_dir / "drug_report_render.json").write_text("partial")
+            (self.data_dir / ".report-sections-partial").mkdir()
+
+    def kill(self) -> None:
+        self.killed = True
+
+
+class _ForcedExit(Exception):
+    pass
+
+
+class _StartFailingProcess:
+    def start(self) -> None:
+        raise OSError("cannot start child")
+
+    def is_alive(self) -> bool:
+        return False
+
+
+class _ProcessContext:
+    def __init__(self, process) -> None:
+        self.process = process
+
+    def Queue(self):
+        return _ResultQueue()
+
+    def Process(self, **_kwargs):
+        return self.process
 
 
 def _args(path, **overrides):
@@ -140,49 +239,34 @@ async def test_writer_only_uses_direct_factory_with_existing_evidence_context_an
     monkeypatch,
 ):
     _evidence_ready(tmp_path)
-    seen = {}
     writer = _Writer(callback=lambda: _passed_artifacts(tmp_path))
 
     monkeypatch.setattr(runner, "parse_args", lambda: _args(tmp_path, model="qwen3.5:122b"))
 
-    def factory(config):
-        seen["factory_calls"] = seen.get("factory_calls", 0) + 1
-        seen["config"] = config
-        return writer
-
-    monkeypatch.setattr(runner, "create_guarded_report_writer", factory)
+    monkeypatch.setattr(runner, "create_guarded_report_writer", lambda _config: writer)
 
     assert await runner.main() == 0
     assert "DRUG_TARGET_SKIP_EVIDENCE_ASSESSOR" not in inspect.getsource(runner)
-    assert seen["factory_calls"] == 1
-    config = seen["config"]
-    assert config.provider == "ollama"
-    assert config.model == "qwen3.5:122b"
-    assert config.request_timeout_seconds == 600.0
-    assert config.data_dir == str(tmp_path.resolve())
-    assert config.disease == "breast cancer"
-    assert writer.calls == [
-        {
-            "messages": [
-                {
-                    "role": "user",
-                    "content": (
-                        "Render guarded hybrid report from existing evidence. "
-                        f"Data dir: {tmp_path.resolve()}. Disease: breast cancer."
-                    ),
-                }
-            ]
-        }
-    ]
 
 
 @pytest.mark.asyncio
 async def test_writer_only_clears_stale_outputs_before_direct_writer_runs(tmp_path, monkeypatch):
     _evidence_ready(tmp_path)
     _passed_artifacts(tmp_path)
+    for name in ("report_data.json", "drug_report_render.json"):
+        (tmp_path / name).write_text("stale")
+        (tmp_path / name).with_suffix(f"{Path(name).suffix}.tmp").write_text("temporary")
+    staging = tmp_path / ".report-sections-stale"
+    staging.mkdir()
+    (staging / "partial.json").write_text("stale")
 
     def assert_stale_outputs_removed():
         assert not any((tmp_path / name).exists() for name in runner.REQUIRED_GUARDED_ARTIFACTS)
+        assert not any(
+            (tmp_path / name).exists()
+            for name in ("report_data.json", "drug_report_render.json")
+        )
+        assert not staging.exists()
 
     monkeypatch.setattr(runner, "parse_args", lambda: _args(tmp_path))
     monkeypatch.setattr(
@@ -213,10 +297,12 @@ async def test_invalid_deadlines_fail_before_writer_creation(tmp_path, monkeypat
 
 
 @pytest.mark.asyncio
-async def test_writer_timeout_cancels_and_rejects_stale_success_artifacts(tmp_path, monkeypatch, capsys):
+async def test_writer_timeout_cleans_all_guarded_outputs(tmp_path, monkeypatch, capsys):
     _evidence_ready(tmp_path)
     _passed_artifacts(tmp_path)
     (tmp_path / "report_sections.json").write_text("{}")
+    for name in ("report_data.json", "drug_report_render.json"):
+        (tmp_path / name).write_text("stale")
     writer = _HangingWriter()
     monkeypatch.setattr(
         runner,
@@ -226,11 +312,122 @@ async def test_writer_timeout_cancels_and_rejects_stale_success_artifacts(tmp_pa
     monkeypatch.setattr(runner, "create_guarded_report_writer", lambda _config: writer)
 
     assert await runner.main() == 1
-    assert writer.cancelled is True
+    assert not any(
+        (tmp_path / name).exists()
+        for name in (*runner.REQUIRED_GUARDED_ARTIFACTS, "report_sections.json", "report_data.json", "drug_report_render.json")
+    )
     assert capsys.readouterr().err == (
         "ERROR: guarded report timed out after 0.002s in phase=report_writer "
         "provider=ollama model=default\n"
     )
+
+
+@pytest.mark.asyncio
+async def test_writer_timeout_hard_stops_threaded_guardrail_work_and_prevents_late_publish(
+    tmp_path,
+    monkeypatch,
+    capsys,
+):
+    _evidence_ready(tmp_path)
+    monkeypatch.setattr(
+        runner,
+        "parse_args",
+        lambda: _args(tmp_path, request_timeout_seconds=0.01, run_timeout_seconds=0.02),
+    )
+    monkeypatch.setattr(
+        runner,
+        "create_guarded_report_writer",
+        lambda _config: _ThreadHangingWriter(tmp_path),
+    )
+
+    started = time.monotonic()
+    assert await runner.main() == 1
+    assert time.monotonic() - started < 0.3
+    assert not (tmp_path / "report_data.json").exists()
+    assert not (tmp_path / "drug_report_render.json").exists()
+    await asyncio.sleep(0.55)
+    assert not (tmp_path / "report_data.json").exists()
+    assert not (tmp_path / "drug_report_render.json").exists()
+    assert capsys.readouterr().err == (
+        "ERROR: guarded report timed out after 0.02s in phase=report_writer "
+        "provider=ollama model=default\n"
+    )
+
+
+@pytest.mark.asyncio
+async def test_writer_timeout_kills_a_termination_resistant_child(tmp_path, monkeypatch, capsys):
+    _evidence_ready(tmp_path)
+    process = _TerminationResistantProcess()
+    monkeypatch.setattr(runner, "parse_args", lambda: _args(tmp_path, request_timeout_seconds=0.001, run_timeout_seconds=0.01))
+    monkeypatch.setattr(runner, "_process_context", lambda: _ProcessContext(process))
+
+    started = time.monotonic()
+    assert await runner.main() == 1
+    assert time.monotonic() - started < 0.15
+    assert process.terminated is True
+    assert process.killed is True
+    assert process.join_timeouts[1:] == [runner._PROCESS_STOP_SECONDS] * 2
+    assert capsys.readouterr().err == (
+        "ERROR: guarded report timed out after 0.01s in phase=report_writer "
+        "provider=ollama model=default\n"
+    )
+
+
+@pytest.mark.asyncio
+async def test_writer_child_start_failure_is_reported_by_parent(tmp_path, monkeypatch, capsys):
+    _evidence_ready(tmp_path)
+    monkeypatch.setattr(runner, "parse_args", lambda: _args(tmp_path))
+    monkeypatch.setattr(runner, "_process_context", lambda: _ProcessContext(_StartFailingProcess()))
+
+    assert await runner.main() == 1
+    assert capsys.readouterr().err == "ERROR: guarded report writer failed: OSError: cannot start child\n"
+
+
+def test_cli_timeout_never_waits_for_an_unbounded_child_join(tmp_path, monkeypatch, capsys):
+    _evidence_ready(tmp_path)
+    process = _CliLifecycleProcess()
+    monkeypatch.setattr(runner, "parse_args", lambda: _args(tmp_path, request_timeout_seconds=0.001, run_timeout_seconds=0.01))
+    monkeypatch.setattr(runner, "_process_context", lambda: _ProcessContext(process))
+
+    started = time.monotonic()
+    assert asyncio.run(runner.main()) == 1
+    assert time.monotonic() - started < 0.15
+    assert process.terminated is True
+    assert process.killed is True
+    assert all(timeout is not None for timeout in process.join_timeouts)
+    assert capsys.readouterr().err == (
+        "ERROR: guarded report timed out after 0.01s in phase=report_writer "
+        "provider=ollama model=default\n"
+    )
+
+
+@pytest.mark.asyncio
+async def test_force_exit_clears_guarded_outputs_when_kill_is_ineffective(
+    tmp_path,
+    monkeypatch,
+):
+    _evidence_ready(tmp_path)
+    _passed_artifacts(tmp_path)
+    (tmp_path / "report_sections.json").write_text("{}")
+    for name in ("report_data.json", "drug_report_render.json"):
+        (tmp_path / name).write_text("stale")
+    staging = tmp_path / ".report-sections-stale"
+    staging.mkdir()
+    process = _KillIneffectiveProcess(tmp_path)
+    monkeypatch.setattr(runner, "parse_args", lambda: _args(tmp_path, request_timeout_seconds=0.001, run_timeout_seconds=0.01))
+    monkeypatch.setattr(runner, "_process_context", lambda: _ProcessContext(process))
+    monkeypatch.setattr(runner, "_force_exit", lambda: (_ for _ in ()).throw(_ForcedExit()))
+
+    with pytest.raises(_ForcedExit):
+        await runner.main()
+
+    assert process.terminated is True
+    assert process.killed is True
+    assert not any(
+        (tmp_path / name).exists()
+        for name in (*runner.REQUIRED_GUARDED_ARTIFACTS, "report_sections.json", "report_data.json", "drug_report_render.json")
+    )
+    assert not staging.exists()
 
 
 @pytest.mark.parametrize(

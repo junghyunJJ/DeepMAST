@@ -33,6 +33,30 @@ _HYBRID_PREPUBLICATION_ARTIFACTS = (
 )
 
 
+def clear_guarded_report_run_artifacts(data_dir: str | Path) -> None:
+    """Remove guarded-run outputs while preserving evidence inputs."""
+    from src.agents.drug_target.report_guardrails import (
+        _resolve_safe_run_dir,
+        clear_derived_report_artifacts,
+    )
+
+    run_dir = _resolve_safe_run_dir(data_dir)
+    clear_derived_report_artifacts(
+        run_dir,
+        include_audits=True,
+        include_sources=True,
+    )
+    for name in _HYBRID_PREPUBLICATION_ARTIFACTS:
+        path = run_dir / name
+        for candidate in (path, path.with_suffix(f"{path.suffix}.tmp")):
+            candidate.unlink(missing_ok=True)
+    for staging_dir in run_dir.glob(".report-sections-*"):
+        if staging_dir.is_dir() and not staging_dir.is_symlink():
+            shutil.rmtree(staging_dir)
+        else:
+            staging_dir.unlink(missing_ok=True)
+
+
 class _DrugReportRunDirectoryMiddleware(AgentMiddleware):
     """Shared fail-closed run-directory cleanup boundary."""
 
@@ -48,13 +72,7 @@ class _DrugReportRunDirectoryMiddleware(AgentMiddleware):
         return _resolve_safe_run_dir(self._data_dir)
 
     def _clear_for_new_run(self) -> None:
-        from src.agents.drug_target.report_guardrails import clear_derived_report_artifacts
-
-        clear_derived_report_artifacts(
-            self._require_data_dir(),
-            include_audits=True,
-            include_sources=True,
-        )
+        clear_guarded_report_run_artifacts(self._require_data_dir())
 
     def before_agent(self, state: Any, runtime: Any) -> None:
         self._clear_for_new_run()
@@ -67,19 +85,6 @@ class _DrugReportRunDirectoryMiddleware(AgentMiddleware):
 
 class DrugReportRunCleanupMiddleware(_DrugReportRunDirectoryMiddleware):
     """Clear stale guarded-run artifacts before top-level orchestration begins."""
-
-    def _clear_for_new_run(self) -> None:
-        super()._clear_for_new_run()
-        run_dir = self._require_data_dir()
-        for name in _HYBRID_PREPUBLICATION_ARTIFACTS:
-            path = run_dir / name
-            for candidate in (path, path.with_suffix(f"{path.suffix}.tmp")):
-                candidate.unlink(missing_ok=True)
-        for staging_dir in run_dir.glob(".report-sections-*"):
-            if staging_dir.is_dir() and not staging_dir.is_symlink():
-                shutil.rmtree(staging_dir)
-            else:
-                staging_dir.unlink(missing_ok=True)
 
 
 class DrugReportGuardrailMiddleware(_DrugReportRunDirectoryMiddleware):

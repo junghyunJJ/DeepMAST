@@ -5,10 +5,12 @@
 
 ---
 
-> **Current production contract:** `DrugReportRunCleanupMiddleware -> evidence_assessor -> report_writer -> DrugReportGuardrailMiddleware`. Production Section 4 is in `drug.md`; success needs two audits and seven artifacts including `drug_report_validation_final.json`. Configured-directory tools are forced safe, `general-purpose` is blocked, and custom tools are rejected. `legacy_hypothesis` is the explicit outer-super-graph/finalizer compatibility path; guarded runners are writer-only, E2E, and BC.
+> **Current production contract:** `DrugReportRunCleanupMiddleware -> evidence_assessor -> report_writer -> DrugReportGuardrailMiddleware`. Production Section 4 is in `drug.md`; success needs two audits and seven artifacts including `drug_report_validation_final.json`. Configured-directory tools are forced safe, `general-purpose` is blocked, and custom tools are rejected. `legacy_hypothesis` is the explicit outer-super-graph/finalizer compatibility path. Full-agent, E2E, and BC paths are production entrypoints; `run_report_writer_only.py` is diagnostic-only.
 
 **Production entrypoints**: construct `create_drug_target_agent` directly with
-`workflow_mode="guarded_report"`, or run `run_report_writer_only.py`, `run_drug_target_e2e.py`, and `run_drug_target_agent_bc.py`.
+`workflow_mode="guarded_report"`, or run `run_drug_target_e2e.py` and
+`run_drug_target_agent_bc.py`. `run_report_writer_only.py` only diagnoses the
+canonical writer against existing evidence.
 
 **Legacy compatibility wrapper integration**: `integration.py` invokes
 `drug_target_graph.ainvoke(...)`, whose graph forces `legacy_hypothesis`; it is
@@ -25,13 +27,17 @@ identified from spatial transcriptomics cell-cell interaction (CCI) analysis.
 create_drug_target_agent (guarded_report)
   DrugReportRunCleanupMiddleware
     └── evidence_assessor   ← 3-stage funnel + inline rubric
-    └── report_writer       ← direct target_assessment.json + drug.md
+    └── report_writer       ← authors report_sections.json
           └── DrugReportGuardrailMiddleware
-                validate/repair → Part 4/HTML → two audits/seven artifacts
+                validate/repair → deterministic Jinja target_assessment.json + drug.md
+                → Part 4/HTML → two audits/seven artifacts
 ```
 
-`evidence_assessor` runs the staged funnel. `report_writer` is the sole production
-author. The guardrail owns post-write output rather than an outer graph node.
+`evidence_assessor` runs the staged funnel. `report_writer` authors only
+`report_sections.json`; deterministic Jinja rendering owns
+`target_assessment.json` and `drug.md`. The guardrail owns post-write output
+rather than an outer graph node. `request_timeout_seconds` is forwarded to
+supported provider clients when supplied; omitted values retain provider defaults.
 
 ### Input / Output
 
@@ -41,8 +47,9 @@ author. The guardrail owns post-write output rather than an outer graph node.
 | Input | `targets.json` (optional) | User-selected interest cell types |
 | Input | `selected_top3_lr.json` (optional/legacy) | Legacy top-3 selection |
 | Output | `evidence/*.json` | Per-stage, per-pair/gene evidence files |
-| Output | `target_assessment.json` | Structured JSON contract |
-| Output | `drug.md` | Publication-quality markdown report |
+| Output | `report_sections.json` | Report-writer-authored structured sections |
+| Output | `target_assessment.json` | Deterministic Jinja structured JSON contract |
+| Output | `drug.md` | Deterministically rendered publication-quality markdown report |
 
 ### Workflow Order
 

@@ -269,6 +269,13 @@ class DrugTargetConfig:
                 dict[str, BaseChatModel | str] | None,
                 load_subagent_models_from_env(model_names),
             )
+        if self.workflow_mode == "guarded_report" and (
+            self.subagent_models and "report_writer" in self.subagent_models
+        ):
+            raise ValueError(
+                "guarded_report does not support subagent_models['report_writer']; "
+                "set DrugTargetConfig.model instead"
+            )
 
 
 def _create_docker_backend(

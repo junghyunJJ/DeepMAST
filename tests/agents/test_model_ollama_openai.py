@@ -14,7 +14,41 @@ from unittest.mock import MagicMock, patch
 import pytest
 from langchain_openai import ChatOpenAI
 
-from src.agents.model import create_llm, create_llm_from_config, create_ollama_openai_llm
+from src.agents.model import (
+    create_claude_llm,
+    create_llm,
+    create_llm_from_config,
+    create_openai_llm,
+    create_openrouter_llm,
+    create_ollama_openai_llm,
+)
+
+
+def test_openai_timeout_is_forwarded_only_when_explicit() -> None:
+    with patch("src.agents.model.ChatOpenAI", autospec=True) as mock_chatopenai:
+        mock_chatopenai.return_value = MagicMock(spec=ChatOpenAI)
+        create_openai_llm(request_timeout=45.0)
+        assert mock_chatopenai.call_args.kwargs["request_timeout"] == 45.0
+        create_openai_llm()
+        assert "request_timeout" not in mock_chatopenai.call_args.kwargs
+
+
+def test_claude_timeout_is_forwarded_only_when_explicit() -> None:
+    with patch("src.agents.model.ChatAnthropic", autospec=True) as mock_chatanthropic:
+        mock_chatanthropic.return_value = MagicMock()
+        create_claude_llm(request_timeout=45.0)
+        assert mock_chatanthropic.call_args.kwargs["timeout"] == 45.0
+        create_claude_llm()
+        assert "timeout" not in mock_chatanthropic.call_args.kwargs
+
+
+def test_openrouter_timeout_is_forwarded_only_when_explicit() -> None:
+    with patch("src.agents.model.ChatOpenAI", autospec=True) as mock_chatopenai:
+        mock_chatopenai.return_value = MagicMock(spec=ChatOpenAI)
+        create_openrouter_llm(request_timeout=45.0)
+        assert mock_chatopenai.call_args.kwargs["request_timeout"] == 45.0
+        create_openrouter_llm()
+        assert "request_timeout" not in mock_chatopenai.call_args.kwargs
 
 
 # ---------------------------------------------------------------------------

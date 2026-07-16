@@ -11,6 +11,8 @@ import ast
 from pathlib import Path
 from unittest.mock import MagicMock
 
+import pytest
+
 from src.agents.drug_target import agent
 
 
@@ -222,3 +224,11 @@ def test_unset_timeout_is_omitted_from_guarded_report_construction(
     assert captured["llm_kwargs"] == {"provider": "ollama-openai"}
     assert "report_writer_model" not in captured["subagent_kwargs"]
     assert "report_writer_request_timeout_seconds" not in captured["subagent_kwargs"]
+
+
+def test_guarded_config_rejects_report_writer_subagent_override() -> None:
+    with pytest.raises(ValueError, match=r"DrugTargetConfig\.model"):
+        agent.DrugTargetConfig(
+            workflow_mode="guarded_report",
+            subagent_models={"report_writer": MagicMock()},
+        )

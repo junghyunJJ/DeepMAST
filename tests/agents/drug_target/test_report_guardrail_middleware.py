@@ -18,6 +18,7 @@ from src.agents.drug_target.middleware import (
     DrugReportRunCleanupMiddleware,
     DrugTargetManagedFilesystemGuardMiddleware,
     DrugTargetTaskAllowlistMiddleware,
+    clear_guarded_report_run_artifacts,
 )
 from src.agents.drug_target.production_report_tools import (
     production_assessment_evidence_tool,
@@ -840,6 +841,39 @@ def test_top_level_cleanup_before_agent_removes_guarded_stale_artifacts_but_keep
     assert (evidence / "hypothesis_report.json").read_text(encoding="utf-8") == "legacy"
     assert (evidence / "report_data.json").read_text(encoding="utf-8") == "legacy"
     assert not (tmp_path / "report_data.json").exists()
+
+
+def test_public_guarded_run_cleanup_removes_hybrid_temporary_and_staging_outputs(
+    tmp_path: Path,
+) -> None:
+    _seed_managed(tmp_path)
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    (evidence / "keep.json").write_text("evidence", encoding="utf-8")
+    for name in (REPORT_SECTIONS_FILENAME, "report_data.json", "drug_report_render.json"):
+        path = tmp_path / name
+        path.write_text("stale", encoding="utf-8")
+        path.with_suffix(f"{path.suffix}.tmp").write_text("temporary", encoding="utf-8")
+    staging = tmp_path / ".report-sections-stale"
+    staging.mkdir()
+    (staging / "partial.json").write_text("stale", encoding="utf-8")
+
+    clear_guarded_report_run_artifacts(tmp_path)
+
+    assert (evidence / "keep.json").read_text(encoding="utf-8") == "evidence"
+    for name in (
+        *report_guardrails.PUBLICATION_ARTIFACTS,
+        *report_guardrails.GUARDRAIL_AUDIT_ARTIFACTS,
+        "drug.md",
+        "target_assessment.json",
+        REPORT_SECTIONS_FILENAME,
+        "report_data.json",
+        "drug_report_render.json",
+    ):
+        path = tmp_path / name
+        assert not path.exists()
+        assert not path.with_suffix(f"{path.suffix}.tmp").exists()
+    assert not staging.exists()
 
 
 def test_top_level_cleanup_removes_stale_hybrid_artifacts_but_post_writer_guardrail_keeps_new_sections(

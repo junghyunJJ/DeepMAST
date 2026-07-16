@@ -1,15 +1,16 @@
 # Drug Target Assessment Agent -- Comprehensive Reference
 
 > **Source of truth**: `src/agents/drug_target/` codebase
-> **Last verified**: 2026-07-16 (guarded hybrid report-writer production path)
+> **Last updated**: 2026-07-16 (guarded hybrid report-writer production path)
 > **Related**: `drug_target_stage_guide.md` (stage-level detail), `output_schema.json` (JSON contract)
 
 ---
 
-> **Current production contract:** `evidence_assessor -> report_writer -> DrugReportGuardrailMiddleware -> guarded publication`. The writer owns only canonical `report_sections.json`; Jinja renders `drug.md` and the other pre-publication artifacts. Success requires valid initial/final audits plus Part 4 and HTML publication artifacts. Tools are forced to the configured directory, DeepAgents `general-purpose` is blocked, and custom tools are rejected. The guarded runners are `run_report_writer_only.py`, `run_drug_target_e2e.py`, and `run_drug_target_agent_bc.py`. `legacy_hypothesis` is the only outer-super-graph/finalizer compatibility path.
+> **Current production contract:** `evidence_assessor -> report_writer -> DrugReportGuardrailMiddleware -> guarded publication`. The writer owns only canonical `report_sections.json`; Jinja renders `drug.md` and the other pre-publication artifacts. Success requires valid initial/final audits plus Part 4 and HTML publication artifacts. Tools are forced to the configured directory, DeepAgents `general-purpose` is blocked, and custom tools are rejected. Full-agent, E2E, and BC paths are production entrypoints; `run_report_writer_only.py` is diagnostic-only. `legacy_hypothesis` is the only outer-super-graph/finalizer compatibility path.
 
 **Production entrypoints**: construct `create_drug_target_agent` directly with
-`workflow_mode="guarded_report"`, or use `run_report_writer_only.py`, `run_drug_target_e2e.py`, and `run_drug_target_agent_bc.py`.
+`workflow_mode="guarded_report"`, or use `run_drug_target_e2e.py` and
+`run_drug_target_agent_bc.py`. `run_report_writer_only.py` is diagnostic-only.
 
 **Legacy compatibility wrapper integration**: `integration.py` calls
 `drug_target_graph.ainvoke(...)`; that graph forces `legacy_hypothesis` and is
@@ -51,7 +52,10 @@ Production entrypoints
      -> evidence_assessor (configured-run evidence tools)
      -> report_writer (save_report_sections exactly once)
      -> DrugReportGuardrailMiddleware (validate rendered Markdown, repair sections, publish Part 4 + HTML, audit)
-  -> run_report_writer_only.py | run_drug_target_e2e.py | run_drug_target_agent_bc.py
+  -> run_drug_target_e2e.py | run_drug_target_agent_bc.py
+
+Diagnostic-only
+  -> run_report_writer_only.py (existing evidence -> canonical guarded report_writer)
 
 Legacy compatibility wrapper integration (not guarded production)
   -> run_drug_target_assessment(data_dir, disease)    [integration.py]
@@ -131,6 +135,7 @@ Markdown repair remains only for runs without `report_sections.json`.
 |-------|------|---------|-------------|
 | `provider` | str | `"ollama"` | LLM provider |
 | `model` | str\|None | `None` | Optional explicit top-level model; in guarded mode the same constructed model is assigned to `report_writer`. |
+| `request_timeout_seconds` | float\|None | `None` | Optional request timeout; forwarded to supported provider clients (OpenAI, Claude, and OpenRouter) when supplied, otherwise their defaults remain in effect. |
 | `data_dir` | str | env `DEEP_INTERPRETER_DATA_DIR` | Directory with `lr_candidates.json` |
 | `disease` | str | `""` | Disease context injected into system prompt |
 | `use_checkpointer` | bool | `False` | Enable LangGraph memory checkpointer |
@@ -140,7 +145,7 @@ Markdown repair remains only for runs without `report_sections.json`.
 | `enable_progressive_disclosure` | bool | `True` | Expose skills metadata via SkillsMiddleware |
 | `agent_skill_names` | tuple | `("opentargets-database", "gwas-database", "chembl-database")` | Skills exposed to agent |
 | `skills_dir` | str\|None | `None` | Override project skills directory |
-| `subagent_models` | dict\|None | `None` | Per-subagent model overrides (init_chat_model format) |
+| `subagent_models` | dict\|None | `None` | Per-subagent model overrides; guarded mode rejects a `report_writer` override—use `model` for the single report-writer identity. |
 
 > **Legacy compatibility note**: `critic_enabled` and `summarizer_skill_names` config fields were removed in the 2026-05-19 migration. The summarizer subagent no longer exists; explicit `legacy_hypothesis` execution uses the deterministic `finalize_report` LangGraph node. Guarded production uses `report_writer` plus `DrugReportGuardrailMiddleware` instead.
 
@@ -567,6 +572,7 @@ Several scripts are available in `scripts/`:
 |--------|---------|
 | `run_drug_target_agent_bc.py` | Run agent for breast cancer |
 | `run_drug_target_e2e.py` | End-to-end agent execution |
+| `run_report_writer_only.py` | Diagnostic-only guarded writer run over existing evidence |
 | `run_stage2_parquet.py` | Stage 2 only (parquet mode) |
 | `run_stage2_recompute.py` | Recompute Stage 2 evidence |
 | `run_stage12_bc_ollama.py` | Stage 1+2 with Ollama provider |
@@ -578,7 +584,6 @@ Several scripts are available in `scripts/`:
 config = DrugTargetConfig(
     subagent_models={
         "evidence_assessor": "openai:gpt-4.1",
-        "report_writer": "openai:gpt-4.1-mini",
     }
 )
 ```
@@ -586,8 +591,11 @@ config = DrugTargetConfig(
 Or via environment variables:
 ```bash
 export SUBAGENT_EVIDENCE_ASSESSOR_PROVIDER="openai:gpt-4.1"
-export SUBAGENT_REPORT_WRITER_PROVIDER="openai:gpt-4.1-mini"
 ```
+
+In guarded mode, select the report writer with `DrugTargetConfig.model`; a
+`subagent_models["report_writer"]` override is rejected so authoring, repair,
+and Part 4 use one explicit model identity.
 
 ### 7.4 Supported Ollama guarded smoke invocation (live validation pending)
 
@@ -637,7 +645,8 @@ latency before relabeling this invocation as verified.
 
 The legacy compatibility drug target graph integrates into the DeepMAST wrapper
 pipeline as **Step 9.5** via `integration.py`. Guarded production instead uses
-the direct agent factory or the three canonical guarded runners listed above:
+the direct agent factory or the two full-agent runners listed above;
+`run_report_writer_only.py` remains diagnostic-only:
 
 ```python
 @tool
