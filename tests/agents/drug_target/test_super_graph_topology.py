@@ -1,65 +1,122 @@
-"""#18b — AC4 + CP-P0-009: Super-graph topology and messages contract.
-
-1. Node set includes run_deep_agent, validate_and_maybe_retry_hypothesis,
-   and finalize_report.
-2. Edges: START→run_deep_agent,
-   run_deep_agent→validate_and_maybe_retry_hypothesis,
-   validate_and_maybe_retry_hypothesis→finalize_report|END,
-   finalize_report→END.
-3. Messages contract: only the last AIMessage survives after run_deep_agent.
-"""
+"""Production direct-agent topology plus legacy super-graph compatibility."""
 
 from __future__ import annotations
 
+import importlib
 import threading
+from contextlib import contextmanager
+from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
 
 # ---------------------------------------------------------------------------
-# Topology assertions
+# Production topology and documentation
 # ---------------------------------------------------------------------------
 
 
-def test_graph_contains_required_nodes() -> None:
-    """graph must expose required drug-target super-graph node IDs."""
-    from src.agents.drug_target.graph_builder import drug_target_graph
+@contextmanager
+def _reloaded_guarded_export(monkeypatch, environment: dict[str, str | None]):
+    """Reload graph_builder against an offline direct-agent factory."""
+    import dotenv
 
-    compiled = drug_target_graph.get_graph()
-    node_ids = set(compiled.nodes.keys())
+    from src.agents.drug_target import agent
 
-    assert "run_deep_agent" in node_ids, f"run_deep_agent missing from {node_ids}"
-    assert "validate_and_maybe_retry_hypothesis" in node_ids, (
-        f"validate_and_maybe_retry_hypothesis missing from {node_ids}"
-    )
-    assert "finalize_report" in node_ids, f"finalize_report missing from {node_ids}"
+    graph_builder = importlib.import_module("src.agents.drug_target.graph_builder")
+    configs = []
+    create_kwargs = []
+    real_factory = agent.create_drug_target_agent
+
+    class FakeRunnable:
+        def with_config(self, _config):
+            return self
+
+        def get_graph(self):
+            return SimpleNamespace(nodes={"direct_agent": object()})
+
+    def fake_create_deep_agent(**kwargs):
+        create_kwargs.append(kwargs)
+        return FakeRunnable()
+
+    def record_config(config):
+        configs.append(config)
+        return real_factory(config)
+
+    with monkeypatch.context() as local:
+        local.setattr(dotenv, "load_dotenv", lambda: False)
+        local.setattr(agent, "create_llm", lambda **_kwargs: object())
+        local.setattr(agent, "create_deep_agent", fake_create_deep_agent)
+        local.setattr(agent, "create_drug_target_agent", record_config)
+        for name, value in environment.items():
+            if value is None:
+                local.delenv(name, raising=False)
+            else:
+                local.setenv(name, value)
+        importlib.reload(graph_builder)
+        yield graph_builder, configs, create_kwargs
+
+    with monkeypatch.context() as local:
+        local.setattr(dotenv, "load_dotenv", lambda: False)
+        importlib.reload(graph_builder)
+    graph_builder.load_dotenv = dotenv.load_dotenv
 
 
-def test_graph_edges_include_required_transitions() -> None:
-    """Graph must validate hypothesis quality before finalization."""
-    from langgraph.graph import END, START
+def test_production_export_is_direct_deep_agent_runnable(monkeypatch) -> None:
+    with _reloaded_guarded_export(monkeypatch, {}) as (graph_builder, _, _):
+        node_ids = set(graph_builder.drug_target_graph.get_graph().nodes)
 
-    from src.agents.drug_target.graph_builder import drug_target_graph
+        assert "run_deep_agent" not in node_ids
+        assert "validate_and_maybe_retry_hypothesis" not in node_ids
+        assert "finalize_report" not in node_ids
 
-    compiled = drug_target_graph.get_graph()
-    edges = [(e.source, e.target) for e in compiled.edges]
 
-    assert (START, "run_deep_agent") in edges, f"Missing START→run_deep_agent in {edges}"
-    assert ("run_deep_agent", "validate_and_maybe_retry_hypothesis") in edges, (
-        f"Missing run_deep_agent→validate_and_maybe_retry_hypothesis in {edges}"
-    )
-    assert ("validate_and_maybe_retry_hypothesis", "finalize_report") in edges, (
-        f"Missing validate_and_maybe_retry_hypothesis→finalize_report in {edges}"
-    )
-    assert ("validate_and_maybe_retry_hypothesis", END) in edges, (
-        f"Missing validate_and_maybe_retry_hypothesis→END in {edges}"
-    )
-    assert ("finalize_report", END) in edges, f"Missing finalize_report→END in {edges}"
+def test_production_export_uses_environment_guarded_configuration(monkeypatch) -> None:
+    with _reloaded_guarded_export(
+        monkeypatch,
+        {"LLM_PROVIDER": "google", "DRUG_TARGET_DISEASE": "IPF"},
+    ) as (_, configs, create_kwargs):
+        assert configs[0].provider == "google"
+        assert configs[0].disease == "IPF"
+        assert configs[0].workflow_mode == "guarded_report"
+        assert create_kwargs
+
+    with _reloaded_guarded_export(
+        monkeypatch,
+        {"LLM_PROVIDER": None, "DRUG_TARGET_DISEASE": None},
+    ) as (_, configs, create_kwargs):
+        assert configs[0].provider == "openrouter"
+        assert configs[0].disease == ""
+        assert configs[0].workflow_mode == "guarded_report"
+        system_prompt = create_kwargs[0]["system_prompt"]
+        assert "load_lr_candidates(data_dir=" in system_prompt
+        assert "disease=" not in system_prompt
+
+
+def test_production_docs_describe_guarded_report_path() -> None:
+    root = Path(__file__).parents[3]
+    texts = [
+        (root / "src/agents/drug_target" / name).read_text(encoding="utf-8")
+        for name in ("__init__.py", "graph_builder.py", "integration.py")
+    ]
+    for production_doc in texts:
+        for term in (
+            "evidence_assessor",
+            "report_writer",
+            "DrugReportGuardrailMiddleware",
+        ):
+            assert term in production_doc
+        for obsolete_description in (
+            "3 top-level subagents",
+            "hypothesis_writer -> summarizer",
+            "START -> run_deep_agent -> finalize_report",
+        ):
+            assert obsolete_description not in production_doc
 
 
 # ---------------------------------------------------------------------------
-# Messages contract (CP-P0-009)
+# Legacy compatibility super-graph contract (not production topology)
 # ---------------------------------------------------------------------------
 
 

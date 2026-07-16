@@ -1,8 +1,8 @@
-"""Reporter integration tool for Drug Target Assessment Agent.
+"""Reporter integration tool for the guarded direct Drug Target agent.
 
-Provides run_drug_target_assessment() as a single @tool that the Reporter
-subagent calls to delegate the entire Step 9.5 drug target assessment
-to the DrugTargetAgent super-graph.
+Each call creates an ``evidence_assessor``/``report_writer`` agent with
+``DrugReportGuardrailMiddleware``. Success requires a passed final audit and
+all seven report, publication, and audit artifacts.
 """
 
 import asyncio
@@ -11,26 +11,30 @@ import logging
 import os
 import uuid
 from pathlib import Path
+from typing import cast
 
 from langchain_core.tools import tool
 
 logger = logging.getLogger(__name__)
 
-# NOTE: drug_target_graph is imported lazily inside run_drug_target_assessment()
-# to break the circular import chain:
-# deep_interpreter.subagents.configs → drug_target.integration
-#   → drug_target.graph_builder → drug_target.super_graph (cycle)
+_SUCCESS_ARTIFACTS = (
+    "drug.md",
+    "target_assessment.json",
+    "part4_candidate_selection.json",
+    "part4_therapeutic_synthesis.md",
+    "drug_report.html",
+    "drug_report_validation_initial.json",
+    "drug_report_validation_final.json",
+)
 
 
 @tool
 async def run_drug_target_assessment(data_dir: str, disease: str) -> str:
     """Run the Drug Target Assessment agent on lr_candidates.json.
 
-    Delegates the full therapeutic target assessment to the drug-target
-    super-graph (START → run_deep_agent → finalize_report → END), which
-    uses 2 top-level subagents (evidence_assessor, hypothesis_writer) to
-    gather evidence, score targets, generate hypotheses, and produce an
-    audited drug.md via the deterministic finalize_report node.
+    Builds a guarded direct agent for this data directory, asks it to run the
+    assessment, and returns success only after its final audit and every
+    required report/publication artifact pass the completion gate.
 
     Args:
         data_dir: Directory containing lr_candidates.json
@@ -61,56 +65,85 @@ async def run_drug_target_assessment(data_dir: str, disease: str) -> str:
                 "Temporarily set DISABLE_RUN_COMPRESSION for drug-target runtime"
             )
 
-        # Lazy import to break circular dependency
-        from src.agents.drug_target.graph_builder import drug_target_graph
-
-        initial_state = {
-            "messages": [],
-            "data_dir": resolved_dir,
-            "disease": disease,
-            "featured_lr_pairs": None,
-            "report_finalization_error": None,
-            "evidence_truncated": False,
-        }
-
-        # recursion_limit is a top-level RunnableConfig key (NOT under configurable).
-        final_state = await drug_target_graph.ainvoke(
-            initial_state,
-            config={
-                "recursion_limit": 10000,
-                "configurable": {"thread_id": str(uuid.uuid4())},
-            },
+        # Lazy imports preserve the Reporter integration circular-import boundary.
+        from src.agents.drug_target.agent import (
+            DrugTargetConfig,
+            Provider,
+            create_drug_target_agent,
         )
+        from src.agents.drug_target.report_guardrails import clear_derived_report_artifacts
 
-        finalization_error: str | None = final_state.get("report_finalization_error")
-        evidence_truncated: bool = final_state.get("evidence_truncated", False)
+        await asyncio.to_thread(
+            clear_derived_report_artifacts,
+            resolved_dir,
+            include_audits=True,
+            include_sources=True,
+        )
+        config = DrugTargetConfig(
+            provider=cast(Provider, os.getenv("LLM_PROVIDER", "openrouter")),
+            data_dir=resolved_dir,
+            disease=disease,
+            use_checkpointer=False,
+            workflow_mode="guarded_report",
+        )
+        agent, backend = await asyncio.to_thread(create_drug_target_agent, config)
+        try:
+            await agent.ainvoke(
+                {
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": (
+                                f"Run the drug-target assessment for {disease}. "
+                                f"Data directory: {resolved_dir}."
+                            ),
+                        }
+                    ]
+                },
+                config={
+                    "recursion_limit": 10000,
+                    "configurable": {"thread_id": str(uuid.uuid4())},
+                },
+            )
+        finally:
+            cleanup = getattr(backend, "cleanup", None)
+            if callable(cleanup):
+                await asyncio.to_thread(cleanup)
 
-        if finalization_error is not None:
-            envelope = {
+        final_audit_raw = await asyncio.to_thread(
+            (Path(resolved_dir) / "drug_report_validation_final.json").read_text,
+            encoding="utf-8",
+        )
+        final_audit = json.loads(final_audit_raw)
+        publication = final_audit.get("publication", {}) if isinstance(final_audit, dict) else {}
+        if (
+            not isinstance(final_audit, dict)
+            or final_audit.get("valid") is not True
+            or not isinstance(publication, dict)
+            or publication.get("status") != "passed"
+        ):
+            return json.dumps({
                 "success": False,
                 "drug_md": None,
                 "target_assessment": None,
-                "errors": [finalization_error],
-                "evidence_truncated": evidence_truncated,
-            }
-        else:
-            drug_md_path = Path(resolved_dir) / "drug.md"
-            target_assessment_path = Path(resolved_dir) / "target_assessment.json"
-            drug_md = await asyncio.to_thread(drug_md_path.read_text, encoding="utf-8")
-            target_assessment_raw = await asyncio.to_thread(
-                target_assessment_path.read_text,
+                "errors": ["drug-target final audit did not pass publication"],
+                "evidence_truncated": False,
+            })
+
+        artifact_texts = {
+            name: await asyncio.to_thread(
+                (Path(resolved_dir) / name).read_text,
                 encoding="utf-8",
             )
-            target_assessment = json.loads(target_assessment_raw)
-            envelope = {
-                "success": True,
-                "drug_md": drug_md,
-                "target_assessment": target_assessment,
-                "errors": [],
-                "evidence_truncated": evidence_truncated,
-            }
-
-        return json.dumps(envelope, ensure_ascii=False)
+            for name in _SUCCESS_ARTIFACTS
+        }
+        return json.dumps({
+            "success": True,
+            "drug_md": artifact_texts["drug.md"],
+            "target_assessment": json.loads(artifact_texts["target_assessment.json"]),
+            "errors": [],
+            "evidence_truncated": False,
+        }, ensure_ascii=False)
 
     except Exception as exc:
         logger.error("Drug target assessment failed: %s", exc, exc_info=True)

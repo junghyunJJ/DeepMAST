@@ -6,9 +6,7 @@ Called as a tool from the Reporter subagent.
 Architecture:
     Reporter subagent
       -> run_drug_target_assessment() tool
-        -> DrugTargetAgent (3 top-level subagents)
-             evidence_assessor -> hypothesis_writer -> summarizer
-               summarizer: report_writer -> critic repair loop
+        -> evidence_assessor -> report_writer -> DrugReportGuardrailMiddleware
 
 Input: lr_candidates.json (top-30 L-R pairs) + disease context
 Output: drug.md (markdown for HTML report integration)

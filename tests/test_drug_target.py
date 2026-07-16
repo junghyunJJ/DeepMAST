@@ -5414,7 +5414,7 @@ class TestIntegration:
 
     @pytest.mark.asyncio
     async def test_run_drug_target_assessment_with_mock_agent(self, mock_data_dir):
-        """Full integration: mock super-graph writes drug.md, integration reads envelope."""
+        """Full integration constructs a guarded direct agent per tool call."""
         from src.agents.drug_target.integration import run_drug_target_assessment
 
         mock_report = "# Drug Target Assessment\n\n## Executive Summary\nMock report."
@@ -5424,25 +5424,35 @@ class TestIntegration:
             "featured_candidates_deep_dive": [],
         }
 
-        # Simulate the super-graph writing artifacts and returning final_state
-        async def mock_graph_ainvoke(initial_state, config=None):
+        async def mock_agent_ainvoke(payload, config=None):
             (mock_data_dir / "drug.md").write_text(mock_report, encoding="utf-8")
             (mock_data_dir / "target_assessment.json").write_text(
                 json.dumps(mock_json), encoding="utf-8"
             )
-            return {
-                "messages": [],
-                "report_finalization_error": None,
-                "evidence_truncated": False,
-            }
+            (mock_data_dir / "part4_candidate_selection.json").write_text(
+                json.dumps({"selected_lr_pairs": []}), encoding="utf-8"
+            )
+            (mock_data_dir / "part4_therapeutic_synthesis.md").write_text(
+                "# Part 4\n", encoding="utf-8"
+            )
+            (mock_data_dir / "drug_report.html").write_text(
+                "<html></html>", encoding="utf-8"
+            )
+            audit = json.dumps({"valid": True, "publication": {"status": "passed"}})
+            (mock_data_dir / "drug_report_validation_initial.json").write_text(
+                audit, encoding="utf-8"
+            )
+            (mock_data_dir / "drug_report_validation_final.json").write_text(
+                audit, encoding="utf-8"
+            )
+            return {"messages": []}
 
-        mock_graph = MagicMock()
-        mock_graph.ainvoke = mock_graph_ainvoke
+        mock_agent = MagicMock()
+        mock_agent.ainvoke = mock_agent_ainvoke
 
-        # Patch at graph_builder — integration.py lazy-imports from there at call time
         with patch(
-            "src.agents.drug_target.graph_builder.drug_target_graph",
-            mock_graph,
+            "src.agents.drug_target.agent.create_drug_target_agent",
+            return_value=(mock_agent, None),
         ):
             raw = await run_drug_target_assessment.ainvoke({
                 "data_dir": str(mock_data_dir),

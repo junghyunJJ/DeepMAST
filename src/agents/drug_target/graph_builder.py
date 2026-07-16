@@ -1,34 +1,52 @@
-"""Graph builder for Drug Target Assessment Agent.
+"""Direct guarded Drug Target runnable for LangGraph deployment.
 
-Provides LangGraph CLI integration for standalone testing and deployment.
-
-Graph: DrugTarget — drug target assessment super-graph
-Topology: START → run_deep_agent → finalize_report → END
-
-Invocation contract (HARD — per Decision 1 / CP-P1-014):
-    ``recursion_limit`` is a TOP-LEVEL ``RunnableConfig`` key, NOT nested
-    under ``configurable``.  Callers MUST use::
-
-        await drug_target_graph.ainvoke(
-            initial_state,
-            config={
-                "recursion_limit": cfg.recursion_limit,
-                "configurable": {"thread_id": "..."},
-            },
-        )
-
-    Passing ``recursion_limit`` inside ``configurable`` is silently ignored
-    by LangGraph 0.3+ and will cause the graph to use the default limit.
+The production agent dispatches ``evidence_assessor`` then ``report_writer``;
+``DrugReportGuardrailMiddleware`` validates and publishes the report. Callers
+keep ``recursion_limit`` at the top level of ``RunnableConfig``.
 """
 
+import os
+from typing import cast
+
 from dotenv import load_dotenv
+from langchain_core.runnables import Runnable
+
+from src.agents.drug_target.agent import (
+    DrugTargetConfig,
+    Provider,
+    create_drug_target_agent,
+)
 
 load_dotenv()
 
-from src.agents.drug_target.super_graph import build_drug_target_super_graph  # noqa: E402
+
+def create_drug_target_graph(
+    *,
+    provider: Provider = "openrouter",
+    data_dir: str = "",
+    disease: str = "",
+    use_checkpointer: bool = False,
+) -> Runnable:
+    """Build the guarded direct agent for one configured workspace."""
+    resolved_data_dir = data_dir or os.getenv(
+        "DRUG_TARGET_DATA_DIR",
+        os.getenv("DEEP_INTERPRETER_DATA_DIR", "/tmp/deep_interpreter_workspace"),
+    )
+    agent, _backend = create_drug_target_agent(
+        DrugTargetConfig(
+            provider=provider,
+            data_dir=resolved_data_dir,
+            disease=disease,
+            use_checkpointer=use_checkpointer,
+            workflow_mode="guarded_report",
+        )
+    )
+    return agent
 
 
-# LangGraph CLI export — langgraph.json entry path:
-#   "DrugTarget": "src.agents.drug_target.graph_builder:drug_target_graph"
-# Symbol name MUST stay ``drug_target_graph`` (langgraph.json depends on it).
-drug_target_graph = build_drug_target_super_graph()
+# LangGraph CLI export — langgraph.json depends on this symbol name.
+drug_target_graph = create_drug_target_graph(
+    provider=cast(Provider, os.getenv("LLM_PROVIDER", "openrouter")),
+    disease=os.getenv("DRUG_TARGET_DISEASE", ""),
+    use_checkpointer=False,
+)
