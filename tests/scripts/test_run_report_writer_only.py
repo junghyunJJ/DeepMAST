@@ -1,26 +1,53 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
+import inspect
 import json
+import sys
 
 import pytest
 
-from scripts import run_report_writer_only as runner
 from scripts import run_drug_target_agent_bc as bc_runner
 from scripts import run_drug_target_e2e as e2e_runner
+from scripts import run_report_writer_only as runner
 
 
-class _Agent:
-    async def ainvoke(self, *_args, **_kwargs):
+class _Writer:
+    def __init__(self, callback=None) -> None:
+        self.calls: list[dict[str, object]] = []
+        self.callback = callback
+
+    async def ainvoke(self, writer_input):
+        self.calls.append(writer_input)
+        if self.callback:
+            self.callback()
         return {"messages": []}
 
 
-class _Backend:
+class _HangingWriter:
     def __init__(self) -> None:
-        self.cleaned = False
+        self.cancelled = False
 
-    def cleanup(self) -> None:
-        self.cleaned = True
+    async def ainvoke(self, _writer_input):
+        try:
+            await asyncio.sleep(60)
+        except asyncio.CancelledError:
+            self.cancelled = True
+            raise
+
+
+def _args(path, **overrides):
+    values = {
+        "data_dir": str(path),
+        "disease": "breast cancer",
+        "provider": "ollama",
+        "model": None,
+        "request_timeout_seconds": 600.0,
+        "run_timeout_seconds": 1800.0,
+    }
+    values.update(overrides)
+    return argparse.Namespace(**values)
 
 
 def _evidence_ready(path):
@@ -62,54 +89,156 @@ def test_guarded_runner_predicate_rejects_published_alias_and_is_shared(tmp_path
     assert bc_runner.guarded_run_succeeded is runner.guarded_run_succeeded
 
 
+def test_parse_args_has_bounded_deadline_defaults(monkeypatch):
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["run_report_writer_only.py", "--data-dir", "run", "--disease", "breast cancer"],
+    )
+
+    args = runner.parse_args()
+
+    assert args.request_timeout_seconds == 600.0
+    assert args.run_timeout_seconds == 1800.0
+
+
+@pytest.mark.parametrize(
+    ("request_timeout_seconds", "run_timeout_seconds"),
+    [(0, 1800), (600, 0), (1800, 1800), (1801, 1800)],
+)
+def test_timeout_validation_rejects_invalid_deadlines(
+    tmp_path,
+    request_timeout_seconds,
+    run_timeout_seconds,
+):
+    with pytest.raises(ValueError):
+        runner._validate_timeouts(
+            _args(
+                tmp_path,
+                request_timeout_seconds=request_timeout_seconds,
+                run_timeout_seconds=run_timeout_seconds,
+            )
+        )
+
+
 @pytest.mark.asyncio
-async def test_writer_only_uses_guarded_factory_and_audit_gate(tmp_path, monkeypatch):
+async def test_writer_only_requires_evidence_before_creating_writer(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(runner, "parse_args", lambda: _args(tmp_path))
+    monkeypatch.setattr(
+        runner,
+        "create_guarded_report_writer",
+        lambda _config: pytest.fail("writer should not be created"),
+    )
+
+    assert await runner.main() == 1
+    assert capsys.readouterr().out == "ERROR: Not enough evidence files. Run evidence assessment first.\n"
+
+
+@pytest.mark.asyncio
+async def test_writer_only_uses_direct_factory_with_existing_evidence_context_and_no_env_mutation(
+    tmp_path,
+    monkeypatch,
+):
     _evidence_ready(tmp_path)
     seen = {}
-    backend = _Backend()
+    writer = _Writer(callback=lambda: _passed_artifacts(tmp_path))
 
-    def factory(config):
-        seen["config"] = config
-        _passed_artifacts(tmp_path)
-        return _Agent(), backend
+    monkeypatch.setattr(runner, "parse_args", lambda: _args(tmp_path, model="qwen3.5:122b"))
+    monkeypatch.setattr(
+        runner,
+        "create_guarded_report_writer",
+        lambda config: seen.setdefault("config", config) and writer,
+    )
 
-    monkeypatch.setattr(runner, "parse_args", lambda: argparse.Namespace(data_dir=str(tmp_path), disease="IPF", provider="ollama", model=None))
-    monkeypatch.setattr(runner, "create_drug_target_agent", factory)
     assert await runner.main() == 0
-    assert seen["config"].workflow_mode == "guarded_report"
-    assert backend.cleaned
+    assert "DRUG_TARGET_SKIP_EVIDENCE_ASSESSOR" not in inspect.getsource(runner)
+    config = seen["config"]
+    assert config.provider == "ollama"
+    assert config.model == "qwen3.5:122b"
+    assert config.request_timeout_seconds == 600.0
+    assert config.data_dir == str(tmp_path.resolve())
+    assert config.disease == "breast cancer"
+    assert writer.calls == [
+        {
+            "messages": [
+                {
+                    "role": "user",
+                    "content": (
+                        "Render guarded hybrid report from existing evidence. "
+                        f"Data dir: {tmp_path.resolve()}. Disease: breast cancer."
+                    ),
+                }
+            ]
+        }
+    ]
 
 
 @pytest.mark.asyncio
-async def test_writer_only_assigns_model_to_config(tmp_path, monkeypatch):
+async def test_writer_only_clears_stale_outputs_before_direct_writer_runs(tmp_path, monkeypatch):
     _evidence_ready(tmp_path)
-    seen = {}
+    _passed_artifacts(tmp_path)
 
-    def factory(config):
-        seen["config"] = config
-        _passed_artifacts(tmp_path)
-        return _Agent(), _Backend()
+    def assert_stale_outputs_removed():
+        assert not any((tmp_path / name).exists() for name in runner.REQUIRED_GUARDED_ARTIFACTS)
 
+    monkeypatch.setattr(runner, "parse_args", lambda: _args(tmp_path))
+    monkeypatch.setattr(
+        runner,
+        "create_guarded_report_writer",
+        lambda _config: _Writer(callback=assert_stale_outputs_removed),
+    )
+
+    assert await runner.main() == 1
+
+
+@pytest.mark.asyncio
+async def test_invalid_deadlines_fail_before_writer_creation(tmp_path, monkeypatch, capsys):
+    _evidence_ready(tmp_path)
     monkeypatch.setattr(
         runner,
         "parse_args",
-        lambda: argparse.Namespace(
-            data_dir=str(tmp_path),
-            disease="IPF",
-            provider="ollama-openai",
-            model="qwen3.5:122b",
-        ),
+        lambda: _args(tmp_path, request_timeout_seconds=1800, run_timeout_seconds=1800),
     )
-    monkeypatch.setattr(runner, "create_drug_target_agent", factory)
+    monkeypatch.setattr(
+        runner,
+        "create_guarded_report_writer",
+        lambda _config: pytest.fail("invalid deadlines must stop before writer creation"),
+    )
 
-    assert await runner.main() == 0
-    assert seen["config"].model == "qwen3.5:122b"
+    assert await runner.main() == 1
+    assert "request timeout" in capsys.readouterr().err
 
 
 @pytest.mark.asyncio
-async def test_writer_only_rejects_stale_outputs_from_a_noop_agent(tmp_path, monkeypatch):
+async def test_writer_timeout_cancels_and_rejects_stale_success_artifacts(tmp_path, monkeypatch, capsys):
     _evidence_ready(tmp_path)
     _passed_artifacts(tmp_path)
-    monkeypatch.setattr(runner, "parse_args", lambda: argparse.Namespace(data_dir=str(tmp_path), disease="IPF", provider="ollama", model=None))
-    monkeypatch.setattr(runner, "create_drug_target_agent", lambda _config: (_Agent(), _Backend()))
+    writer = _HangingWriter()
+    monkeypatch.setattr(
+        runner,
+        "parse_args",
+        lambda: _args(tmp_path, request_timeout_seconds=0.001, run_timeout_seconds=0.002),
+    )
+    monkeypatch.setattr(runner, "create_guarded_report_writer", lambda _config: writer)
+
     assert await runner.main() == 1
+    assert writer.cancelled is True
+    assert capsys.readouterr().err == (
+        "ERROR: guarded report timed out after 0.002s in phase=report_writer "
+        "provider=ollama model=default\n"
+    )
+
+
+@pytest.mark.parametrize(
+    ("artifact", "phase"),
+    [
+        (None, "report_writer"),
+        ("report_sections.json", "guardrail_or_publication"),
+        ("drug_report_validation_final.json", "publication"),
+    ],
+)
+def test_timeout_phase_uses_only_current_run_artifacts(tmp_path, artifact, phase):
+    if artifact:
+        (tmp_path / artifact).write_text("{}")
+
+    assert runner.infer_timeout_phase(tmp_path) == phase

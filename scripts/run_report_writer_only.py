@@ -6,15 +6,13 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
-import os
 import sys
-import uuid
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.agents.drug_target.agent import DrugTargetConfig, create_drug_target_agent
+from src.agents.drug_target.agent import DrugTargetConfig, create_guarded_report_writer
 from src.agents.drug_target.report_guardrails import clear_derived_report_artifacts
 
 REQUIRED_GUARDED_ARTIFACTS = (
@@ -34,6 +32,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--disease", required=True)
     parser.add_argument("--provider", default="ollama")
     parser.add_argument("--model")
+    parser.add_argument("--request-timeout-seconds", type=float, default=600)
+    parser.add_argument("--run-timeout-seconds", type=float, default=1800)
     return parser.parse_args()
 
 
@@ -52,8 +52,28 @@ def guarded_run_succeeded(data_dir: Path) -> bool:
     )
 
 
+def _validate_timeouts(args: argparse.Namespace) -> None:
+    if args.request_timeout_seconds <= 0 or args.run_timeout_seconds <= 0:
+        raise ValueError("request and run timeouts must be positive")
+    if args.request_timeout_seconds >= args.run_timeout_seconds:
+        raise ValueError("request timeout must be shorter than run timeout")
+
+
+def infer_timeout_phase(data_dir: Path) -> str:
+    if (data_dir / "drug_report_validation_final.json").is_file():
+        return "publication"
+    if (data_dir / "report_sections.json").is_file():
+        return "guardrail_or_publication"
+    return "report_writer"
+
+
 async def main() -> int:
     args = parse_args()
+    try:
+        _validate_timeouts(args)
+    except ValueError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
     data_dir = Path(args.data_dir).expanduser().resolve()
     if len(list((data_dir / "evidence").glob("*.json"))) < 5:
         print("ERROR: Not enough evidence files. Run evidence assessment first.")
@@ -67,32 +87,38 @@ async def main() -> int:
     config = DrugTargetConfig(
         provider=args.provider,
         model=args.model,
+        request_timeout_seconds=args.request_timeout_seconds,
         data_dir=str(data_dir),
         disease=args.disease,
         workflow_mode="guarded_report",
-        use_checkpointer=True,
-        report_writer_resume_instruction=(
-            "Render guarded hybrid report from existing evidence. "
-            f"Data dir: {data_dir}"
-        ),
     )
-    old_skip = os.environ.get("DRUG_TARGET_SKIP_EVIDENCE_ASSESSOR")
-    os.environ["DRUG_TARGET_SKIP_EVIDENCE_ASSESSOR"] = "1"
-    backend = None
+    report_writer = create_guarded_report_writer(config)
+    writer_input = {
+        "messages": [
+            {
+                "role": "user",
+                "content": (
+                    "Render guarded hybrid report from existing evidence. "
+                    f"Data dir: {data_dir}. Disease: {args.disease}."
+                ),
+            }
+        ]
+    }
     try:
-        agent, backend = create_drug_target_agent(config)
-        await agent.ainvoke(
-            {"messages": [{"role": "user", "content": "Render guarded hybrid report from existing evidence."}]},
-            config={"configurable": {"thread_id": str(uuid.uuid4())}},
+        result = await asyncio.wait_for(
+            report_writer.ainvoke(writer_input),
+            timeout=args.run_timeout_seconds,
         )
-    finally:
-        if old_skip is None:
-            os.environ.pop("DRUG_TARGET_SKIP_EVIDENCE_ASSESSOR", None)
-        else:
-            os.environ["DRUG_TARGET_SKIP_EVIDENCE_ASSESSOR"] = old_skip
-        cleanup = getattr(backend, "cleanup", None)
-        if callable(cleanup):
-            cleanup()
+    except TimeoutError:
+        phase = infer_timeout_phase(data_dir)
+        model_label = args.model or "default"
+        print(
+            "ERROR: guarded report timed out after "
+            f"{args.run_timeout_seconds}s in phase={phase} "
+            f"provider={args.provider} model={model_label}",
+            file=sys.stderr,
+        )
+        return 1
     if guarded_run_succeeded(data_dir):
         print("DONE")
         return 0
