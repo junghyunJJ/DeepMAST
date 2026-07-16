@@ -5679,7 +5679,7 @@ class TestDrugTargetAgent:
         assert governor.hard_required_skill_names == ("drug-target-reporting",)
         assert governor.required_skill_names == ("drug-target-reporting",)
         assert governor.candidate_skill_names == ()
-        assert governor.artifact_gate == "save_drug_md"
+        assert governor.artifact_gate == "save_report_sections"
 
 
 # =========================================================================
