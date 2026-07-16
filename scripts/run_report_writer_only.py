@@ -13,6 +13,8 @@ from queue import Empty
 from pathlib import Path
 from typing import Any, NoReturn, cast
 
+from langchain_core.runnables import RunnableConfig
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -43,6 +45,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--model")
     parser.add_argument("--request-timeout-seconds", type=float, default=600)
     parser.add_argument("--run-timeout-seconds", type=float, default=1800)
+    parser.add_argument("--trace-file", type=Path)
     return parser.parse_args()
 
 
@@ -66,6 +69,16 @@ def _validate_timeouts(args: argparse.Namespace) -> None:
         raise ValueError("request and run timeouts must be positive")
     if args.request_timeout_seconds >= args.run_timeout_seconds:
         raise ValueError("request timeout must be shorter than run timeout")
+
+
+def _resolve_trace_file(data_dir: Path, trace_file: Path | None) -> str | None:
+    if trace_file is None:
+        return None
+    resolved = trace_file.expanduser().resolve()
+    if resolved.is_relative_to(data_dir):
+        raise ValueError("trace file must be outside data directory")
+    resolved.parent.mkdir(parents=True, exist_ok=True)
+    return str(resolved)
 
 
 def _infer_timeout_phase(data_dir: Path) -> str:
@@ -127,6 +140,7 @@ def _run_guarded_writer_child(
     provider: str,
     model: str | None,
     request_timeout_seconds: float,
+    trace_file: str | None,
 ) -> None:
     """Construct and invoke the diagnostic writer outside the parent deadline."""
     try:
@@ -141,7 +155,13 @@ def _run_guarded_writer_child(
                 subagent_models={},
             )
         )
-        asyncio.run(report_writer.ainvoke(_writer_input(data_dir, disease)))
+        if trace_file is None:
+            asyncio.run(report_writer.ainvoke(_writer_input(data_dir, disease)))
+        else:
+            from langchain_core.callbacks import FileCallbackHandler
+
+            invoke_config: RunnableConfig = {"callbacks": [FileCallbackHandler(trace_file)]}
+            asyncio.run(report_writer.ainvoke(_writer_input(data_dir, disease), config=invoke_config))
     except Exception as exc:
         results.put(("error", f"{type(exc).__name__}: {exc}"))
     else:
@@ -152,6 +172,7 @@ async def _run_guarded_writer_with_deadline(
     *,
     data_dir: Path,
     args: argparse.Namespace,
+    trace_file: str | None,
 ) -> tuple[str, str]:
     context = _process_context()
     results = context.Queue()
@@ -164,6 +185,7 @@ async def _run_guarded_writer_with_deadline(
             args.provider,
             args.model,
             args.request_timeout_seconds,
+            trace_file,
         ),
     )
     stop_attempted = False
@@ -208,8 +230,17 @@ async def main() -> int:
     if len(list((data_dir / "evidence").glob("*.json"))) < 5:
         print("ERROR: Not enough evidence files. Run evidence assessment first.")
         return 1
+    try:
+        trace_file = _resolve_trace_file(data_dir, args.trace_file)
+    except ValueError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
     await asyncio.to_thread(clear_guarded_report_run_artifacts, data_dir)
-    status, detail = await _run_guarded_writer_with_deadline(data_dir=data_dir, args=args)
+    status, detail = await _run_guarded_writer_with_deadline(
+        data_dir=data_dir,
+        args=args,
+        trace_file=trace_file,
+    )
     if status == "timeout":
         phase = _infer_timeout_phase(data_dir)
         await asyncio.to_thread(clear_guarded_report_run_artifacts, data_dir)

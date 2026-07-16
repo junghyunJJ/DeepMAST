@@ -24,10 +24,12 @@ def _use_fork_for_runner_monkeypatches(monkeypatch):
 class _Writer:
     def __init__(self, callback=None) -> None:
         self.calls: list[dict[str, object]] = []
+        self.configs: list[dict[str, object] | None] = []
         self.callback = callback
 
-    async def ainvoke(self, writer_input):
+    async def ainvoke(self, writer_input, config=None):
         self.calls.append(writer_input)
+        self.configs.append(config)
         if self.callback:
             self.callback()
         return {"messages": []}
@@ -58,6 +60,14 @@ class _ResultQueue:
 
     def join_thread(self) -> None:
         return None
+
+
+class _ChildResultQueue:
+    def __init__(self) -> None:
+        self.items: list[tuple[str, str]] = []
+
+    def put(self, item: tuple[str, str]) -> None:
+        self.items.append(item)
 
 
 class _TerminationResistantProcess:
@@ -144,6 +154,7 @@ def _args(path, **overrides):
         "model": None,
         "request_timeout_seconds": 600.0,
         "run_timeout_seconds": 1800.0,
+        "trace_file": None,
     }
     values.update(overrides)
     return argparse.Namespace(**values)
@@ -199,6 +210,60 @@ def test_parse_args_has_bounded_deadline_defaults(monkeypatch):
 
     assert args.request_timeout_seconds == 600.0
     assert args.run_timeout_seconds == 1800.0
+    assert args.trace_file is None
+
+
+def test_writer_child_passes_trace_callback(tmp_path, monkeypatch):
+    writer = _Writer()
+    monkeypatch.setattr(runner, "create_guarded_report_writer", lambda _config: writer)
+    results = _ChildResultQueue()
+    run_dir = tmp_path / "run"
+
+    runner._run_guarded_writer_child(
+        results,
+        str(run_dir),
+        "breast cancer",
+        "ollama-openai",
+        "qwen3.5:122b",
+        60.0,
+        str(tmp_path / "writer.trace"),
+    )
+
+    assert len(writer.configs) == 1
+    assert len(writer.configs[0]["callbacks"]) == 1
+    assert results.items == [("success", "")]
+
+
+def test_writer_child_omits_trace_callback_without_trace_file(tmp_path, monkeypatch):
+    writer = _Writer()
+    monkeypatch.setattr(runner, "create_guarded_report_writer", lambda _config: writer)
+    results = _ChildResultQueue()
+
+    runner._run_guarded_writer_child(
+        results,
+        str(tmp_path / "run"),
+        "breast cancer",
+        "ollama-openai",
+        "qwen3.5:122b",
+        60.0,
+        None,
+    )
+
+    assert writer.configs == [None]
+    assert results.items == [("success", "")]
+
+
+def test_trace_file_is_external_and_its_parent_is_created(tmp_path):
+    data_dir = tmp_path / "run"
+    data_dir.mkdir()
+    trace_file = tmp_path / "diagnostics" / "writer.trace"
+
+    resolved = runner._resolve_trace_file(data_dir, trace_file)
+
+    assert resolved == str(trace_file.resolve())
+    assert trace_file.parent.is_dir()
+    with pytest.raises(ValueError, match="outside data directory"):
+        runner._resolve_trace_file(data_dir, data_dir / "writer.trace")
 
 
 @pytest.mark.parametrize(
