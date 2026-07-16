@@ -422,6 +422,46 @@ def test_success_audit_write_failure_removes_published_outputs(
     assert not (tmp_path / "drug_report_validation_final.json.tmp").exists()
 
 
+def test_final_audit_temp_unlink_failure_still_rolls_back_publication(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_sources(tmp_path)
+    monkeypatch.setattr(report_guardrails, "_validate", lambda _data_dir: _validation(valid=True))
+
+    async def publish(*_args: Any, **_kwargs: Any) -> dict[str, str]:
+        for path in _publication_paths(tmp_path):
+            path.write_text("published", encoding="utf-8")
+        return {"status": "published"}
+
+    real_write = report_guardrails._write_audit
+    monkeypatch.setattr(report_guardrails, "_publish_report_outputs", publish)
+    calls = 0
+    final_tmp = tmp_path / "drug_report_validation_final.json.tmp"
+
+    def fail_final(*args: Any, **kwargs: Any) -> None:
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            final_tmp.write_text("partial audit", encoding="utf-8")
+            raise OSError("disk full")
+        real_write(*args, **kwargs)
+
+    original_unlink = Path.unlink
+
+    def fail_only_final_tmp_unlink(self: Path, *args: Any, **kwargs: Any) -> None:
+        if self == final_tmp:
+            raise OSError("temp cleanup blocked")
+        original_unlink(self, *args, **kwargs)
+
+    monkeypatch.setattr(report_guardrails, "_write_audit", fail_final)
+    monkeypatch.setattr(Path, "unlink", fail_only_final_tmp_unlink)
+
+    with pytest.raises(OSError, match="disk full"):
+        report_guardrails.run_drug_report_guardrail(tmp_path)
+    assert all(not path.exists() for path in _publication_paths(tmp_path))
+    assert (tmp_path / "drug_report_validation_initial.json").exists()
+
+
 def test_middleware_without_data_dir_fails_before_touching_cwd() -> None:
     middleware = DrugReportGuardrailMiddleware(None)
     with pytest.raises(RuntimeError, match="data_dir"):

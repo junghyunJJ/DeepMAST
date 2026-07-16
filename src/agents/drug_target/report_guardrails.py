@@ -542,13 +542,19 @@ def run_drug_report_guardrail(
             changed_repair_count=changes,
             publication_status="published",
         )
-    except Exception:
+    except Exception as audit_error:
         final_audit_tmp = (run_dir / "drug_report_validation_final.json").with_suffix(
             ".json.tmp"
         )
-        if final_audit_tmp.exists():
-            final_audit_tmp.unlink()
-        clear_derived_report_artifacts(run_dir)
+        try:
+            if final_audit_tmp.exists():
+                final_audit_tmp.unlink()
+        except Exception as temp_cleanup_error:
+            audit_error.add_note(
+                f"Failed to remove final audit temporary file: {temp_cleanup_error}"
+            )
+        finally:
+            clear_derived_report_artifacts(run_dir)
         raise
     return _result(
         status="passed",
