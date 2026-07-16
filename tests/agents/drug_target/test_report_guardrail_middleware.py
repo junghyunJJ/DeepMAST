@@ -777,7 +777,57 @@ def test_top_level_cleanup_before_agent_removes_guarded_stale_artifacts_but_keep
     assert all(not path.exists() for path in _publication_paths(tmp_path))
     assert (evidence / "hypothesis_report.json").read_text(encoding="utf-8") == "legacy"
     assert (evidence / "report_data.json").read_text(encoding="utf-8") == "legacy"
-    assert (tmp_path / "report_data.json").read_text(encoding="utf-8") == "legacy"
+    assert not (tmp_path / "report_data.json").exists()
+
+
+def test_top_level_cleanup_removes_stale_hybrid_artifacts_but_post_writer_guardrail_keeps_new_sections(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _seed_managed(tmp_path)
+    _write_report_sections(tmp_path, {"stale": True})
+    for name in ("report_data.json", "drug_report_render.json"):
+        (tmp_path / name).write_text("stale", encoding="utf-8")
+    for name in (REPORT_SECTIONS_FILENAME, "report_data.json", "drug_report_render.json"):
+        path = tmp_path / name
+        path.with_suffix(f"{path.suffix}.tmp").write_text("temporary", encoding="utf-8")
+    staging = tmp_path / ".report-sections-stale"
+    staging.mkdir()
+    (staging / "drug.md").write_text("stale", encoding="utf-8")
+
+    assert DrugReportRunCleanupMiddleware(tmp_path).before_agent({}, None) is None
+
+    for name in (REPORT_SECTIONS_FILENAME, "report_data.json", "drug_report_render.json"):
+        path = tmp_path / name
+        assert not path.exists()
+        assert not path.with_suffix(f"{path.suffix}.tmp").exists()
+    assert not staging.exists()
+
+    fresh = {"hypothesis_report": {"fresh": True}}
+    _write_report_sections(tmp_path, fresh)
+    validations = iter([_validation(valid=False, issues=[_hard()]), _validation(valid=True)])
+    repairs: list[str] = []
+    monkeypatch.setattr(report_guardrails, "_validate", lambda _data_dir: next(validations))
+
+    def repair_sections(data_dir: Path, *_args: Any, **_kwargs: Any) -> bool:
+        assert json.loads((data_dir / REPORT_SECTIONS_FILENAME).read_text()) == fresh
+        repairs.append("sections")
+        return True
+
+    monkeypatch.setattr(report_guardrails, "_repair_report_sections", repair_sections)
+    monkeypatch.setattr(
+        report_guardrails,
+        "_repair_drug_md",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("direct repair called")),
+    )
+    published: list[str] = []
+    _patch_publish(monkeypatch, published)
+
+    DrugReportGuardrailMiddleware(tmp_path).after_agent({}, None)
+
+    assert repairs == ["sections"]
+    assert published == ["publish"]
+    assert json.loads((tmp_path / REPORT_SECTIONS_FILENAME).read_text()) == fresh
 
 
 def test_production_hypothesis_loader_forces_scope_when_caller_requests_all(

@@ -8,8 +8,9 @@ identical-payload retries against the deterministic save gate).
 
 from __future__ import annotations
 
-import json
 import asyncio
+import json
+import shutil
 from collections.abc import Awaitable, Callable, Collection, Sequence
 from pathlib import Path
 from typing import Any, cast
@@ -21,7 +22,15 @@ from langchain_core.messages import AIMessage, ToolCall, ToolMessage
 from langgraph.types import Command
 
 from src.agents.drug_target.report_guardrails import run_drug_report_guardrail
+from src.agents.drug_target.hybrid_report_sections import REPORT_SECTIONS_FILENAME
 from src.agents.drug_target.tools.report_expansion_schema import canonical_json_hash
+
+
+_HYBRID_PREPUBLICATION_ARTIFACTS = (
+    REPORT_SECTIONS_FILENAME,
+    "report_data.json",
+    "drug_report_render.json",
+)
 
 
 class _DrugReportRunDirectoryMiddleware(AgentMiddleware):
@@ -58,6 +67,19 @@ class _DrugReportRunDirectoryMiddleware(AgentMiddleware):
 
 class DrugReportRunCleanupMiddleware(_DrugReportRunDirectoryMiddleware):
     """Clear stale guarded-run artifacts before top-level orchestration begins."""
+
+    def _clear_for_new_run(self) -> None:
+        super()._clear_for_new_run()
+        run_dir = self._require_data_dir()
+        for name in _HYBRID_PREPUBLICATION_ARTIFACTS:
+            path = run_dir / name
+            for candidate in (path, path.with_suffix(f"{path.suffix}.tmp")):
+                candidate.unlink(missing_ok=True)
+        for staging_dir in run_dir.glob(".report-sections-*"):
+            if staging_dir.is_dir() and not staging_dir.is_symlink():
+                shutil.rmtree(staging_dir)
+            else:
+                staging_dir.unlink(missing_ok=True)
 
 
 class DrugReportGuardrailMiddleware(_DrugReportRunDirectoryMiddleware):
