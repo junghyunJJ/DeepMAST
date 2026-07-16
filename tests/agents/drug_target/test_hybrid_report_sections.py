@@ -270,6 +270,9 @@ def test_canonicalize_report_sections_accepts_bounded_recommendations(
         "Prioritize NINTEDANIB testing before advancing target selection.",
         "Prioritize 7 experiments before advancing target selection.",
         "[source: evidence/assessment_results.json] Prioritize FN1 validation.",
+        "Prioritize **FN1** validation before advancing target selection.",
+        "Prioritize `FN1` validation before advancing target selection.",
+        "Prioritize <script>FN1</script> validation before advancing target selection.",
         "FN1 is a supported candidate in deterministic analysis.",
         "Prioritize FN1 validation\nbefore advancing target selection.",
         (
