@@ -17,6 +17,7 @@ from src.agents.drug_target.deterministic_report import (
     build_report_data,
     validate_report_data,
 )
+from src.agents.drug_target.hybrid_report_sections import REPORT_SECTIONS_FILENAME
 from src.agents.drug_target.part4_candidate_selector import (
     PART4_CANDIDATE_SELECTION_SCHEMA_VERSION,
     generate_part4_candidate_selection,
@@ -25,8 +26,12 @@ from src.agents.drug_target.part4_candidate_selector import (
 from src.agents.drug_target.production_report_tools import (
     production_hypothesis_evidence_tool,
     production_save_drug_md_tool,
+    production_save_report_sections_tool,
 )
-from src.agents.drug_target.subagents.prompts import DIRECT_MARKDOWN_REPAIR_PROMPT
+from src.agents.drug_target.subagents.prompts import (
+    DIRECT_MARKDOWN_REPAIR_PROMPT,
+    REPORT_WRITER_PROMPT,
+)
 from src.agents.drug_target.therapeutic_synthesis import (
     PART4_SYNTHESIS_SCHEMA_VERSION,
     build_part4_therapeutic_synthesis,
@@ -37,6 +42,10 @@ from src.agents.drug_target.tools.drug_report_html import (
     build_drug_html_context,
     parse_drug_md,
     render_drug_html,
+)
+from src.agents.drug_target.tools.hypothesis_schema import (
+    canonicalize_hypothesis_report,
+    validate_canonical_hypothesis_report,
 )
 
 
@@ -51,6 +60,7 @@ GUARDRAIL_AUDIT_ARTIFACTS = (
     "drug_report_validation_final.json",
 )
 _MAX_STORED_ERROR_CHARS = 500
+_MAX_REPAIR_FINDINGS = 20
 
 
 def _resolve_safe_run_dir(data_dir: str | Path) -> Path:
@@ -175,6 +185,16 @@ def _write_audit(
     path = run_dir / name
     temporary = path.with_suffix(f"{path.suffix}.tmp")
     payload = _audit_payload(validation, **metadata)
+    report_sections_path = run_dir / REPORT_SECTIONS_FILENAME
+    if report_sections_path.exists():
+        sources = payload.get("sources")
+        payload["sources"] = list(sources) if isinstance(sources, list) else []
+        payload["sources"].append(
+            {
+                "path": REPORT_SECTIONS_FILENAME,
+                "sha256": _sha256(report_sections_path),
+            }
+        )
     temporary.write_text(
         json.dumps(payload, indent=2, ensure_ascii=False) + "\n",
         encoding="utf-8",
@@ -233,6 +253,57 @@ Current drug.md:
     return _sha256(current_path) != before
 
 
+def _repair_report_sections(
+    data_dir: Path,
+    issues: list[dict[str, Any]],
+    *,
+    provider: str | None,
+    disease: str,
+) -> bool:
+    """Ask the hybrid repair agent once, then report whether sections changed."""
+
+    sections_path = data_dir / REPORT_SECTIONS_FILENAME
+    sections = json.loads(sections_path.read_text(encoding="utf-8"))
+    if not isinstance(sections, dict):
+        raise ValueError("report_sections.json must be a JSON object")
+    before = _sha256(sections_path)
+    repair_prompt = f"""## REPAIR MODE
+
+Repair the supplied hybrid report sections payload in place. Fix only the listed
+validation findings. Do not edit drug.md, rebuild evidence, produce Part 4, or
+produce HTML. Call save_report_sections exactly once with the corrected complete
+schema-conforming payload, then stop.
+
+Data directory: {json.dumps(str(data_dir), ensure_ascii=False)}
+Disease: {json.dumps(disease or "unspecified", ensure_ascii=False)}
+Current report_sections.json SHA-256: {before}
+
+Validation findings (first {_MAX_REPAIR_FINDINGS} only):
+{json.dumps(issues[:_MAX_REPAIR_FINDINGS], ensure_ascii=False, indent=2)}
+
+Current report_sections.json:
+{json.dumps(sections, ensure_ascii=False, indent=2)}
+"""
+    from src.agents.drug_target.middleware import DrugTargetManagedFilesystemGuardMiddleware
+
+    agent = create_agent(
+        model=create_llm(provider=provider),
+        tools=[
+            production_hypothesis_evidence_tool(data_dir),
+            production_save_report_sections_tool(data_dir, disease),
+        ],
+        system_prompt=REPORT_WRITER_PROMPT,
+        middleware=[
+            DrugTargetManagedFilesystemGuardMiddleware(
+                data_dir,
+                data_dir_tool_names={"load_evidence_files"},
+            )
+        ],
+    )
+    agent.invoke({"messages": [{"role": "user", "content": repair_prompt}]})
+    return _sha256(sections_path) != before
+
+
 def _required_text(value: object, field: str) -> str:
     text = str(value or "").strip()
     if not text:
@@ -283,6 +354,26 @@ def _hypothesis_payload_from_markdown(markdown: str) -> dict[str, Any]:
     return {"hypotheses": hypotheses}
 
 
+def _hypothesis_payload_from_report_sections(data_dir: Path) -> dict[str, Any]:
+    """Load and revalidate canonical hybrid hypotheses without trusting Markdown."""
+
+    sections_path = data_dir / REPORT_SECTIONS_FILENAME
+    sections = json.loads(sections_path.read_text(encoding="utf-8"))
+    if not isinstance(sections, Mapping):
+        raise ValueError("report_sections.json must be a JSON object")
+    hypothesis_report = sections.get("hypothesis_report")
+    canonical, errors, _ = canonicalize_hypothesis_report(
+        hypothesis_report,
+        data_dir / "evidence",
+        legacy_compat=False,
+    )
+    if canonical is None or errors:
+        raise ValueError("report_sections.json hypotheses are invalid")
+    if validate_canonical_hypothesis_report(canonical, data_dir / "evidence"):
+        raise ValueError("report_sections.json hypotheses failed canonical validation")
+    return canonical
+
+
 def _selected_genes(synthesis: Mapping[str, Any]) -> list[str]:
     candidates = synthesis.get("featured_candidates")
     if not isinstance(candidates, list):
@@ -305,13 +396,20 @@ async def _publish_report_outputs(
     run_dir = _resolve_safe_run_dir(data_dir)
     temporary_paths: list[Path] = []
     try:
-        payload = _hypothesis_payload_from_markdown(
-            (run_dir / "drug.md").read_text(encoding="utf-8")
-        )
+        sections_path = run_dir / REPORT_SECTIONS_FILENAME
+        if sections_path.exists():
+            payload = _hypothesis_payload_from_report_sections(run_dir)
+            hypothesis_source = REPORT_SECTIONS_FILENAME
+        else:
+            payload = _hypothesis_payload_from_markdown(
+                (run_dir / "drug.md").read_text(encoding="utf-8")
+            )
+            hypothesis_source = None
         report_data = build_report_data(
             str(run_dir),
             disease,
             hypothesis_data=payload,
+            hypothesis_source=hypothesis_source,
         )
         issues = validate_report_data(report_data)
         if issues:
@@ -484,11 +582,13 @@ def run_drug_report_guardrail(
 
     while _hard_issues(final) and attempts < MAX_DRUG_REPORT_REPAIR_PASSES:
         try:
-            changed = _repair_drug_md(
-                run_dir,
-                _hard_issues(final),
-                provider=provider,
-                disease=disease,
+            repair = (
+                _repair_report_sections
+                if (run_dir / REPORT_SECTIONS_FILENAME).exists()
+                else _repair_drug_md
+            )
+            changed = repair(
+                run_dir, _hard_issues(final), provider=provider, disease=disease
             )
             attempts += 1
         except Exception as exc:  # noqa: BLE001 - audit the provider boundary

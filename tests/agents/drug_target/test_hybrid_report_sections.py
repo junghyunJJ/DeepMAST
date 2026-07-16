@@ -478,6 +478,53 @@ def test_hybrid_renderer_uses_canonical_sections_with_host_owned_provenance(
     assert "FABRICATED_DRUG_NAME" not in finding_types
 
 
+def test_valid_hybrid_report_passes_guardrail_before_publication(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.agents.drug_target import report_guardrails
+    from src.agents.drug_target.deterministic_report import render_hybrid_report
+
+    evidence_dir = _write_renderer_evidence(tmp_path)
+    canonical, errors = canonicalize_report_sections(
+        _payload(),
+        evidence_dir,
+        _source_paths(),
+        _report_data(),
+    )
+    assert errors == []
+    assert canonical is not None
+    render_hybrid_report(str(tmp_path), "IPF", canonical)
+
+    validations: list[dict] = []
+    real_validate = report_guardrails._validate
+
+    def validate(data_dir: Path) -> dict:
+        result = real_validate(data_dir)
+        validations.append(result)
+        return result
+
+    async def publish(data_dir: Path, **_kwargs: object) -> dict[str, str]:
+        assert validations[-1]["valid"] is True
+        for name in report_guardrails.PUBLICATION_ARTIFACTS:
+            (data_dir / name).write_text("published", encoding="utf-8")
+        return {"status": "published"}
+
+    monkeypatch.setattr(report_guardrails, "_validate", validate)
+    monkeypatch.setattr(report_guardrails, "_publish_report_outputs", publish)
+
+    result = report_guardrails.run_drug_report_guardrail(tmp_path, disease="IPF")
+
+    assert result["status"] == "passed"
+    assert all((tmp_path / name).exists() for name in report_guardrails.PUBLICATION_ARTIFACTS)
+    audit = json.loads((tmp_path / "drug_report_validation_final.json").read_text())
+    assert audit["publication"]["status"] == "passed"
+    source = next(
+        source for source in audit["sources"] if source["path"] == REPORT_SECTIONS_FILENAME
+    )
+    assert source["sha256"]
+
+
 def test_hybrid_renderer_explicitly_omits_legacy_interpretations(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

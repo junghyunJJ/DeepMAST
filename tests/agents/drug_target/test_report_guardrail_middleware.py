@@ -12,6 +12,7 @@ from langchain.tools.tool_node import ToolCallRequest
 from langchain_core.messages import AIMessage, ToolMessage
 
 from src.agents.drug_target import report_guardrails
+from src.agents.drug_target.hybrid_report_sections import REPORT_SECTIONS_FILENAME
 from src.agents.drug_target.middleware import (
     DrugReportGuardrailMiddleware,
     DrugReportRunCleanupMiddleware,
@@ -66,6 +67,13 @@ def _hard(code: str = "BAD_CONTENT") -> dict[str, str]:
 def _write_sources(data_dir: Path, markdown: str = DRUG_MD_WITH_HYPOTHESIS) -> None:
     (data_dir / "drug.md").write_text(markdown, encoding="utf-8")
     (data_dir / "target_assessment.json").write_text("{}", encoding="utf-8")
+
+
+def _write_report_sections(data_dir: Path, payload: dict[str, Any] | None = None) -> None:
+    (data_dir / REPORT_SECTIONS_FILENAME).write_text(
+        json.dumps(payload or {"hypothesis_report": {}}),
+        encoding="utf-8",
+    )
 
 
 def _audit(data_dir: Path, name: str) -> dict[str, Any]:
@@ -233,6 +241,94 @@ def test_guardrail_stops_after_three_changed_repairs(
     }
 
 
+def test_hybrid_guardrail_repairs_sections_not_markdown_and_records_source(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_sources(tmp_path)
+    _write_report_sections(tmp_path)
+    calls: list[str] = []
+    validations = iter([_validation(valid=False, issues=[_hard()]), _validation(valid=True)])
+    monkeypatch.setattr(report_guardrails, "_validate", lambda _data_dir: next(validations))
+    monkeypatch.setattr(
+        report_guardrails,
+        "_repair_report_sections",
+        lambda *_args, **_kwargs: calls.append("sections") or True,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        report_guardrails,
+        "_repair_drug_md",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("direct repair called")),
+    )
+    _patch_publish(monkeypatch, calls)
+
+    assert report_guardrails.run_drug_report_guardrail(tmp_path)["status"] == "passed"
+    assert calls == ["sections", "publish"]
+    assert {
+        "path": REPORT_SECTIONS_FILENAME,
+        "sha256": report_guardrails._sha256(tmp_path / REPORT_SECTIONS_FILENAME),
+    } in _audit(tmp_path, "drug_report_validation_final.json")["sources"]
+
+
+def test_hybrid_guardrail_stops_after_three_invalid_sections_repairs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_sources(tmp_path)
+    _write_report_sections(tmp_path)
+    validations = iter([_validation(valid=False, issues=[_hard()])] * 4)
+    repairs: list[str] = []
+    monkeypatch.setattr(report_guardrails, "_validate", lambda _data_dir: next(validations))
+    monkeypatch.setattr(
+        report_guardrails,
+        "_repair_report_sections",
+        lambda *_args, **_kwargs: repairs.append("sections") or True,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        report_guardrails,
+        "_repair_drug_md",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("direct repair called")),
+    )
+    monkeypatch.setattr(
+        report_guardrails,
+        "_publish_report_outputs",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("publish called")),
+    )
+
+    result = report_guardrails.run_drug_report_guardrail(tmp_path)
+
+    assert result["status"] == "failed"
+    assert repairs == ["sections"] * report_guardrails.MAX_DRUG_REPORT_REPAIR_PASSES
+    assert all(not path.exists() for path in _publication_paths(tmp_path))
+    final = _audit(tmp_path, "drug_report_validation_final.json")
+    assert final["issues"] == [_hard()]
+    assert final["publication"] == {"status": "skipped", "artifacts": [], "error": None}
+
+
+def test_legacy_guardrail_keeps_direct_markdown_repair_fallback(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_sources(tmp_path)
+    calls: list[str] = []
+    validations = iter([_validation(valid=False, issues=[_hard()]), _validation(valid=True)])
+    monkeypatch.setattr(report_guardrails, "_validate", lambda _data_dir: next(validations))
+    monkeypatch.setattr(
+        report_guardrails,
+        "_repair_report_sections",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("sections repair called")),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        report_guardrails,
+        "_repair_drug_md",
+        lambda *_args, **_kwargs: calls.append("markdown") or True,
+    )
+    _patch_publish(monkeypatch, calls)
+
+    assert report_guardrails.run_drug_report_guardrail(tmp_path)["status"] == "passed"
+    assert calls == ["markdown", "publish"]
+
+
 def test_guardrail_stops_when_repair_revalidation_becomes_nonrepairable(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -395,6 +491,44 @@ def test_direct_repair_agent_keeps_legacy_prompt_and_tool_pair(
     ]
     assert "save_drug_md" in DIRECT_MARKDOWN_REPAIR_PROMPT
     assert "save_report_sections" not in DIRECT_MARKDOWN_REPAIR_PROMPT
+
+
+def test_hybrid_repair_agent_uses_bounded_sections_payload_and_safe_tools(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.agents.drug_target.subagents.prompts import REPORT_WRITER_PROMPT
+
+    _write_sources(tmp_path)
+    _write_report_sections(tmp_path)
+    captured: dict[str, Any] = {}
+
+    class FakeAgent:
+        def invoke(self, payload: dict[str, Any]) -> None:
+            captured["prompt"] = payload["messages"][0]["content"]
+
+    monkeypatch.setattr(report_guardrails, "create_llm", lambda **_kwargs: object())
+    monkeypatch.setattr(
+        report_guardrails,
+        "create_agent",
+        lambda **kwargs: captured.update(kwargs) or FakeAgent(),
+    )
+    findings = [_hard(f"ISSUE_{index}") for index in range(25)]
+
+    assert report_guardrails._repair_report_sections(
+        tmp_path,
+        findings,
+        provider="test",
+        disease="IPF",
+    ) is False
+    assert captured["system_prompt"] == REPORT_WRITER_PROMPT
+    assert [tool.name for tool in captured["tools"]] == [
+        "load_evidence_files",
+        "save_report_sections",
+    ]
+    assert "Current report_sections.json SHA-256:" in captured["prompt"]
+    assert "ISSUE_19" in captured["prompt"]
+    assert "ISSUE_20" not in captured["prompt"]
 
 
 def test_repair_exception_writes_skipped_final_audit_and_clears_outputs(
@@ -981,6 +1115,7 @@ def _publisher_report_data() -> dict[str, Any]:
 def _patch_publisher_happy_path(monkeypatch: pytest.MonkeyPatch, captured: dict[str, Any]) -> None:
     def build_report(*_args: Any, **kwargs: Any) -> dict[str, Any]:
         captured["payload"] = kwargs["hypothesis_data"]
+        captured["hypothesis_source"] = kwargs.get("hypothesis_source")
         return _publisher_report_data()
 
     monkeypatch.setattr(report_guardrails, "build_report_data", build_report)
@@ -1035,6 +1170,38 @@ def test_publication_uses_markdown_derived_hypotheses(tmp_path: Path, monkeypatc
     }
     assert not (tmp_path / "report_data.json").exists()
     assert not (tmp_path / "evidence" / "hypothesis_report.json").exists()
+
+
+def test_publication_uses_canonical_hypotheses_from_report_sections(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / "drug.md").write_text("not parsed", encoding="utf-8")
+    _write_report_sections(tmp_path, {"hypothesis_report": {"untrusted": True}})
+    canonical = {"schema_version": "hypothesis_report.v2", "hypotheses": []}
+    captured: dict[str, Any] = {}
+    _patch_publisher_happy_path(monkeypatch, captured)
+    monkeypatch.setattr(
+        report_guardrails,
+        "_hypothesis_payload_from_markdown",
+        lambda *_args: (_ for _ in ()).throw(AssertionError("Markdown parsed")),
+    )
+    monkeypatch.setattr(
+        report_guardrails,
+        "canonicalize_hypothesis_report",
+        lambda *_args, **_kwargs: (canonical, [], []),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        report_guardrails,
+        "validate_canonical_hypothesis_report",
+        lambda *_args, **_kwargs: [],
+        raising=False,
+    )
+
+    asyncio.run(report_guardrails._publish_report_outputs(tmp_path, disease="test"))
+
+    assert captured["payload"] == canonical
+    assert captured["hypothesis_source"] == REPORT_SECTIONS_FILENAME
 
 
 @pytest.mark.parametrize(
