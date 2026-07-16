@@ -205,6 +205,39 @@ def test_guardrail_stops_after_three_changed_repairs(
     assert result["changed_repair_count"] == 3
 
 
+def test_guardrail_stops_when_repair_revalidation_becomes_nonrepairable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_sources(tmp_path)
+    repairs: list[str] = []
+    initial = _validation(valid=False, issues=[_hard("REPAIRABLE_CONTENT")])
+    post_repair = _validation(valid=False, issues=[_hard("MISSING_REQUIRED_ARTIFACT")])
+    post_repair["checks"]["required_artifacts"] = {
+        "status": "fail",
+        "missing": ["evidence/assessment_results.json"],
+    }
+    validations = iter([initial, post_repair])
+    monkeypatch.setattr(report_guardrails, "_validate", lambda _data_dir: next(validations))
+    monkeypatch.setattr(
+        report_guardrails,
+        "_repair_drug_md",
+        lambda *_args, **_kwargs: repairs.append("repair") or True,
+    )
+    monkeypatch.setattr(
+        report_guardrails,
+        "_publish_report_outputs",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("publish called")),
+    )
+
+    result = report_guardrails.run_drug_report_guardrail(tmp_path)
+
+    assert result["status"] == "failed"
+    assert result["repair_attempt_count"] == 1
+    assert repairs == ["repair"]
+    final = _audit(tmp_path, "drug_report_validation_final.json")
+    assert final["checks"]["required_artifacts"]["status"] == "fail"
+
+
 def test_guardrail_stops_when_drug_md_is_unchanged(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -375,6 +408,9 @@ def test_success_audit_write_failure_removes_published_outputs(
         nonlocal calls
         calls += 1
         if calls == 2:
+            (tmp_path / "drug_report_validation_final.json.tmp").write_text(
+                "partial audit", encoding="utf-8"
+            )
             raise OSError("disk full")
         real_write(*args, **kwargs)
 
@@ -383,6 +419,7 @@ def test_success_audit_write_failure_removes_published_outputs(
         report_guardrails.run_drug_report_guardrail(tmp_path)
     assert all(not path.exists() for path in _publication_paths(tmp_path))
     assert (tmp_path / "drug_report_validation_initial.json").exists()
+    assert not (tmp_path / "drug_report_validation_final.json.tmp").exists()
 
 
 def test_middleware_without_data_dir_fails_before_touching_cwd() -> None:

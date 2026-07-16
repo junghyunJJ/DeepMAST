@@ -496,6 +496,14 @@ def run_drug_report_guardrail(
         if changed:
             changes += 1
         final = _validate(run_dir)
+        if _nonrepairable_check_failure(final):
+            return _write_final_failure(
+                run_dir,
+                initial,
+                final,
+                repair_attempt_count=attempts,
+                changed_repair_count=changes,
+            )
         if not changed:
             break
 
@@ -535,6 +543,11 @@ def run_drug_report_guardrail(
             publication_status="published",
         )
     except Exception:
+        final_audit_tmp = (run_dir / "drug_report_validation_final.json").with_suffix(
+            ".json.tmp"
+        )
+        if final_audit_tmp.exists():
+            final_audit_tmp.unlink()
         clear_derived_report_artifacts(run_dir)
         raise
     return _result(
