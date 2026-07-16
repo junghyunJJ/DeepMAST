@@ -181,6 +181,8 @@ class DrugTargetConfig:
         provider: LLM provider. Defaults to 'openrouter'.
         model: Optional explicit model selection. When omitted, the provider
             environment/default model selection remains unchanged.
+        request_timeout_seconds: Optional LLM request timeout. When omitted,
+            the provider environment/default timeout remains unchanged.
         data_dir: Directory containing lr_candidates.json and workspace.
         disease: Disease context for queries.
         use_checkpointer: Whether to use memory checkpointer (default: False).
@@ -208,6 +210,7 @@ class DrugTargetConfig:
 
     provider: Provider = "ollama"
     model: str | None = None
+    request_timeout_seconds: float | None = None
     data_dir: str = field(
         default_factory=lambda: os.getenv(
             "DRUG_TARGET_DATA_DIR",
@@ -457,6 +460,8 @@ def create_drug_target_agent(
     llm_kwargs: dict[str, Any] = {"provider": config.provider}
     if config.model:
         llm_kwargs["model"] = config.model
+    if config.request_timeout_seconds is not None:
+        llm_kwargs["request_timeout"] = config.request_timeout_seconds
     llm = create_llm(**llm_kwargs)
     skill_activation_mode: SkillActivationMode = (
         config.skill_activation_mode
@@ -472,7 +477,7 @@ def create_drug_target_agent(
     #    SkillsMiddleware + activation middleware instead of deepagents native
     #    `subagent["skills"]` auto-loading.
     model_overrides = config.subagent_models
-    if config.model and workflow_mode == "guarded_report":
+    if (config.model or config.request_timeout_seconds is not None) and workflow_mode == "guarded_report":
         model_overrides = {**(model_overrides or {}), "report_writer": llm}
     subagent_kwargs: dict[str, Any] = dict(
         data_dir=resolved_data_dir,
@@ -488,11 +493,18 @@ def create_drug_target_agent(
         skill_activation_mode=skill_activation_mode,
     )
     if workflow_mode == "guarded_report":
-        subagent_specs = get_subagents(
-            provider=config.provider,
-            hypothesis_writer_prompt_mode=config.hypothesis_writer_prompt_mode,
+        report_writer_kwargs: dict[str, Any] = {
+            "provider": config.provider,
+            "hypothesis_writer_prompt_mode": config.hypothesis_writer_prompt_mode,
             **subagent_kwargs,
-        )
+        }
+        if config.model:
+            report_writer_kwargs["report_writer_model"] = config.model
+        if config.request_timeout_seconds is not None:
+            report_writer_kwargs["report_writer_request_timeout_seconds"] = (
+                config.request_timeout_seconds
+            )
+        subagent_specs = get_subagents(**report_writer_kwargs)
     elif workflow_mode == "legacy_hypothesis":
         subagent_specs = get_legacy_subagents(
             custom_tools=config.custom_tools,

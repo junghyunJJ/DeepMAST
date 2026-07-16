@@ -212,6 +212,8 @@ def _repair_drug_md(
     *,
     provider: str | None,
     disease: str,
+    model: str | None = None,
+    request_timeout_seconds: float | None = None,
 ) -> bool:
     """Ask the repair-only agent once, then report whether Markdown changed."""
 
@@ -235,8 +237,13 @@ Current drug.md:
 """
     from src.agents.drug_target.middleware import DrugTargetManagedFilesystemGuardMiddleware
 
+    llm_kwargs: dict[str, object] = {"provider": provider}
+    if model:
+        llm_kwargs["model"] = model
+    if request_timeout_seconds is not None:
+        llm_kwargs["request_timeout"] = request_timeout_seconds
     agent = create_agent(
-        model=create_llm(provider=provider),
+        model=create_llm(**llm_kwargs),
         tools=[
             production_hypothesis_evidence_tool(data_dir),
             production_save_drug_md_tool(data_dir),
@@ -259,6 +266,8 @@ def _repair_report_sections(
     *,
     provider: str | None,
     disease: str,
+    model: str | None = None,
+    request_timeout_seconds: float | None = None,
 ) -> bool:
     """Ask the hybrid repair agent once, then report whether sections changed."""
 
@@ -286,8 +295,13 @@ Current report_sections.json:
 """
     from src.agents.drug_target.middleware import DrugTargetManagedFilesystemGuardMiddleware
 
+    llm_kwargs: dict[str, object] = {"provider": provider}
+    if model:
+        llm_kwargs["model"] = model
+    if request_timeout_seconds is not None:
+        llm_kwargs["request_timeout"] = request_timeout_seconds
     agent = create_agent(
-        model=create_llm(provider=provider),
+        model=create_llm(**llm_kwargs),
         tools=[
             production_hypothesis_evidence_tool(data_dir),
             production_save_report_sections_tool(data_dir, disease),
@@ -390,6 +404,8 @@ async def _publish_report_outputs(
     *,
     disease: str,
     provider: str | None = None,
+    model: str | None = None,
+    request_timeout_seconds: float | None = None,
 ) -> dict[str, Any]:
     """Publish all derived files atomically after all in-memory checks pass."""
 
@@ -420,9 +436,14 @@ async def _publish_report_outputs(
             report_data,
             validation=validation,
         )
-        selector_config: dict[str, Any] = (
-            {"configurable": {"llm_provider": provider}} if provider else {}
-        )
+        configurable: dict[str, object] = {}
+        if provider:
+            configurable["llm_provider"] = provider
+        if model:
+            configurable["llm_model"] = model
+        if request_timeout_seconds is not None:
+            configurable["llm_request_timeout_seconds"] = request_timeout_seconds
+        selector_config: dict[str, Any] = {"configurable": configurable} if configurable else {}
         selector_provider = part4_candidate_selector_provider_from_config(selector_config)
         selection = await generate_part4_candidate_selection(
             report_data,
@@ -552,6 +573,8 @@ def run_drug_report_guardrail(
     *,
     provider: str | None = None,
     disease: str = "",
+    model: str | None = None,
+    request_timeout_seconds: float | None = None,
 ) -> dict[str, Any]:
     """Validate, repair no more than three times, then publish as one transaction."""
 
@@ -587,9 +610,12 @@ def run_drug_report_guardrail(
                 if (run_dir / REPORT_SECTIONS_FILENAME).exists()
                 else _repair_drug_md
             )
-            changed = repair(
-                run_dir, _hard_issues(final), provider=provider, disease=disease
-            )
+            repair_kwargs: dict[str, object] = {"provider": provider, "disease": disease}
+            if model:
+                repair_kwargs["model"] = model
+            if request_timeout_seconds is not None:
+                repair_kwargs["request_timeout_seconds"] = request_timeout_seconds
+            changed = repair(run_dir, _hard_issues(final), **repair_kwargs)
             attempts += 1
         except Exception as exc:  # noqa: BLE001 - audit the provider boundary
             attempts += 1
@@ -625,7 +651,15 @@ def run_drug_report_guardrail(
         )
 
     try:
-        asyncio.run(_publish_report_outputs(run_dir, disease=disease, provider=provider))
+        asyncio.run(
+            _publish_report_outputs(
+                run_dir,
+                disease=disease,
+                provider=provider,
+                model=model,
+                request_timeout_seconds=request_timeout_seconds,
+            )
+        )
         if any(
             not (run_dir / name).exists() or (run_dir / name).stat().st_size == 0
             for name in PUBLICATION_ARTIFACTS

@@ -130,6 +130,13 @@ def test_selected_model_is_shared_by_guarded_orchestrator_and_report_writer(
     compiled_agent = MagicMock()
     compiled_agent.with_config.return_value = compiled_agent
 
+    def capture_subagents(**kwargs):
+        captured["subagent_kwargs"] = kwargs
+        return [
+            {"name": "evidence_assessor"},
+            {"name": "report_writer", "model": selected_model},
+        ]
+
     monkeypatch.setattr(
         agent,
         "create_llm",
@@ -140,11 +147,17 @@ def test_selected_model_is_shared_by_guarded_orchestrator_and_report_writer(
         "create_deep_agent",
         lambda **kwargs: captured.update(kwargs) or compiled_agent,
     )
+    monkeypatch.setattr(
+        agent,
+        "get_subagents",
+        capture_subagents,
+    )
 
     agent.create_drug_target_agent(
         agent.DrugTargetConfig(
             provider="ollama-openai",
             model="qwen3.5:122b",
+            request_timeout_seconds=45.0,
             workflow_mode="guarded_report",
             data_dir=str(tmp_path),
             subagent_models={},
@@ -154,9 +167,58 @@ def test_selected_model_is_shared_by_guarded_orchestrator_and_report_writer(
     assert captured["llm_kwargs"] == {
         "provider": "ollama-openai",
         "model": "qwen3.5:122b",
+        "request_timeout": 45.0,
     }
+    assert captured["subagent_kwargs"]["report_writer_model"] == "qwen3.5:122b"
+    assert captured["subagent_kwargs"]["report_writer_request_timeout_seconds"] == 45.0
+    assert captured["subagent_kwargs"]["model_overrides"]["report_writer"] is selected_model
     assert captured["model"] is selected_model
     report_writer = next(
         subagent for subagent in captured["subagents"] if subagent["name"] == "report_writer"
     )
     assert report_writer["model"] is selected_model
+
+
+def test_unset_timeout_is_omitted_from_guarded_report_construction(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    captured: dict = {}
+    compiled_agent = MagicMock()
+    compiled_agent.with_config.return_value = compiled_agent
+
+    def capture_subagents(**kwargs):
+        captured["subagent_kwargs"] = kwargs
+        return [
+            {"name": "evidence_assessor"},
+            {"name": "report_writer"},
+        ]
+
+    monkeypatch.setattr(
+        agent,
+        "create_llm",
+        lambda **kwargs: captured.setdefault("llm_kwargs", kwargs) or MagicMock(),
+    )
+    monkeypatch.setattr(
+        agent,
+        "get_subagents",
+        capture_subagents,
+    )
+    monkeypatch.setattr(
+        agent,
+        "create_deep_agent",
+        lambda **kwargs: captured.update(kwargs) or compiled_agent,
+    )
+
+    agent.create_drug_target_agent(
+        agent.DrugTargetConfig(
+            provider="ollama-openai",
+            workflow_mode="guarded_report",
+            data_dir=str(tmp_path),
+            subagent_models={},
+        )
+    )
+
+    assert captured["llm_kwargs"] == {"provider": "ollama-openai"}
+    assert "report_writer_model" not in captured["subagent_kwargs"]
+    assert "report_writer_request_timeout_seconds" not in captured["subagent_kwargs"]

@@ -90,19 +90,27 @@ class DrugReportGuardrailMiddleware(_DrugReportRunDirectoryMiddleware):
         data_dir: str | Path | None,
         *,
         provider: str | None = None,
+        model: str | None = None,
+        request_timeout_seconds: float | None = None,
         disease: str = "",
     ) -> None:
         super().__init__(data_dir)
         self._provider = provider
+        self._model = model
+        self._request_timeout_seconds = request_timeout_seconds
         self._disease = disease
 
     def _run(self) -> dict[str, Any]:
         data_dir = self._require_data_dir()
-        result = run_drug_report_guardrail(
-            data_dir,
-            provider=self._provider,
-            disease=self._disease,
-        )
+        guardrail_kwargs: dict[str, Any] = {
+            "provider": self._provider,
+            "disease": self._disease,
+        }
+        if self._model:
+            guardrail_kwargs["model"] = self._model
+        if self._request_timeout_seconds is not None:
+            guardrail_kwargs["request_timeout_seconds"] = self._request_timeout_seconds
+        result = run_drug_report_guardrail(data_dir, **guardrail_kwargs)
         if result.get("status") == "failed":
             final_error_count = result.get("final_error_count", "unknown")
             detail = result.get("publication_error") or f"{final_error_count} hard error(s)"

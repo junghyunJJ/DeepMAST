@@ -437,4 +437,7 @@ def create_llm_from_config(
     provider = (configurable.get("llm_provider") or "").strip() or fallback_provider
     model_name = (configurable.get("llm_model") or "").strip() or None
     kwargs = {"model": model_name} if model_name else {}
+    request_timeout = configurable.get("llm_request_timeout_seconds")
+    if request_timeout is not None:
+        kwargs["request_timeout"] = request_timeout
     return create_llm(provider=provider, **kwargs)

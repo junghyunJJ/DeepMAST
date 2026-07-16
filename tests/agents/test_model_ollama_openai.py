@@ -14,7 +14,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from langchain_openai import ChatOpenAI
 
-from src.agents.model import create_llm, create_ollama_openai_llm
+from src.agents.model import create_llm, create_llm_from_config, create_ollama_openai_llm
 
 
 # ---------------------------------------------------------------------------
@@ -423,3 +423,38 @@ def test_chat_ollama_with_think_injects_native_payload_flag():
     params = llm._chat_params([HumanMessage(content="Return OK")])
 
     assert params["think"] is False
+
+
+def test_create_llm_from_config_passes_explicit_model_and_request_timeout():
+    """Configured Part 4 calls keep the caller-selected client settings."""
+    with patch("src.agents.model.create_llm", autospec=True) as mock_create_llm:
+        create_llm_from_config(
+            {
+                "configurable": {
+                    "llm_provider": "ollama-openai",
+                    "llm_model": "qwen3.5:122b",
+                    "llm_request_timeout_seconds": 45.0,
+                }
+            }
+        )
+
+    assert mock_create_llm.call_args.kwargs == {
+        "provider": "ollama-openai",
+        "model": "qwen3.5:122b",
+        "request_timeout": 45.0,
+    }
+
+
+def test_create_llm_from_config_omits_unset_request_timeout():
+    """An absent timeout leaves the provider factory's existing default intact."""
+    with patch("src.agents.model.create_llm", autospec=True) as mock_create_llm:
+        create_llm_from_config(
+            {
+                "configurable": {
+                    "llm_provider": "ollama-openai",
+                    "llm_request_timeout_seconds": None,
+                }
+            }
+        )
+
+    assert mock_create_llm.call_args.kwargs == {"provider": "ollama-openai"}

@@ -688,6 +688,8 @@ def get_subagents(
     data_dir: str | None = None,
     disease: str | None = None,
     provider: str | None = None,
+    report_writer_model: str | None = None,
+    report_writer_request_timeout_seconds: float | None = None,
     model_overrides: dict[str, BaseChatModel | str] | None = None,
     default_model: BaseChatModel | str | None = None,
     backend: object | None = None,
@@ -811,12 +813,19 @@ def get_subagents(
             WriteFileArgGuardMiddleware(backend_root=safe_data_dir),
         ]
         if name == "report_writer":
-            middleware.append(
-                DrugReportGuardrailMiddleware(
-                    data_dir=safe_data_dir,
-                    provider=provider,
-                    disease=safe_disease,
+            guardrail_kwargs: dict[str, object] = {
+                "data_dir": safe_data_dir,
+                "provider": provider,
+                "disease": safe_disease,
+            }
+            if report_writer_model:
+                guardrail_kwargs["model"] = report_writer_model
+            if report_writer_request_timeout_seconds is not None:
+                guardrail_kwargs["request_timeout_seconds"] = (
+                    report_writer_request_timeout_seconds
                 )
+            middleware.append(
+                DrugReportGuardrailMiddleware(**guardrail_kwargs)
             )
         if allowed_names:
             from src.agents.shared.skills_middleware import SkillsMiddleware

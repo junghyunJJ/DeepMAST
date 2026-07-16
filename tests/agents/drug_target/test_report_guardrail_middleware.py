@@ -531,6 +531,68 @@ def test_hybrid_repair_agent_uses_bounded_sections_payload_and_safe_tools(
     assert "ISSUE_20" not in captured["prompt"]
 
 
+@pytest.mark.parametrize("repair_name", ["_repair_drug_md", "_repair_report_sections"])
+def test_repairs_construct_llm_with_selected_model_and_request_timeout(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    repair_name: str,
+) -> None:
+    _write_sources(tmp_path)
+    if repair_name == "_repair_report_sections":
+        _write_report_sections(tmp_path)
+    captured: dict[str, Any] = {}
+
+    class FakeAgent:
+        def invoke(self, _payload: dict[str, Any]) -> None:
+            return None
+
+    monkeypatch.setattr(
+        report_guardrails,
+        "create_llm",
+        lambda **kwargs: captured.setdefault("llm_kwargs", kwargs) and object(),
+    )
+    monkeypatch.setattr(report_guardrails, "create_agent", lambda **_kwargs: FakeAgent())
+
+    repair = getattr(report_guardrails, repair_name)
+    assert repair(
+        tmp_path,
+        [_hard()],
+        provider="ollama-openai",
+        model="qwen3.5:122b",
+        request_timeout_seconds=45.0,
+        disease="IPF",
+    ) is False
+
+    assert captured["llm_kwargs"] == {
+        "provider": "ollama-openai",
+        "model": "qwen3.5:122b",
+        "request_timeout": 45.0,
+    }
+
+
+def test_repair_omits_unset_model_and_request_timeout(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_sources(tmp_path)
+    captured: dict[str, Any] = {}
+
+    class FakeAgent:
+        def invoke(self, _payload: dict[str, Any]) -> None:
+            return None
+
+    monkeypatch.setattr(
+        report_guardrails,
+        "create_llm",
+        lambda **kwargs: captured.setdefault("llm_kwargs", kwargs) and object(),
+    )
+    monkeypatch.setattr(report_guardrails, "create_agent", lambda **_kwargs: FakeAgent())
+
+    assert report_guardrails._repair_drug_md(
+        tmp_path, [_hard()], provider="ollama-openai", disease="IPF"
+    ) is False
+    assert captured["llm_kwargs"] == {"provider": "ollama-openai"}
+
+
 def test_repair_exception_writes_skipped_final_audit_and_clears_outputs(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -1139,6 +1201,55 @@ def test_middleware_after_hooks_return_metadata_on_success(
     assert json.loads(str(message.content))["drug_report_guardrail"]["status"] == "passed"
 
 
+def test_middleware_forwards_selected_model_and_request_timeout(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    captured: dict[str, Any] = {}
+
+    def run_guardrail(*_args: Any, **kwargs: Any) -> dict[str, Any]:
+        captured.update(kwargs)
+        return {"status": "passed", "final_error_count": 0}
+
+    monkeypatch.setattr(
+        "src.agents.drug_target.middleware.run_drug_report_guardrail", run_guardrail
+    )
+
+    DrugReportGuardrailMiddleware(
+        tmp_path,
+        provider="ollama-openai",
+        model="qwen3.5:122b",
+        request_timeout_seconds=45.0,
+        disease="IPF",
+    ).after_agent({}, None)
+
+    assert captured == {
+        "provider": "ollama-openai",
+        "model": "qwen3.5:122b",
+        "request_timeout_seconds": 45.0,
+        "disease": "IPF",
+    }
+
+
+def test_middleware_omits_unset_model_and_request_timeout(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    captured: dict[str, Any] = {}
+
+    def run_guardrail(*_args: Any, **kwargs: Any) -> dict[str, Any]:
+        captured.update(kwargs)
+        return {"status": "passed", "final_error_count": 0}
+
+    monkeypatch.setattr(
+        "src.agents.drug_target.middleware.run_drug_report_guardrail", run_guardrail
+    )
+
+    DrugReportGuardrailMiddleware(tmp_path, provider="ollama-openai", disease="IPF").after_agent(
+        {}, None
+    )
+
+    assert captured == {"provider": "ollama-openai", "disease": "IPF"}
+
+
 @pytest.mark.asyncio
 async def test_middleware_after_hooks_raise_on_validation_or_publication_failure(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -1252,6 +1363,62 @@ def test_publication_uses_canonical_hypotheses_from_report_sections(
 
     assert captured["payload"] == canonical
     assert captured["hypothesis_source"] == REPORT_SECTIONS_FILENAME
+
+
+def test_publication_passes_selected_llm_configuration_to_part4_selector(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / "drug.md").write_text(DRUG_MD_WITH_HYPOTHESIS, encoding="utf-8")
+    captured: dict[str, Any] = {}
+    _patch_publisher_happy_path(monkeypatch, captured)
+
+    async def selection(*_args: Any, **kwargs: Any) -> dict[str, Any]:
+        captured["selector_config"] = kwargs["config"]
+        return {
+            "schema_version": report_guardrails.PART4_CANDIDATE_SELECTION_SCHEMA_VERSION,
+            "selected_genes": ["GENE1"],
+        }
+
+    monkeypatch.setattr(report_guardrails, "generate_part4_candidate_selection", selection)
+
+    asyncio.run(
+        report_guardrails._publish_report_outputs(
+            tmp_path,
+            disease="IPF",
+            provider="ollama-openai",
+            model="qwen3.5:122b",
+            request_timeout_seconds=45.0,
+        )
+    )
+
+    assert captured["selector_config"] == {
+        "configurable": {
+            "llm_provider": "ollama-openai",
+            "llm_model": "qwen3.5:122b",
+            "llm_request_timeout_seconds": 45.0,
+        }
+    }
+
+
+def test_publication_omits_unset_llm_configuration_from_part4_selector(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / "drug.md").write_text(DRUG_MD_WITH_HYPOTHESIS, encoding="utf-8")
+    captured: dict[str, Any] = {}
+    _patch_publisher_happy_path(monkeypatch, captured)
+
+    async def selection(*_args: Any, **kwargs: Any) -> dict[str, Any]:
+        captured["selector_config"] = kwargs["config"]
+        return {
+            "schema_version": report_guardrails.PART4_CANDIDATE_SELECTION_SCHEMA_VERSION,
+            "selected_genes": ["GENE1"],
+        }
+
+    monkeypatch.setattr(report_guardrails, "generate_part4_candidate_selection", selection)
+
+    asyncio.run(report_guardrails._publish_report_outputs(tmp_path, disease="IPF"))
+
+    assert captured["selector_config"] == {}
 
 
 @pytest.mark.parametrize(
