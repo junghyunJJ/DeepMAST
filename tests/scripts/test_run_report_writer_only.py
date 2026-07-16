@@ -34,7 +34,20 @@ def _passed_artifacts(path):
     for name in runner.REQUIRED_GUARDED_ARTIFACTS:
         (path / name).write_text("x" if not name.endswith(".json") else "{}")
     (path / "drug_report_validation_final.json").write_text(
-        json.dumps({"valid": True, "publication": {"status": "passed"}})
+        json.dumps(
+            {
+                "valid": True,
+                "publication": {
+                    "status": "passed",
+                    "artifacts": [
+                        "part4_candidate_selection.json",
+                        "part4_therapeutic_synthesis.md",
+                        "drug_report.html",
+                    ],
+                    "error": None,
+                },
+            }
+        )
     )
 
 

@@ -20,10 +20,18 @@ SUCCESS_ARTIFACTS = (
     "drug_report_validation_initial.json",
     "drug_report_validation_final.json",
 )
+PUBLICATION_ARTIFACTS = SUCCESS_ARTIFACTS[2:5]
 
 
 def _passed_audit(*, publication_status: str = "passed") -> dict:
-    return {"valid": True, "publication": {"status": publication_status}}
+    return {
+        "valid": True,
+        "publication": {
+            "status": publication_status,
+            "artifacts": list(PUBLICATION_ARTIFACTS),
+            "error": None,
+        },
+    }
 
 
 def _write_success_artifacts(

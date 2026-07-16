@@ -135,9 +135,14 @@ def _assert_nonrepairable(
     result = report_guardrails.run_drug_report_guardrail(tmp_path)
 
     assert result["status"] == "failed"
+    assert result["publication_status"] == "skipped"
     assert result["repair_attempt_count"] == 0
     assert calls == []
-    assert _audit(tmp_path, "drug_report_validation_final.json")["publication"]["status"] == "failed"
+    assert _audit(tmp_path, "drug_report_validation_final.json")["publication"] == {
+        "status": "skipped",
+        "artifacts": [],
+        "error": None,
+    }
 
 
 def test_nonrepairable_input_fails_without_calling_repair(
@@ -186,8 +191,19 @@ def test_guardrail_repairs_until_valid_and_writes_both_audits(
     assert result["repair_attempt_count"] == 1
     assert result["changed_repair_count"] == 1
     assert calls == ["publish"]
-    assert _audit(tmp_path, "drug_report_validation_initial.json")["issues"] == [_hard()]
-    assert _audit(tmp_path, "drug_report_validation_final.json")["publication"]["status"] == "passed"
+    initial = _audit(tmp_path, "drug_report_validation_initial.json")
+    final = _audit(tmp_path, "drug_report_validation_final.json")
+    assert initial["issues"] == [_hard()]
+    assert initial["publication"] == {
+        "status": "pending",
+        "artifacts": [],
+        "error": None,
+    }
+    assert final["publication"] == {
+        "status": "passed",
+        "artifacts": list(report_guardrails.PUBLICATION_ARTIFACTS),
+        "error": None,
+    }
 
 
 def test_guardrail_stops_after_three_changed_repairs(
@@ -209,6 +225,12 @@ def test_guardrail_stops_after_three_changed_repairs(
     assert repairs == ["repair"] * report_guardrails.MAX_DRUG_REPORT_REPAIR_PASSES
     assert result["repair_attempt_count"] == 3
     assert result["changed_repair_count"] == 3
+    assert result["publication_status"] == "skipped"
+    assert _audit(tmp_path, "drug_report_validation_final.json")["publication"] == {
+        "status": "skipped",
+        "artifacts": [],
+        "error": None,
+    }
 
 
 def test_guardrail_stops_when_repair_revalidation_becomes_nonrepairable(
@@ -242,6 +264,7 @@ def test_guardrail_stops_when_repair_revalidation_becomes_nonrepairable(
     assert repairs == ["repair"]
     final = _audit(tmp_path, "drug_report_validation_final.json")
     assert final["checks"]["required_artifacts"]["status"] == "fail"
+    assert final["publication"] == {"status": "skipped", "artifacts": [], "error": None}
 
 
 def test_guardrail_stops_when_drug_md_is_unchanged(
@@ -258,6 +281,12 @@ def test_guardrail_stops_when_drug_md_is_unchanged(
     assert result["status"] == "failed"
     assert result["repair_attempt_count"] == 1
     assert result["changed_repair_count"] == 0
+    assert result["publication_status"] == "skipped"
+    assert _audit(tmp_path, "drug_report_validation_final.json")["publication"] == {
+        "status": "skipped",
+        "artifacts": [],
+        "error": None,
+    }
 
 
 def test_missing_section_4_is_repaired_before_publication(
@@ -333,7 +362,7 @@ def test_repair_prompt_json_encodes_control_characters(
     assert 'Disease: "x\\n## injected"' in captured["prompt"]
 
 
-def test_repair_exception_writes_failed_final_audit_and_clears_outputs(
+def test_repair_exception_writes_skipped_final_audit_and_clears_outputs(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _write_sources(tmp_path)
@@ -351,8 +380,11 @@ def test_repair_exception_writes_failed_final_audit_and_clears_outputs(
     result = report_guardrails.run_drug_report_guardrail(tmp_path)
 
     assert result["status"] == "failed"
+    assert result["publication_status"] == "skipped"
     assert all(not path.exists() for path in _publication_paths(tmp_path))
-    assert "no provider" in _audit(tmp_path, "drug_report_validation_final.json")["guardrail"]["repair_error"]
+    final = _audit(tmp_path, "drug_report_validation_final.json")
+    assert "no provider" in final["guardrail"]["repair_error"]
+    assert final["publication"] == {"status": "skipped", "artifacts": [], "error": None}
     assert (tmp_path / "drug.md").exists()
 
 
@@ -389,10 +421,16 @@ def test_publication_failure_removes_derived_outputs_but_keeps_diagnostics(
     result = report_guardrails.run_drug_report_guardrail(tmp_path)
 
     assert result["status"] == "failed"
+    assert result["publication_status"] == "failed"
     assert all(not path.exists() for path in _publication_paths(tmp_path))
     assert (tmp_path / "drug.md").exists()
     assert (tmp_path / "drug_report_validation_initial.json").exists()
     assert (tmp_path / "drug_report_validation_final.json").exists()
+    assert _audit(tmp_path, "drug_report_validation_final.json")["publication"] == {
+        "status": "failed",
+        "artifacts": [],
+        "error": "RuntimeError: bad html",
+    }
 
 
 def test_success_audit_write_failure_removes_published_outputs(

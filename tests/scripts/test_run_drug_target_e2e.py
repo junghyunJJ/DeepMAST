@@ -29,7 +29,22 @@ async def test_e2e_requires_guarded_audit_and_cleans_backend(tmp_path, monkeypat
         assert config.workflow_mode == "guarded_report"
         for name in runner.guarded_run_succeeded.__globals__["REQUIRED_GUARDED_ARTIFACTS"]:
             (tmp_path / name).write_text("{}" if name.endswith(".json") else "x")
-        (tmp_path / "drug_report_validation_final.json").write_text(json.dumps({"valid": True, "publication": {"status": "passed"}}))
+        (tmp_path / "drug_report_validation_final.json").write_text(
+            json.dumps(
+                {
+                    "valid": True,
+                    "publication": {
+                        "status": "passed",
+                        "artifacts": [
+                            "part4_candidate_selection.json",
+                            "part4_therapeutic_synthesis.md",
+                            "drug_report.html",
+                        ],
+                        "error": None,
+                    },
+                }
+            )
+        )
         return _Agent(), backend
 
     monkeypatch.setattr(runner, "create_drug_target_agent", factory)

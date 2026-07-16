@@ -145,6 +145,7 @@ def _audit_payload(
     repair_attempt_count: int,
     changed_repair_count: int,
     publication_status: str,
+    publication_artifacts: tuple[str, ...] = (),
     repair_error: str | None = None,
     publication_error: str | None = None,
 ) -> dict[str, Any]:
@@ -158,7 +159,8 @@ def _audit_payload(
     }
     payload["publication"] = {
         "status": publication_status,
-        **({"error": publication_error} if publication_error else {}),
+        "artifacts": list(publication_artifacts),
+        "error": publication_error,
     }
     return payload
 
@@ -422,6 +424,7 @@ def _write_final_failure(
     repair_error: str | None = None,
     publication_error: str | None = None,
 ) -> dict[str, Any]:
+    publication_status = "failed" if publication_error is not None else "skipped"
     clear_derived_report_artifacts(data_dir)
     _write_audit(
         data_dir,
@@ -430,7 +433,7 @@ def _write_final_failure(
         status="failed",
         repair_attempt_count=repair_attempt_count,
         changed_repair_count=changed_repair_count,
-        publication_status="failed",
+        publication_status=publication_status,
         repair_error=repair_error,
         publication_error=publication_error,
     )
@@ -440,7 +443,7 @@ def _write_final_failure(
         final=final,
         repair_attempt_count=repair_attempt_count,
         changed_repair_count=changed_repair_count,
-        publication_status="failed",
+        publication_status=publication_status,
         repair_error=repair_error,
         publication_error=publication_error,
     )
@@ -546,6 +549,7 @@ def run_drug_report_guardrail(
             repair_attempt_count=attempts,
             changed_repair_count=changes,
             publication_status="passed",
+            publication_artifacts=PUBLICATION_ARTIFACTS,
         )
     except Exception as audit_error:
         final_audit_tmp = (run_dir / "drug_report_validation_final.json").with_suffix(
