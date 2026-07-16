@@ -272,6 +272,8 @@ def production_save_report_sections_tool(
                     if not (staging / name).is_file():
                         raise ValueError(f"hybrid renderer did not create {name}")
                 _clear_hybrid_artifacts(run_dir)
+                # ponytail: per-file replace can expose mixed artifacts after interruption or to
+                # concurrent readers; add a manifest/generation switch if that contract is needed.
                 for name in _HYBRID_ARTIFACTS:
                     (staging / name).replace(run_dir / name)
 

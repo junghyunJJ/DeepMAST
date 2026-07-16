@@ -19,6 +19,8 @@ def test_report_writer_prompt_owns_sections_payload_and_repair_contract() -> Non
     assert "JSON sections payload" in REPORT_WRITER_PROMPT
     assert "never edit `drug.md`" in REPORT_WRITER_PROMPT
     assert "exactly one `save_report_sections` call" in REPORT_WRITER_PROMPT
+    assert "Load the current sections receipt" not in REPORT_WRITER_PROMPT
+    assert "Use the corrected JSON sections payload supplied" in REPORT_WRITER_PROMPT
     assert "save_report_expansions" not in REPORT_WRITER_PROMPT
     assert "render_drug_md_from_expansions" not in REPORT_WRITER_PROMPT
     assert "generate_drug_html_report" not in REPORT_WRITER_PROMPT

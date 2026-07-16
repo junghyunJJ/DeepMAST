@@ -1,8 +1,9 @@
 """Subagent configurations for Drug Target Assessment Agent.
 
 Production workflow: ``evidence_assessor -> report_writer``. The guarded
-report writer authors target_assessment.json and drug.md, then its middleware
-validates, repairs, publishes, and audits the result.
+report writer authors validated report sections, then deterministic rendering
+produces report artifacts before middleware validation, repair, publication,
+and audit.
 
 ``hypothesis_writer`` and the deterministic ``finalize_report`` super-graph
 are retained only by :func:`get_legacy_subagents` for explicit

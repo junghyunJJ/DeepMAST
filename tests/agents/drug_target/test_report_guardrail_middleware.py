@@ -362,6 +362,41 @@ def test_repair_prompt_json_encodes_control_characters(
     assert 'Disease: "x\\n## injected"' in captured["prompt"]
 
 
+def test_direct_repair_agent_keeps_legacy_prompt_and_tool_pair(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.agents.drug_target.subagents.prompts import DIRECT_MARKDOWN_REPAIR_PROMPT
+
+    _write_sources(tmp_path)
+    captured: dict[str, Any] = {}
+
+    class FakeAgent:
+        def invoke(self, _payload: dict[str, Any]) -> None:
+            return None
+
+    monkeypatch.setattr(report_guardrails, "create_llm", lambda **_kwargs: object())
+    monkeypatch.setattr(
+        report_guardrails,
+        "create_agent",
+        lambda **kwargs: captured.update(kwargs) or FakeAgent(),
+    )
+
+    assert report_guardrails._repair_drug_md(
+        tmp_path,
+        [_hard()],
+        provider="test",
+        disease="IPF",
+    ) is False
+    assert captured["system_prompt"] == DIRECT_MARKDOWN_REPAIR_PROMPT
+    assert [tool.name for tool in captured["tools"]] == [
+        "load_evidence_files",
+        "save_drug_md",
+    ]
+    assert "save_drug_md" in DIRECT_MARKDOWN_REPAIR_PROMPT
+    assert "save_report_sections" not in DIRECT_MARKDOWN_REPAIR_PROMPT
+
+
 def test_repair_exception_writes_skipped_final_audit_and_clears_outputs(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

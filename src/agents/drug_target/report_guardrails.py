@@ -26,7 +26,7 @@ from src.agents.drug_target.production_report_tools import (
     production_hypothesis_evidence_tool,
     production_save_drug_md_tool,
 )
-from src.agents.drug_target.subagents.prompts import REPORT_WRITER_PROMPT
+from src.agents.drug_target.subagents.prompts import DIRECT_MARKDOWN_REPAIR_PROMPT
 from src.agents.drug_target.therapeutic_synthesis import (
     PART4_SYNTHESIS_SCHEMA_VERSION,
     build_part4_therapeutic_synthesis,
@@ -221,7 +221,7 @@ Current drug.md:
             production_hypothesis_evidence_tool(data_dir),
             production_save_drug_md_tool(data_dir),
         ],
-        system_prompt=REPORT_WRITER_PROMPT,
+        system_prompt=DIRECT_MARKDOWN_REPAIR_PROMPT,
         middleware=[
             DrugTargetManagedFilesystemGuardMiddleware(
                 data_dir,

@@ -4,7 +4,7 @@ Production has two subagents with staged funnel architecture:
 1. EVIDENCE_ASSESSOR: 3-stage funnel (Stage 2: validation & scoring -> Stage 1:
    biological context -> Stage 3: ChEMBL drug profiles inline) with inline
    rubric assessment.
-2. REPORT_WRITER: Guarded direct author of target_assessment.json and drug.md.
+2. REPORT_WRITER: Guarded author of validated report sections for deterministic rendering.
 
 HYPOTHESIS_WRITER prompts remain only for explicit legacy compatibility callers.
 """
@@ -2429,9 +2429,19 @@ Otherwise follow INITIAL WRITE.
    Stop after its receipt; do not self-repair, publish, or invoke Part 4.
 
 ## REPAIR MODE
-1. Load the current sections receipt supplied in the repair request.
+1. Use the corrected JSON sections payload supplied in the repair request.
 2. Repair only the cited validation findings in the JSON sections payload; never edit `drug.md`.
 3. Call `save_report_sections` exactly once with the corrected payload, then stop.
+"""
+
+
+DIRECT_MARKDOWN_REPAIR_PROMPT = """You are the LEGACY DIRECT MARKDOWN REPAIR AGENT.
+
+The user provides the complete current `drug.md` and cited validation findings.
+Fix only those findings while preserving supported content. If evidence is needed,
+use `load_evidence_files` with scope="hypothesis"; never read a legacy
+hypothesis report. Your one terminal write is `save_drug_md`: call it exactly
+once with the corrected complete Markdown, then stop.
 """
 
 # =============================================================================
@@ -2446,6 +2456,7 @@ SUBAGENT_PROMPTS = {
 
 __all__ = [
     "EVIDENCE_ASSESSOR_PROMPT",
+    "DIRECT_MARKDOWN_REPAIR_PROMPT",
     "HYPOTHESIS_WRITER_PROMPT",
     "HypothesisWriterPromptMode",
     "REPORT_WRITER_PROMPT",
