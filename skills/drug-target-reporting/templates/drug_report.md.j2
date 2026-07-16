@@ -183,12 +183,12 @@ Each gene is scored on two independent tracks reflecting different types of ther
 
 {% endif %}
 {% if hypothesis_data and hypothesis_data.hypotheses %}
-Evidence coverage: {{ hypothesis_data.evidence_coverage_pct }}% ({{ hypothesis_data.hypotheses_retained }} follow-up recommendations retained from {{ hypothesis_data.hypotheses_generated }} generated)
+Evidence coverage: {{ hypothesis_data.evidence_coverage_pct }}% ({{ hypothesis_data.hypotheses_retained }} follow-up recommendations retained from {{ hypothesis_data.hypotheses_generated }} generated). [source: rubric_assessment]
 
 {% if interpretations.hypotheses_overview %}
 {{ interpretations.hypotheses_overview }}
 {% endif %}
-These recommendations are grounded in the available spatial, Census, OpenTargets, and ChEMBL evidence. They should be read as follow-up experimental or analysis priorities, not as literature-validated causal mechanisms.
+These recommendations are grounded in the available spatial, Census, OpenTargets, and ChEMBL evidence. [source: rubric_assessment] They should be read as follow-up experimental or analysis priorities, not as literature-validated causal mechanisms. [source: rubric_assessment]
 
 {% macro render_hypothesis(h, prefix) -%}
 #### {{ prefix }}.{{ h._tier_rank | default(h.rank) }}. {{ h.title }}
@@ -199,15 +199,15 @@ These recommendations are grounded in the available spatial, Census, OpenTargets
 **Interpretation Tier:** {{ h._tier_label }}{% if h._tier_note is defined and h._tier_note %} — {{ h._tier_note }}{% endif %}
 
 {% endif %}
-**Conservative Interpretation:** {{ h.core_claim }}
+**Core Claim:** {{ h.core_claim }}
 
-**Biological Grounding:** {% if h._biological_grounding_refs is defined and h._biological_grounding_refs %}{{ h._biological_grounding_refs | join(', ') }}{% else %}No Stage 1/spatial grounding reference cited.{% endif %}
+**Biological Grounding:** {% if h._biological_grounding_refs is defined and h._biological_grounding_refs %}{{ h._biological_grounding_refs | join(', ') }}{% else %}No Stage 1/spatial grounding reference cited. [source: gene]{% endif %}
 
-**Target-Disease Support:** {% if h._target_disease_support_refs is defined and h._target_disease_support_refs %}{{ h._target_disease_support_refs | join(', ') }}{% else %}No Stage 2 OpenTargets evidence cited for this recommendation.{% endif %}
+**Target-Disease Support:** {% if h._target_disease_support_refs is defined and h._target_disease_support_refs %}{{ h._target_disease_support_refs | join(', ') }}{% else %}No Stage 2 OpenTargets evidence cited for this recommendation. [source: gene]{% endif %}
 
-**Actionability:** {% if h._actionability_refs is defined and h._actionability_refs %}{{ h._actionability_refs | join(', ') }}{% else %}No Stage 3 druggability evidence cited; treat as analysis or perturbation-development follow-up.{% endif %}
+**Actionability:** {% if h._actionability_refs is defined and h._actionability_refs %}{{ h._actionability_refs | join(', ') }}{% else %}No Stage 3 druggability evidence cited; treat as analysis or perturbation-development follow-up. [source: gene]{% endif %}
 
-**Interpretation Constraint:** {% if h._interpretation_constraint is defined and h._interpretation_constraint %}{{ h._interpretation_constraint }}{% else %}Interpret as an evidence-grounded follow-up recommendation, not a validated causal mechanism.{% endif %}
+**Interpretation Constraint:** {% if h._interpretation_constraint is defined and h._interpretation_constraint %}{{ h._interpretation_constraint }}{% else %}Interpret as an evidence-grounded follow-up recommendation, not a validated causal mechanism. [source: gene]{% endif %}
 
 **Evidence References:**
 {% for ref in h.evidence_references %}
@@ -222,9 +222,9 @@ These recommendations are grounded in the available spatial, Census, OpenTargets
 - Drugs: {{ h.biological_entities.drugs | join(', ') }}
 {% endif %}
 
-**Recommended Follow-up Test:** {{ h.falsifiable_prediction }}
+**Falsifiable Prediction:** {{ h.falsifiable_prediction }}
 
-**Suggested Validation Approach:** {{ h.validation_approach }}
+**Validation Approach:** {{ h.validation_approach }}
 
 {% if h._interpretation is defined and h._interpretation %}
 {{ h._interpretation }}
@@ -240,20 +240,20 @@ These recommendations are grounded in the available spatial, Census, OpenTargets
 {% if primary_hypotheses or secondary_hypotheses %}
 ### 4.1. {{ celltype_context.primary_heading }}
 
-These recommendations cite Stage 1 Census support for same-cell coexpression enrichment in the resolved context ({{ celltype_context.focus_detail }}). Treat them as the strongest {{ celltype_context.focus_short }} follow-up candidates, while reserving causal mechanism claims for downstream validation.
+These recommendations cite Stage 1 Census support for same-cell coexpression enrichment in the resolved context ({{ celltype_context.focus_detail }}). [source: ligand] Treat them as the strongest {{ celltype_context.focus_short }} follow-up candidates, while reserving causal mechanism claims for downstream validation. [source: ligand]
 
 {% if primary_hypotheses %}
 {% for h in primary_hypotheses %}
 {{ render_hypothesis(h, "4.1") }}
 {% endfor %}
 {% else %}
-No primary {{ celltype_context.focus_short }} follow-up candidates met the Stage 1 intrinsic-support criteria.
+No primary {{ celltype_context.focus_short }} follow-up candidates met the Stage 1 intrinsic-support criteria. [source: ligand]
 
 {% endif %}
 ### 4.2. Secondary Spatial-Niche Follow-up Candidates
 
-These recommendations retain spatially colocalized ligand-receptor evidence, but Stage 1 Census does not support them as interest-cell same-cell mechanisms in the resolved context ({{ celltype_context.focus_detail }}). Treat them as spatial-niche or cross-cell follow-up candidates, not as interest-cell-intrinsic target mechanisms.
-When a passed Stage 1 pair is target-cell-depleted or coexpression-depleted, its citation constrains interpretation as framing evidence for non-interest-cell or cross-cell follow-up, not as interest-cell-intrinsic support.
+These recommendations retain spatially colocalized ligand-receptor evidence, but Stage 1 Census does not support them as interest-cell same-cell mechanisms in the resolved context ({{ celltype_context.focus_detail }}). [source: ligand] Treat them as spatial-niche or cross-cell follow-up candidates, not as interest-cell-intrinsic target mechanisms. [source: ligand]
+When a passed Stage 1 pair is target-cell-depleted or coexpression-depleted, its citation constrains interpretation as framing evidence for non-interest-cell or cross-cell follow-up, not as interest-cell-intrinsic support. [source: ligand]
 
 {% if hypothesis_data.secondary_stage1_framing_pairs | default([]) %}
 #### Secondary Stage 1 Framing Evidence
@@ -270,7 +270,7 @@ When a passed Stage 1 pair is target-cell-depleted or coexpression-depleted, its
 {{ render_hypothesis(h, "4.2") }}
 {% endfor %}
 {% else %}
-No secondary spatial-niche follow-up candidates were retained.
+No secondary spatial-niche follow-up candidates were retained. [source: ligand]
 
 {% endif %}
 {% endif %}
@@ -278,7 +278,7 @@ No secondary spatial-niche follow-up candidates were retained.
 {% if gene_level_hypotheses %}
 ### 4.3. Gene-Level/Actionability Follow-up Candidates
 
-These recommendations cite target-disease or actionability evidence but no Stage 1/spatial grounding. Treat them as gene-level follow-up candidates, not spatial-niche or interest-cell-intrinsic evidence.
+These recommendations cite target-disease or actionability evidence but no Stage 1/spatial grounding. [source: gene] Treat them as gene-level follow-up candidates, not spatial-niche or interest-cell-intrinsic evidence. [source: gene]
 
 {% for h in gene_level_hypotheses %}
 {{ render_hypothesis(h, "4.3") }}
@@ -287,20 +287,20 @@ These recommendations cite target-disease or actionability evidence but no Stage
 
 {% if unbucketed_hypotheses %}
 {% for h in unbucketed_hypotheses %}
-{{ render_hypothesis(h, "4") }}
+{{ render_hypothesis(h, "4.1") }}
 {% endfor %}
 {% endif %}
 
 {% if not primary_hypotheses and not secondary_hypotheses and not gene_level_hypotheses and not unbucketed_hypotheses %}
 {% for h in hypothesis_data.hypotheses %}
-{{ render_hypothesis(h, "4") }}
+{{ render_hypothesis(h, "4.1") }}
 {% endfor %}
 {% endif %}
 
 {% if hypothesis_data.gap_analysis %}
 ### Gap Analysis
 
-Evidence coverage: {{ hypothesis_data.gap_analysis.referenced_files | default(0) }} of {{ hypothesis_data.gap_analysis.total_evidence_files | default(0) }} evidence files referenced.
+Evidence coverage: {{ hypothesis_data.gap_analysis.referenced_files | default(0) }} of {{ hypothesis_data.gap_analysis.total_evidence_files | default(0) }} evidence files referenced. [source: gene]
 
 {% if hypothesis_data.gap_analysis.orphan_files | default([]) %}
 **Uncovered evidence files:**
@@ -324,9 +324,21 @@ Evidence coverage: {{ hypothesis_data.gap_analysis.referenced_files | default(0)
 
 ## 5. Pipeline Execution Summary & Recommendations
 
-- Total genes assessed: {{ n_genes }}
-- Featured candidates (Stage 3): {{ n_featured }}
-- Featured genes: {{ stage3_genes | join(', ') }}
+### 5.1. Pipeline Execution Summary
+
+| Metric | Value | Artifact / Source |
+| --- | --- | --- |
+| Total genes assessed | {{ n_genes }} | `evidence/assessment_results.json` |
+| Featured candidates (Stage 3) | {{ n_featured }} | `evidence/assessment_results.json` |
+| Featured genes | {{ stage3_genes | join(', ') }} | `report_data.json` |
+| Render status | Deterministic Jinja report rendered | `drug_report_render.json` |
+| Renderer-owned artifacts | `report_sections.json`, `report_data.json`, `target_assessment.json`, `drug.md` | `drug_report_render.json` |
+
+### 5.2. Evidence-Grounded Follow-up Recommendations
+
+{% for recommendation in pipeline_recommendations %}
+- {{ recommendation.text }} [source: interpretation]
+{% endfor %}
 
 {% if interpretations.final_recommendations %}
 {{ interpretations.final_recommendations }}

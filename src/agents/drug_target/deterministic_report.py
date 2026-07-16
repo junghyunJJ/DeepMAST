@@ -22,6 +22,7 @@ from src.agents.drug_target.part4_candidate_selector import (
     part4_candidate_selector_enabled,
     part4_candidate_selector_provider_from_config,
 )
+from src.agents.drug_target.hybrid_report_sections import REPORT_SECTIONS_FILENAME
 from src.agents.drug_target.therapeutic_synthesis import (
     PART4_SYNTHESIS_FILENAME,
     build_part4_therapeutic_synthesis,
@@ -1717,8 +1718,9 @@ def _drop_preclinical_duplicates(
 def build_report_data(
     data_dir: str,
     disease: str,
-    *,
     hypothesis_data: dict[str, Any] | None = None,
+    *,
+    hypothesis_source: str | None = None,
 ) -> dict[str, Any]:
     base = Path(data_dir).expanduser().resolve()
     require_hypothesis_file = hypothesis_data is None
@@ -1763,8 +1765,8 @@ def build_report_data(
             )
         hypothesis_source = "evidence/hypothesis_report.json"
     else:
-        hypothesis = hypothesis_data
-        hypothesis_source = "drug.md"
+        hypothesis = hypothesis_data.get("hypothesis_report", hypothesis_data)
+        hypothesis_source = hypothesis_source or "drug.md"
     if not isinstance(assessment, dict):
         return _invalid_report_data(
             base,
@@ -2189,9 +2191,40 @@ def _write_deterministic_render_metadata(base: Path, markdown: str) -> None:
     )
 
 
+def _write_hybrid_render_metadata(base: Path, markdown: str) -> None:
+    source_paths = {
+        "report_sections": REPORT_SECTIONS_FILENAME,
+        "report_data": "report_data.json",
+        "target_assessment": "target_assessment.json",
+    }
+    _write_json(
+        base / "drug_report_render.json",
+        {
+            "schema_version": "drug_report_render.v1",
+            "renderer": "deterministic_report.render_hybrid_report",
+            "mode": "hybrid_jinja_qwen",
+            "source_paths": source_paths,
+            "source_hashes": {
+                key: _sha256_path(base / path)
+                for key, path in source_paths.items()
+                if (base / path).exists()
+            },
+            "rendered_drug_md_sha256": _sha256_text(markdown),
+            "required_slot_count": 0,
+            "rendered_slot_count": 0,
+            "missing_slots": [],
+            "extra_slots": [],
+            "pagination_warnings": [],
+            "created_at": _utc_now(),
+        },
+    )
+
+
 def render_report_markdown(
     report_data: dict[str, Any],
     interpretations: dict[str, Any] | None = None,
+    *,
+    pipeline_recommendations: Sequence[Mapping[str, str]] = (),
 ) -> str:
     template_str = _markdown_template_path().read_text(encoding="utf-8")
     env = Environment(
@@ -2200,10 +2233,64 @@ def render_report_markdown(
         trim_blocks=True,
         lstrip_blocks=True,
     )
-    rendered = env.from_string(template_str).render(
-        **_markdown_template_context(report_data, interpretations=interpretations)
-    )
+    context = _markdown_template_context(report_data, interpretations=interpretations)
+    context["pipeline_recommendations"] = [
+        dict(recommendation) for recommendation in pipeline_recommendations
+    ]
+    rendered = env.from_string(template_str).render(**context)
     return _strip_expand_markers(rendered)
+
+
+def render_hybrid_report(
+    data_dir: str,
+    disease: str,
+    report_sections: Mapping[str, Any],
+) -> tuple[str, dict[str, Any]]:
+    """Render renderer-owned artifacts from an already-canonical sections payload."""
+
+    if not isinstance(report_sections, Mapping):
+        raise ValueError("report_sections must be a canonical mapping")
+    sections = dict(report_sections)
+    if sections.get("schema_version") != "hybrid_report_sections/v1":
+        raise ValueError("report_sections must use hybrid_report_sections/v1")
+    hypothesis_report = sections.get("hypothesis_report")
+    recommendations = sections.get("pipeline_recommendations")
+    if not isinstance(hypothesis_report, Mapping) or not isinstance(recommendations, list):
+        raise ValueError("report_sections must include canonical hypotheses and recommendations")
+    if not all(isinstance(recommendation, Mapping) for recommendation in recommendations):
+        raise ValueError("pipeline_recommendations must contain mappings")
+
+    base = Path(data_dir).expanduser().resolve()
+    _write_json(base / REPORT_SECTIONS_FILENAME, sections)
+    report_data = build_report_data(
+        str(base),
+        disease,
+        hypothesis_data=sections,
+        hypothesis_source=REPORT_SECTIONS_FILENAME,
+    )
+    issues = validate_report_data(report_data)
+    if issues:
+        raise ValueError(f"hybrid report data is invalid: {issues[0]['code']}")
+    _write_json(base / "report_data.json", report_data)
+
+    target_assessment_issues = _persist_target_assessment_if_applicable(
+        base,
+        report_data,
+    )
+    if target_assessment_issues:
+        raise ValueError(
+            f"target assessment is invalid: {target_assessment_issues[0]['code']}"
+        )
+    if not (base / "target_assessment.json").exists():
+        raise ValueError("hybrid report rendering requires target_assessment.json")
+
+    markdown = render_report_markdown(
+        report_data,
+        pipeline_recommendations=recommendations,
+    )
+    (base / "drug.md").write_text(markdown, encoding="utf-8")
+    _write_hybrid_render_metadata(base, markdown)
+    return markdown, report_data
 
 
 async def finalize_report_mvp(state: dict, config: RunnableConfig) -> dict:

@@ -41,6 +41,40 @@ def _write_evidence(tmp_path: Path) -> Path:
     return evidence_dir
 
 
+def _write_renderer_evidence(tmp_path: Path) -> Path:
+    evidence_dir = _write_evidence(tmp_path)
+    (evidence_dir / "assessment_results.json").write_text(
+        json.dumps(
+            {
+                "disease": "IPF",
+                "rubric_assessment": [
+                    {
+                        "gene": "CD4",
+                        "classification": "validated_target",
+                        "priority": "high",
+                        "combined_total": 12,
+                        "stage3_candidate": True,
+                    },
+                    {
+                        "gene": "FN1",
+                        "classification": "exploratory_target",
+                        "priority": "medium",
+                        "combined_total": 8,
+                        "stage3_candidate": True,
+                    },
+                ],
+                "stage3_candidates": [{"gene": "CD4"}, {"gene": "FN1"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / "lr_candidates.json").write_text(
+        json.dumps({"pairs": [{"ligand": "FN1", "receptor": "CD4"}]}),
+        encoding="utf-8",
+    )
+    return evidence_dir
+
+
 def _hypothesis(
     rank: int,
     category: str,
@@ -349,3 +383,96 @@ def test_canonicalize_report_sections_ignores_caller_entity_allowlist(
 
     assert canonical is None
     assert "Unsupported entity token" in "\n".join(errors)
+
+
+def test_hybrid_renderer_uses_canonical_sections_with_host_owned_provenance(
+    tmp_path: Path,
+) -> None:
+    from src.agents.drug_target.deterministic_report import (
+        build_report_data,
+        render_hybrid_report,
+        render_report_markdown,
+    )
+    from src.agents.drug_target.tools import validate_drug_report_finalization
+
+    evidence_dir = _write_renderer_evidence(tmp_path)
+    canonical, errors = canonicalize_report_sections(
+        _payload(),
+        evidence_dir,
+        _source_paths(),
+        _report_data(),
+    )
+
+    assert errors == []
+    assert canonical is not None
+    report_data = build_report_data(
+        str(tmp_path),
+        "IPF",
+        hypothesis_data=canonical,
+        hypothesis_source=REPORT_SECTIONS_FILENAME,
+    )
+    markdown = render_report_markdown(
+        report_data,
+        pipeline_recommendations=canonical["pipeline_recommendations"],
+    )
+
+    for section in range(1, 6):
+        assert f"## {section}." in markdown
+    assert any(
+        line.startswith("#### 4.") and line.endswith("FN1-CD4 mechanism")
+        for line in markdown.splitlines()
+    )
+    for field in (
+        "**Category:**",
+        "**Core Claim:**",
+        "- Genes:",
+        "**Falsifiable Prediction:**",
+        "**Validation Approach:**",
+    ):
+        assert field in markdown
+    assert "### 5.1. Pipeline Execution Summary" in markdown
+    assert "| Total genes assessed |" in markdown
+    assert "### 5.2. Evidence-Grounded Follow-up Recommendations" in markdown
+    for recommendation in canonical["pipeline_recommendations"]:
+        assert (
+            f"{recommendation['text']} [source: interpretation]" in markdown
+        )
+        assert markdown.count(recommendation["text"]) == 1
+        assert json.dumps(recommendation["supporting_sources"]) not in markdown
+    assert "supporting_sources" not in markdown
+    for sentence in (
+        "These recommendations are grounded",
+        "Treat them as spatial-niche",
+        "Treat them as gene-level",
+    ):
+        line = next(line for line in markdown.splitlines() if sentence in line)
+        assert "[source:" in line
+
+    rendered_markdown, rendered_report_data = render_hybrid_report(
+        str(tmp_path),
+        "IPF",
+        canonical,
+    )
+
+    assert rendered_markdown == (tmp_path / "drug.md").read_text(encoding="utf-8")
+    assert rendered_report_data["sections"]["hypotheses"]["sources"] == [
+        REPORT_SECTIONS_FILENAME
+    ]
+    assert json.loads((tmp_path / REPORT_SECTIONS_FILENAME).read_text(encoding="utf-8")) == canonical
+    render_metadata = json.loads(
+        (tmp_path / "drug_report_render.json").read_text(encoding="utf-8")
+    )
+    assert render_metadata["mode"] == "hybrid_jinja_qwen"
+    assert render_metadata["source_hashes"]["report_sections"]
+    validation = json.loads(
+        validate_drug_report_finalization.invoke(
+            {"data_dir": str(tmp_path), "publication_mode": "agent_markdown"}
+        )
+    )
+    assert validation["valid"] is True
+    finding_types = {
+        finding["type"]
+        for finding in validation["checks"]["validate_drug_md"]["raw"]["findings"]
+    }
+    assert "UNANCHORED_SENTENCE" not in finding_types
+    assert "FABRICATED_DRUG_NAME" not in finding_types

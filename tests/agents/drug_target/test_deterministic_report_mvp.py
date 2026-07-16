@@ -321,6 +321,44 @@ def test_build_report_data_accepts_hypotheses_without_legacy_file(
     assert "evidence/hypothesis_report.json" not in report_data["sources"]
 
 
+def test_build_report_data_records_explicit_injected_hypothesis_source(
+    tmp_path: Path,
+) -> None:
+    from src.agents.drug_target.deterministic_report import build_report_data
+
+    workspace = _copy_baseline_workspace(tmp_path)
+    hypothesis_data = {
+        "hypotheses": [
+            {
+                "rank": 1,
+                "title": "Injected report section hypothesis",
+                "category": "Mechanism of Action",
+                "core_claim": "FN1 is a testable follow-up candidate.",
+                "biological_entities": {
+                    "genes": ["FN1"],
+                    "pathways": [],
+                    "cell_types": [],
+                    "drugs": [],
+                },
+                "falsifiable_prediction": "Measure FN1 after perturbation.",
+                "validation_approach": "Use a matched FN1 perturbation assay.",
+                "evidence_references": ["stage3_FN1.json"],
+            }
+        ]
+    }
+
+    report_data = build_report_data(
+        str(workspace),
+        "idiopathic pulmonary fibrosis",
+        hypothesis_data=hypothesis_data,
+        hypothesis_source="report_sections.json",
+    )
+
+    assert report_data["sections"]["hypotheses"]["sources"] == [
+        "report_sections.json"
+    ]
+
+
 def test_report_mvp_defaults_absent_gwas_audit_fields(tmp_path: Path) -> None:
     from src.agents.drug_target.deterministic_report import build_report_data
 
