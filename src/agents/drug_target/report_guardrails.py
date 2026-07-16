@@ -542,9 +542,10 @@ def _write_final_failure(
     changed_repair_count: int,
     repair_error: str | None = None,
     publication_error: str | None = None,
+    clear_sources: bool = False,
 ) -> dict[str, Any]:
     publication_status = "failed" if publication_error is not None else "skipped"
-    clear_derived_report_artifacts(data_dir)
+    clear_derived_report_artifacts(data_dir, include_sources=clear_sources)
     _write_audit(
         data_dir,
         "drug_report_validation_final.json",
@@ -620,6 +621,7 @@ def run_drug_report_guardrail(
             final,
             repair_attempt_count=attempts,
             changed_repair_count=changes,
+            clear_sources=True,
         )
     if _nonrepairable_check_failure(final):
         return _write_final_failure(

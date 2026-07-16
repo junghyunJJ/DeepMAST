@@ -365,8 +365,8 @@ def test_guarded_middleware_fails_closed_without_nonempty_report_sections(
         }
     ]
     assert final["publication"] == {"status": "skipped", "artifacts": [], "error": None}
-    assert (tmp_path / "drug.md").exists()
-    assert (tmp_path / "target_assessment.json").exists()
+    assert not (tmp_path / "drug.md").exists()
+    assert not (tmp_path / "target_assessment.json").exists()
     assert all(not path.exists() for path in _publication_paths(tmp_path))
 
 
