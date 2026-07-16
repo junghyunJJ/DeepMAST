@@ -260,6 +260,28 @@ async def test_writer_process_writes_trace_callback_boundaries(tmp_path, monkeyp
     assert all("secret" not in line for line in trace_file.read_text().splitlines())
 
 
+def test_trace_callback_records_sections_save_failure_receipt(tmp_path: Path) -> None:
+    trace = tmp_path / "writer.trace"
+    callback = runner.ReportWriterTraceCallback(str(trace))
+    try:
+        callback.on_tool_end(
+            json.dumps({"saved": False, "errors": ["missing evidence footprint"]}),
+            name="save_report_sections",
+        )
+        event = json.loads(trace.read_text(encoding="utf-8").splitlines()[-1])
+        assert event["event"] == "tool_end"
+        assert event["tool"] == "save_report_sections"
+        assert event["saved"] is False
+        assert event["errors"] == ["missing evidence footprint"]
+
+        callback.on_tool_end("secret tool output", name="load_evidence_files")
+        other_event = json.loads(trace.read_text(encoding="utf-8").splitlines()[-1])
+        assert "saved" not in other_event
+        assert "errors" not in other_event
+    finally:
+        callback.close()
+
+
 def test_trace_callback_records_error_classes_without_error_messages(tmp_path):
     trace_file = tmp_path / "writer.trace"
     callback = runner.ReportWriterTraceCallback(str(trace_file))

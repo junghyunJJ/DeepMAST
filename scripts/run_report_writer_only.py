@@ -61,8 +61,19 @@ class ReportWriterTraceCallback(BaseCallbackHandler):
         tool = serialized.get("name")
         self._write("tool_start", tool=tool if isinstance(tool, str) else "unknown")
 
-    def on_tool_end(self, output: Any, **_kwargs: Any) -> None:
-        self._write("tool_end")
+    def on_tool_end(self, output: Any, *, name: str | None = None, **_kwargs: Any) -> None:
+        fields: dict[str, object] = {}
+        if name == "save_report_sections":
+            fields["tool"] = name
+            try:
+                receipt = json.loads(str(getattr(output, "content", output)))
+            except json.JSONDecodeError:
+                receipt = None
+            if isinstance(receipt, dict) and isinstance(receipt.get("saved"), bool):
+                fields["saved"] = receipt["saved"]
+                if receipt["saved"] is False and isinstance(receipt.get("errors"), list):
+                    fields["errors"] = receipt["errors"]
+        self._write("tool_end", **fields)
 
     def on_tool_error(self, error: BaseException, **_kwargs: Any) -> None:
         self._write("tool_error", error=type(error).__name__)
