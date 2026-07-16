@@ -8,7 +8,7 @@ import os
 import re
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 from langchain_core.tools import tool
 
@@ -952,6 +952,95 @@ def _validate_primary_epithelial_intrinsic_coverage(
     return [_PRIMARY_EPITHELIAL_INTRINSIC_COVERAGE_MISSING]
 
 
+def _validate_canonical_hypothesis_fields(
+    report: Mapping[str, Any],
+    evidence_dir: Path,
+    *,
+    min_hypotheses: int,
+    max_hypotheses: int,
+) -> list[str]:
+    errors: list[str] = []
+    hypotheses = report.get("hypotheses", [])
+    hypothesis_count = len(hypotheses) if isinstance(hypotheses, list) else 0
+
+    # Legacy persistence has historically allowed any count/category coverage;
+    # its call passes 0/0 to retain that behavior.
+    if min_hypotheses or max_hypotheses:
+        if hypothesis_count < min_hypotheses or hypothesis_count > max_hypotheses:
+            errors.append(
+                "HYPOTHESIS_COUNT_OUT_OF_RANGE: "
+                f"Expected {min_hypotheses}-{max_hypotheses} hypotheses, "
+                f"found {hypothesis_count}."
+            )
+
+        present_categories = {
+            hypothesis.get("category")
+            for hypothesis in hypotheses
+            if isinstance(hypothesis, dict)
+            and hypothesis.get("category") in REQUIRED_HYPOTHESIS_CATEGORIES
+        }
+        missing_categories = sorted(
+            REQUIRED_HYPOTHESIS_CATEGORIES - present_categories
+        )
+        if missing_categories:
+            errors.append(
+                "MISSING_REQUIRED_CATEGORIES: Hypothesis report is missing "
+                f"required thematic categories: {missing_categories}."
+            )
+
+    from src.agents.drug_target.tools.evidence_loader import (
+        _tag_hypothesis_prediction_grounding,
+        _validate_hypothesis_report_references,
+        _validate_hypothesis_report_topn_and_failed_pairs,
+    )
+
+    errors.extend(_validate_hypothesis_report_references(dict(report), evidence_dir))
+    errors.extend(_validate_featured_gene_level_references(dict(report), evidence_dir))
+    errors.extend(validate_hypothesis_grounding(dict(report), evidence_dir))
+    errors.extend(_validate_primary_epithelial_intrinsic_coverage(dict(report), evidence_dir))
+
+    diagnostic = _validate_hypothesis_report_topn_and_failed_pairs(
+        dict(report),
+        evidence_dir,
+    )
+    if diagnostic["reject_reason"]:
+        errors.append(diagnostic["reject_reason"])
+
+    prediction_grounding = _tag_hypothesis_prediction_grounding(
+        copy.deepcopy(dict(report)),
+        evidence_dir=evidence_dir,
+    )
+    if prediction_grounding.get("grounded", 0) > 0:
+        errors.append(
+            "One or more falsifiable predictions contain fabricated or "
+            "non-evidence-derived numeric values. Use qualitative wording unless "
+            "the numeric value appears in a cited evidence file."
+        )
+    if prediction_grounding.get("unverified", 0) > 0:
+        errors.append(
+            "One or more falsifiable predictions contain unverified numeric values. "
+            "Use qualitative wording unless the numeric value appears in a cited "
+            "evidence file."
+        )
+    return errors
+
+
+def validate_canonical_hypothesis_report(
+    report: Mapping[str, Any],
+    evidence_dir: Path,
+    *,
+    min_hypotheses: int = 4,
+    max_hypotheses: int = 6,
+) -> list[str]:
+    """Validate an already-canonical v2 hypothesis report without writing files."""
+    return _validate_canonical_hypothesis_fields(
+        report,
+        evidence_dir,
+        min_hypotheses=min_hypotheses,
+        max_hypotheses=max_hypotheses,
+    )
+
+
 def persist_hypothesis_report(data_dir: str | Path, report: Any) -> dict:
     """Validate, canonicalize, and write evidence/hypothesis_report.json."""
     base = _resolve_hypothesis_report_data_dir(data_dir)
@@ -980,7 +1069,6 @@ def persist_hypothesis_report(data_dir: str | Path, report: Any) -> dict:
 
     from src.agents.drug_target.tools.evidence_loader import (
         _tag_hypothesis_prediction_grounding,
-        _validate_hypothesis_report_references,
         _validate_hypothesis_report_topn_and_failed_pairs,
     )
 
@@ -990,26 +1078,31 @@ def persist_hypothesis_report(data_dir: str | Path, report: Any) -> dict:
     canonical["gap_analysis"] = diag["gap_analysis"]
     diagnostics.extend(_autofix_intrinsic_stage1_cell_anchor(canonical, evidence_dir))
 
-    deterministic_errors: list[str] = []
-    ref_errors = _validate_hypothesis_report_references(canonical, evidence_dir)
-    deterministic_errors.extend(ref_errors)
-    gene_ref_errors = _validate_featured_gene_level_references(canonical, evidence_dir)
-    deterministic_errors.extend(gene_ref_errors)
-    grounding_errors = validate_hypothesis_grounding(canonical, evidence_dir)
-    deterministic_errors.extend(grounding_errors)
-    primary_coverage_errors = _validate_primary_epithelial_intrinsic_coverage(
+    deterministic_errors = validate_canonical_hypothesis_report(
         canonical,
         evidence_dir,
+        min_hypotheses=0,
+        max_hypotheses=0,
     )
-    deterministic_errors.extend(primary_coverage_errors)
-    if diag["reject_reason"]:
-        deterministic_errors.append(diag["reject_reason"])
+    non_prediction_errors = [
+        error
+        for error in deterministic_errors
+        if not error.startswith("One or more falsifiable predictions contain")
+    ]
+    if non_prediction_errors:
+        deterministic_errors = non_prediction_errors
     if deterministic_errors:
         result["errors"].extend(deterministic_errors)
         result["topn_coverage"] = diag["topn_coverage"]
         result["failed_pair_violations"] = diag["failed_pair_violations"]
+        grounding_errors = validate_hypothesis_grounding(canonical, evidence_dir)
         if grounding_errors:
             result["hypothesis_grounding_violations"] = grounding_errors
+        if any("falsifiable predictions contain" in error for error in deterministic_errors):
+            result["prediction_grounding_summary"] = _tag_hypothesis_prediction_grounding(
+                copy.deepcopy(canonical),
+                evidence_dir=evidence_dir,
+            )
         _write_hypothesis_rejection(evidence_dir, result)
         return result
 

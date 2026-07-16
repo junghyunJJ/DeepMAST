@@ -8,6 +8,10 @@ from src.agents.drug_target.tools import (
     save_hypothesis_report,
     validate_evidence_references,
 )
+from src.agents.drug_target.tools.hypothesis_schema import (
+    canonicalize_hypothesis_report,
+    validate_canonical_hypothesis_report,
+)
 
 
 def _write_hypothesis_evidence(tmp_path: Path) -> Path:
@@ -184,6 +188,26 @@ def _strict_report() -> dict:
 
 def _clone_report() -> dict:
     return json.loads(json.dumps(_strict_report()))
+
+
+def test_validate_canonical_hypothesis_report_is_pure(tmp_path: Path) -> None:
+    data_dir = _write_hypothesis_evidence(tmp_path)
+    report = _clone_report()
+    canonical, errors, _ = canonicalize_hypothesis_report(
+        report,
+        data_dir / "evidence",
+        legacy_compat=False,
+    )
+
+    assert canonical is not None
+    assert errors == []
+    assert validate_canonical_hypothesis_report(
+        canonical,
+        data_dir / "evidence",
+        min_hypotheses=0,
+        max_hypotheses=0,
+    ) == []
+    assert not (data_dir / "evidence" / "hypothesis_report.json").exists()
 
 
 def _write_featured_gene_reference_evidence(
@@ -1227,6 +1251,23 @@ def test_save_hypothesis_report_rejects_missing_strict_scores(tmp_path: Path) ->
     assert result["saved"] is False
     assert any("scores.composite" in err for err in result["errors"])
     assert not (data_dir / "evidence" / "hypothesis_report.json").exists()
+
+
+def test_save_hypothesis_report_keeps_numeric_prediction_check_after_other_gates(
+    tmp_path: Path,
+) -> None:
+    data_dir = _write_hypothesis_evidence(tmp_path)
+    report = _clone_report()
+    report["hypotheses"][0]["evidence_references"] = ["stage3_missing.json"]
+    report["hypotheses"][0]["falsifiable_prediction"] = "Expect a 40% reduction."
+
+    result = json.loads(
+        save_hypothesis_report.invoke({"data_dir": str(data_dir), "report": report})
+    )
+
+    assert result["saved"] is False
+    assert any("not in evidence/ directory" in error for error in result["errors"])
+    assert not any("unverified numeric values" in error for error in result["errors"])
 
 
 def test_save_evidence_legacy_wrapper_writes_v2_projection(tmp_path: Path) -> None:
