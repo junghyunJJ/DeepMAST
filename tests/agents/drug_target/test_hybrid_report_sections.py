@@ -144,8 +144,13 @@ def _source_paths() -> set[str]:
     }
 
 
-def _recommendation_card() -> dict:
-    return {"allowed_genes": ["CD4", "FN1"], "allowed_drugs": []}
+def _report_data() -> dict:
+    return {
+        "candidates": [
+            {"gene": "CD4", "drugs": []},
+            {"gene": "FN1", "drugs": []},
+        ]
+    }
 
 
 def test_validate_canonical_hypothesis_report_accepts_current_contract_without_write(
@@ -198,7 +203,7 @@ def test_canonicalize_report_sections_rejects_invalid_hypothesis_contract(
         payload,
         evidence_dir,
         _source_paths(),
-        _recommendation_card(),
+        _report_data(),
     )
 
     assert canonical is None
@@ -214,7 +219,7 @@ def test_canonicalize_report_sections_accepts_bounded_recommendations(
         _payload(),
         evidence_dir,
         _source_paths(),
-        _recommendation_card(),
+        _report_data(),
     )
 
     assert errors == []
@@ -233,6 +238,10 @@ def test_canonicalize_report_sections_accepts_bounded_recommendations(
         "[source: evidence/assessment_results.json] Prioritize FN1 validation.",
         "FN1 is a supported candidate in deterministic analysis.",
         "Prioritize FN1 validation\nbefore advancing target selection.",
+        (
+            "Prioritize orthogonal validation of FN1 before advancing target "
+            "selection. Evaluate CD4 signals in future mechanistic assays."
+        ),
     ],
 )
 def test_canonicalize_report_sections_rejects_unsafe_recommendation_text(
@@ -247,7 +256,7 @@ def test_canonicalize_report_sections_rejects_unsafe_recommendation_text(
         payload,
         evidence_dir,
         _source_paths(),
-        _recommendation_card(),
+        _report_data(),
     )
 
     assert canonical is None
@@ -274,7 +283,7 @@ def test_canonicalize_report_sections_rejects_invalid_recommendation_count(
         payload,
         evidence_dir,
         _source_paths(),
-        _recommendation_card(),
+        _report_data(),
     )
 
     assert canonical is None
@@ -313,8 +322,30 @@ def test_canonicalize_report_sections_rejects_invalid_recommendation_sources(
         payload,
         evidence_dir,
         _source_paths(),
-        _recommendation_card(),
+        _report_data(),
     )
 
     assert canonical is None
     assert expected in "\n".join(errors)
+
+
+def test_canonicalize_report_sections_ignores_caller_entity_allowlist(
+    tmp_path: Path,
+) -> None:
+    evidence_dir = _write_evidence(tmp_path)
+    payload = _payload()
+    payload["pipeline_recommendations"][0]["text"] = (
+        "Prioritize NINTEDANIB testing before advancing target selection."
+    )
+    report_data = _report_data()
+    report_data["allowed_genes"] = ["CD4", "FN1", "NINTEDANIB"]
+
+    canonical, errors = canonicalize_report_sections(
+        payload,
+        evidence_dir,
+        _source_paths(),
+        report_data,
+    )
+
+    assert canonical is None
+    assert "Unsupported entity token" in "\n".join(errors)

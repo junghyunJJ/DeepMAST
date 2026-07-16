@@ -45,26 +45,42 @@ _FUTURE_ACTION_RE = re.compile(
 )
 
 
-def _card_strings(card: Mapping[str, Any], *keys: str) -> list[str]:
-    values: list[str] = []
-    for key in keys:
-        raw = card.get(key)
-        if not isinstance(raw, list):
-            continue
-        for value in raw:
-            if isinstance(value, str) and value.strip() and value not in values:
-                values.append(value)
-    return values
-
-
 def _recommendation_validation_card(
-    recommendation_card: Mapping[str, Any],
+    report_data: Mapping[str, Any],
     source_paths: set[str],
 ) -> dict[str, Any]:
+    genes: list[str] = []
+    drugs: list[str] = []
+    candidates = report_data.get("candidates")
+    if isinstance(candidates, list):
+        for candidate in candidates:
+            if not isinstance(candidate, Mapping):
+                continue
+            gene = candidate.get("gene")
+            if isinstance(gene, str) and gene.strip() and gene not in genes:
+                genes.append(gene)
+            for field in ("drugs", "clinical_drugs", "preclinical_drugs"):
+                entries = candidate.get(field)
+                if not isinstance(entries, list):
+                    continue
+                for entry in entries:
+                    if isinstance(entry, str):
+                        name = entry
+                    elif isinstance(entry, Mapping):
+                        name = (
+                            entry.get("name")
+                            or entry.get("drug_name")
+                            or entry.get("pref_name")
+                            or entry.get("molecule_pref_name")
+                        )
+                    else:
+                        continue
+                    if isinstance(name, str) and name.strip() and name not in drugs:
+                        drugs.append(name)
     return {
         "id": "pipeline_recommendations",
-        "allowed_genes": _card_strings(recommendation_card, "allowed_genes", "genes"),
-        "allowed_drugs": _card_strings(recommendation_card, "allowed_drugs", "drugs"),
+        "allowed_genes": genes,
+        "allowed_drugs": drugs,
         "allowed_terms": [],
         "allowed_numbers": [],
         "allowed_sources": sorted(source_paths),
@@ -75,7 +91,7 @@ def canonicalize_report_sections(
     payload: Any,
     evidence_dir: Path,
     source_paths: Collection[str],
-    recommendation_card: Mapping[str, Any],
+    report_data: Mapping[str, Any],
 ) -> tuple[dict[str, Any] | None, list[str]]:
     """Return a canonical hybrid payload without persisting it."""
     try:
@@ -102,7 +118,7 @@ def canonicalize_report_sections(
         for source in source_paths
         if isinstance(source, str) and source.strip()
     }
-    card = _recommendation_validation_card(recommendation_card, known_sources)
+    card = _recommendation_validation_card(report_data, known_sources)
     recommendations: list[dict[str, Any]] = []
     for index, recommendation in enumerate(parsed.pipeline_recommendations):
         text = recommendation.text.strip()
@@ -120,6 +136,12 @@ def canonicalize_report_sections(
         if "\n" in text or "\r" in text:
             errors.append(
                 f"pipeline_recommendations[{index}].text must be a single line."
+            )
+        if text[-1:] not in {".", "!", "?"} or len(
+            re.findall(r"[.!?]", text)
+        ) != 1:
+            errors.append(
+                f"pipeline_recommendations[{index}].text must contain exactly one sentence."
             )
         if _MARKDOWN_RECOMMENDATION_RE.search(text):
             errors.append(
