@@ -7,6 +7,13 @@
 
 > **Current production contract:** `DrugReportRunCleanupMiddleware -> evidence_assessor -> report_writer -> DrugReportGuardrailMiddleware`. Production Section 4 is in `drug.md`; success needs two audits and seven artifacts including `drug_report_validation_final.json`. Configured-directory tools are forced safe, `general-purpose` is blocked, and custom tools are rejected. `legacy_hypothesis` is the explicit outer-super-graph/finalizer compatibility path; guarded runners are writer-only, E2E, and BC.
 
+**Production entrypoints**: construct `create_drug_target_agent` directly with
+`workflow_mode="guarded_report"`, or run `run_report_writer_only.py`, `run_drug_target_e2e.py`, and `run_drug_target_agent_bc.py`.
+
+**Legacy compatibility wrapper integration**: `integration.py` invokes
+`drug_target_graph.ainvoke(...)`, whose graph forces `legacy_hypothesis`; it is
+not a guarded production entrypoint.
+
 ## 1. Overview
 
 ### Architecture: Guarded 2-Subagent + 3-Stage Funnel
@@ -399,7 +406,7 @@ the druggability_matrix before writing, and validates the schema contract.
 | `validators.py` | `validate_cited_only_provenance()` |
 | `tools/report_expansion_schema.py` | `ReportExpansionsPayload`, `validate_report_expansions()`, `_build_provenance_index()` |
 | `super_graph.py` | `DrugTargetState`, `run_deep_agent()`, `build_drug_target_super_graph()` |
-| `graph_builder.py` | `drug_target_graph` (compiled `CompiledStateGraph`) |
+| `graph_builder.py` | Legacy compatibility `drug_target_graph` (compiled `CompiledStateGraph`) |
 
 ---
 
@@ -578,7 +585,7 @@ targets.json (optional) ──────────────────�
 | File | Role | Key Contents |
 |------|------|-------------|
 | `src/agents/drug_target/super_graph.py` | Legacy compatibility super-graph | `DrugTargetState`, `run_deep_agent()`, `build_drug_target_super_graph()` |
-| `src/agents/drug_target/graph_builder.py` | Compiled graph entry | `drug_target_graph` (module-level `CompiledStateGraph`) |
+| `src/agents/drug_target/graph_builder.py` | Legacy compatibility graph entry | `drug_target_graph` (module-level `CompiledStateGraph`) |
 | `src/agents/drug_target/finalize_report.py` | Legacy finalizer | Retained explicit compatibility implementation |
 | `src/agents/drug_target/finalize_report_prompts.py` | Legacy finalizer LLM prompts | `FINALIZE_REPORT_SYSTEM_PROMPT`, `FINALIZE_REPORT_USER_TEMPLATE` |
 | `src/agents/drug_target/validators.py` | Cited-only validation | `validate_cited_only_provenance()` |
@@ -593,5 +600,5 @@ targets.json (optional) ──────────────────�
 | `src/agents/drug_target/tools/evidence_loader.py` | I/O helpers | `load_lr_candidates`, `load_evidence_files`, `save_evidence` |
 | `src/agents/drug_target/tools/report_expansion_schema.py` | Expansion schema | `ReportExpansionsPayload`, `validate_report_expansions()`, `_build_provenance_index()` |
 | `src/agents/drug_target/tools/common.py` | Cognitive tools | `sequential_thinking`, `think_tool`, `validate_quality` |
-| `src/agents/drug_target/integration.py` | Reporter bridge | `run_drug_target_assessment()` — async tool for deep_interpreter; invokes `drug_target_graph.ainvoke(...)` |
+| `src/agents/drug_target/integration.py` | Legacy compatibility reporter bridge | `run_drug_target_assessment()` invokes `drug_target_graph.ainvoke(...)`, which forces `legacy_hypothesis` |
 | `docs/drugtarget/output_schema.json` | JSON schema | Contract schema for `target_assessment.json` |

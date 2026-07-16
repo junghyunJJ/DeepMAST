@@ -48,7 +48,7 @@ def guarded_run_succeeded(data_dir: Path) -> bool:
     return (
         audit.get("valid") is True
         and isinstance(publication, dict)
-        and publication.get("status") in {"passed", "published"}
+        and publication.get("status") == "passed"
         and all((data_dir / name).is_file() and (data_dir / name).stat().st_size > 0 for name in REQUIRED_GUARDED_ARTIFACTS)
     )
 

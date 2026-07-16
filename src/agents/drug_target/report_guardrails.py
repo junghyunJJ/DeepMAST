@@ -540,7 +540,7 @@ def run_drug_report_guardrail(
             status="passed",
             repair_attempt_count=attempts,
             changed_repair_count=changes,
-            publication_status="published",
+            publication_status="passed",
         )
     except Exception as audit_error:
         final_audit_tmp = (run_dir / "drug_report_validation_final.json").with_suffix(
@@ -562,5 +562,5 @@ def run_drug_report_guardrail(
         final=final,
         repair_attempt_count=attempts,
         changed_repair_count=changes,
-        publication_status="published",
+        publication_status="passed",
     )

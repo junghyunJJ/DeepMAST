@@ -6,6 +6,8 @@ import json
 import pytest
 
 from scripts import run_report_writer_only as runner
+from scripts import run_drug_target_agent_bc as bc_runner
+from scripts import run_drug_target_e2e as e2e_runner
 
 
 class _Agent:
@@ -34,6 +36,17 @@ def _passed_artifacts(path):
     (path / "drug_report_validation_final.json").write_text(
         json.dumps({"valid": True, "publication": {"status": "passed"}})
     )
+
+
+def test_guarded_runner_predicate_rejects_published_alias_and_is_shared(tmp_path):
+    _passed_artifacts(tmp_path)
+    (tmp_path / "drug_report_validation_final.json").write_text(
+        json.dumps({"valid": True, "publication": {"status": "published"}})
+    )
+
+    assert runner.guarded_run_succeeded(tmp_path) is False
+    assert e2e_runner.guarded_run_succeeded is runner.guarded_run_succeeded
+    assert bc_runner.guarded_run_succeeded is runner.guarded_run_succeeded
 
 
 @pytest.mark.asyncio

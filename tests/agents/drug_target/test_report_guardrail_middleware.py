@@ -182,11 +182,12 @@ def test_guardrail_repairs_until_valid_and_writes_both_audits(
     result = report_guardrails.run_drug_report_guardrail(tmp_path)
 
     assert result["status"] == "passed"
+    assert result["publication_status"] == "passed"
     assert result["repair_attempt_count"] == 1
     assert result["changed_repair_count"] == 1
     assert calls == ["publish"]
     assert _audit(tmp_path, "drug_report_validation_initial.json")["issues"] == [_hard()]
-    assert _audit(tmp_path, "drug_report_validation_final.json")["publication"]["status"] == "published"
+    assert _audit(tmp_path, "drug_report_validation_final.json")["publication"]["status"] == "passed"
 
 
 def test_guardrail_stops_after_three_changed_repairs(
@@ -662,6 +663,27 @@ def test_production_wrappers_force_run_directory_and_fixed_options(
     ]
 
 
+@pytest.mark.parametrize("filename", ["hypothesis_report.json", "report_data.json"])
+def test_assessment_save_evidence_rejects_reserved_prior_report_outputs_without_raw_dispatch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, filename: str
+) -> None:
+    from src.agents.drug_target import production_report_tools
+
+    raw_calls: list[dict[str, Any]] = []
+    monkeypatch.setattr(
+        production_report_tools,
+        "save_evidence",
+        lambda **kwargs: raw_calls.append(kwargs) or "unexpected",
+    )
+
+    result = production_assessment_save_evidence_tool(tmp_path).invoke(
+        {"filename": filename, "data": {"legacy": True}}
+    )
+
+    assert json.loads(result)["saved"] is False
+    assert raw_calls == []
+
+
 def test_production_skill_reader_rejects_traversal_outside_and_symlink_escape(tmp_path: Path) -> None:
     skills = tmp_path / "skills"
     allowed = skills / "drug-target-reporting"
@@ -675,6 +697,7 @@ def test_production_skill_reader_rejects_traversal_outside_and_symlink_escape(tm
     assert "safe guidance" in reader.invoke(
         {"skill_path": "skills/drug-target-reporting/SKILL.md"}
     )
+    assert "safe guidance" in reader.invoke({"skill_path": str(allowed / "SKILL.md")})
     for attempted_path in ("../outside.md", str(outside), "drug-target-reporting/escape.md"):
         result = reader.invoke({"skill_path": attempted_path})
         assert "not in the allowed skills" in result
