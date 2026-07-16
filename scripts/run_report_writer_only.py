@@ -60,7 +60,7 @@ def _validate_timeouts(args: argparse.Namespace) -> None:
         raise ValueError("request timeout must be shorter than run timeout")
 
 
-def infer_timeout_phase(data_dir: Path) -> str:
+def _infer_timeout_phase(data_dir: Path) -> str:
     if (data_dir / "drug_report_validation_final.json").is_file():
         return "publication"
     if (data_dir / "report_sections.json").is_file():
@@ -112,7 +112,7 @@ async def main() -> int:
             timeout=args.run_timeout_seconds,
         )
     except TimeoutError:
-        phase = infer_timeout_phase(data_dir)
+        phase = _infer_timeout_phase(data_dir)
         model_label = args.model or "default"
         print(
             "ERROR: guarded report timed out after "

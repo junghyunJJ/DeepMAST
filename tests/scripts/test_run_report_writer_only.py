@@ -245,4 +245,4 @@ def test_timeout_phase_uses_only_current_run_artifacts(tmp_path, artifact, phase
     if artifact:
         (tmp_path / artifact).write_text("{}")
 
-    assert runner.infer_timeout_phase(tmp_path) == phase
+    assert runner._infer_timeout_phase(tmp_path) == phase
