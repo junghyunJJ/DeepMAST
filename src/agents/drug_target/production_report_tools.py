@@ -18,7 +18,6 @@ from src.agents.drug_target.tools import (
     save_evidence,
     save_target_assessment,
 )
-from src.agents.drug_target.tools.stage_logic import build_evidence_summary
 from src.agents.drug_target.deterministic_report import (
     build_report_data,
     render_hybrid_report,
@@ -78,28 +77,6 @@ def production_hypothesis_evidence_tool(data_dir: str | Path) -> StructuredTool:
     """Bind report-writer reads to the safe hypothesis scope."""
 
     return _bound_evidence_tool(data_dir, "hypothesis")
-
-
-def production_evidence_summary_tool(data_dir: str | Path) -> StructuredTool:
-    """Bind the reference card to this run and disable legacy hypotheses."""
-
-    run_dir = _resolve_run_dir(data_dir)
-
-    def build_evidence_summary_for_run(
-        data_dir: str = "", include_legacy_hypothesis: bool = False
-    ) -> Any:
-        _ = data_dir, include_legacy_hypothesis
-        return _invoke(
-            build_evidence_summary,
-            data_dir=str(run_dir),
-            include_legacy_hypothesis=False,
-        )
-
-    return StructuredTool.from_function(
-        func=build_evidence_summary_for_run,
-        name="build_evidence_summary",
-        description="Build the guarded run's non-legacy reference card.",
-    )
 
 
 def _is_forbidden_prior_report_output(filename: str) -> bool:

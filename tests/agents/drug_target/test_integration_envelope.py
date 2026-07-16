@@ -74,6 +74,7 @@ def test_guarded_report_writer_has_one_sections_write_boundary(tmp_path: Path) -
 
     assert "save_report_sections" in tool_names
     assert not {
+        "build_evidence_summary",
         "save_drug_md",
         "save_target_assessment",
         "save_hypothesis_report",

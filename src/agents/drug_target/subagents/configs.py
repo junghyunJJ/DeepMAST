@@ -37,14 +37,12 @@ from src.agents.drug_target.middleware import (
 from src.agents.drug_target.production_report_tools import (
     production_assessment_evidence_tool,
     production_assessment_save_evidence_tool,
-    production_evidence_summary_tool,
     production_hypothesis_evidence_tool,
     production_save_report_sections_tool,
     production_skill_reader_tool,
 )
 from src.agents.drug_target.tools import (
     apply_semantic_celltype_proxy,
-    build_evidence_summary,
     compute_rubric_scores,
     finalize_stage1_artifacts,
     list_census_cell_types,
@@ -334,7 +332,6 @@ SUBAGENT_CONFIGS = {
         "tools": [
             load_lr_candidates,
             load_evidence_files,
-            build_evidence_summary,
             read_skill_file,
             production_save_report_sections_tool,
             sequential_thinking,
@@ -766,7 +763,6 @@ def get_subagents(
         else:
             replacements = {
                 "load_evidence_files": production_hypothesis_evidence_tool(safe_data_dir),
-                "build_evidence_summary": production_evidence_summary_tool(safe_data_dir),
                 "read_skill_file": production_skill_reader_tool(root, ("drug-target-reporting",)),
             }
             tools = [

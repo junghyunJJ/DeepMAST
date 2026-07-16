@@ -23,7 +23,6 @@ from src.agents.drug_target.middleware import (
 from src.agents.drug_target.production_report_tools import (
     production_assessment_evidence_tool,
     production_assessment_save_evidence_tool,
-    production_evidence_summary_tool,
     production_hypothesis_evidence_tool,
     production_save_drug_md_tool,
     production_save_target_assessment_tool,
@@ -1004,11 +1003,6 @@ def test_production_wrappers_force_run_directory_and_fixed_options(
     )
     monkeypatch.setattr(
         production_report_tools,
-        "build_evidence_summary",
-        lambda **kwargs: calls.append(("summary", kwargs)) or "summary",
-    )
-    monkeypatch.setattr(
-        production_report_tools,
         "save_evidence",
         lambda **kwargs: calls.append(("save_evidence", kwargs)) or "saved",
     )
@@ -1021,9 +1015,6 @@ def test_production_wrappers_force_run_directory_and_fixed_options(
     assert production_assessment_evidence_tool(tmp_path).invoke(
         {"data_dir": str(other), "scope": "hypothesis"}
     ) == "evidence"
-    assert production_evidence_summary_tool(tmp_path).invoke(
-        {"data_dir": str(other), "include_legacy_hypothesis": True}
-    ) == "summary"
     assert production_assessment_save_evidence_tool(tmp_path).invoke(
         {"data_dir": str(other), "filename": "stage2_note.json", "data": {"ok": True}}
     ) == "saved"
@@ -1039,7 +1030,6 @@ def test_production_wrappers_force_run_directory_and_fixed_options(
     safe = str(tmp_path.resolve())
     assert calls == [
         ("evidence", {"data_dir": safe, "scope": "assessment"}),
-        ("summary", {"data_dir": safe, "include_legacy_hypothesis": False}),
         (
             "save_evidence",
             {"data_dir": safe, "filename": "stage2_note.json", "data": {"ok": True}},
