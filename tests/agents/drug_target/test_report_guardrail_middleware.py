@@ -663,7 +663,16 @@ def test_production_wrappers_force_run_directory_and_fixed_options(
     ]
 
 
-@pytest.mark.parametrize("filename", ["hypothesis_report.json", "report_data.json"])
+@pytest.mark.parametrize(
+    "filename",
+    [
+        "hypothesis_report.json",
+        "hypothesis_report.summarizer_sanitized.json",
+        "hypothesis_report_last_rejection.json",
+        "hypothesis_report_draft.json",
+        "report_data.json",
+    ],
+)
 def test_assessment_save_evidence_rejects_reserved_prior_report_outputs_without_raw_dispatch(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, filename: str
 ) -> None:
