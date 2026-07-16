@@ -465,7 +465,7 @@ def create_drug_target_agent(
     # 4. Get subagent specs — primary subagents use allow-listed shared
     #    SkillsMiddleware + activation middleware instead of deepagents native
     #    `subagent["skills"]` auto-loading.
-    subagent_kwargs = dict(
+    subagent_kwargs: dict[str, Any] = dict(
         data_dir=resolved_data_dir,
         disease=config.disease,
         model_overrides=config.subagent_models,

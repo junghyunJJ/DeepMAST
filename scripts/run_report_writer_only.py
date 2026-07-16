@@ -92,8 +92,9 @@ async def main() -> int:
             os.environ.pop("DRUG_TARGET_SKIP_EVIDENCE_ASSESSOR", None)
         else:
             os.environ["DRUG_TARGET_SKIP_EVIDENCE_ASSESSOR"] = old_skip
-        if backend is not None and hasattr(backend, "cleanup"):
-            backend.cleanup()
+        cleanup = getattr(backend, "cleanup", None)
+        if callable(cleanup):
+            cleanup()
     if guarded_run_succeeded(data_dir):
         print("DONE")
         return 0

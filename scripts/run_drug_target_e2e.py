@@ -60,8 +60,9 @@ async def main() -> int:
             os.environ.pop("DRUG_TARGET_DATA_DIR", None)
         else:
             os.environ["DRUG_TARGET_DATA_DIR"] = old_data_dir
-        if backend is not None and hasattr(backend, "cleanup"):
-            backend.cleanup()
+        cleanup = getattr(backend, "cleanup", None)
+        if callable(cleanup):
+            cleanup()
 
 
 if __name__ == "__main__":

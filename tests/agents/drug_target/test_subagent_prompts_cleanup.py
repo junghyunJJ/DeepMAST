@@ -91,7 +91,8 @@ def test_validate_drug_report_finalization_require_critic_remains_legacy_path() 
     assert validate_drug_report_finalization is not None
 
     # Unwrap LangChain tool wrapper to inspect the underlying callable
-    underlying = getattr(validate_drug_report_finalization, "func", validate_drug_report_finalization)
+    underlying = getattr(validate_drug_report_finalization, "func", None)
+    assert callable(underlying)
 
     sig = inspect.signature(underlying)
     params = sig.parameters

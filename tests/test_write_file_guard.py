@@ -125,7 +125,7 @@ def test_mutation_tools_block_all_managed_report_artifacts(tool_name, file_path)
 
     result = middleware.wrap_tool_call(request, handler)
     assert called is False
-    assert "report_data.json" in str(result.content)
+    assert "report_data.json" in str(getattr(result, "content", ""))
 
 
 def test_write_file_allows_hypothesis_report_near_miss():

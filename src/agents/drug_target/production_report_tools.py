@@ -31,14 +31,16 @@ def _resolve_run_dir(data_dir: str | Path) -> Path:
     return path
 
 
-def _invoke(tool: BaseTool | Any, **kwargs: Any) -> Any:
+def _invoke(tool: Any, **kwargs: Any) -> Any:
     function = getattr(tool, "func", None)
     if callable(function):
         return function(**kwargs)
     invoke = getattr(tool, "invoke", None)
     if callable(invoke):
         return invoke(kwargs)
-    return tool(**kwargs)
+    if callable(tool):
+        return tool(**kwargs)
+    raise TypeError("tool must expose func, invoke, or be callable")
 
 
 def _bound_evidence_tool(data_dir: str | Path, scope: str) -> StructuredTool:

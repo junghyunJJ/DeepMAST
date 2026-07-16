@@ -35,7 +35,7 @@ FIXTURE_ROOT = Path(__file__).parent / "fixtures"
 
 
 def _invoke(
-    data_dir: Path,
+    data_dir: Path | str,
     *,
     allow_legacy: bool = True,
     publication_mode: str = "renderer",
@@ -685,7 +685,7 @@ def test_finalization_fails_when_failed_suffix_leaks_to_drug_md(tmp_path):
 def test_finalization_reports_unverified_numeric_prediction_by_default(tmp_path):
     d = _copy_fixture("clean", tmp_path)
     hyp_path = d / "evidence" / "hypothesis_report.json"
-    payload = {"hypotheses": []}
+    payload: dict[str, object] = {"hypotheses": []}
     payload["prediction_grounding_summary"] = {
         "unverified": 1,
         "unverified_indices": [0],
@@ -708,7 +708,7 @@ def test_finalization_strict_mode_fails_unverified_numeric_prediction(
 ):
     d = _copy_fixture("clean", tmp_path)
     hyp_path = d / "evidence" / "hypothesis_report.json"
-    payload = {"hypotheses": []}
+    payload: dict[str, object] = {"hypotheses": []}
     payload["prediction_grounding_summary"] = {
         "unverified": 1,
         "unverified_indices": [0],
@@ -1039,9 +1039,11 @@ def test_validate_drug_md_str_uses_resolve_data_dir(tmp_path, monkeypatch):
     monkeypatch.setattr(_el, "_resolve_data_dir", _fake_resolve)
 
     # validate_drug_md is a @tool; unwrap to call the underlying function.
-    impl = getattr(validate_drug_md, "func", None) or validate_drug_md
+    impl = getattr(validate_drug_md, "func", None)
+    assert callable(impl)
     raw_json = impl(nonexistent_str)
     raw = json.loads(raw_json) if isinstance(raw_json, str) else raw_json
+    assert isinstance(raw, dict)
     # The redirect must have succeeded — valid=True (clean fixture passes).
     assert raw.get("valid") is True, (
         f"Expected valid=True after _resolve_data_dir redirect; got: {raw}"
@@ -1065,10 +1067,12 @@ def test_validate_drug_md_path_skips_resolve_data_dir(tmp_path, monkeypatch):
     import src.agents.drug_target.tools.evidence_loader as _el
     monkeypatch.setattr(_el, "_resolve_data_dir", _must_not_be_called)
 
-    impl = getattr(validate_drug_md, "func", None) or validate_drug_md
+    impl = getattr(validate_drug_md, "func", None)
+    assert callable(impl)
     # Pass a Path — must NOT raise AssertionError.
     raw_json = impl(clean_copy)  # clean_copy is already a Path
     raw = json.loads(raw_json) if isinstance(raw_json, str) else raw_json
+    assert isinstance(raw, dict)
     assert raw.get("valid") is True, (
         f"Expected valid=True when called with Path; got: {raw}"
     )

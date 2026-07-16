@@ -86,7 +86,7 @@ def clear_derived_report_artifacts(
     """Remove only derived outputs after validating the run-directory boundary."""
 
     run_dir = _resolve_safe_run_dir(data_dir)
-    names = list(PUBLICATION_ARTIFACTS)
+    names: list[str] = list(PUBLICATION_ARTIFACTS)
     if include_audits:
         names.extend(GUARDRAIL_AUDIT_ARTIFACTS)
     if include_sources:
@@ -97,8 +97,13 @@ def clear_derived_report_artifacts(
 
 
 def _validate(data_dir: Path) -> dict[str, Any]:
-    tool = getattr(validate_drug_report_finalization, "func", validate_drug_report_finalization)
-    result = tool(data_dir=str(data_dir), publication_mode="agent_markdown")
+    tool = getattr(validate_drug_report_finalization, "func", None)
+    if callable(tool):
+        result = tool(data_dir=str(data_dir), publication_mode="agent_markdown")
+    else:
+        result = validate_drug_report_finalization.invoke(
+            {"data_dir": str(data_dir), "publication_mode": "agent_markdown"}
+        )
     if isinstance(result, str):
         parsed = json.loads(result)
     else:

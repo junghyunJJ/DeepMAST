@@ -122,10 +122,13 @@ def _invoke_build_evidence_summary(
         from src.agents.drug_target.tools.stage_logic import build_evidence_summary
 
         # .func gives direct access to the unwrapped function under the @tool decorator
-        raw = build_evidence_summary.func(
+        impl = getattr(build_evidence_summary, "func", None)
+        assert callable(impl)
+        raw = impl(
             str(data_dir),
             include_legacy_hypothesis=include_legacy_hypothesis,
         )
+    assert isinstance(raw, str)
     return json.loads(raw)
 
 

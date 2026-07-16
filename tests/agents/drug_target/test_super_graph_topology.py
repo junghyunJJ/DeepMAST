@@ -60,7 +60,7 @@ def _reloaded_guarded_export(monkeypatch, environment: dict[str, str | None]):
     with monkeypatch.context() as local:
         local.setattr(dotenv, "load_dotenv", lambda: False)
         importlib.reload(graph_builder)
-    graph_builder.load_dotenv = dotenv.load_dotenv
+    setattr(graph_builder, "load_dotenv", dotenv.load_dotenv)
 
 
 def test_production_export_is_direct_deep_agent_runnable(monkeypatch) -> None:

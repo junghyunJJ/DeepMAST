@@ -42,7 +42,7 @@ def _get_provider_literal_values(filepath: Path) -> list[str]:
                         return [
                             elt.value
                             for elt in annotation.slice.elts
-                            if isinstance(elt, ast.Constant)
+                            if isinstance(elt, ast.Constant) and isinstance(elt.value, str)
                         ]
     return []
 

@@ -669,7 +669,7 @@ def _tool_data_dir_names(tools: Sequence[BaseTool | Callable]) -> set[str]:
         try:
             import inspect
 
-            if "data_dir" in inspect.signature(target).parameters:
+            if callable(target) and "data_dir" in inspect.signature(target).parameters:
                 names.add(str(name))
         except (TypeError, ValueError):
             pass
@@ -749,7 +749,7 @@ def get_subagents(
     for subagent in subagents:
         name = subagent["name"]
         allowed_names = tuple(skill_names.get(name, ()))
-        tools = list(subagent["tools"])
+        tools = [tool for tool in subagent["tools"] if tool is not None]
         if name == "evidence_assessor":
             tools = [
                 production_assessment_evidence_tool(safe_data_dir)
@@ -802,7 +802,9 @@ def get_subagents(
         middleware = [
             DrugTargetManagedFilesystemGuardMiddleware(
                 safe_data_dir,
-                data_dir_tool_names=_tool_data_dir_names(tools),
+                data_dir_tool_names=_tool_data_dir_names(
+                    [tool for tool in tools if isinstance(tool, BaseTool) or callable(tool)]
+                ),
             ),
             WriteFileArgGuardMiddleware(backend_root=safe_data_dir),
         ]

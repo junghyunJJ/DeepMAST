@@ -49,8 +49,9 @@ async def main() -> int:
         print(f"ERROR: {exc}")
         return 1
     finally:
-        if backend is not None and hasattr(backend, "cleanup"):
-            backend.cleanup()
+        cleanup = getattr(backend, "cleanup", None)
+        if callable(cleanup):
+            cleanup()
 
 
 if __name__ == "__main__":

@@ -150,7 +150,8 @@ def _compact_target_drug(entry: dict) -> dict:
 
 
 def _compact_ot_payload(filename: str, payload: dict, top_n: int = _OT_COMPACT_TOP_N) -> dict:
-    target_info = payload.get("target_info") if isinstance(payload.get("target_info"), dict) else {}
+    target_info = payload.get("target_info")
+    target_info = target_info if isinstance(target_info, dict) else {}
     disease_evidence = payload.get("disease_evidence")
     associations = payload.get("associations")
     target_drug_rows = _target_drug_rows(payload)

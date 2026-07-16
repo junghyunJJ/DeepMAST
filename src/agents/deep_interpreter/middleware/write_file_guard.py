@@ -247,7 +247,7 @@ class WriteFileArgGuardMiddleware(AgentMiddleware):
                 normalized = self._normalize_path(
                     args,
                     self._backend_root,
-                    patched.tool_call.get("id", ""),
+                    patched.tool_call.get("id") or "",
                 )
                 if isinstance(normalized, ToolMessage):
                     return normalized
@@ -269,7 +269,7 @@ class WriteFileArgGuardMiddleware(AgentMiddleware):
                 normalized = self._normalize_path(
                     args,
                     self._backend_root,
-                    patched.tool_call.get("id", ""),
+                    patched.tool_call.get("id") or "",
                 )
                 if isinstance(normalized, ToolMessage):
                     return normalized
