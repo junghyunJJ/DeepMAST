@@ -809,6 +809,12 @@ def get_subagents(
             WriteFileArgGuardMiddleware(backend_root=safe_data_dir),
         ]
         if name == "report_writer":
+            middleware.append(
+                HypothesisRetryLoopMiddleware(
+                    stop_after_first_save=True,
+                    terminal_save_tool_names=("save_report_sections",),
+                )
+            )
             guardrail_kwargs: dict[str, Any] = {
                 "data_dir": safe_data_dir,
                 "provider": provider,

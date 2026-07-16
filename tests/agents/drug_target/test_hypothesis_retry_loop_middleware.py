@@ -28,6 +28,20 @@ def _save_request(
     )
 
 
+def _sections_save_request(call_id: str = "sections-1") -> ToolCallRequest:
+    return ToolCallRequest(
+        tool_call={
+            "name": "save_report_sections",
+            "args": {"payload": {"schema_version": "hybrid_report_sections/v1"}},
+            "id": call_id,
+            "type": "tool_call",
+        },
+        tool=None,
+        state={},
+        runtime=None,  # type: ignore[arg-type]
+    )
+
+
 def _read_skill_request(
     call_id: str = "skill-call-1",
     skill_path: str = "skills/drug-target-hypothesis/SKILL.md",
@@ -60,6 +74,23 @@ def test_stop_after_first_save_requests_end_after_model() -> None:
     assert isinstance(result, ToolMessage)
     assert middleware.after_model({}, None) == {"jump_to": "end"}  # type: ignore[arg-type]
     assert middleware.after_model({}, None) is None  # type: ignore[arg-type]
+
+
+def test_terminal_save_tool_requests_end_after_first_sections_save() -> None:
+    middleware = HypothesisRetryLoopMiddleware(
+        stop_after_first_save=True,
+        terminal_save_tool_names=("save_report_sections",),
+    )
+
+    def handler(req: ToolCallRequest) -> ToolMessage:
+        return ToolMessage(
+            content=json.dumps({"saved": False}),
+            tool_call_id=req.tool_call["id"],
+        )
+
+    middleware.wrap_tool_call(_sections_save_request(), handler)
+
+    assert middleware.after_model({}, None) == {"jump_to": "end"}  # type: ignore[arg-type]
 
 
 def test_stop_after_first_save_blocks_additional_save_calls() -> None:

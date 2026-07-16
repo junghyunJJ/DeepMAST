@@ -9,6 +9,8 @@ from types import SimpleNamespace
 
 import pytest
 
+from src.agents.drug_target.middleware import HypothesisRetryLoopMiddleware
+
 
 EXPECTED_KEYS = {"success", "drug_md", "target_assessment", "errors", "evidence_truncated"}
 SUCCESS_ARTIFACTS = (
@@ -81,6 +83,15 @@ def test_guarded_report_writer_has_one_sections_write_boundary(tmp_path: Path) -
         "save_report_expansions",
         "render_drug_md_from_expansions",
     } & tool_names
+    terminal_save_middleware = [
+        middleware
+        for middleware in writer["middleware"]
+        if isinstance(middleware, HypothesisRetryLoopMiddleware)
+        and middleware._stop_after_first_save is True
+        and middleware._terminal_save_tool_names == ("save_report_sections",)
+    ]
+
+    assert len(terminal_save_middleware) == 1
 
 
 def test_legacy_hypothesis_writer_retains_legacy_tools_and_prompt(

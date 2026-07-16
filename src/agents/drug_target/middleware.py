@@ -255,11 +255,13 @@ class HypothesisRetryLoopMiddleware(AgentMiddleware):
         self,
         *,
         stop_after_first_save: bool = False,
+        terminal_save_tool_names: Sequence[str] = (),
         max_hypothesis_save_attempts: int | None = None,
         single_read_skill_paths: Sequence[str] = (),
     ) -> None:
         super().__init__()
         self._stop_after_first_save = stop_after_first_save
+        self._terminal_save_tool_names = tuple(terminal_save_tool_names)
         self._max_hypothesis_save_attempts = max_hypothesis_save_attempts
         self._single_read_skill_paths = tuple(single_read_skill_paths)
         self._seen_single_read_skill_paths: set[str] = set()
@@ -296,6 +298,8 @@ class HypothesisRetryLoopMiddleware(AgentMiddleware):
 
     def _is_hypothesis_report_save_request(self, request: ToolCallRequest) -> bool:
         tool_name = request.tool_call.get("name")
+        if tool_name in self._terminal_save_tool_names:
+            return True
         if tool_name == "save_hypothesis_report":
             return True
         args = request.tool_call.get("args") or {}
