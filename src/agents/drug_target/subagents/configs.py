@@ -13,7 +13,7 @@ are retained only by :func:`get_legacy_subagents` for explicit
 import json
 import re
 from pathlib import Path
-from typing import Callable, Literal, Sequence
+from typing import Any, Callable, Literal, Sequence
 
 from langchain_core.language_models import BaseChatModel
 from langchain_core.tools import BaseTool
@@ -813,7 +813,7 @@ def get_subagents(
             WriteFileArgGuardMiddleware(backend_root=safe_data_dir),
         ]
         if name == "report_writer":
-            guardrail_kwargs: dict[str, object] = {
+            guardrail_kwargs: dict[str, Any] = {
                 "data_dir": safe_data_dir,
                 "provider": provider,
                 "disease": safe_disease,

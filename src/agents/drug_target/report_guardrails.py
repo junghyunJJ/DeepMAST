@@ -237,7 +237,7 @@ Current drug.md:
 """
     from src.agents.drug_target.middleware import DrugTargetManagedFilesystemGuardMiddleware
 
-    llm_kwargs: dict[str, object] = {"provider": provider}
+    llm_kwargs: dict[str, Any] = {"provider": provider}
     if model:
         llm_kwargs["model"] = model
     if request_timeout_seconds is not None:
@@ -295,7 +295,7 @@ Current report_sections.json:
 """
     from src.agents.drug_target.middleware import DrugTargetManagedFilesystemGuardMiddleware
 
-    llm_kwargs: dict[str, object] = {"provider": provider}
+    llm_kwargs: dict[str, Any] = {"provider": provider}
     if model:
         llm_kwargs["model"] = model
     if request_timeout_seconds is not None:
@@ -610,7 +610,7 @@ def run_drug_report_guardrail(
                 if (run_dir / REPORT_SECTIONS_FILENAME).exists()
                 else _repair_drug_md
             )
-            repair_kwargs: dict[str, object] = {"provider": provider, "disease": disease}
+            repair_kwargs: dict[str, Any] = {"provider": provider, "disease": disease}
             if model:
                 repair_kwargs["model"] = model
             if request_timeout_seconds is not None:
