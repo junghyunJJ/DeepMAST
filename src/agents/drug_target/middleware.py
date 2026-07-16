@@ -110,6 +110,7 @@ class DrugReportGuardrailMiddleware(_DrugReportRunDirectoryMiddleware):
         guardrail_kwargs: dict[str, Any] = {
             "provider": self._provider,
             "disease": self._disease,
+            "require_report_sections": True,
         }
         if self._model:
             guardrail_kwargs["model"] = self._model

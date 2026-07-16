@@ -330,6 +330,43 @@ def test_legacy_guardrail_keeps_direct_markdown_repair_fallback(
     assert calls == ["markdown", "publish"]
 
 
+def test_guarded_middleware_fails_closed_without_report_sections(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_sources(tmp_path)
+    calls: list[str] = []
+    monkeypatch.setattr(
+        report_guardrails,
+        "_validate",
+        lambda _data_dir: _validation(valid=True),
+    )
+    monkeypatch.setattr(
+        report_guardrails,
+        "_repair_drug_md",
+        lambda *_args, **_kwargs: calls.append("markdown") or True,
+    )
+    _patch_publish(monkeypatch, calls)
+
+    with pytest.raises(RuntimeError, match="drug_report_validation_final"):
+        DrugReportGuardrailMiddleware(tmp_path).after_agent({}, None)
+
+    assert calls == []
+    final = _audit(tmp_path, "drug_report_validation_final.json")
+    assert final["valid"] is False
+    assert final["guardrail"]["status"] == "failed"
+    assert final["issues"] == [
+        {
+            "code": "REPORT_SECTIONS_REQUIRED",
+            "severity": "critical",
+            "message": "guarded report publication requires nonempty report_sections.json",
+        }
+    ]
+    assert final["publication"] == {"status": "skipped", "artifacts": [], "error": None}
+    assert (tmp_path / "drug.md").exists()
+    assert (tmp_path / "target_assessment.json").exists()
+    assert all(not path.exists() for path in _publication_paths(tmp_path))
+
+
 def test_guardrail_stops_when_repair_revalidation_becomes_nonrepairable(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -1261,6 +1298,7 @@ def test_middleware_forwards_selected_model_and_request_timeout(
         "model": "qwen3.5:122b",
         "request_timeout_seconds": 45.0,
         "disease": "IPF",
+        "require_report_sections": True,
     }
 
 
@@ -1281,7 +1319,11 @@ def test_middleware_omits_unset_model_and_request_timeout(
         {}, None
     )
 
-    assert captured == {"provider": "ollama-openai", "disease": "IPF"}
+    assert captured == {
+        "provider": "ollama-openai",
+        "disease": "IPF",
+        "require_report_sections": True,
+    }
 
 
 @pytest.mark.asyncio

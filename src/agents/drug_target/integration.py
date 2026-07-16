@@ -2,7 +2,7 @@
 
 Each call creates an ``evidence_assessor``/``report_writer`` agent with
 ``DrugReportGuardrailMiddleware``. Success requires a passed final audit and
-all seven report, publication, and audit artifacts.
+all required report-section, report, publication, and audit artifacts.
 """
 
 import asyncio
@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 _SUCCESS_ARTIFACTS = (
     "drug.md",
     "target_assessment.json",
+    "report_sections.json",
     "part4_candidate_selection.json",
     "part4_therapeutic_synthesis.md",
     "drug_report.html",
@@ -127,6 +128,19 @@ async def run_drug_target_assessment(data_dir: str, disease: str) -> str:
                 "drug_md": None,
                 "target_assessment": None,
                 "errors": ["drug-target final audit did not pass publication"],
+                "evidence_truncated": False,
+            })
+
+        if any(
+            not (Path(resolved_dir) / name).is_file()
+            or (Path(resolved_dir) / name).stat().st_size == 0
+            for name in _SUCCESS_ARTIFACTS
+        ):
+            return json.dumps({
+                "success": False,
+                "drug_md": None,
+                "target_assessment": None,
+                "errors": ["drug-target guarded artifacts are incomplete"],
                 "evidence_truncated": False,
             })
 

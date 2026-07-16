@@ -70,7 +70,9 @@ failed repairs it does not publish Part 4 or HTML.
 - Gap Analysis must not be empty: state data limitations, missing evidence, or
   open questions.
 
-## Verified local Ollama smoke invocation
+## Supported local Ollama diagnostic invocation
+
+This invocation is diagnostic; no successful report was produced.
 
 Use OpenAI-compatible Ollama because the writer needs tool schemas:
 

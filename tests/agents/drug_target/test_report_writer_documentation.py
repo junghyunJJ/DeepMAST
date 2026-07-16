@@ -30,3 +30,6 @@ def test_docs_describe_guarded_reporter_and_graph_builder_entrypoints() -> None:
 
     assert "`run_report_writer_only.py` is diagnostic-only." in reference
     assert "`run_report_writer_only.py` only diagnoses the\ncanonical writer against existing evidence." in stage_guide
+    assert "returned payload" not in reference
+    assert "instrument and bound `build_evidence_summary`'s internal stages" in reference
+    assert "before choosing a performance fix" in reference

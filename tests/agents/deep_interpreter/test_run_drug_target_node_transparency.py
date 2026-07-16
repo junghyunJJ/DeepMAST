@@ -16,6 +16,7 @@ def _write_success_artifacts(
     artifacts = {
         "drug.md": "# Drug Report\n",
         "target_assessment.json": json.dumps({"schema_version": "report.v1"}),
+        "report_sections.json": json.dumps({"schema_version": "hybrid_report_sections/v1"}),
         "part4_candidate_selection.json": json.dumps({"selected_lr_pairs": []}),
         "part4_therapeutic_synthesis.md": "# Part 4\n",
         "drug_report.html": "<html></html>",

@@ -575,6 +575,7 @@ def run_drug_report_guardrail(
     disease: str = "",
     model: str | None = None,
     request_timeout_seconds: float | None = None,
+    require_report_sections: bool = False,
 ) -> dict[str, Any]:
     """Validate, repair no more than three times, then publish as one transaction."""
 
@@ -594,6 +595,32 @@ def run_drug_report_guardrail(
     final = initial
     attempts = 0
     changes = 0
+    sections_path = run_dir / REPORT_SECTIONS_FILENAME
+    try:
+        has_report_sections = sections_path.is_file() and sections_path.stat().st_size > 0
+    except OSError:
+        has_report_sections = False
+    if require_report_sections and not has_report_sections:
+        final = copy.deepcopy(initial)
+        issues = final.get("issues")
+        missing_sections_issue = {
+            "code": "REPORT_SECTIONS_REQUIRED",
+            "severity": "critical",
+            "message": "guarded report publication requires nonempty report_sections.json",
+        }
+        final["issues"] = [
+            *(issues if isinstance(issues, list) else []),
+            missing_sections_issue,
+        ]
+        final["issue_count"] = len(final["issues"])
+        final["valid"] = False
+        return _write_final_failure(
+            run_dir,
+            initial,
+            final,
+            repair_attempt_count=attempts,
+            changed_repair_count=changes,
+        )
     if _nonrepairable_check_failure(final):
         return _write_final_failure(
             run_dir,
@@ -607,7 +634,7 @@ def run_drug_report_guardrail(
         try:
             repair = (
                 _repair_report_sections
-                if (run_dir / REPORT_SECTIONS_FILENAME).exists()
+                if sections_path.exists()
                 else _repair_drug_md
             )
             repair_kwargs: dict[str, Any] = {"provider": provider, "disease": disease}

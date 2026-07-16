@@ -214,6 +214,19 @@ def test_guarded_runner_predicate_rejects_published_alias_and_is_shared(tmp_path
     assert bc_runner.guarded_run_succeeded is runner.guarded_run_succeeded
 
 
+def test_guarded_runner_predicate_requires_nonempty_report_sections(tmp_path):
+    _passed_artifacts(tmp_path)
+    (tmp_path / "report_sections.json").unlink()
+
+    assert runner.guarded_run_succeeded(tmp_path) is False
+
+    (tmp_path / "report_sections.json").write_text("{}", encoding="utf-8")
+    assert runner.guarded_run_succeeded(tmp_path) is True
+
+    (tmp_path / "report_sections.json").write_text("", encoding="utf-8")
+    assert runner.guarded_run_succeeded(tmp_path) is False
+
+
 def test_parse_args_has_bounded_deadline_defaults(monkeypatch):
     monkeypatch.setattr(
         sys,

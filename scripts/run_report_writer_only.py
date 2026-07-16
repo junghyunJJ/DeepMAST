@@ -30,6 +30,7 @@ from src.agents.drug_target.middleware import clear_guarded_report_run_artifacts
 REQUIRED_GUARDED_ARTIFACTS = (
     "drug.md",
     "target_assessment.json",
+    "report_sections.json",
     "drug_report_validation_initial.json",
     "drug_report_validation_final.json",
     "part4_candidate_selection.json",

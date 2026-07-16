@@ -10,6 +10,9 @@ SCORING_PATH = Path("skills/drug-target-reporting/references/scoring_guide.md")
 
 def test_reporting_skill_matches_guarded_direct_writer_surface() -> None:
     text = SKILL_PATH.read_text(encoding="utf-8")
+    assert "## Supported local Ollama diagnostic invocation" in text
+    assert "This invocation is diagnostic; no successful report was produced." in text
+    assert "## Verified local Ollama smoke invocation" not in text
     assert "Author exactly one `hybrid_report_sections/v1` payload through\n`save_report_sections`." in text
     assert "Qwen owns only canonical Section 4 hypotheses and 2–4\nSection 5 recommendations in `report_sections.json`." in text
     assert "Jinja owns every rendered layout and factual value" in text

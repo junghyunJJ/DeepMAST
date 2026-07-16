@@ -14,13 +14,18 @@ EXPECTED_KEYS = {"success", "drug_md", "target_assessment", "errors", "evidence_
 SUCCESS_ARTIFACTS = (
     "drug.md",
     "target_assessment.json",
+    "report_sections.json",
     "part4_candidate_selection.json",
     "part4_therapeutic_synthesis.md",
     "drug_report.html",
     "drug_report_validation_initial.json",
     "drug_report_validation_final.json",
 )
-PUBLICATION_ARTIFACTS = SUCCESS_ARTIFACTS[2:5]
+PUBLICATION_ARTIFACTS = (
+    "part4_candidate_selection.json",
+    "part4_therapeutic_synthesis.md",
+    "drug_report.html",
+)
 
 
 def _passed_audit(*, publication_status: str = "passed") -> dict:
@@ -43,6 +48,7 @@ def _write_success_artifacts(
     artifacts = {
         "drug.md": "# Drug report\n",
         "target_assessment.json": json.dumps({"schema_version": "report.v1"}),
+        "report_sections.json": json.dumps({"schema_version": "hybrid_report_sections/v1"}),
         "part4_candidate_selection.json": json.dumps({"selected_lr_pairs": []}),
         "part4_therapeutic_synthesis.md": "# Part 4\n",
         "drug_report.html": "<html><body>report</body></html>",
@@ -233,6 +239,28 @@ async def test_integration_uses_llm_provider_environment(
     assert (await _run(tmp_path))["success"] is True
     assert fake.configs[0].provider == "google"
     assert fake.configs[0].workflow_mode == "guarded_report"
+
+
+@pytest.mark.asyncio
+async def test_integration_requires_nonempty_report_sections(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    (tmp_path / "lr_candidates.json").write_text("[]", encoding="utf-8")
+
+    async def invoke():
+        _write_success_artifacts(tmp_path)
+        (tmp_path / "report_sections.json").write_text("", encoding="utf-8")
+        return {"messages": []}
+
+    _install_fake_factory(monkeypatch, invoke=invoke)
+
+    envelope = await _run(tmp_path)
+
+    assert envelope["success"] is False
+    assert envelope["drug_md"] is None
+    assert envelope["target_assessment"] is None
+    assert envelope["errors"]
 
 
 @pytest.mark.asyncio
