@@ -1,12 +1,12 @@
 # Drug Target Assessment Agent -- Comprehensive Reference
 
 > **Source of truth**: `src/agents/drug_target/` codebase
-> **Last verified**: 2026-07-15 (guarded direct report-writer production path)
+> **Last verified**: 2026-07-16 (guarded hybrid report-writer production path)
 > **Related**: `drug_target_stage_guide.md` (stage-level detail), `output_schema.json` (JSON contract)
 
 ---
 
-> **Current production contract:** `DrugReportRunCleanupMiddleware -> evidence_assessor -> report_writer -> DrugReportGuardrailMiddleware`. `drug.md` is the sole production Section 4 source. Success requires the two audits and seven guarded artifacts, including `drug_report_validation_final.json`; tools are forced to the configured directory, DeepAgents `general-purpose` is blocked, and custom tools are rejected. The guarded runners are `run_report_writer_only.py`, `run_drug_target_e2e.py`, and `run_drug_target_agent_bc.py`. `legacy_hypothesis` is the only outer-super-graph/finalizer compatibility path.
+> **Current production contract:** `evidence_assessor -> report_writer -> DrugReportGuardrailMiddleware -> guarded publication`. The writer owns only canonical `report_sections.json`; Jinja renders `drug.md` and the other pre-publication artifacts. Success requires valid initial/final audits plus Part 4 and HTML publication artifacts. Tools are forced to the configured directory, DeepAgents `general-purpose` is blocked, and custom tools are rejected. The guarded runners are `run_report_writer_only.py`, `run_drug_target_e2e.py`, and `run_drug_target_agent_bc.py`. `legacy_hypothesis` is the only outer-super-graph/finalizer compatibility path.
 
 **Production entrypoints**: construct `create_drug_target_agent` directly with
 `workflow_mode="guarded_report"`, or use `run_report_writer_only.py`, `run_drug_target_e2e.py`, and `run_drug_target_agent_bc.py`.
@@ -17,7 +17,7 @@ not the guarded production entrypoint.
 
 ## 1. Overview
 
-The Drug Target Assessment Agent evaluates therapeutic potential of ligand-receptor (L-R) pairs identified from spatial transcriptomics (ST) cell-cell interaction (CCI) analysis. Production uses a **guarded 2-subagent** architecture: the evidence assessor gathers evidence and the report writer directly authors the two source artifacts; bounded middleware validates, repairs, publishes, and audits the result.
+The Drug Target Assessment Agent evaluates therapeutic potential of ligand-receptor (L-R) pairs identified from spatial transcriptomics (ST) cell-cell interaction (CCI) analysis. Production uses a **guarded 2-subagent** architecture: the evidence assessor gathers evidence, the report writer authors bounded structured sections, and middleware validates, repairs, publishes, and audits the rendered result.
 
 ### Key Design Principles
 
@@ -34,8 +34,9 @@ The Drug Target Assessment Agent evaluates therapeutic potential of ligand-recep
 | **Input** | `lr_candidates.json` | Top-30 L-R pairs from CCI analysis |
 | **Input** | `targets.json` (optional) | User-selected interest cell types |
 | **Output** | `evidence/*.json` | Per-stage, per-pair/gene evidence files |
-| **Output** | `target_assessment.json` | Structured JSON contract (schema-validated) |
-| **Output** | `drug.md` | Publication-quality markdown report |
+| **Output** | `report_sections.json` | Qwen-authored canonical hypotheses and recommendations |
+| **Output** | `target_assessment.json`, `report_data.json`, `drug.md`, `drug_report_render.json` | Renderer-owned pre-publication artifacts |
+| **Output** | Part 4 JSON/Markdown and `drug_report.html` | Guarded-publication artifacts after final validation |
 
 ---
 
@@ -48,8 +49,8 @@ Production entrypoints
   -> create_drug_target_agent(config, workflow_mode="guarded_report") [agent.py]
      -> DrugReportRunCleanupMiddleware
      -> evidence_assessor (configured-run evidence tools)
-     -> report_writer (direct target_assessment.json + drug.md)
-     -> DrugReportGuardrailMiddleware (validation, repair, Part 4, HTML, audits)
+     -> report_writer (save_report_sections exactly once)
+     -> DrugReportGuardrailMiddleware (validate rendered Markdown, repair sections, publish Part 4 + HTML, audit)
   -> run_report_writer_only.py | run_drug_target_e2e.py | run_drug_target_agent_bc.py
 
 Legacy compatibility wrapper integration (not guarded production)
@@ -90,7 +91,7 @@ Legacy compatibility wrapper integration (not guarded production)
 | Component | Type | Tools | Role |
 |-----------|------|-------|------|
 | `evidence_assessor` | flat dict subagent | ~20 tools | 3-stage funnel: biological context -> validation & scoring -> deep dive + inline rubric |
-| `report_writer` | flat dict subagent | 9 bound tools | Direct guarded author of `target_assessment.json` and `drug.md`; only allow-listed skill content and the configured run directory are available. |
+| `report_writer` | flat dict subagent | bound evidence tools + `save_report_sections` | Authors the canonical `report_sections.json` payload; only allow-listed skill content and the configured run directory are available. |
 
 Production middleware boundaries:
 
@@ -103,11 +104,33 @@ Production middleware boundaries:
 
 **Sentinel**: The orchestrator ends with `REPORT_PIPELINE_COMPLETE` after the guarded writer returns.
 
-### 2.4 DrugTargetConfig Options
+### 2.4 Guarded hybrid ownership and recovery
+
+`evidence_assessor -> report_writer -> DrugReportGuardrailMiddleware -> guarded publication`
+is the complete guarded production graph. The report writer (Qwen in the local
+smoke path) owns only the canonical Section 4 hypotheses and 2–4 Section 5
+recommendations in `report_sections.json`. It never writes Markdown, report
+data, or target assessment artifacts directly.
+
+| Output | Owner | When written |
+|---|---|---|
+| `report_sections.json` | report writer / repair agent | One validated structured save per write or repair pass |
+| `target_assessment.json`, `report_data.json`, `drug.md`, `drug_report_render.json` | Jinja renderer | Immediately after a valid sections save or repair re-render |
+| Markdown layout, factual values, Section 5.1 execution summary, and `[source: …]` placement | Jinja renderer | During deterministic render only |
+| `part4_candidate_selection.json`, `part4_therapeutic_synthesis.md`, `drug_report.html` | guarded publication | Only after final Markdown validation succeeds |
+| `drug_report_validation_initial.json`, `drug_report_validation_final.json` | guardrail | Before and after validation/publication |
+
+The guardrail repairs the structured sections payload, re-renders the complete
+Markdown, and validates it again. After three failed repair attempts it clears
+publication artifacts and does not publish Part 4 or HTML. Legacy direct
+Markdown repair remains only for runs without `report_sections.json`.
+
+### 2.5 DrugTargetConfig Options
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `provider` | str | `"openrouter"` | LLM provider |
+| `provider` | str | `"ollama"` | LLM provider |
+| `model` | str\|None | `None` | Optional explicit top-level model; in guarded mode the same constructed model is assigned to `report_writer`. |
 | `data_dir` | str | env `DEEP_INTERPRETER_DATA_DIR` | Directory with `lr_candidates.json` |
 | `disease` | str | `""` | Disease context injected into system prompt |
 | `use_checkpointer` | bool | `False` | Enable LangGraph memory checkpointer |
@@ -121,7 +144,7 @@ Production middleware boundaries:
 
 > **Legacy compatibility note**: `critic_enabled` and `summarizer_skill_names` config fields were removed in the 2026-05-19 migration. The summarizer subagent no longer exists; explicit `legacy_hypothesis` execution uses the deterministic `finalize_report` LangGraph node. Guarded production uses `report_writer` plus `DrugReportGuardrailMiddleware` instead.
 
-### 2.5 Legacy `finalize_report` compatibility node — historical error classes
+### 2.6 Legacy `finalize_report` compatibility node — historical error classes
 
 The retained `finalize_report` node (`src/agents/drug_target/finalize_report.py`) serves only explicit `legacy_hypothesis` super-graph/traced compatibility callers. Production uses the guarded writer flow above.
 
@@ -137,7 +160,7 @@ The retained `finalize_report` node (`src/agents/drug_target/finalize_report.py`
 
 **Idempotency** (Decision 12, line 77, `finalize_report.py`): if `drug.md` already exists at node entry, `finalize_report` skips all processing and returns success. This allows safe re-invocation without re-running the LLM call.
 
-### 2.6 Legacy compatibility Super-Graph State Schema (`DrugTargetState`)
+### 2.7 Legacy compatibility Super-Graph State Schema (`DrugTargetState`)
 
 Defined in `src/agents/drug_target/super_graph.py`:
 
@@ -564,6 +587,22 @@ Or via environment variables:
 ```bash
 export SUBAGENT_EVIDENCE_ASSESSOR_PROVIDER="openai:gpt-4.1"
 export SUBAGENT_REPORT_WRITER_PROVIDER="openai:gpt-4.1-mini"
+```
+
+### 7.4 Verified Ollama guarded smoke invocation
+
+The local guarded report smoke uses OpenAI-compatible Ollama so the writer can
+receive tool schemas. The explicit `--model` reaches both the top-level agent
+and `report_writer`; it does not rely on environment fallback alone.
+
+```bash
+export OLLAMA_BASE_URL=http://localhost:6000
+export OLLAMA_MODEL=qwen3.5:122b
+python scripts/run_report_writer_only.py \
+  --data-dir /Users/jungj2/Dropbox/Metadata/aiagent/DeepMAST/final_bc_hybrid_qwen_test \
+  --disease "breast cancer" \
+  --provider ollama-openai \
+  --model qwen3.5:122b
 ```
 
 ---

@@ -179,6 +179,8 @@ class DrugTargetConfig:
 
     Attributes:
         provider: LLM provider. Defaults to 'openrouter'.
+        model: Optional explicit model selection. When omitted, the provider
+            environment/default model selection remains unchanged.
         data_dir: Directory containing lr_candidates.json and workspace.
         disease: Disease context for queries.
         use_checkpointer: Whether to use memory checkpointer (default: False).
@@ -205,6 +207,7 @@ class DrugTargetConfig:
     """
 
     provider: Provider = "ollama"
+    model: str | None = None
     data_dir: str = field(
         default_factory=lambda: os.getenv(
             "DRUG_TARGET_DATA_DIR",
@@ -451,7 +454,10 @@ def create_drug_target_agent(
         raise AssertionError(f"validated workflow mode unexpectedly missing: {workflow_mode!r}")
 
     # 3. Create the orchestrator LLM.
-    llm = create_llm(provider=config.provider)
+    llm_kwargs: dict[str, Any] = {"provider": config.provider}
+    if config.model:
+        llm_kwargs["model"] = config.model
+    llm = create_llm(**llm_kwargs)
     skill_activation_mode: SkillActivationMode = (
         config.skill_activation_mode
         if config.skill_activation_mode is not None
@@ -465,10 +471,13 @@ def create_drug_target_agent(
     # 4. Get subagent specs — primary subagents use allow-listed shared
     #    SkillsMiddleware + activation middleware instead of deepagents native
     #    `subagent["skills"]` auto-loading.
+    model_overrides = config.subagent_models
+    if config.model and workflow_mode == "guarded_report":
+        model_overrides = {**(model_overrides or {}), "report_writer": llm}
     subagent_kwargs: dict[str, Any] = dict(
         data_dir=resolved_data_dir,
         disease=config.disease,
-        model_overrides=config.subagent_models,
+        model_overrides=model_overrides,
         default_model=llm,
         backend=backend,
         enable_census=config.enable_census,

@@ -14,7 +14,6 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.agents.model import create_llm
 from src.agents.drug_target.agent import DrugTargetConfig, create_drug_target_agent
 from src.agents.drug_target.report_guardrails import clear_derived_report_artifacts
 
@@ -65,9 +64,9 @@ async def main() -> int:
         include_audits=True,
         include_sources=True,
     )
-    model = create_llm(provider=args.provider, model=args.model) if args.model else None
     config = DrugTargetConfig(
         provider=args.provider,
+        model=args.model,
         data_dir=str(data_dir),
         disease=args.disease,
         workflow_mode="guarded_report",
@@ -76,7 +75,6 @@ async def main() -> int:
             "Render guarded hybrid report from existing evidence. "
             f"Data dir: {data_dir}"
         ),
-        subagent_models={"report_writer": model} if model is not None else None,
     )
     old_skip = os.environ.get("DRUG_TARGET_SKIP_EVIDENCE_ASSESSOR")
     os.environ["DRUG_TARGET_SKIP_EVIDENCE_ASSESSOR"] = "1"

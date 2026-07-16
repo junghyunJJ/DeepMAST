@@ -81,6 +81,32 @@ async def test_writer_only_uses_guarded_factory_and_audit_gate(tmp_path, monkeyp
 
 
 @pytest.mark.asyncio
+async def test_writer_only_assigns_model_to_config(tmp_path, monkeypatch):
+    _evidence_ready(tmp_path)
+    seen = {}
+
+    def factory(config):
+        seen["config"] = config
+        _passed_artifacts(tmp_path)
+        return _Agent(), _Backend()
+
+    monkeypatch.setattr(
+        runner,
+        "parse_args",
+        lambda: argparse.Namespace(
+            data_dir=str(tmp_path),
+            disease="IPF",
+            provider="ollama-openai",
+            model="qwen3.5:122b",
+        ),
+    )
+    monkeypatch.setattr(runner, "create_drug_target_agent", factory)
+
+    assert await runner.main() == 0
+    assert seen["config"].model == "qwen3.5:122b"
+
+
+@pytest.mark.asyncio
 async def test_writer_only_rejects_stale_outputs_from_a_noop_agent(tmp_path, monkeypatch):
     _evidence_ready(tmp_path)
     _passed_artifacts(tmp_path)

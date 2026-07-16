@@ -9,6 +9,9 @@ resolved hint and exercises the same source-of-truth (the .py file).
 
 import ast
 from pathlib import Path
+from unittest.mock import MagicMock
+
+from src.agents.drug_target import agent
 
 
 _AGENT_SRC = (
@@ -116,3 +119,44 @@ def test_subagent_models_field_annotation_accepts_basechatmodel_via_ast():
                     )
                     return
     raise AssertionError("DrugTargetConfig.subagent_models annotation not found")
+
+
+def test_selected_model_is_shared_by_guarded_orchestrator_and_report_writer(
+    tmp_path: Path,
+    monkeypatch,
+):
+    selected_model = MagicMock()
+    captured: dict = {}
+    compiled_agent = MagicMock()
+    compiled_agent.with_config.return_value = compiled_agent
+
+    monkeypatch.setattr(
+        agent,
+        "create_llm",
+        lambda **kwargs: captured.setdefault("llm_kwargs", kwargs) and selected_model,
+    )
+    monkeypatch.setattr(
+        agent,
+        "create_deep_agent",
+        lambda **kwargs: captured.update(kwargs) or compiled_agent,
+    )
+
+    agent.create_drug_target_agent(
+        agent.DrugTargetConfig(
+            provider="ollama-openai",
+            model="qwen3.5:122b",
+            workflow_mode="guarded_report",
+            data_dir=str(tmp_path),
+            subagent_models={},
+        )
+    )
+
+    assert captured["llm_kwargs"] == {
+        "provider": "ollama-openai",
+        "model": "qwen3.5:122b",
+    }
+    assert captured["model"] is selected_model
+    report_writer = next(
+        subagent for subagent in captured["subagents"] if subagent["name"] == "report_writer"
+    )
+    assert report_writer["model"] is selected_model

@@ -1,16 +1,21 @@
 ---
 name: drug-target-reporting
-description: Generate a guarded, evidence-grounded direct drug target report from completed evidence.
+description: Generate guarded, evidence-grounded hybrid report sections from completed evidence.
 ---
 
 # Drug Target Reporting
 
-## Your Role: GUARDED REPORT AUTHOR
+## Your role: guarded report author
 
-Write `target_assessment.json` and a complete `drug.md` directly from local
-evidence. Use only values in the Reference Card or loaded evidence. When data
-is absent, omit the claim or write `not available in source data`. Keep
-`[source: ...]` annotations in `drug.md` as deterministic audit provenance.
+Author exactly one `hybrid_report_sections/v1` payload through
+`save_report_sections`. Qwen owns only canonical Section 4 hypotheses and 2–4
+Section 5 recommendations in `report_sections.json`. Never author Markdown,
+target assessment, report data, render metadata, Part 4, or HTML.
+
+Jinja owns every rendered layout and factual value, the deterministic Section
+5.1 execution summary, source-tag placement, and renderer-owned output
+artifacts. The guardrail validates the rendered Markdown, repairs sections
+when needed, and publishes only after final validation.
 
 ## Evidence hierarchy and calibration
 
@@ -30,48 +35,51 @@ is absent, omit the claim or write `not available in source data`. Keep
 1. Read this skill and `references/scoring_guide.md` with `read_skill_file`.
 2. Call `load_lr_candidates`.
 3. Call `build_evidence_summary` exactly once with
-   `include_legacy_hypothesis=False`. Treat its Markdown template as a factual
-   skeleton, replace every marker, and write a complete direct Markdown report.
-4. Call `load_evidence_files` with `scope="hypothesis"` for Section 4.
-5. Call `save_target_assessment` exactly once with the complete payload. In other words, save_target_assessment exactly once.
-6. Call `save_drug_md` exactly once with `strip_unexpanded_markers=False`,
-   after saving the assessment, then stop.
+   `include_legacy_hypothesis=False`.
+4. Call `load_evidence_files` with `scope="hypothesis"` for grounded Section 4
+   content.
+5. Build one `hybrid_report_sections/v1` payload:
+   - `hypothesis_report` has 4–6 canonical hypotheses across Mechanism of
+     Action, Therapeutic Strategy, Cross-Target Interaction, and Novel Pathway.
+     Every hypothesis includes rank, title, category, core claim, biological
+     entities, falsifiable prediction, validation approach, scores, and
+     grounded evidence references.
+   - `pipeline_recommendations` has 2–4 single-sentence, future-directed
+     recommendations. Each has 1–3 deterministic supporting evidence paths and
+     introduces no new quantitative claim.
+6. Self-check the payload against loaded evidence, call `save_report_sections`
+   exactly once, then stop.
 
 ## Repair mode
 
-When the request begins `## REPAIR MODE`, use only the embedded current
-Markdown. Fix only listed issues. Do not read skills or call initial-write
-tools, and do not regenerate `target_assessment.json`. Call `save_drug_md`
-exactly once with `strip_unexpanded_markers=False`, then stop.
+When the request begins `## REPAIR MODE`, use only the supplied current
+sections payload and bounded validation findings. Repair only those findings,
+call `save_report_sections` exactly once with the complete corrected payload,
+then stop. Do not edit `drug.md`.
 
-`DrugReportGuardrailMiddleware` owns deterministic validation, up to three
-repair passes, Part 4, HTML, audits, and publication. Do not call those
-post-write operations yourself.
-
-## Section 4 contract
-
-Author recommendations from hypothesis-scope evidence in this parser-compatible
-form; include every required label and use `4.1.2`, `4.2.1`, or `4.3.1` next:
-
-```markdown
-## 4. Mechanistic Hypothesis Recommendations
-
-#### 4.1.1. <hypothesis title>
-**Category:** <category>
-**Core Claim:** <grounded, hedged claim>
-- Genes: <comma-separated genes>
-- Pathways: <comma-separated pathways or data not available>
-- Cell Types: <comma-separated cell types or data not available>
-- Drugs: <comma-separated drugs or data not available>
-**Falsifiable Prediction:** <prediction>
-**Validation Approach:** <test>
-```
+The guardrail re-renders and revalidates after every save. After at most three
+failed repairs it does not publish Part 4 or HTML.
 
 ## Non-negotiable boundaries
 
-- NEVER create or read evidence/hypothesis_report.json.
-- NEVER create or write report_data.json.
+- NEVER create or read `evidence/hypothesis_report.json`.
+- NEVER create or write `report_data.json`, `target_assessment.json`, or
+  `drug.md`.
 - Do not use `read_file`, `write_file`, `grep`, `execute`, general-purpose
   subagents, external databases, or a second writer.
 - Gap Analysis must not be empty: state data limitations, missing evidence, or
   open questions.
+
+## Verified local Ollama smoke invocation
+
+Use OpenAI-compatible Ollama because the writer needs tool schemas:
+
+```bash
+export OLLAMA_BASE_URL=http://localhost:6000
+export OLLAMA_MODEL=qwen3.5:122b
+python scripts/run_report_writer_only.py \
+  --data-dir /Users/jungj2/Dropbox/Metadata/aiagent/DeepMAST/final_bc_hybrid_qwen_test \
+  --disease "breast cancer" \
+  --provider ollama-openai \
+  --model qwen3.5:122b
+```
