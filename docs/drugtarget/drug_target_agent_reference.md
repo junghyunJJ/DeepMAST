@@ -589,21 +589,47 @@ export SUBAGENT_EVIDENCE_ASSESSOR_PROVIDER="openai:gpt-4.1"
 export SUBAGENT_REPORT_WRITER_PROVIDER="openai:gpt-4.1-mini"
 ```
 
-### 7.4 Verified Ollama guarded smoke invocation
+### 7.4 Supported Ollama guarded smoke invocation (live validation pending)
 
-The local guarded report smoke uses OpenAI-compatible Ollama so the writer can
-receive tool schemas. The explicit `--model` reaches both the top-level agent
-and `report_writer`; it does not rely on environment fallback alone.
+Production continues to run the full Deep Agent topology:
+`evidence_assessor -> report_writer -> DrugReportGuardrailMiddleware`.
+`run_report_writer_only.py` is a diagnostic entrypoint instead: it requires
+existing evidence-assessor artifacts, then directly compiles the canonical
+guarded `report_writer` specification without an outer task-dispatch turn.
+
+The explicit `--model` and `--request-timeout-seconds` selection is preserved
+for initial authoring, both guardrail repair paths, and the Part 4 selector.
+The provider request timeout must be positive and shorter than the positive
+overall `--run-timeout-seconds`; the latter reports a bounded, artifact-derived
+failure phase without accepting stale success artifacts.
+
+Ollama 0.20.6's OpenAI-compatible endpoint may ignore
+`enable_thinking=false`; do not treat that setting as guaranteed reasoning
+suppression.
 
 ```bash
 export OLLAMA_BASE_URL=http://localhost:6000
-export OLLAMA_MODEL=qwen3.5:122b
-python scripts/run_report_writer_only.py \
-  --data-dir /Users/jungj2/Dropbox/Metadata/aiagent/DeepMAST/final_bc_hybrid_qwen_test \
+uv run python -u scripts/run_report_writer_only.py \
+  --data-dir /path/to/copied-evidence-run \
   --disease "breast cancer" \
   --provider ollama-openai \
-  --model qwen3.5:122b
+  --model qwen3.5:122b \
+  --request-timeout-seconds 600 \
+  --run-timeout-seconds 1800
 ```
+
+Exit `0` requires all guarded artifacts plus a valid final audit and passed
+publication gate. A timeout exits `1` with its best observable phase:
+`report_writer`, `guardrail_or_publication`, or `publication`.
+
+**Latest bounded live result (2026-07-16):** with `qwen3.5:122b` through
+`http://localhost:6000`, `--request-timeout-seconds 600`, and
+`--run-timeout-seconds 1800`, the first writer request produced no
+`report_sections.json` or audit artifacts and exited `1` after 1800 seconds
+with `phase=report_writer`. This validates the bounded failure contract, not
+successful report generation. The configured provider request timeout did not
+preempt this Ollama OpenAI-compatible call; investigate model-side first-token
+latency before relabeling this invocation as verified.
 
 ---
 
