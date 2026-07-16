@@ -330,7 +330,11 @@ def _load_expansion_inputs(data_dir: str, disease: str) -> tuple[dict, dict, dic
     # both files. With the summarizer subagent removed (Phase 3 task #8), this
     # finalize_report node is now the only production caller — invoking it here
     # makes _load_expansion_inputs self-contained.
-    _call_tool(_build_evidence_summary_st, data_dir=str(base))
+    _call_tool(
+        _build_evidence_summary_st,
+        data_dir=str(base),
+        include_legacy_hypothesis=True,
+    )
 
     # Evidence — load_evidence_files returns a JSON string
     raw_evidence = _call_tool(_load_evidence_files_st, data_dir=str(base))

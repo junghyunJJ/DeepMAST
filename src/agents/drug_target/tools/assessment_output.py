@@ -368,7 +368,11 @@ def _persist_pipeline_quality_flags(data_dir_path: Path) -> dict:
     try:
         # LangChain @tool wrappers expose the underlying function via `.func`.
         impl = getattr(validate_drug_md, "func", None) or validate_drug_md
-        report_json = impl(str(data_dir_path))
+        report_json = impl(
+            str(data_dir_path),
+            include_legacy_hypothesis_checks=False,
+            include_renderer_provenance=False,
+        )
         report = json.loads(report_json) if isinstance(report_json, str) else report_json
     except Exception as exc:
         report = {"valid": False, "error": f"validator raised: {exc}"}
@@ -397,7 +401,11 @@ def _persist_pipeline_quality_flags(data_dir_path: Path) -> dict:
 
 
 @tool
-def save_drug_md(data_dir: str, content: str | dict | list) -> str:
+def save_drug_md(
+    data_dir: str,
+    content: str | dict | list,
+    strip_unexpanded_markers: bool = False,
+) -> str:
     """Save drug.md report to disk.
 
     Args:
@@ -412,8 +420,8 @@ def save_drug_md(data_dir: str, content: str | dict | list) -> str:
             "saved": False,
         })
     import re
-    # Strip unexpanded EXPAND placeholders left by timeout
-    content = re.sub(r'\n*<!-- EXPAND:.*?-->\n*', '\n', content)
+    if strip_unexpanded_markers:
+        content = re.sub(r"\n*<!-- EXPAND:.*?-->\n*", "\n", content)
     resolved = _resolve_data_dir(data_dir)
     drug_md_path = resolved / "drug.md"
     drug_md_path.write_text(content, encoding="utf-8")

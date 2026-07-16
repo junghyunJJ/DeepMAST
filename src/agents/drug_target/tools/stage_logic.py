@@ -38,7 +38,7 @@ def _atomic_write_text(path, content: str, encoding: str = "utf-8") -> None:
             pass
         raise
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from langchain_core.tools import tool
 from src.agents.drug_target.tools.chembl_resolver import resolve_chembl_molecule
@@ -2934,7 +2934,10 @@ def _build_disease_scope(
 
 
 @tool
-def build_evidence_summary(data_dir: str) -> str:
+def build_evidence_summary(
+    data_dir: str,
+    include_legacy_hypothesis: bool = False,
+) -> str:
     """Build a Reference Card with exact values from all evidence files.
 
     Returns a structured JSON summary that report_writer MUST use as the
@@ -3254,28 +3257,30 @@ def build_evidence_summary(data_dir: str) -> str:
             for row in _csv.DictReader(_f):
                 stage1_filter_results.append(row)
 
-    # 7. Load hypothesis_report.json (if hypothesis_writer completed).
-    # The summarizer may create a sanitized copy that removes impossible file
-    # references while preserving the original hypothesis_writer artifact.
     hypothesis_data = {}
-    sanitized_hypothesis_path = evidence_dir / "hypothesis_report.summarizer_sanitized.json"
-    hypothesis_path = (
-        sanitized_hypothesis_path
-        if sanitized_hypothesis_path.exists()
-        else evidence_dir / "hypothesis_report.json"
-    )
     hypothesis_source: dict[str, object] | None = None
-    if hypothesis_path.exists():
-        with open(hypothesis_path, encoding="utf-8") as _f:
-            hypothesis_data = json.load(_f)
-        from src.agents.drug_target.tools.report_expansion_schema import (
-            canonical_json_hash,
+    if include_legacy_hypothesis:
+        # The summarizer may create a sanitized copy that removes impossible
+        # file references while preserving the original hypothesis artifact.
+        sanitized_hypothesis_path = (
+            evidence_dir / "hypothesis_report.summarizer_sanitized.json"
         )
+        hypothesis_path = (
+            sanitized_hypothesis_path
+            if sanitized_hypothesis_path.exists()
+            else evidence_dir / "hypothesis_report.json"
+        )
+        if hypothesis_path.exists():
+            with open(hypothesis_path, encoding="utf-8") as _f:
+                hypothesis_data = json.load(_f)
+            from src.agents.drug_target.tools.report_expansion_schema import (
+                canonical_json_hash,
+            )
 
-        hypothesis_source = {
-            "path": str(hypothesis_path.relative_to(data_dir_path)),
-            "canonical_sha256": canonical_json_hash(hypothesis_data),
-        }
+            hypothesis_source = {
+                "path": str(hypothesis_path.relative_to(data_dir_path)),
+                "canonical_sha256": canonical_json_hash(hypothesis_data),
+            }
 
     # Assemble Reference Card
     featured_cards = []
@@ -3707,7 +3712,12 @@ def _build_moa_map(resolved_drugs: list[dict]) -> dict[str, str]:
     return result
 
 
-def _build_evidence_field_set(evidence_dir: "Path") -> frozenset[str]:
+def _build_evidence_field_set(
+    evidence_dir: "Path",
+    *,
+    include_legacy_report_provenance: bool = True,
+    include_renderer_provenance: bool = True,
+) -> frozenset[str]:
     """Build set of known evidence JSON field names from all evidence files."""
     fields: set[str] = set(_BASE_EVIDENCE_FIELDS)
 
@@ -3717,6 +3727,12 @@ def _build_evidence_field_set(evidence_dir: "Path") -> frozenset[str]:
             fields.add(field.casefold())
 
     for json_path in evidence_dir.glob("*.json"):
+        basename = json_path.name.casefold()
+        if not include_legacy_report_provenance and (
+            (basename.startswith("hypothesis_report") and basename.endswith(".json"))
+            or basename == "report_data.json"
+        ):
+            continue
         try:
             data = json.loads(json_path.read_text())
         except Exception:
@@ -3727,47 +3743,44 @@ def _build_evidence_field_set(evidence_dir: "Path") -> frozenset[str]:
                     fields.update(k.casefold() for k in item.keys())
         elif isinstance(data, dict):
             fields.update(k.casefold() for k in data.keys())
-    data_dir = evidence_dir.parent
-    expansions_path = data_dir / "report_expansions.json"
-    if expansions_path.exists():
-        try:
-            expansions = json.loads(expansions_path.read_text(encoding="utf-8"))
-        except Exception:
-            expansions = {}
-        slots = expansions.get("slots", []) if isinstance(expansions, dict) else []
-        for slot in slots:
-            if not isinstance(slot, dict):
-                continue
-            for sentence in slot.get("sentences", []) or []:
-                if not isinstance(sentence, dict):
+    if include_renderer_provenance:
+        data_dir = evidence_dir.parent
+        expansions_path = data_dir / "report_expansions.json"
+        if expansions_path.exists():
+            try:
+                expansions = json.loads(expansions_path.read_text(encoding="utf-8"))
+            except Exception:
+                expansions = {}
+            slots = expansions.get("slots", []) if isinstance(expansions, dict) else []
+            for slot in slots:
+                if not isinstance(slot, dict):
                     continue
-                provenance = sentence.get("source_provenance")
+                for sentence in slot.get("sentences", []) or []:
+                    if not isinstance(sentence, dict):
+                        continue
+                    provenance = sentence.get("source_provenance")
+                    if isinstance(provenance, dict):
+                        sf = provenance.get("source_field")
+                        add_field(sf)
+                        if sf:
+                            add_field(str(sf).rsplit("::", 1)[-1])
+                    for field in sentence.get("source_fields", []) or []:
+                        add_field(str(field).rsplit(".", 1)[-1])
+                        add_field(str(field).rsplit("::", 1)[-1])
+        reference_path = data_dir / "drug_report_reference_card.json"
+        if reference_path.exists():
+            try:
+                reference = json.loads(reference_path.read_text(encoding="utf-8"))
+            except Exception:
+                reference = {}
+            provenance_index = (
+                reference.get("provenance_index", {})
+                if isinstance(reference, dict)
+                else {}
+            )
+            for provenance in provenance_index.values():
                 if isinstance(provenance, dict):
-                    sf = provenance.get("source_field")
-                    add_field(sf)
-                    # Also register the bare field after a gene prefix
-                    # (``CD4::combined_total`` → ``combined_total``) so the
-                    # T7 unanchored-sentence check, which extracts the bare
-                    # segment via rsplit(":", 1)[-1], finds a match.
-                    if sf:
-                        add_field(str(sf).rsplit("::", 1)[-1])
-                for field in sentence.get("source_fields", []) or []:
-                    add_field(str(field).rsplit(".", 1)[-1])
-                    add_field(str(field).rsplit("::", 1)[-1])
-    reference_path = data_dir / "drug_report_reference_card.json"
-    if reference_path.exists():
-        try:
-            reference = json.loads(reference_path.read_text(encoding="utf-8"))
-        except Exception:
-            reference = {}
-        provenance_index = (
-            reference.get("provenance_index", {})
-            if isinstance(reference, dict)
-            else {}
-        )
-        for provenance in provenance_index.values():
-            if isinstance(provenance, dict):
-                add_field(provenance.get("source_field"))
+                    add_field(provenance.get("source_field"))
     return frozenset(fields)
 
 
@@ -4021,7 +4034,11 @@ def _check_unanchored_sentence(
 
 
 @tool
-def validate_drug_md(data_dir: str | Path) -> str:
+def validate_drug_md(
+    data_dir: str | Path,
+    include_legacy_hypothesis_checks: bool = True,
+    include_renderer_provenance: bool = True,
+) -> str:
     """Validate drug.md against evidence files for hallucinations.
 
     Dual-input contract:
@@ -4235,7 +4252,11 @@ def validate_drug_md(data_dir: str | Path) -> str:
 
     # 7. Hypothesis drug claims validation
     hypothesis_path = evidence_dir / "hypothesis_report.json"
-    if hypothesis_path.exists() and resolved_drugs_path.exists():
+    if (
+        include_legacy_hypothesis_checks
+        and hypothesis_path.exists()
+        and resolved_drugs_path.exists()
+    ):
         try:
             hyp = json.loads(hypothesis_path.read_text())
         except Exception:
@@ -4361,7 +4382,11 @@ def validate_drug_md(data_dir: str | Path) -> str:
     if evidence_dir.exists():
         drug_allowlist = _build_drug_allowlist(evidence_dir, resolved)
         moa_map = _build_moa_map(resolved)
-        evidence_field_set = _build_evidence_field_set(evidence_dir)
+        evidence_field_set = _build_evidence_field_set(
+            evidence_dir,
+            include_legacy_report_provenance=include_legacy_hypothesis_checks,
+            include_renderer_provenance=include_renderer_provenance,
+        )
     else:
         drug_allowlist = frozenset()
         moa_map = {}
@@ -5226,21 +5251,27 @@ def _finding_matches_renderer_expansion(
     return any(snippet in text or text in snippet for text in expansion_texts)
 
 
-def _check_disease_scope_note(drug_text: str, data_dir_path: Path) -> list[dict]:
-    reference_path = data_dir_path / "drug_report_reference_card.json"
-    if not reference_path.exists():
-        return []
-    try:
-        reference = json.loads(reference_path.read_text(encoding="utf-8"))
-    except Exception as exc:
-        return [{
-            "code": "DISEASE_SCOPE_METADATA_INVALID",
-            "severity": "critical",
-            "message": f"Failed to parse drug_report_reference_card.json: {exc}",
-            "location": str(reference_path),
-            "evidence": {},
-        }]
-    scope = reference.get("disease_scope") if isinstance(reference, dict) else None
+def _check_disease_scope_note(
+    drug_text: str,
+    data_dir_path: Path,
+    *,
+    scope: dict[str, object] | None = None,
+) -> list[dict]:
+    if scope is None:
+        reference_path = data_dir_path / "drug_report_reference_card.json"
+        if not reference_path.exists():
+            return []
+        try:
+            reference = json.loads(reference_path.read_text(encoding="utf-8"))
+        except Exception as exc:
+            return [{
+                "code": "DISEASE_SCOPE_METADATA_INVALID",
+                "severity": "critical",
+                "message": f"Failed to parse drug_report_reference_card.json: {exc}",
+                "location": str(reference_path),
+                "evidence": {},
+            }]
+        scope = reference.get("disease_scope") if isinstance(reference, dict) else None
     if not isinstance(scope, dict) or scope.get("requires_proxy_note") is not True:
         return []
     note = str(scope.get("proxy_note") or "").strip()
@@ -5260,6 +5291,91 @@ def _check_disease_scope_note(drug_text: str, data_dir_path: Path) -> list[dict]
             },
         }]
     return []
+
+
+def _agent_markdown_disease_scope(
+    assessment: object,
+    evidence_dir: Path,
+) -> dict[str, object]:
+    requested_disease = assessment.get("disease") if isinstance(assessment, dict) else ""
+    evidence_diseases: set[str] = set()
+    for stage1_path in evidence_dir.glob("stage1_*.json"):
+        if stage1_path.name in _STAGE1_NON_PAIR_ARTIFACTS:
+            continue
+        if not _is_stage1_pair_artifact(stage1_path):
+            continue
+        try:
+            payload = json.loads(stage1_path.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        if isinstance(payload, dict):
+            disease = _stage1_evidence_disease(payload)
+            if disease:
+                evidence_diseases.add(disease)
+    return _build_disease_scope(requested_disease, evidence_diseases)
+
+
+def _check_agent_markdown_hypotheses(
+    drug_text: str,
+    drug_md_path: Path,
+) -> list[dict]:
+    """Require parser-compatible, complete Section 4 hypotheses."""
+    from src.agents.drug_target.tools.drug_report_html import parse_drug_md
+
+    context = parse_drug_md(drug_text)
+    hypotheses = context.get("hypothesis")
+    if not isinstance(hypotheses, list) or not hypotheses:
+        return [{
+            "code": "AGENT_REPORT_HYPOTHESES_MISSING",
+            "severity": "high",
+            "message": "Agent-authored reports require a parser-compatible Section 4 hypothesis.",
+            "location": str(drug_md_path),
+            "evidence": {},
+        }]
+
+    def missing(value: object) -> bool:
+        text = str(value or "").strip()
+        return not text or bool(re.fullmatch(r"<!--.*?-->", text, flags=re.DOTALL))
+
+    issues: list[dict] = []
+    for index, hypothesis in enumerate(hypotheses, start=1):
+        if not isinstance(hypothesis, dict):
+            issues.append({
+                "code": "AGENT_REPORT_HYPOTHESIS_INCOMPLETE",
+                "severity": "high",
+                "message": f"Section 4 hypothesis {index} is incomplete.",
+                "location": str(drug_md_path),
+                "evidence": {"missing_fields": ["entry"]},
+            })
+            continue
+        missing_fields = [
+            field
+            for field in (
+                "title",
+                "category",
+                "core_claim",
+                "falsifiable_prediction",
+                "validation_approach",
+            )
+            if missing(hypothesis.get(field))
+        ]
+        title = str(hypothesis.get("title") or "").strip()
+        if title.casefold().startswith("**category:") and "title" not in missing_fields:
+            missing_fields.append("title")
+        genes = hypothesis.get("genes")
+        if not isinstance(genes, list) or not any(
+            not missing(gene) for gene in genes
+        ):
+            missing_fields.append("genes")
+        if missing_fields:
+            issues.append({
+                "code": "AGENT_REPORT_HYPOTHESIS_INCOMPLETE",
+                "severity": "high",
+                "message": f"Section 4 hypothesis {index} is incomplete.",
+                "location": str(drug_md_path),
+                "evidence": {"missing_fields": missing_fields},
+            })
+    return issues
 
 
 def _critic_finalization_issues(data_dir_path: Path) -> tuple[dict, list[dict]]:
@@ -5336,8 +5452,15 @@ def _critic_finalization_issues(data_dir_path: Path) -> tuple[dict, list[dict]]:
     return check, issues
 
 
+PublicationMode = Literal["renderer", "agent_markdown"]
+
+
 @tool
-def validate_drug_report_finalization(data_dir: str, require_critic: bool = False) -> str:
+def validate_drug_report_finalization(
+    data_dir: str,
+    require_critic: bool = False,
+    publication_mode: PublicationMode = "renderer",
+) -> str:
     """Deterministic fail-closed finalization validator for drug.md.
 
     Composes the existing `validate_drug_md` and `validate_target_assessment_file`
@@ -5354,7 +5477,7 @@ def validate_drug_report_finalization(data_dir: str, require_critic: bool = Fals
     issues: list[dict] = []
     checks: dict[str, dict] = {
         "data_dir": {"status": "fail", "path": ""},
-        "required_artifacts": {"status": "fail", "missing": []},
+        "required_artifacts": {"status": "fail", "missing": [], "invalid": []},
         "validate_drug_md": {"status": "fail", "raw": {}},
         "target_assessment": {"status": "fail", "issues": []},
         "report_finalization": {"status": "fail", "issues": [], "warnings": []},
@@ -5392,7 +5515,7 @@ def validate_drug_report_finalization(data_dir: str, require_critic: bool = Fals
         invalid_reason = "data_dir is not a directory"
     elif str(data_dir_path) == "/":
         invalid_reason = "data_dir is the filesystem root"
-    elif (data_dir_path / ".git").is_dir():
+    elif (data_dir_path / ".git").exists():
         invalid_reason = (
             "data_dir is the repository root (contains .git/); "
             "expected a per-run output directory"
@@ -5426,11 +5549,23 @@ def validate_drug_report_finalization(data_dir: str, require_critic: bool = Fals
         "stage1_filter_results.json",
     ]
     missing: list[str] = []
+    required_json_inputs: list[tuple[str, Path]] = []
+    required_json_payloads: dict[str, object] = {}
     for rel in required_artifacts:
         artifact_path = data_dir_path / rel
         if rel == "stage1_filter_results.json":
             resolved_stage1_path = _stage1_filter_results_path(data_dir_path)
             if resolved_stage1_path is not None:
+                required_json_inputs.append(
+                    (
+                        (
+                            "evidence/stage1_filter_results.json"
+                            if resolved_stage1_path.parent == data_dir_path / "evidence"
+                            else "stage1_filter_results.json"
+                        ),
+                        resolved_stage1_path,
+                    )
+                )
                 continue
             artifact_path = data_dir_path / "evidence" / rel
         if not artifact_path.exists():
@@ -5442,8 +5577,35 @@ def validate_drug_report_finalization(data_dir: str, require_critic: bool = Fals
                 "location": str(artifact_path),
                 "evidence": {"artifact": rel},
             })
+        elif rel == "evidence/assessment_results.json":
+            required_json_inputs.append((rel, artifact_path))
+
+    invalid: list[str] = []
+    for rel, artifact_path in required_json_inputs:
+        try:
+            payload = json.loads(artifact_path.read_text(encoding="utf-8"))
+            if not isinstance(payload, (dict, list)):
+                raise ValueError(
+                    f"expected mapping or list, got {type(payload).__name__}"
+                )
+            required_json_payloads[rel] = payload
+        except Exception as exc:
+            invalid.append(rel)
+            issues.append({
+                "code": "INVALID_REQUIRED_ARTIFACT",
+                "severity": "critical",
+                "message": (
+                    f"Required artifact is invalid: {rel}: "
+                    f"{type(exc).__name__}: {str(exc)[:200]}"
+                ),
+                "location": str(artifact_path),
+                "evidence": {"artifact": rel},
+            })
     checks["required_artifacts"]["missing"] = missing
-    checks["required_artifacts"]["status"] = "pass" if not missing else "fail"
+    checks["required_artifacts"]["invalid"] = invalid
+    checks["required_artifacts"]["status"] = (
+        "pass" if not missing and not invalid else "fail"
+    )
 
     # ------------------------------------------------------------------
     # 3. validate_drug_md — pass the resolved Path so _resolve_data_dir
@@ -5453,7 +5615,11 @@ def validate_drug_report_finalization(data_dir: str, require_critic: bool = Fals
     if drug_md_present:
         try:
             impl: Any = getattr(validate_drug_md, "func", None) or validate_drug_md
-            raw_json = impl(data_dir_path)
+            raw_json = impl(
+                data_dir_path,
+                include_legacy_hypothesis_checks=publication_mode == "renderer",
+                include_renderer_provenance=publication_mode == "renderer",
+            )
             raw = json.loads(raw_json) if isinstance(raw_json, str) else raw_json
         except Exception as exc:
             raw = {"valid": False, "error": f"validate_drug_md raised: {exc}"}
@@ -5477,7 +5643,7 @@ def validate_drug_report_finalization(data_dir: str, require_critic: bool = Fals
             })
         import os
 
-        renderer_mode_active = any(
+        sidecars_present = any(
             (data_dir_path / rel).exists()
             for rel in (
                 "drug_report_render.json",
@@ -5485,13 +5651,15 @@ def validate_drug_report_finalization(data_dir: str, require_critic: bool = Fals
                 "report_expansions.json",
             )
         )
+        renderer_mode_active = publication_mode == "renderer" and sidecars_present
         renderer_expansion_texts = (
             _load_renderer_expansion_texts(data_dir_path)
             if renderer_mode_active
             else ()
         )
         block_findings = (
-            require_critic
+            publication_mode == "agent_markdown"
+            or require_critic
             or renderer_mode_active
             or os.getenv("DEEPMAST_ALLOW_LEGACY_DRUG_MD") != "1"
         )
@@ -5560,6 +5728,14 @@ def validate_drug_report_finalization(data_dir: str, require_critic: bool = Fals
     # ------------------------------------------------------------------
     finalization_issues: list[dict] = []
     numeric_warnings: list[dict] = []
+    agent_disease_scope = (
+        _agent_markdown_disease_scope(
+            required_json_payloads.get("evidence/assessment_results.json"),
+            data_dir_path / "evidence",
+        )
+        if publication_mode == "agent_markdown"
+        else None
+    )
     if drug_md_present:
         try:
             drug_text = (data_dir_path / "drug.md").read_text(encoding="utf-8")
@@ -5580,23 +5756,43 @@ def validate_drug_report_finalization(data_dir: str, require_critic: bool = Fals
             )
             finalization_issues.extend(_check_empty_gap_analysis(drug_text))
             finalization_issues.extend(
-                _check_stale_hypothesis_report(drug_text, data_dir_path)
-            )
-            finalization_issues.extend(
                 _check_unsupported_moa_claim(drug_text, data_dir_path)
             )
             finalization_issues.extend(_check_failed_suffix_leak(drug_text, data_dir_path))
-            finalization_issues.extend(_check_disease_scope_note(drug_text, data_dir_path))
-            finalization_issues.extend(
-                _check_renderer_metadata(drug_text=drug_text, data_dir_path=data_dir_path)
-            )
-            import os
+            if publication_mode == "renderer":
+                finalization_issues.extend(
+                    _check_stale_hypothesis_report(drug_text, data_dir_path)
+                )
+                finalization_issues.extend(
+                    _check_disease_scope_note(drug_text, data_dir_path)
+                )
+                finalization_issues.extend(
+                    _check_renderer_metadata(
+                        drug_text=drug_text,
+                        data_dir_path=data_dir_path,
+                    )
+                )
+                import os
 
-            numeric_issues, numeric_warnings = _check_unverified_numeric_predictions(
-                data_dir_path,
-                strict=os.getenv("DEEPMAST_STRICT_NUMERIC_PREDICTIONS") == "1",
-            )
-            finalization_issues.extend(numeric_issues)
+                numeric_issues, numeric_warnings = _check_unverified_numeric_predictions(
+                    data_dir_path,
+                    strict=os.getenv("DEEPMAST_STRICT_NUMERIC_PREDICTIONS") == "1",
+                )
+                finalization_issues.extend(numeric_issues)
+            else:
+                finalization_issues.extend(
+                    _check_disease_scope_note(
+                        drug_text,
+                        data_dir_path,
+                        scope=agent_disease_scope,
+                    )
+                )
+                finalization_issues.extend(
+                    _check_agent_markdown_hypotheses(
+                        drug_text,
+                        data_dir_path / "drug.md",
+                    )
+                )
 
     checks["report_finalization"]["issues"] = [
         f"{i['code']} @ {i.get('location', '')}: {i.get('message', '')}"

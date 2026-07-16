@@ -93,7 +93,11 @@ def _copy_stage3_fixture(gene: str, evidence_dir: Path) -> None:
     shutil.copy(src, dst)
 
 
-def _invoke_build_evidence_summary(data_dir: Path) -> dict:
+def _invoke_build_evidence_summary(
+    data_dir: Path,
+    *,
+    include_legacy_hypothesis: bool = False,
+) -> dict:
     """Call build_evidence_summary with mocked render_drug_md and sidecar persist.
 
     build_evidence_summary is a @tool-decorated StructuredTool. We access the
@@ -118,7 +122,10 @@ def _invoke_build_evidence_summary(data_dir: Path) -> dict:
         from src.agents.drug_target.tools.stage_logic import build_evidence_summary
 
         # .func gives direct access to the unwrapped function under the @tool decorator
-        raw = build_evidence_summary.func(str(data_dir))
+        raw = build_evidence_summary.func(
+            str(data_dir),
+            include_legacy_hypothesis=include_legacy_hypothesis,
+        )
     return json.loads(raw)
 
 
@@ -279,4 +286,63 @@ def test_featured_card_matched_drugs_sourced_from_evidence_dir_not_normalization
     first_actual_moa = matched_drugs[0]["mechanism_of_action"]
     assert first_actual_moa == first_expected_moa, (
         f"Expected mechanism_of_action={first_expected_moa!r}, got {first_actual_moa!r}"
+    )
+
+
+@pytest.mark.parametrize(
+    "filename",
+    [
+        "hypothesis_report.json",
+        "hypothesis_report.summarizer_sanitized.json",
+    ],
+)
+def test_reference_card_default_does_not_read_prior_hypothesis(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    filename: str,
+) -> None:
+    data_dir = _setup_evidence_dir(
+        tmp_path,
+        "ITGB2",
+        _MINIMAL_RUBRIC_ROW_ITGB2,
+    )
+    hypothesis_path = data_dir / "evidence" / filename
+    hypothesis_path.write_text("not valid json", encoding="utf-8")
+    forbidden_reads: list[Path] = []
+    original_read_text = Path.read_text
+
+    def tracking_read_text(path: Path, *args, **kwargs) -> str:
+        if path == hypothesis_path:
+            forbidden_reads.append(path)
+        return original_read_text(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", tracking_read_text)
+
+    result = _invoke_build_evidence_summary(data_dir)
+
+    assert "error" not in result
+    assert result.get("hypothesis_source") is None
+    assert forbidden_reads == []
+
+
+def test_reference_card_legacy_hypothesis_loading_is_explicit(
+    tmp_path: Path,
+) -> None:
+    data_dir = _setup_evidence_dir(
+        tmp_path,
+        "ITGB2",
+        _MINIMAL_RUBRIC_ROW_ITGB2,
+    )
+    (data_dir / "evidence" / "hypothesis_report.json").write_text(
+        json.dumps({"hypotheses": []}),
+        encoding="utf-8",
+    )
+
+    result = _invoke_build_evidence_summary(
+        data_dir,
+        include_legacy_hypothesis=True,
+    )
+
+    assert result.get("hypothesis_source", {}).get("path").endswith(
+        "hypothesis_report.json"
     )

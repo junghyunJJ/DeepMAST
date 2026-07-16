@@ -119,7 +119,11 @@ def test_template_passes_validate_drug_md_before_llm_expansion(
     evidence_dir = tmp_path / "evidence"
     shutil.copytree(FIXTURE_EVIDENCE, evidence_dir)
 
-    _call_tool(build_evidence_summary, str(tmp_path))
+    _call_tool(
+        build_evidence_summary,
+        str(tmp_path),
+        include_legacy_hypothesis=True,
+    )
 
     spec_path = tmp_path / EXPANSION_SCHEMA_SPEC_FILE
     assert spec_path.exists(), (
@@ -165,7 +169,11 @@ def test_template_census_lines_carry_inline_pair_file_citation(
     evidence_dir = tmp_path / "evidence"
     shutil.copytree(FIXTURE_EVIDENCE, evidence_dir)
 
-    _call_tool(build_evidence_summary, str(tmp_path))
+    _call_tool(
+        build_evidence_summary,
+        str(tmp_path),
+        include_legacy_hypothesis=True,
+    )
 
     draft_md = (tmp_path / "drug.md").read_text(encoding="utf-8")
     census_lines = [
