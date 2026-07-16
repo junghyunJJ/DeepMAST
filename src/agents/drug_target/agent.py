@@ -28,6 +28,7 @@ from pathlib import Path
 from typing import Any, Literal, TypeAlias, cast
 
 from deepagents import create_deep_agent
+from langchain.agents import create_agent
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.runnables import Runnable
 from langchain_core.tools import BaseTool
@@ -379,6 +380,90 @@ def _build_subagent_skill_name_map(
     raise AssertionError(f"validated workflow mode unexpectedly missing: {config.workflow_mode!r}")
 
 
+def create_guarded_report_writer(config: DrugTargetConfig) -> Runnable:
+    """Compile the canonical guarded report-writer spec for diagnostics only."""
+    if _validate_workflow_mode(config.workflow_mode) != "guarded_report":
+        raise ValueError(
+            "create_guarded_report_writer requires workflow_mode='guarded_report'"
+        )
+
+    resolved_data_dir = str(Path(config.data_dir).expanduser().resolve())
+    llm_kwargs: dict[str, Any] = {"provider": config.provider}
+    if config.model:
+        llm_kwargs["model"] = config.model
+    if config.request_timeout_seconds is not None:
+        llm_kwargs["request_timeout"] = config.request_timeout_seconds
+    llm = create_llm(**llm_kwargs)
+
+    model_overrides = dict(config.subagent_models or {})
+    if (
+        config.model
+        or config.request_timeout_seconds is not None
+        or "report_writer" not in model_overrides
+    ):
+        model_overrides["report_writer"] = llm
+
+    skill_activation_mode: SkillActivationMode = (
+        config.skill_activation_mode
+        if config.skill_activation_mode is not None
+        else (
+            "middleware_plus_activator"
+            if config.enable_skill_activator
+            else "middleware_only"
+        )
+    )
+    resolved_skills_dir = str(_resolve_skills_dir(config))
+    if config.docker_image:
+        skills_dir = resolved_skills_dir
+        subagent_skill_names = {"evidence_assessor": (), "report_writer": ()}
+        subagent_skill_registries = None
+    else:
+        skills_dir = resolved_skills_dir if config.enable_progressive_disclosure else None
+        subagent_skill_names = (
+            _build_subagent_skill_name_map(config, enable_census=config.enable_census)
+            if config.enable_progressive_disclosure
+            else {"evidence_assessor": (), "report_writer": ()}
+        )
+        subagent_skill_registries = {
+            name: _build_skill_registry(config, names)
+            for name, names in subagent_skill_names.items()
+        }
+
+    report_writer_kwargs: dict[str, Any] = {
+        "data_dir": resolved_data_dir,
+        "disease": config.disease,
+        "provider": config.provider,
+        "model_overrides": model_overrides,
+        "default_model": llm,
+        "enable_census": config.enable_census,
+        "skills_dir": skills_dir,
+        "subagent_skill_names": subagent_skill_names,
+        "subagent_skill_registries": subagent_skill_registries,
+        "enable_skill_activator": config.enable_skill_activator,
+        "skill_activation_mode": skill_activation_mode,
+        "hypothesis_writer_prompt_mode": config.hypothesis_writer_prompt_mode,
+    }
+    if config.model:
+        report_writer_kwargs["report_writer_model"] = config.model
+    if config.request_timeout_seconds is not None:
+        report_writer_kwargs["report_writer_request_timeout_seconds"] = (
+            config.request_timeout_seconds
+        )
+    report_writers = [
+        spec for spec in get_subagents(**report_writer_kwargs) if spec["name"] == "report_writer"
+    ]
+    if len(report_writers) != 1:
+        raise ValueError("expected exactly one report_writer subagent spec")
+    report_writer_spec = report_writers[0]
+    return create_agent(
+        model=report_writer_spec["model"],
+        tools=report_writer_spec["tools"],
+        system_prompt=report_writer_spec["system_prompt"],
+        middleware=report_writer_spec["middleware"],
+        name="report_writer",
+    )
+
+
 def create_drug_target_agent(
     config: DrugTargetConfig | None = None,
 ) -> tuple[Runnable, object | None]:
@@ -593,6 +678,7 @@ def create_drug_target_agent(
 
 __all__ = [
     "create_drug_target_agent",
+    "create_guarded_report_writer",
     "DrugTargetConfig",
     "Provider",
     "WorkflowMode",
