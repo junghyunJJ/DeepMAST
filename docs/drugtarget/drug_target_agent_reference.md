@@ -61,12 +61,15 @@ Other production entrypoints
   -> create_drug_target_agent(config, workflow_mode="guarded_report") [agent.py]
   -> run_drug_target_e2e.py | run_drug_target_agent_bc.py
 
+Guarded direct-agent deployment entrypoint
+  -> drug_target_graph [graph_builder.py]
+    -> create_drug_target_agent(config, workflow_mode="guarded_report") [agent.py]
+
 Diagnostic-only
   -> run_report_writer_only.py (existing evidence -> canonical guarded report_writer)
 
 Legacy compatibility surface (not used by Reporter integration)
-  -> drug_target_graph [graph_builder.py]
-    -> legacy_hypothesis super-graph [super_graph.py]
+  -> legacy_hypothesis super-graph [super_graph.py]
 ```
 
 ### 2.2 Source File Map
@@ -74,7 +77,7 @@ Legacy compatibility surface (not used by Reporter integration)
 | File | Role |
 |------|------|
 | `super_graph.py` | Explicit `legacy_hypothesis` compatibility super-graph only. |
-| `graph_builder.py` | Legacy graph entry surface. |
+| `graph_builder.py` | Guarded direct-agent deployment entrypoint: the `drug_target_graph` export builds `workflow_mode="guarded_report"`. |
 | `finalize_report.py` | Explicit legacy finalizer compatibility implementation. |
 | `finalize_report_prompts.py` | Legacy compatibility prompts for the `finalize_report` LLM call: `FINALIZE_REPORT_SYSTEM_PROMPT`, `FINALIZE_REPORT_USER_TEMPLATE` |
 | `validators.py` | `validate_cited_only_provenance(payload, reference_card)` — cited-only provenance check called inside `_persist_and_validate` |
@@ -682,9 +685,11 @@ async def run_drug_target_assessment(data_dir: str, disease: str) -> str:
 }
 ```
 
-**Legacy compatibility separation**: `graph_builder.py` and `super_graph.py` retain the
-Legacy compatibility super-graph for explicit `legacy_hypothesis` callers. The
-production Reporter integration does not construct or invoke that graph.
+**Deployment and legacy separation**: `graph_builder.py` exposes
+`drug_target_graph` as the guarded direct-agent deployment entrypoint and builds
+`workflow_mode="guarded_report"`. `super_graph.py` alone retains the Legacy
+compatibility super-graph for explicit `legacy_hypothesis` callers. The
+production Reporter integration does not construct or invoke that super-graph.
 
 **Wrapper transparency**: The disk-artifact contract (`drug.md`,
 `drug_report.html`, `target_assessment.json`) is unchanged.

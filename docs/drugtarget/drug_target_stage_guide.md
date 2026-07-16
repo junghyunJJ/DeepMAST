@@ -416,7 +416,7 @@ the druggability_matrix before writing, and validates the schema contract.
 | `validators.py` | `validate_cited_only_provenance()` |
 | `tools/report_expansion_schema.py` | `ReportExpansionsPayload`, `validate_report_expansions()`, `_build_provenance_index()` |
 | `super_graph.py` | `DrugTargetState`, `run_deep_agent()`, `build_drug_target_super_graph()` |
-| `graph_builder.py` | Legacy compatibility `drug_target_graph` (compiled `CompiledStateGraph`) |
+| `graph_builder.py` | Guarded direct-agent deployment entrypoint: `drug_target_graph` builds `workflow_mode="guarded_report"` |
 
 ---
 
@@ -595,7 +595,7 @@ targets.json (optional) ──────────────────�
 | File | Role | Key Contents |
 |------|------|-------------|
 | `src/agents/drug_target/super_graph.py` | Legacy compatibility super-graph | `DrugTargetState`, `run_deep_agent()`, `build_drug_target_super_graph()` |
-| `src/agents/drug_target/graph_builder.py` | Legacy compatibility graph entry | `drug_target_graph` (module-level `CompiledStateGraph`) |
+| `src/agents/drug_target/graph_builder.py` | Guarded direct-agent deployment entrypoint | `drug_target_graph` builds `workflow_mode="guarded_report"` |
 | `src/agents/drug_target/finalize_report.py` | Legacy finalizer | Retained explicit compatibility implementation |
 | `src/agents/drug_target/finalize_report_prompts.py` | Legacy finalizer LLM prompts | `FINALIZE_REPORT_SYSTEM_PROMPT`, `FINALIZE_REPORT_USER_TEMPLATE` |
 | `src/agents/drug_target/validators.py` | Cited-only validation | `validate_cited_only_provenance()` |
