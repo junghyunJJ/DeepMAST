@@ -9,16 +9,203 @@ identical-payload retries against the deterministic save gate).
 from __future__ import annotations
 
 import json
-from collections.abc import Awaitable, Callable, Sequence
-from typing import Any
+import asyncio
+from collections.abc import Awaitable, Callable, Collection, Sequence
+from pathlib import Path
+from typing import Any, cast
 
 from langchain.agents.middleware import AgentMiddleware
 from langchain.agents.middleware.types import hook_config
 from langchain.tools.tool_node import ToolCallRequest
-from langchain_core.messages import ToolMessage
+from langchain_core.messages import AIMessage, ToolCall, ToolMessage
 from langgraph.types import Command
 
+from src.agents.drug_target.report_guardrails import run_drug_report_guardrail
 from src.agents.drug_target.tools.report_expansion_schema import canonical_json_hash
+
+
+class _DrugReportRunDirectoryMiddleware(AgentMiddleware):
+    """Shared fail-closed run-directory cleanup boundary."""
+
+    def __init__(self, data_dir: str | Path | None) -> None:
+        super().__init__()
+        self._data_dir = Path(data_dir).expanduser() if data_dir is not None else None
+
+    def _require_data_dir(self) -> Path:
+        if self._data_dir is None:
+            raise RuntimeError("Drug report guardrail requires an explicit data_dir")
+        from src.agents.drug_target.report_guardrails import _resolve_safe_run_dir
+
+        return _resolve_safe_run_dir(self._data_dir)
+
+    def _clear_for_new_run(self) -> None:
+        from src.agents.drug_target.report_guardrails import clear_derived_report_artifacts
+
+        clear_derived_report_artifacts(
+            self._require_data_dir(),
+            include_audits=True,
+            include_sources=True,
+        )
+
+    def before_agent(self, state: Any, runtime: Any) -> None:
+        self._clear_for_new_run()
+        return None
+
+    async def abefore_agent(self, state: Any, runtime: Any) -> None:
+        await asyncio.to_thread(self._clear_for_new_run)
+        return None
+
+
+class DrugReportRunCleanupMiddleware(_DrugReportRunDirectoryMiddleware):
+    """Clear stale guarded-run artifacts before top-level orchestration begins."""
+
+
+class DrugReportGuardrailMiddleware(_DrugReportRunDirectoryMiddleware):
+    """Validate/repair/publish only after a report-writer invocation completes."""
+
+    def __init__(
+        self,
+        data_dir: str | Path | None,
+        *,
+        provider: str | None = None,
+        disease: str = "",
+    ) -> None:
+        super().__init__(data_dir)
+        self._provider = provider
+        self._disease = disease
+
+    def _run(self) -> dict[str, Any]:
+        data_dir = self._require_data_dir()
+        result = run_drug_report_guardrail(
+            data_dir,
+            provider=self._provider,
+            disease=self._disease,
+        )
+        if result.get("status") == "failed":
+            final_error_count = result.get("final_error_count", "unknown")
+            detail = result.get("publication_error") or f"{final_error_count} hard error(s)"
+            raise RuntimeError(
+                "Drug report guardrail failed with "
+                f"{detail}; see {data_dir / 'drug_report_validation_final.json'}"
+            )
+        return {
+            "messages": [
+                AIMessage(
+                    content=json.dumps(
+                        {"drug_report_guardrail": result},
+                        ensure_ascii=False,
+                        sort_keys=True,
+                    )
+                )
+            ]
+        }
+
+    def after_agent(self, state: Any, runtime: Any) -> dict[str, Any]:
+        return self._run()
+
+    async def aafter_agent(self, state: Any, runtime: Any) -> dict[str, Any]:
+        return await asyncio.to_thread(self._run)
+
+
+class DrugTargetManagedFilesystemGuardMiddleware(AgentMiddleware):
+    """Block generic content tools and bind domain tools to one run directory."""
+
+    _BLOCKED_TOOL_NAMES = frozenset({"read_file", "grep", "write_file", "edit_file", "execute"})
+
+    def __init__(
+        self,
+        data_dir: str | Path,
+        *,
+        data_dir_tool_names: Collection[str],
+    ) -> None:
+        super().__init__()
+        from src.agents.drug_target.report_guardrails import _resolve_safe_run_dir
+
+        self._data_dir = _resolve_safe_run_dir(data_dir)
+        self._data_dir_tool_names = frozenset(data_dir_tool_names)
+
+    @staticmethod
+    def _blocked_response(request: ToolCallRequest) -> ToolMessage:
+        return ToolMessage(
+            content=(
+                f"ERROR: {request.tool_call.get('name', 'tool')} is blocked in the "
+                "managed Drug Target filesystem. Use an allowed domain tool instead."
+            ),
+            tool_call_id=request.tool_call.get("id", ""),
+        )
+
+    def _patched_request(self, request: ToolCallRequest) -> ToolCallRequest:
+        tool_call = request.tool_call
+        if tool_call.get("name") not in self._data_dir_tool_names:
+            return request
+        args = tool_call.get("args")
+        patched_args = {**args, "data_dir": str(self._data_dir)} if isinstance(args, dict) else {"data_dir": str(self._data_dir)}
+        patched_call = cast(ToolCall, {**tool_call, "args": patched_args})
+        return request.override(tool_call=patched_call)
+
+    def wrap_tool_call(
+        self,
+        request: ToolCallRequest,
+        handler: Callable[[ToolCallRequest], ToolMessage | Command],
+    ) -> ToolMessage | Command:
+        if request.tool_call.get("name") in self._BLOCKED_TOOL_NAMES:
+            return self._blocked_response(request)
+        return handler(self._patched_request(request))
+
+    async def awrap_tool_call(
+        self,
+        request: ToolCallRequest,
+        handler: Callable[[ToolCallRequest], Awaitable[ToolMessage | Command]],
+    ) -> ToolMessage | Command:
+        if request.tool_call.get("name") in self._BLOCKED_TOOL_NAMES:
+            return self._blocked_response(request)
+        return await handler(self._patched_request(request))
+
+
+class DrugTargetTaskAllowlistMiddleware(AgentMiddleware):
+    """Keep production orchestration to its two explicit domain subagents."""
+
+    _PRODUCTION_SUBAGENT_TYPES = frozenset({"evidence_assessor", "report_writer"})
+
+    def __init__(self, allowed_subagent_types: Collection[str]) -> None:
+        super().__init__()
+        self._allowed_subagent_types = (
+            frozenset(allowed_subagent_types) & self._PRODUCTION_SUBAGENT_TYPES
+        )
+
+    def _is_allowed(self, request: ToolCallRequest) -> bool:
+        if request.tool_call.get("name") != "task":
+            return True
+        args = request.tool_call.get("args")
+        return isinstance(args, dict) and args.get("subagent_type") in self._allowed_subagent_types
+
+    @staticmethod
+    def _blocked_response(request: ToolCallRequest) -> ToolMessage:
+        return ToolMessage(
+            content=(
+                "ERROR: task subagent_type is not allowed for guarded Drug Target "
+                "production. Allowed types: evidence_assessor, report_writer."
+            ),
+            tool_call_id=request.tool_call.get("id", ""),
+        )
+
+    def wrap_tool_call(
+        self,
+        request: ToolCallRequest,
+        handler: Callable[[ToolCallRequest], ToolMessage | Command],
+    ) -> ToolMessage | Command:
+        if not self._is_allowed(request):
+            return self._blocked_response(request)
+        return handler(request)
+
+    async def awrap_tool_call(
+        self,
+        request: ToolCallRequest,
+        handler: Callable[[ToolCallRequest], Awaitable[ToolMessage | Command]],
+    ) -> ToolMessage | Command:
+        if not self._is_allowed(request):
+            return self._blocked_response(request)
+        return await handler(request)
 
 
 class HypothesisRetryLoopMiddleware(AgentMiddleware):
