@@ -270,6 +270,57 @@ def test_report_mvp_keeps_section_sources_deterministic(tmp_path: Path) -> None:
         assert "evidence/assessment_results.json" in candidate["sources"]
 
 
+def test_build_report_data_accepts_hypotheses_without_legacy_file(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.agents.drug_target import deterministic_report
+
+    data_dir = _copy_baseline_workspace(tmp_path)
+    (data_dir / "evidence" / "hypothesis_report.json").write_text(
+        "stale legacy payload that must not be parsed",
+        encoding="utf-8",
+    )
+    hypothesis_data = {
+        "hypotheses": [
+            {
+                "rank": 1,
+                "title": "Markdown-derived hypothesis",
+                "category": "mechanistic",
+                "core_claim": "A testable association.",
+                "biological_entities": {
+                    "genes": ["GENE1"],
+                    "pathways": [],
+                    "cell_types": [],
+                    "drugs": [],
+                },
+                "falsifiable_prediction": "GENE1 changes in the disease context.",
+                "validation_approach": "Perturb GENE1 and measure the endpoint.",
+                "evidence_references": ["drug.md"],
+            }
+        ]
+    }
+    original_sha256_path = deterministic_report._sha256_path
+
+    def guarded_sha256_path(path: Path) -> str:
+        if path.name == "hypothesis_report.json":
+            raise AssertionError("injected mode must not hash the legacy hypothesis file")
+        return original_sha256_path(path)
+
+    monkeypatch.setattr(deterministic_report, "_sha256_path", guarded_sha256_path)
+
+    report_data = deterministic_report.build_report_data(
+        str(data_dir),
+        "IPF",
+        hypothesis_data=hypothesis_data,
+    )
+
+    assert report_data["valid"] is True
+    assert report_data["hypotheses"][0]["title"] == "Markdown-derived hypothesis"
+    assert report_data["sections"]["hypotheses"]["sources"] == ["drug.md"]
+    assert "evidence/hypothesis_report.json" not in report_data["sources"]
+
+
 def test_report_mvp_defaults_absent_gwas_audit_fields(tmp_path: Path) -> None:
     from src.agents.drug_target.deterministic_report import build_report_data
 

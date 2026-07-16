@@ -179,9 +179,15 @@ def _required_evidence_paths(base: Path) -> dict[str, Path]:
     }
 
 
-def _missing_required_evidence(base: Path) -> list[dict[str, Any]]:
+def _missing_required_evidence(
+    base: Path,
+    *,
+    require_hypothesis: bool = True,
+) -> list[dict[str, Any]]:
     issues: list[dict[str, Any]] = []
     for name, path in _required_evidence_paths(base).items():
+        if name == "hypothesis_report" and not require_hypothesis:
+            continue
         if not path.exists():
             issues.append(
                 {
@@ -1708,9 +1714,18 @@ def _drop_preclinical_duplicates(
     ]
 
 
-def build_report_data(data_dir: str, disease: str) -> dict[str, Any]:
+def build_report_data(
+    data_dir: str,
+    disease: str,
+    *,
+    hypothesis_data: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     base = Path(data_dir).expanduser().resolve()
-    issues = _missing_required_evidence(base)
+    require_hypothesis_file = hypothesis_data is None
+    issues = _missing_required_evidence(
+        base,
+        require_hypothesis=require_hypothesis_file,
+    )
     if issues:
         return _invalid_report_data(base, disease, issues)
 
@@ -1730,21 +1745,26 @@ def build_report_data(data_dir: str, disease: str) -> dict[str, Any]:
                 )
             ],
         )
-    try:
-        hypothesis = _load_json(paths["hypothesis_report"])
-    except (json.JSONDecodeError, OSError) as exc:
-        return _invalid_report_data(
-            base,
-            disease,
-            [
-                _invalid_required_json_issue(
-                    base,
-                    "hypothesis_report",
-                    paths["hypothesis_report"],
-                    exc,
-                )
-            ],
-        )
+    if hypothesis_data is None:
+        try:
+            hypothesis = _load_json(paths["hypothesis_report"])
+        except (json.JSONDecodeError, OSError) as exc:
+            return _invalid_report_data(
+                base,
+                disease,
+                [
+                    _invalid_required_json_issue(
+                        base,
+                        "hypothesis_report",
+                        paths["hypothesis_report"],
+                        exc,
+                    )
+                ],
+            )
+        hypothesis_source = "evidence/hypothesis_report.json"
+    else:
+        hypothesis = hypothesis_data
+        hypothesis_source = "drug.md"
     if not isinstance(assessment, dict):
         return _invalid_report_data(
             base,
@@ -1759,6 +1779,16 @@ def build_report_data(data_dir: str, disease: str) -> dict[str, Any]:
             ],
         )
     if not isinstance(hypothesis, dict):
+        path = (
+            "evidence/hypothesis_report.json"
+            if hypothesis_data is None
+            else "drug.md"
+        )
+        message = (
+            "hypothesis_report.json must be a JSON object"
+            if hypothesis_data is None
+            else "injected hypothesis_data must be a JSON object"
+        )
         return _invalid_report_data(
             base,
             disease,
@@ -1766,8 +1796,8 @@ def build_report_data(data_dir: str, disease: str) -> dict[str, Any]:
                 {
                     "code": "INVALID_HYPOTHESIS_SHAPE",
                     "severity": "critical",
-                    "message": "hypothesis_report.json must be a JSON object",
-                    "path": "evidence/hypothesis_report.json",
+                    "message": message,
+                    "path": path,
                 }
             ],
         )
@@ -1872,7 +1902,7 @@ def build_report_data(data_dir: str, disease: str) -> dict[str, Any]:
         },
         "hypotheses": {
             "title": "Mechanistic Hypotheses",
-            "sources": ["evidence/hypothesis_report.json"],
+            "sources": [hypothesis_source],
         },
     }
 
@@ -1889,7 +1919,12 @@ def build_report_data(data_dir: str, disease: str) -> dict[str, Any]:
         for source in candidate["sources"]
         if isinstance(source, str)
     )
-    cited_sources.update(str(path.relative_to(base)) for path in paths.values())
+    cited_sources.update(
+        {
+            "evidence/assessment_results.json",
+            hypothesis_source,
+        }
+    )
     for optional_source in (
         "evidence/stage1_filter_results.json",
         "evidence/stage1_filter_results.csv",

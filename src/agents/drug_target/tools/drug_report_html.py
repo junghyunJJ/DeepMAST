@@ -1483,7 +1483,11 @@ def _format_filter_results(results: list[dict]) -> list[dict]:
     return formatted
 
 
-def build_drug_html_context(data_dir: str) -> dict[str, Any]:
+def build_drug_html_context(
+    data_dir: str,
+    *,
+    allow_legacy_hypothesis_fallback: bool = True,
+) -> dict[str, Any]:
     """Build complete Jinja2 context for drug target HTML report."""
     base = _resolve_data_dir(data_dir)
     drug_md_path = base / "drug.md"
@@ -1497,7 +1501,7 @@ def build_drug_html_context(data_dir: str) -> dict[str, Any]:
         _enrich_from_target_assessment(context, ta_path)
 
     # Fallback: load hypothesis from evidence/hypothesis_report.json if parser missed it
-    if not context.get("hypothesis"):
+    if allow_legacy_hypothesis_fallback and not context.get("hypothesis"):
         hyp_path = base / "evidence" / "hypothesis_report.json"
         if hyp_path.exists():
             try:

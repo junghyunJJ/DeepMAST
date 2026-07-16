@@ -39,9 +39,7 @@ MAX_EVIDENCE_REFERENCE_COUNT = 12
 MAX_EVIDENCE_REFERENCE_CHARS = 160
 PART4_CANDIDATE_SELECTION_EVIDENCE_REFERENCES = [
     "drug.md",
-    "report_data.json",
     "target_assessment.json",
-    "evidence/hypothesis_report.json",
 ]
 
 _TRUTHY_ENV_VALUES = {"1", "true", "yes", "on"}
