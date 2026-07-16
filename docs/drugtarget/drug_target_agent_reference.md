@@ -664,7 +664,7 @@ uv run python -u scripts/run_report_writer_only.py \
 ```
 
 Its configured outer deadline was 120 seconds; the JSONL trace does not record
-the deadline or a measured elapsed duration. It completed two model calls plus
+the deadline or a measured elapsed duration. It completed three model calls plus
 `read_skill_file` and `load_lr_candidates`; the last JSONL boundary was
 `tool_start` for `build_evidence_summary`, with no matching `tool_end`. No
 guarded artifacts were left in the data directory. This is a tool-level stall,
