@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
+import tempfile
 from collections.abc import Collection
 from pathlib import Path
 from typing import Any
@@ -17,6 +19,14 @@ from src.agents.drug_target.tools import (
     save_target_assessment,
 )
 from src.agents.drug_target.tools.stage_logic import build_evidence_summary
+from src.agents.drug_target.deterministic_report import (
+    build_report_data,
+    render_hybrid_report,
+)
+from src.agents.drug_target.hybrid_report_sections import (
+    REPORT_SECTIONS_FILENAME,
+    canonicalize_report_sections,
+)
 
 
 def _resolve_run_dir(data_dir: str | Path) -> Path:
@@ -178,6 +188,121 @@ def production_save_drug_md_tool(data_dir: str | Path) -> StructuredTool:
         func=save_drug_md_for_run,
         name="save_drug_md",
         description="Save drug.md only in the configured run; markers stay visible.",
+    )
+
+
+_HYBRID_ARTIFACTS = (
+    REPORT_SECTIONS_FILENAME,
+    "report_data.json",
+    "target_assessment.json",
+    "drug.md",
+    "drug_report_render.json",
+)
+
+
+def _clear_hybrid_artifacts(run_dir: Path) -> None:
+    """Remove stale renderer-owned artifacts after a rejected sections payload."""
+
+    from src.agents.drug_target.report_guardrails import clear_derived_report_artifacts
+
+    clear_derived_report_artifacts(
+        run_dir,
+        include_audits=True,
+        include_sources=True,
+    )
+    for name in _HYBRID_ARTIFACTS:
+        path = run_dir / name
+        for candidate in (path, path.with_suffix(f"{path.suffix}.tmp")):
+            candidate.unlink(missing_ok=True)
+
+
+def _hybrid_source_paths(run_dir: Path) -> set[str]:
+    evidence_dir = run_dir / "evidence"
+    if not evidence_dir.is_dir():
+        return set()
+    return {
+        f"evidence/{path.name}"
+        for path in evidence_dir.glob("*.json")
+        if not _is_forbidden_prior_report_output(path.name)
+    }
+
+
+def production_save_report_sections_tool(
+    data_dir: str | Path,
+    disease: str,
+) -> StructuredTool:
+    """Bind canonical hybrid-section rendering to one guarded report run."""
+
+    run_dir = _resolve_run_dir(data_dir)
+
+    def save_report_sections_for_run(payload: dict[str, Any]) -> str:
+        try:
+            report_data = build_report_data(
+                str(run_dir),
+                disease,
+                hypothesis_data={"hypotheses": []},
+                hypothesis_source=REPORT_SECTIONS_FILENAME,
+            )
+            if not report_data.get("valid"):
+                raise ValueError("deterministic report data is invalid")
+            canonical, errors = canonicalize_report_sections(
+                payload,
+                run_dir / "evidence",
+                _hybrid_source_paths(run_dir),
+                report_data,
+            )
+            if canonical is None:
+                _clear_hybrid_artifacts(run_dir)
+                return json.dumps({"saved": False, "errors": errors})
+
+            with tempfile.TemporaryDirectory(
+                dir=run_dir,
+                prefix=".report-sections-",
+            ) as staging_name:
+                staging = Path(staging_name)
+                (staging / "evidence").symlink_to(
+                    run_dir / "evidence",
+                    target_is_directory=True,
+                )
+                lr_candidates = run_dir / "lr_candidates.json"
+                if lr_candidates.exists():
+                    (staging / "lr_candidates.json").symlink_to(lr_candidates)
+                markdown, _ = render_hybrid_report(str(staging), disease, canonical)
+                for name in _HYBRID_ARTIFACTS:
+                    if not (staging / name).is_file():
+                        raise ValueError(f"hybrid renderer did not create {name}")
+                _clear_hybrid_artifacts(run_dir)
+                for name in _HYBRID_ARTIFACTS:
+                    (staging / name).replace(run_dir / name)
+
+            return json.dumps(
+                {
+                    "saved": True,
+                    "artifacts": {
+                        name: str(run_dir / name) for name in _HYBRID_ARTIFACTS
+                    },
+                    "payload_sha256": hashlib.sha256(
+                        json.dumps(
+                            canonical,
+                            ensure_ascii=False,
+                            sort_keys=True,
+                            separators=(",", ":"),
+                        ).encode("utf-8")
+                    ).hexdigest(),
+                    "markdown_sha256": hashlib.sha256(
+                        markdown.encode("utf-8")
+                    ).hexdigest(),
+                },
+                ensure_ascii=False,
+            )
+        except Exception as exc:
+            _clear_hybrid_artifacts(run_dir)
+            return json.dumps({"saved": False, "errors": [str(exc)]})
+
+    return StructuredTool.from_function(
+        func=save_report_sections_for_run,
+        name="save_report_sections",
+        description="Validate canonical report sections and render the guarded report.",
     )
 
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the canonical guarded report writer against existing evidence."""
+"""Render the guarded hybrid report from existing evidence."""
 
 from __future__ import annotations
 
@@ -30,7 +30,7 @@ REQUIRED_GUARDED_ARTIFACTS = (
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run guarded report_writer on existing evidence")
+    parser = argparse.ArgumentParser(description="Render guarded hybrid report from existing evidence")
     parser.add_argument("--data-dir", required=True)
     parser.add_argument("--disease", required=True)
     parser.add_argument("--provider", default="ollama")
@@ -73,8 +73,8 @@ async def main() -> int:
         workflow_mode="guarded_report",
         use_checkpointer=True,
         report_writer_resume_instruction=(
-            "Write target_assessment.json and a complete drug.md from evidence already "
-            f"on disk. Data dir: {data_dir}"
+            "Render guarded hybrid report from existing evidence. "
+            f"Data dir: {data_dir}"
         ),
         subagent_models={"report_writer": model} if model is not None else None,
     )
@@ -84,7 +84,7 @@ async def main() -> int:
     try:
         agent, backend = create_drug_target_agent(config)
         await agent.ainvoke(
-            {"messages": [{"role": "user", "content": "Write the guarded report from existing evidence."}]},
+            {"messages": [{"role": "user", "content": "Render guarded hybrid report from existing evidence."}]},
             config={"configurable": {"thread_id": str(uuid.uuid4())}},
         )
     finally:

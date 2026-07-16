@@ -38,8 +38,7 @@ from src.agents.drug_target.production_report_tools import (
     production_assessment_save_evidence_tool,
     production_evidence_summary_tool,
     production_hypothesis_evidence_tool,
-    production_save_drug_md_tool,
-    production_save_target_assessment_tool,
+    production_save_report_sections_tool,
     production_skill_reader_tool,
 )
 from src.agents.drug_target.tools import (
@@ -329,15 +328,14 @@ SUBAGENT_CONFIGS = {
     },
     "report_writer": {
         "name": "report_writer",
-        "description": "Guarded direct author of target_assessment.json and drug.md.",
+        "description": "Guarded author of validated report sections.",
         "system_prompt": REPORT_WRITER_PROMPT,
         "tools": [
             load_lr_candidates,
             load_evidence_files,
             build_evidence_summary,
             read_skill_file,
-            save_target_assessment,
-            save_drug_md,
+            production_save_report_sections_tool,
             sequential_thinking,
             think_tool,
             validate_quality,
@@ -766,11 +764,14 @@ def get_subagents(
             replacements = {
                 "load_evidence_files": production_hypothesis_evidence_tool(safe_data_dir),
                 "build_evidence_summary": production_evidence_summary_tool(safe_data_dir),
-                "save_target_assessment": production_save_target_assessment_tool(safe_data_dir),
-                "save_drug_md": production_save_drug_md_tool(safe_data_dir),
                 "read_skill_file": production_skill_reader_tool(root, ("drug-target-reporting",)),
             }
-            tools = [replacements.get(getattr(tool, "name", ""), tool) for tool in tools]
+            tools = [
+                production_save_report_sections_tool(safe_data_dir, safe_disease)
+                if tool is production_save_report_sections_tool
+                else replacements.get(getattr(tool, "name", ""), tool)
+                for tool in tools
+            ]
 
         if not enable_census and name == "evidence_assessor":
             census_names = {
@@ -841,7 +842,7 @@ def get_subagents(
                         skill_registry=registries.get(name, {}),
                         hard_required_skill_names=hard_required,
                         candidate_skill_names=tuple(s for s in allowed_names if s not in hard_required),
-                        artifact_gate="save_drug_md" if name == "report_writer" else "final artifact",
+                        artifact_gate="save_report_sections" if name == "report_writer" else "final artifact",
                     )
                 )
         subagent["middleware"] = middleware

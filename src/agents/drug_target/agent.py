@@ -3,7 +3,7 @@
 Production is a guarded two-subagent workflow:
 1. EVIDENCE_ASSESSOR: 3-stage funnel (Stage 2: validation & scoring ->
    Stage 1: biological context -> Stage 3: ChEMBL drug profiles).
-2. REPORT_WRITER: direct author of target_assessment.json and drug.md;
+2. REPORT_WRITER: renders a guarded hybrid report from validated sections;
    DrugReportGuardrailMiddleware validates, repairs, publishes, and audits.
 
 ``legacy_hypothesis`` retains the hypothesis_writer plus deterministic
@@ -148,7 +148,7 @@ Data directory: {data_dir} | Disease: {disease}
 ## Steps (execute in exact order)
 1. Call {load_lr_candidates_invocation}
 2. Call task(subagent_type="evidence_assessor", instruction="Run Stage 1+2+3. Data dir: {data_dir}.")
-3. Call task(subagent_type="report_writer", instruction="Write target_assessment.json and drug.md from the collected evidence. Data dir: {data_dir}.")
+3. Call task(subagent_type="report_writer", instruction="Render guarded hybrid report from the collected evidence. Data dir: {data_dir}.")
 4. Reply with the single line: REPORT_PIPELINE_COMPLETE
 
 ## Rules
@@ -342,8 +342,8 @@ def _format_report_writer_resume_instruction(
     resolved_data_dir: str,
 ) -> str:
     instruction = config.report_writer_resume_instruction or (
-        "Write target_assessment.json and a complete drug.md from evidence already "
-        f"on disk. Data dir: {resolved_data_dir}"
+        "Render guarded hybrid report from existing evidence. "
+        f"Data dir: {resolved_data_dir}"
     )
     return " ".join(instruction.replace('"', "'").split())
 

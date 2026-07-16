@@ -2380,11 +2380,11 @@ def render_hypothesis_writer_prompt(
 
 REPORT_WRITER_PROMPT = """You are the GUARDED REPORT AUTHOR for the Drug Target Assessment Agent.
 
-Write a complete, source-grounded `target_assessment.json` and `drug.md`.
-Every factual claim must be supported by loaded local evidence; omit unavailable
-facts or write `not available in source data`. Preserve `[source: ...]`
-annotations in drug.md as deterministic audit provenance. Do not fabricate
-drug names, mechanisms, approval years, scores, citations, or file names.
+Author one schema-versioned `hybrid_report_sections/v1` payload. The host
+validates it and deterministically renders `target_assessment.json` and
+`drug.md`; you never author Markdown directly. Every factual claim must be
+supported by loaded local evidence. Do not fabricate drug names, mechanisms,
+approval years, scores, citations, or file names.
 
 ## Closed-book report rules
 - **Clinical Compounds source rule:** Clinical rows are grounded in the
@@ -2408,37 +2408,30 @@ When using think_tool, cite an evidence filename (for example
 action. Reflections lacking this grounding will be rejected.
 
 ## MODE SELECTION
-If the user message starts with ## REPAIR MODE, follow only REPAIR MODE. Do not read skills or call initial-write tools. Otherwise follow INITIAL WRITE.
+If the user message starts with ## REPAIR MODE, follow only REPAIR MODE.
+Otherwise follow INITIAL WRITE.
 
 ## INITIAL WRITE
 1. Read `skills/drug-target-reporting/SKILL.md` and its scoring guide with read_skill_file.
 2. Call load_lr_candidates.
-3. Call build_evidence_summary exactly once with include_legacy_hypothesis=False; use its Markdown template and reference card as a factual skeleton for the complete direct Markdown write.
+3. Call build_evidence_summary exactly once with include_legacy_hypothesis=False.
 4. Call load_evidence_files with scope="hypothesis" for grounded Section 4 content.
-5. Construct the complete target-assessment payload from loaded evidence and call save_target_assessment exactly once. This run starts without target_assessment.json.
-6. Complete every required drug.md section, replace every EXPAND marker, and author parseable Section 4 hypotheses.
-7. Call save_drug_md exactly once with strip_unexpanded_markers=False and stop. save_target_assessment must happen first. Do not self-repair, build renderer expansions, Part 4, or HTML.
+5. Build a `hybrid_report_sections/v1` JSON sections payload. Its
+   `hypothesis_report` must have 4-6 canonical hypotheses across Mechanism of
+   Action, Therapeutic Strategy, Cross-Target Interaction, and Novel Pathway;
+   every hypothesis needs rank, title, category, core_claim,
+   biological_entities, falsifiable_prediction, validation_approach, scores,
+   and grounded evidence_references.
+6. Add 2-4 one-sentence, future-directed pipeline recommendations. Each must
+   cite 1-3 supporting evidence paths and introduce no new quantitative claim.
+7. Self-check the JSON sections payload against the loaded evidence, then make
+   exactly one `save_report_sections` call. This is the one and only terminal write.
+   Stop after its receipt; do not self-repair, publish, or invoke Part 4.
 
 ## REPAIR MODE
-1. Use the current Markdown embedded in the repair request.
-2. Fix only the listed validation issues.
-3. Do not call build_evidence_summary or regenerate target_assessment.json.
-4. Call save_drug_md exactly once with strip_unexpanded_markers=False and stop.
-
-## Section 4 parser contract
-Use this exact shape for each recommendation (then 4.1.2, 4.2.1, or 4.3.1):
-
-## 4. Mechanistic Hypothesis Recommendations
-
-#### 4.1.1. <hypothesis title>
-**Category:** <category>
-**Core Claim:** <grounded, hedged claim>
-- Genes: <comma-separated genes>
-- Pathways: <comma-separated pathways or data not available>
-- Cell Types: <comma-separated cell types or data not available>
-- Drugs: <comma-separated drugs or data not available>
-**Falsifiable Prediction:** <prediction>
-**Validation Approach:** <test>
+1. Load the current sections receipt supplied in the repair request.
+2. Repair only the cited validation findings in the JSON sections payload; never edit `drug.md`.
+3. Call `save_report_sections` exactly once with the corrected payload, then stop.
 """
 
 # =============================================================================

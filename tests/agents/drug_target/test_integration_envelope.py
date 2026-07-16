@@ -56,6 +56,62 @@ def _write_success_artifacts(
             (data_dir / name).write_text(content, encoding="utf-8")
 
 
+def test_guarded_report_writer_has_one_sections_write_boundary(tmp_path: Path) -> None:
+    from src.agents.drug_target.subagents.configs import get_subagents
+
+    writer = next(
+        subagent
+        for subagent in get_subagents(data_dir=str(tmp_path), disease="IPF")
+        if subagent["name"] == "report_writer"
+    )
+    tool_names = {tool.name for tool in writer["tools"]}
+
+    assert "save_report_sections" in tool_names
+    assert not {
+        "save_drug_md",
+        "save_target_assessment",
+        "save_hypothesis_report",
+        "save_report_expansions",
+        "render_drug_md_from_expansions",
+    } & tool_names
+
+
+def test_legacy_hypothesis_writer_retains_legacy_tools_and_prompt(
+    tmp_path: Path,
+) -> None:
+    from src.agents.drug_target.subagents.configs import get_legacy_subagents
+
+    writer = next(
+        subagent
+        for subagent in get_legacy_subagents(data_dir=str(tmp_path), disease="IPF")
+        if subagent["name"] == "hypothesis_writer"
+    )
+    tool_names = {tool.name for tool in writer["tools"]}
+
+    assert "save_hypothesis_report" in tool_names
+    assert "save_report_sections" not in tool_names
+    assert "save_hypothesis_report" in writer["system_prompt"]
+
+
+def test_sections_save_failure_clears_stale_markdown(tmp_path: Path) -> None:
+    from src.agents.drug_target.production_report_tools import (
+        production_save_report_sections_tool,
+    )
+
+    stale_markdown = tmp_path / "drug.md"
+    stale_markdown.write_text("# stale report\n", encoding="utf-8")
+
+    receipt = json.loads(
+        production_save_report_sections_tool(tmp_path, "IPF").invoke(
+            {"payload": {"schema_version": "wrong"}}
+        )
+    )
+
+    assert receipt["saved"] is False
+    assert receipt["errors"]
+    assert not stale_markdown.exists()
+
+
 class _FakeBackend:
     def __init__(self, cleanup_threads: list[str]) -> None:
         self._cleanup_threads = cleanup_threads
