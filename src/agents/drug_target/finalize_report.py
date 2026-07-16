@@ -328,7 +328,7 @@ def _load_expansion_inputs(data_dir: str, disease: str) -> tuple[dict, dict, dic
 
     # Build reference_card + spec from evidence on disk. Idempotent: rewrites
     # both files. With the summarizer subagent removed (Phase 3 task #8), this
-    # finalize_report node is now the only production caller — invoking it here
+    # Explicit legacy super-graph and traced compatibility callers invoke this
     # makes _load_expansion_inputs self-contained.
     _call_tool(
         _build_evidence_summary_st,

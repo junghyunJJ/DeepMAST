@@ -11,6 +11,7 @@ Tests:
 from __future__ import annotations
 
 import importlib
+import tempfile
 
 
 def _get_configs_mod() -> object:
@@ -25,6 +26,13 @@ def _get_configs_mod() -> object:
 
 def _collect_system_prompts(disease: str | None, data_dir: str = "/data/run") -> list[str]:
     mod = _get_configs_mod()
+    # Production construction requires a real run directory; retain an injected
+    # suffix only to exercise prompt sanitization.
+    safe_dir = tempfile.mkdtemp(prefix="drug-target-prompt-")
+    if "\n" in data_dir:
+        data_dir = safe_dir + data_dir[data_dir.index("\n"):]
+    else:
+        data_dir = safe_dir
     subagents = mod.get_subagents(  # type: ignore[attr-defined]
         data_dir=data_dir,
         disease=disease,

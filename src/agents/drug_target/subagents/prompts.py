@@ -131,7 +131,7 @@ Call `query_stage2_gene_panel(gene_symbols, disease, selected_top3_genes, data_d
 After the batch call:
 `query_stage2_gene_panel` automatically saves all evidence files to disk:
 stage2_evidence.json, known_drugs.json, gene_manifest.json, and ot_{GENE}.json per gene.
-Verify by calling `load_evidence_files(data_dir)` afterward.
+Verify by calling `load_evidence_files(data_dir=data_dir, scope="assessment")` afterward.
 Do NOT call save_evidence to overwrite these files — they contain the real database results.
 
 a) **Ensembl VEP** runs automatically during `query_stage2_gene_panel`.
@@ -1037,7 +1037,8 @@ GUIDANCE: If `ls` or `glob` returns an empty list for a path you expect to conta
 # Report Writer
 # =============================================================================
 
-# RETENTION DECISION: Retained pending reader migration
+# Historical compatibility prompt retained for old readers; production uses the
+# canonical REPORT_WRITER_PROMPT declared beside the registry below.
 #
 # REPORT_WRITER_PROMPT is NOT dead code. Five live readers import it directly:
 #   - tests/agents/drug_target/test_prompts_gap_analysis_rule.py
@@ -1056,7 +1057,7 @@ GUIDANCE: If `ls` or `glob` returns an empty list for a path you expect to conta
 #
 # Do NOT add new readers. The migration plan is to delete this constant once
 # existing readers are updated.
-REPORT_WRITER_PROMPT = """You are the Report Writer for the Drug Target Assessment Agent.
+LEGACY_REPORT_WRITER_PROMPT = """You are the Report Writer for the Drug Target Assessment Agent.
 
 Your role is to generate a publication-quality drug.md document that integrates
 all assessment findings into a structured therapeutic target report, and to
@@ -1424,7 +1425,7 @@ GUIDANCE: If `ls` or `glob` returns an empty list for a path you expect to conta
 # =============================================================================
 # Summarizer / Audit Loop — REMOVED (Phase 3b-A, 2026-05-19)
 # The summarizer prompt and critic-review fragment were deleted here.
-# Report finalization is now handled by the deterministic finalize_report
+# Historical compatibility: report finalization is handled by the deterministic finalize_report
 # LangGraph node (src/agents/drug_target/finalize_report.py).
 # =============================================================================
 
@@ -2373,11 +2374,79 @@ def render_hypothesis_writer_prompt(
 
 
 # =============================================================================
+# Canonical production report writer
+# =============================================================================
+
+REPORT_WRITER_PROMPT = """You are the GUARDED REPORT AUTHOR for the Drug Target Assessment Agent.
+
+Write a complete, source-grounded `target_assessment.json` and `drug.md`.
+Every factual claim must be supported by loaded local evidence; omit unavailable
+facts or write `not available in source data`. Preserve `[source: ...]`
+annotations in drug.md as deterministic audit provenance. Do not fabricate
+drug names, mechanisms, approval years, scores, citations, or file names.
+
+## Closed-book report rules
+- **Clinical Compounds source rule:** Clinical rows are grounded in the
+  configured evidence sources below and must not be erased during a narrow repair.
+- Clinical Compounds tables use `ot_<gene>.json` and `resolved_drugs.json`
+  rows sourced from OpenTargets. Stage 3 evidence is restricted to Preclinical
+  sections and does not apply to Clinical Compounds.
+- Do NOT remove an OpenTargets-sourced clinical drug during repair unless the
+  matching `ot_<gene>.json` is empty. Check the union of `resolved_drugs.json`
+  and `stage3.matched_drugs` before saying "No known drugs".
+- Gap Analysis must not be empty: state data limitations, missing evidence, or
+  open questions. Use numeric values and source filenames in reflections, then
+  state the next action; ungrounded reflections will be rejected.
+- NEVER create or read evidence/hypothesis_report.json.
+- NEVER create or write report_data.json.
+- Never use read_file, write_file, grep, execute, or an external database tool.
+
+## Reflection grounding requirements
+When using think_tool, cite an evidence filename (for example
+`stage3_GENE.json`), include a numeric score/count/value, and state the next
+action. Reflections lacking this grounding will be rejected.
+
+## MODE SELECTION
+If the user message starts with ## REPAIR MODE, follow only REPAIR MODE. Do not read skills or call initial-write tools. Otherwise follow INITIAL WRITE.
+
+## INITIAL WRITE
+1. Read `skills/drug-target-reporting/SKILL.md` and its scoring guide with read_skill_file.
+2. Call load_lr_candidates.
+3. Call build_evidence_summary exactly once with include_legacy_hypothesis=False; use its Markdown template and reference card as a factual skeleton for the complete direct Markdown write.
+4. Call load_evidence_files with scope="hypothesis" for grounded Section 4 content.
+5. Construct the complete target-assessment payload from loaded evidence and call save_target_assessment exactly once. This run starts without target_assessment.json.
+6. Complete every required drug.md section, replace every EXPAND marker, and author parseable Section 4 hypotheses.
+7. Call save_drug_md exactly once with strip_unexpanded_markers=False and stop. save_target_assessment must happen first. Do not self-repair, build renderer expansions, Part 4, or HTML.
+
+## REPAIR MODE
+1. Use the current Markdown embedded in the repair request.
+2. Fix only the listed validation issues.
+3. Do not call build_evidence_summary or regenerate target_assessment.json.
+4. Call save_drug_md exactly once with strip_unexpanded_markers=False and stop.
+
+## Section 4 parser contract
+Use this exact shape for each recommendation (then 4.1.2, 4.2.1, or 4.3.1):
+
+## 4. Mechanistic Hypothesis Recommendations
+
+#### 4.1.1. <hypothesis title>
+**Category:** <category>
+**Core Claim:** <grounded, hedged claim>
+- Genes: <comma-separated genes>
+- Pathways: <comma-separated pathways or data not available>
+- Cell Types: <comma-separated cell types or data not available>
+- Drugs: <comma-separated drugs or data not available>
+**Falsifiable Prediction:** <prediction>
+**Validation Approach:** <test>
+"""
+
+# =============================================================================
 # Prompt Registry
 # =============================================================================
 
 SUBAGENT_PROMPTS = {
     "evidence_assessor": EVIDENCE_ASSESSOR_PROMPT,
+    "report_writer": REPORT_WRITER_PROMPT,
     "hypothesis_writer": HYPOTHESIS_WRITER_PROMPT,
 }
 
@@ -2385,7 +2454,7 @@ __all__ = [
     "EVIDENCE_ASSESSOR_PROMPT",
     "HYPOTHESIS_WRITER_PROMPT",
     "HypothesisWriterPromptMode",
-    "REPORT_WRITER_PROMPT",  # Retained pending reader migration — see canonical comment above the constant.
+    "REPORT_WRITER_PROMPT",
     "LEGACY_CRITIC_PROMPT_PERSISTED_REPORT",
     "SUBAGENT_PROMPTS",
     "render_hypothesis_writer_prompt",

@@ -449,6 +449,7 @@ async def run_hypothesis_writer_once(
         config = DrugTargetConfig(
             provider=provider,  # type: ignore[arg-type]
             data_dir=str(workspace),
+            workflow_mode="legacy_hypothesis",
             disease=disease,
             use_checkpointer=False,
             hypothesis_writer_skill_names=hypothesis_writer_skill_names,

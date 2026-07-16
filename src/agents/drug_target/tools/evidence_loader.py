@@ -39,6 +39,15 @@ _HYPOTHESIS_DENIED_CITATIONS: frozenset[str] = frozenset({
     "stage1_evidence.json",
 })
 
+
+def _is_forbidden_prior_report_output(name: str) -> bool:
+    """True for report outputs that must never become evidence inputs."""
+
+    basename = Path(name).name.casefold()
+    return (
+        basename.startswith("hypothesis_report") and basename.endswith(".json")
+    ) or basename == "report_data.json"
+
 _HYPOTHESIS_CONTEXT_ONLY_CITATION_REASON = (
     "context-only cell-type resolution; cite Stage 1 pair files for Census evidence."
 )
@@ -496,7 +505,7 @@ def _classify_hypothesis_scope_file(
       - "excluded"  : omit from files dict (record in excluded_files)
       - "fallback"  : defer to scope=all size-based logic
     """
-    if name in _HYPOTHESIS_DENIED_CITATIONS:
+    if name in _HYPOTHESIS_DENIED_CITATIONS or _is_forbidden_prior_report_output(name):
         return "excluded", "legacy aggregate or prior-run output; not valid hypothesis input"
     if name in _HYPOTHESIS_ALWAYS_FULL:
         return "full", None
@@ -580,7 +589,8 @@ def load_evidence_files(data_dir: str, scope: str = "all") -> str:
     Args:
         data_dir: Directory containing evidence/ subdirectory
         scope: "all" (default) preserves the legacy load-everything
-            behavior. "hypothesis" restricts the payload to evidence that
+            behavior. "assessment" behaves like ``all`` but excludes prior
+            report outputs before opening them. "hypothesis" restricts the payload to evidence that
             passed the evidence_assessor gates and is eligible for
             hypothesis_writer:
               * OpenTargets full content only for genes in stage3_candidates.
@@ -626,7 +636,9 @@ def load_evidence_files(data_dir: str, scope: str = "all") -> str:
         result["errors"].append(f"evidence/ directory not found at {evidence_dir}")
         return json.dumps(result, indent=2)
 
-    hypothesis_scope = (scope or "all").lower() == "hypothesis"
+    normalized_scope = (scope or "all").lower()
+    hypothesis_scope = normalized_scope == "hypothesis"
+    assessment_scope = normalized_scope == "assessment"
     featured: set[str] = set()
     filter_map: dict[str, bool] = {}
     filter_metadata: dict[str, dict] = {}
@@ -657,6 +669,11 @@ def load_evidence_files(data_dir: str, scope: str = "all") -> str:
 
     for path in sorted(evidence_dir.glob("*.json")):
         name = path.name
+        if (hypothesis_scope or assessment_scope) and _is_forbidden_prior_report_output(name):
+            result["excluded_files"].append(
+                {"name": name, "reason": "prior report output is not safe evidence input"}
+            )
+            continue
         try:
             size_bytes = path.stat().st_size
         except Exception as e:
@@ -1101,7 +1118,7 @@ def _validate_hypothesis_report_references(
             if not token_match:
                 continue
             token = token_match.group(1)
-            if token in _HYPOTHESIS_DENIED_CITATIONS:
+            if token in _HYPOTHESIS_DENIED_CITATIONS or _is_forbidden_prior_report_output(token):
                 errors.append(
                     f"hypotheses[{idx}].evidence_references cites '{token}' "
                     "which is a legacy aggregate or prior-run output forbidden "
@@ -1920,7 +1937,7 @@ def validate_evidence_references(data_dir: str, references: list[str]) -> str:
             continue
         token = token_match.group(1)
         seen_tokens.append(token)
-        if token in _HYPOTHESIS_DENIED_CITATIONS:
+        if token in _HYPOTHESIS_DENIED_CITATIONS or _is_forbidden_prior_report_output(token):
             invalid.append(ref)
             denied.append({
                 "reference": ref,
@@ -2153,7 +2170,7 @@ def check_hypothesis_completion(data_dir: str) -> str:
             "hypothesis_complete": False,
             "recommendation": (
                 "hypothesis_report.json not found. hypothesis_writer may have failed. "
-                "Do not proceed to summarizer for production output; retry hypothesis_writer "
+                "Legacy-hypothesis workflow: do not proceed to its summarizer; retry hypothesis_writer "
                 "or fail the hypothesis stage so Section 4 is not silently skipped."
             ),
         }, indent=2)

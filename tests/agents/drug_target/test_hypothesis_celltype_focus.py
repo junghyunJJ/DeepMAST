@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from src.agents.drug_target.subagents import prompts
 from src.agents.drug_target.tools import save_hypothesis_report
 from src.agents.drug_target.tools.evidence_loader import (
@@ -2408,3 +2410,30 @@ def test_hypothesis_grounding_preserves_known_hyphenated_gene_mentions(
     }
 
     assert validate_hypothesis_grounding(report, evidence) == []
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "hypothesis_report.json",
+        "hypothesis_report_sanitized.json",
+        "hypothesis_report_last_rejection.json",
+        "hypothesis_report_draft.json",
+        "report_data.json",
+    ],
+)
+def test_safe_evidence_scopes_exclude_prior_report_outputs_before_parsing(tmp_path: Path, name: str) -> None:
+    from src.agents.drug_target.tools import load_evidence_files
+
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    (evidence / "assessment_results.json").write_text('{"stage3_candidates": []}')
+    (evidence / name).write_text("{ malformed")
+    for scope in ("assessment", "hypothesis"):
+        payload = json.loads(load_evidence_files.invoke({"data_dir": str(tmp_path), "scope": scope}))
+        assert name not in payload["files"]
+        assert any(item["name"] == name for item in payload["excluded_files"])
+        assert not any(name in error for error in payload["errors"])
+
+    legacy = json.loads(load_evidence_files.invoke({"data_dir": str(tmp_path), "scope": "all"}))
+    assert any(name in error for error in legacy["errors"])

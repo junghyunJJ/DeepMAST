@@ -3397,7 +3397,8 @@ def build_evidence_summary(
             "This is the AUTHORITATIVE Reference Card with a PRE-FORMATTED MARKDOWN TEMPLATE. "
             "Use the `markdown_template` field as the SKELETON for drug.md. "
             "The template contains all correct values (scores, drug names, pathways). "
-            "Your job: EXPAND each section with 2-4 sentences of biological interpretation. "
+            "Use it as a factual skeleton for a complete direct Markdown write. "
+            "Replace every marker and author Section 4 from hypothesis-scope evidence. "
             "Do NOT change any numbers, drug names, or classifications in the template. "
             "ADD narrative around the pre-filled data to create a comprehensive report."
         ),

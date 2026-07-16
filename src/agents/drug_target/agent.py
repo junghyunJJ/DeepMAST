@@ -21,12 +21,13 @@ Output: drug.md (markdown for HTML report integration)
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Literal, cast
+from typing import Any, Literal, TypeAlias, cast
 
 from deepagents import create_deep_agent
 from langchain_core.language_models.chat_models import BaseChatModel
@@ -44,7 +45,7 @@ from src.agents.deep_interpreter.middleware.think_tool_quality_gate import (
     ThinkToolQualityGateMiddleware,
 )
 from deepagents.backends import FilesystemBackend
-from src.agents.drug_target.subagents.configs import get_subagents
+from src.agents.drug_target.subagents.configs import get_legacy_subagents, get_subagents
 from src.agents.drug_target.subagents.prompts import HypothesisWriterPromptMode
 from src.agents.drug_target.tools import (
     check_stage1_completion,
@@ -57,6 +58,11 @@ from src.agents.drug_target.tools import (
     think_tool,
     validate_quality,
 )
+from src.agents.drug_target.middleware import (
+    DrugReportRunCleanupMiddleware,
+    DrugTargetManagedFilesystemGuardMiddleware,
+    DrugTargetTaskAllowlistMiddleware,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -65,13 +71,15 @@ SkillActivationMode = Literal[
     "middleware_plus_activator",
     "middleware_plus_governor",
 ]
+Provider: TypeAlias = Literal["openai", "google", "ollama", "ollama-openai", "vllm", "claude", "openrouter"]
+WorkflowMode: TypeAlias = Literal["guarded_report", "legacy_hypothesis"]
 
 
 # =============================================================================
 # Orchestrator System Prompt
 # =============================================================================
 
-ORCHESTRATOR_SYSTEM_PROMPT_TEMPLATE = """You are the Drug Target Assessment orchestrator.
+LEGACY_ORCHESTRATOR_SYSTEM_PROMPT_TEMPLATE = """You are the Drug Target Assessment orchestrator.
 Data directory: {data_dir} | Disease: {disease}
 
 ## Steps (execute in exact order)
@@ -102,7 +110,7 @@ Data directory: {data_dir} | Disease: {disease}
 # script --skip-evidence-assessor flag). Use ONLY when evidence/*.json files
 # from a prior partial run are present on disk; the orchestrator does not
 # verify integrity — the caller is responsible.
-ORCHESTRATOR_RESUME_PROMPT_TEMPLATE = """You are the Drug Target Assessment orchestrator (RESUME mode).
+LEGACY_RESUME_ORCHESTRATOR_SYSTEM_PROMPT_TEMPLATE = """You are the Drug Target Assessment orchestrator (RESUME mode).
 Data directory: {data_dir} | Disease: {disease}
 
 ## Steps (execute in exact order)
@@ -122,6 +130,37 @@ Data directory: {data_dir} | Disease: {disease}
 
 ## Output
 - hypothesis_report.json (finalize_report node writes drug.md + HTML)
+"""
+
+
+ORCHESTRATOR_SYSTEM_PROMPT_TEMPLATE = """You are the guarded Drug Target Assessment orchestrator.
+Data directory: {data_dir} | Disease: {disease}
+
+## Steps (execute in exact order)
+1. Call {load_lr_candidates_invocation}
+2. Call task(subagent_type="evidence_assessor", instruction="Run Stage 1+2+3. Data dir: {data_dir}.")
+3. Call task(subagent_type="report_writer", instruction="Write target_assessment.json and drug.md from the collected evidence. Data dir: {data_dir}.")
+4. Reply with the single line: REPORT_PIPELINE_COMPLETE
+
+## Rules
+- Execute steps 1-4 in order. Do not skip, reorder, or repeat.
+- Do not read files or dispatch general-purpose subagents.
+- After step 4, stop. The report_writer guardrail owns deterministic validation,
+  repair, Part 4, HTML, audits, and publication.
+"""
+
+
+ORCHESTRATOR_RESUME_PROMPT_TEMPLATE = """You are the guarded Drug Target Assessment orchestrator (RESUME mode).
+Data directory: {data_dir} | Disease: {disease}
+
+## Steps (execute in exact order)
+1. Call task(subagent_type="report_writer", instruction="{report_writer_resume_instruction}")
+2. Reply with the single line: REPORT_PIPELINE_COMPLETE
+
+## Rules
+- Evidence files are assumed to exist. Do not run evidence_assessor.
+- Do not read files or dispatch general-purpose subagents.
+- After step 2, stop.
 """
 
 
@@ -156,7 +195,7 @@ class DrugTargetConfig:
         skills_dir: Optional override for the project skills directory.
     """
 
-    provider: Literal["openai", "google", "ollama", "ollama-openai", "vllm", "claude", "openrouter"] = "ollama"
+    provider: Provider = "ollama"
     data_dir: str = field(
         default_factory=lambda: os.getenv(
             "DRUG_TARGET_DATA_DIR",
@@ -164,6 +203,7 @@ class DrugTargetConfig:
         )
     )
     disease: str = ""  # Currently passed via user message, not injected into agent
+    workflow_mode: WorkflowMode = "guarded_report"
     use_checkpointer: bool = False
     custom_tools: Sequence[BaseTool] = field(default_factory=list)
     docker_image: str | None = None
@@ -179,6 +219,9 @@ class DrugTargetConfig:
         "chembl-database",
     )
     evidence_assessor_skill_names: tuple[str, ...] = ()
+    report_writer_skill_names: tuple[str, ...] = ("drug-target-reporting",)
+    report_writer_resume_instruction: str | None = None
+    # Deprecated legacy-hypothesis fields retained for benchmark/super-graph callers.
     hypothesis_writer_skill_names: tuple[str, ...] = (
         "drug-target-hypothesis",
         "opentargets-database",
@@ -194,14 +237,17 @@ class DrugTargetConfig:
     # If None, auto-loads from SUBAGENT_{NAME}_PROVIDER env vars.
 
     def __post_init__(self):
+        if self.workflow_mode == "guarded_report" and self.custom_tools:
+            raise ValueError("custom_tools are not allowed in guarded_report mode")
         if self.subagent_models is None:
             self.subagent_models = cast(
                 dict[str, BaseChatModel | str] | None,
                 load_subagent_models_from_env(
-                    [
-                        "evidence_assessor",
-                        "hypothesis_writer",
-                    ]
+                    (
+                        ["evidence_assessor", "report_writer"]
+                        if self.workflow_mode == "guarded_report"
+                        else ["evidence_assessor", "hypothesis_writer"]
+                    )
                 ),
             )
 
@@ -279,18 +325,37 @@ def _format_hypothesis_writer_resume_instruction(
     return " ".join(instruction.replace('"', "'").split())
 
 
+def _format_report_writer_resume_instruction(
+    config: DrugTargetConfig,
+    resolved_data_dir: str,
+) -> str:
+    instruction = config.report_writer_resume_instruction or (
+        "Write target_assessment.json and a complete drug.md from evidence already "
+        f"on disk. Data dir: {resolved_data_dir}"
+    )
+    return " ".join(instruction.replace('"', "'").split())
+
+
 def _build_subagent_skill_name_map(
     config: DrugTargetConfig,
     *,
     enable_census: bool,
 ) -> dict[str, tuple[str, ...]]:
     """Return the per-subagent skill tuples for the primary workflow."""
+    if config.workflow_mode == "legacy_hypothesis":
+        return {
+            "evidence_assessor": _filter_census_skills(
+                config.evidence_assessor_skill_names,
+                enable_census=enable_census,
+            ),
+            "hypothesis_writer": tuple(config.hypothesis_writer_skill_names),
+        }
     return {
         "evidence_assessor": _filter_census_skills(
             config.evidence_assessor_skill_names,
             enable_census=enable_census,
         ),
-        "hypothesis_writer": tuple(config.hypothesis_writer_skill_names),
+        "report_writer": tuple(config.report_writer_skill_names),
     }
 
 
@@ -318,6 +383,7 @@ def create_drug_target_agent(
         config = DrugTargetConfig()
 
     resolved_data_dir = str(Path(config.data_dir).expanduser().resolve())
+    workflow_mode = config.workflow_mode
     # data_dir is passed explicitly through config and injected into subagent prompts;
     # no os.environ mutation needed.
 
@@ -326,18 +392,19 @@ def create_drug_target_agent(
     evidence_dir.mkdir(parents=True, exist_ok=True)
 
     # 1. Backend
+    resolved_skills_dir = str(_resolve_skills_dir(config))
     if config.docker_image:
         backend = _create_docker_backend(config, resolved_data_dir)
-        skills_dir = None
-        subagent_skill_names = None
+        skills_dir = resolved_skills_dir
+        subagent_skill_names = {"evidence_assessor": (), "report_writer": ()}
         subagent_skill_registries = None
     else:
         backend = FilesystemBackend(root_dir=resolved_data_dir, virtual_mode=True)
-        skills_dir = str(_resolve_skills_dir(config)) if config.enable_progressive_disclosure else None
+        skills_dir = resolved_skills_dir if config.enable_progressive_disclosure else None
         subagent_skill_names = (
             _build_subagent_skill_name_map(config, enable_census=config.enable_census)
             if config.enable_progressive_disclosure
-            else None
+            else {"evidence_assessor": (), "report_writer": ()}
         )
         subagent_skill_registries = (
             {
@@ -350,12 +417,12 @@ def create_drug_target_agent(
 
     # 2. Build orchestrator-level tools — orchestrator only dispatches;
     # all cognitive/IO tools live in subagents.
-    tools: list = [
-        load_lr_candidates,
-        read_skill_file,
-    ]
-    if config.custom_tools:
-        tools.extend(config.custom_tools)
+    if workflow_mode == "guarded_report":
+        tools: list = [load_lr_candidates]
+    else:
+        tools = [load_lr_candidates, read_skill_file]
+        if config.custom_tools:
+            tools.extend(config.custom_tools)
 
     # 3. Create the orchestrator LLM.
     llm = create_llm(provider=config.provider)
@@ -372,8 +439,7 @@ def create_drug_target_agent(
     # 4. Get subagent specs — primary subagents use allow-listed shared
     #    SkillsMiddleware + activation middleware instead of deepagents native
     #    `subagent["skills"]` auto-loading.
-    subagent_specs = get_subagents(
-        custom_tools=config.custom_tools,
+    subagent_kwargs = dict(
         data_dir=resolved_data_dir,
         disease=config.disease,
         model_overrides=config.subagent_models,
@@ -385,8 +451,19 @@ def create_drug_target_agent(
         subagent_skill_registries=subagent_skill_registries,
         enable_skill_activator=config.enable_skill_activator,
         skill_activation_mode=skill_activation_mode,
-        hypothesis_writer_prompt_mode=config.hypothesis_writer_prompt_mode,
     )
+    if workflow_mode == "guarded_report":
+        subagent_specs = get_subagents(
+            provider=config.provider,
+            hypothesis_writer_prompt_mode=config.hypothesis_writer_prompt_mode,
+            **subagent_kwargs,
+        )
+    else:
+        subagent_specs = get_legacy_subagents(
+            custom_tools=config.custom_tools,
+            hypothesis_writer_prompt_mode=config.hypothesis_writer_prompt_mode,
+            **subagent_kwargs,
+        )
 
     # 5. Create agent — orchestrator has NO skills (just delegates)
     checkpointer = MemorySaver() if config.use_checkpointer else None
@@ -396,16 +473,45 @@ def create_drug_target_agent(
     # Resume mode (DRUG_TARGET_SKIP_EVIDENCE_ASSESSOR=1) skips evidence_assessor
     # — used by trace script --skip-evidence-assessor for partial re-runs.
     resume_mode = os.getenv("DRUG_TARGET_SKIP_EVIDENCE_ASSESSOR", "").lower() in {"1", "true", "yes"}
-    template = ORCHESTRATOR_RESUME_PROMPT_TEMPLATE if resume_mode else ORCHESTRATOR_SYSTEM_PROMPT_TEMPLATE
+    if workflow_mode == "guarded_report":
+        template = ORCHESTRATOR_RESUME_PROMPT_TEMPLATE if resume_mode else ORCHESTRATOR_SYSTEM_PROMPT_TEMPLATE
+    else:
+        template = LEGACY_RESUME_ORCHESTRATOR_SYSTEM_PROMPT_TEMPLATE if resume_mode else LEGACY_ORCHESTRATOR_SYSTEM_PROMPT_TEMPLATE
     if resume_mode:
         logger.info("Orchestrator running in RESUME mode (evidence_assessor skipped).")
+    safe_disease = config.disease.strip()
+    invocation = f"load_lr_candidates(data_dir={json.dumps(resolved_data_dir)}"
+    if safe_disease:
+        invocation += f", disease={json.dumps(safe_disease)}"
+    invocation += ")"
     system_prompt = template.format(
         data_dir=resolved_data_dir,
-        disease=config.disease or "(see lr_candidates.json)",
+        disease=safe_disease or "the disease returned by load_lr_candidates",
+        load_lr_candidates_invocation=invocation,
         hypothesis_writer_resume_instruction=(
             _format_hypothesis_writer_resume_instruction(config, resolved_data_dir)
         ),
+        report_writer_resume_instruction=(
+            _format_report_writer_resume_instruction(config, resolved_data_dir)
+        ),
     )
+
+    middleware = [
+        WriteFileArgGuardMiddleware(backend_root=resolved_data_dir),
+        ThinkToolQualityGateMiddleware(),
+        ReadFileBlockMiddleware(),
+        SubagentErrorGuardMiddleware(),
+    ]
+    if workflow_mode == "guarded_report":
+        middleware = [
+            DrugReportRunCleanupMiddleware(resolved_data_dir),
+            DrugTargetManagedFilesystemGuardMiddleware(
+                resolved_data_dir,
+                data_dir_tool_names={"load_lr_candidates"},
+            ),
+            DrugTargetTaskAllowlistMiddleware({"evidence_assessor", "report_writer"}),
+            *middleware,
+        ]
 
     create_kwargs: dict[str, Any] = dict(
         model=llm,
@@ -414,12 +520,7 @@ def create_drug_target_agent(
         checkpointer=checkpointer,
         system_prompt=system_prompt,
         backend=backend,
-        middleware=[
-            WriteFileArgGuardMiddleware(backend_root=resolved_data_dir),
-            ThinkToolQualityGateMiddleware(),  # Fix R1: enforce think_tool quality gates
-            ReadFileBlockMiddleware(),        # Fix 2: block read_file at orchestrator level
-            SubagentErrorGuardMiddleware(),   # Fix 4: catch GraphRecursionError from subagents
-        ],
+        middleware=middleware,
     )
 
     agent = create_deep_agent(**create_kwargs)
@@ -438,4 +539,6 @@ def create_drug_target_agent(
 __all__ = [
     "create_drug_target_agent",
     "DrugTargetConfig",
+    "Provider",
+    "WorkflowMode",
 ]

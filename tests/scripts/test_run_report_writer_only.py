@@ -1,0 +1,63 @@
+from __future__ import annotations
+
+import argparse
+import json
+
+import pytest
+
+from scripts import run_report_writer_only as runner
+
+
+class _Agent:
+    async def ainvoke(self, *_args, **_kwargs):
+        return {"messages": []}
+
+
+class _Backend:
+    def __init__(self) -> None:
+        self.cleaned = False
+
+    def cleanup(self) -> None:
+        self.cleaned = True
+
+
+def _evidence_ready(path):
+    evidence = path / "evidence"
+    evidence.mkdir()
+    for index in range(5):
+        (evidence / f"e{index}.json").write_text("{}")
+
+
+def _passed_artifacts(path):
+    for name in runner.REQUIRED_GUARDED_ARTIFACTS:
+        (path / name).write_text("x" if not name.endswith(".json") else "{}")
+    (path / "drug_report_validation_final.json").write_text(
+        json.dumps({"valid": True, "publication": {"status": "passed"}})
+    )
+
+
+@pytest.mark.asyncio
+async def test_writer_only_uses_guarded_factory_and_audit_gate(tmp_path, monkeypatch):
+    _evidence_ready(tmp_path)
+    seen = {}
+    backend = _Backend()
+
+    def factory(config):
+        seen["config"] = config
+        _passed_artifacts(tmp_path)
+        return _Agent(), backend
+
+    monkeypatch.setattr(runner, "parse_args", lambda: argparse.Namespace(data_dir=str(tmp_path), disease="IPF", provider="ollama", model=None))
+    monkeypatch.setattr(runner, "create_drug_target_agent", factory)
+    assert await runner.main() == 0
+    assert seen["config"].workflow_mode == "guarded_report"
+    assert backend.cleaned
+
+
+@pytest.mark.asyncio
+async def test_writer_only_rejects_stale_outputs_from_a_noop_agent(tmp_path, monkeypatch):
+    _evidence_ready(tmp_path)
+    _passed_artifacts(tmp_path)
+    monkeypatch.setattr(runner, "parse_args", lambda: argparse.Namespace(data_dir=str(tmp_path), disease="IPF", provider="ollama", model=None))
+    monkeypatch.setattr(runner, "create_drug_target_agent", lambda _config: (_Agent(), _Backend()))
+    assert await runner.main() == 1

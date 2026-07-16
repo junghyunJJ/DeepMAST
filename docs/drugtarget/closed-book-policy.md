@@ -3,11 +3,15 @@ title: Closed-Book Hallucination-Reduction Policy
 category: architecture
 status: accepted
 created: 2026-04-29
-updated: 2026-05-19
+updated: 2026-07-15
 tags: drug-target, hallucination, validation, quality-gate, adr
 relates-to: src/agents/drug_target/tools/stage_logic.py, src/agents/drug_target/subagents/configs.py, src/agents/drug_target/subagents/critic_schema.py
 depends-on: docs/drugtarget/drug_target_agent_reference.md
 ---
+
+## 2026-07-15 production migration
+
+`DrugReportGuardrailMiddleware` is the bounded production owner for direct Markdown validation, repair, Part 4, HTML, audits, and publication. The 2026-05-19 finalizer architecture is historical and superseded for production; `legacy_hypothesis` remains the explicit compatibility path only.
 
 # Closed-Book Hallucination-Reduction Policy
 
@@ -89,7 +93,7 @@ Evidence slices are injected via
 `load_evidence_files("evidence/_critic_slices/<gene>.json")` per gene and hypothesis,
 keeping each critic invocation within context limits.
 
-### Layer 5 — Programmatic validation in finalize_report node (post-2026-05-19)
+### Layer 5 — Historical 2026-05-19 finalizer architecture (superseded)
 
 > **Note**: The summarizer-side Layer 5 helpers (`run_summarizer_loop`, `RepairCycleCounterMiddleware`,
 > `synthesize_repair_instructions`) are **superseded** as of 2026-05-19. The `summarizer` subagent

@@ -81,7 +81,7 @@ An L-R pair passes Stage 1 when ALL criteria are met:
 | Drug Profile (deep dive) | stage3_{GENE}.json + ot_{GENE}.json | evidence/ |
 | Biological Context | stage1_{LIGAND}--{RECEPTOR}.json | evidence/ |
 | Rubric Assessment | assessment_results.json rubric_assessment[] | evidence/ |
-| Hypothesis Priorities | hypothesis_report.json | evidence/ |
+| Mechanistic recommendations (Section 4) | hypothesis-scope evidence plus final `drug.md` | evidence/ + report |
 
 ## Narrative Tone Calibration
 

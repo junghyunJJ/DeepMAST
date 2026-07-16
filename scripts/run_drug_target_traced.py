@@ -217,7 +217,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=False,
         help="Skip the evidence_assessor subagent (resume mode). Assumes evidence/*.json "
              "files are already on disk from a prior partial run. Orchestrator runs only "
-             "hypothesis_writer, then the finalize_report node. Sets env var "
+             "hypothesis_writer, then the legacy finalize_report node. DEPRECATED: "
+             "this exercises only the retained legacy compatibility super-graph, not "
+             "the guarded production path. Sets env var "
              "DRUG_TARGET_SKIP_EVIDENCE_ASSESSOR=1 before agent construction.",
     )
     p.add_argument(
@@ -1465,6 +1467,7 @@ async def run_traced(args: argparse.Namespace) -> int:
     config = DrugTargetConfig(
         provider=args.provider,
         data_dir=str(data_dir),
+        workflow_mode="legacy_hypothesis",
         disease=args.disease,
         use_checkpointer=True,
         enable_census=args.census,
@@ -1858,7 +1861,7 @@ async def run_traced(args: argparse.Namespace) -> int:
     # ── Hypothesis quality gate — mirror super-graph routing before
     # deterministic report finalization. The traced script streams the inner
     # agent directly, so it must call this node explicitly to exercise the
-    # same validation + narrow retry path as the production super-graph.
+    # same validation + narrow retry path as the legacy compatibility super-graph.
     print("\n[HYPOTHESIS-QUALITY] Validating hypothesis_report.json before finalize_report...")
     quality_start = time.time()
     try:
@@ -1993,8 +1996,8 @@ async def run_traced(args: argparse.Namespace) -> int:
         with open(trace_log_path, "a") as fp:
             fp.write(f"\n[FALLBACK] drug.md extracted from Command(files=...) state update\n")
 
-    # ── finalize_report node — the new super-graph node that follows the
-    # inner DeepAgents runnable in the production super-graph. The trace
+    # ── finalize_report node — the retained legacy compatibility node that follows the
+    # inner DeepAgents runnable in the legacy compatibility super-graph. The trace
     # script invokes agent.astream() directly on the inner agent (bypassing
     # the super-graph for streaming visibility), so we must invoke
     # finalize_report manually here to reach the post-agent stage.

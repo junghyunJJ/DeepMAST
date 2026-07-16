@@ -1,33 +1,30 @@
 # Drug Target Assessment Agent -- Stage-by-Stage Guide
 
-> **Version**: Current independent agent (`src/agents/drug_target/`) — updated 2026-05-19 for 2-subagent + finalize_report node migration
+> **Version**: Current independent agent (`src/agents/drug_target/`) — updated 2026-07-15 for guarded direct report writing
 > **Supersedes**: `docs/phase47_drug_target_assessment_step_by_step.md` (legacy deep_interpreter Phase 4.7)
 
 ---
 
+> **Current production contract:** `DrugReportRunCleanupMiddleware -> evidence_assessor -> report_writer -> DrugReportGuardrailMiddleware`. Production Section 4 is in `drug.md`; success needs two audits and seven artifacts including `drug_report_validation_final.json`. Configured-directory tools are forced safe, `general-purpose` is blocked, and custom tools are rejected. `legacy_hypothesis` is the explicit outer-super-graph/finalizer compatibility path; guarded runners are writer-only, E2E, and BC.
+
 ## 1. Overview
 
-### Architecture: 2-Subagent + finalize_report Node + 3-Stage Funnel
+### Architecture: Guarded 2-Subagent + 3-Stage Funnel
 
 The Drug Target Assessment Agent evaluates therapeutic potential of ligand-receptor (L-R) pairs
 identified from spatial transcriptomics cell-cell interaction (CCI) analysis.
 
 ```
-LangGraph Super-Graph (graph_builder.py: drug_target_graph)
-  START
-    └── run_deep_agent node (super_graph.py)
-          Orchestrator (agent.py)
-            ├── evidence_assessor   ← 3-Stage Funnel + Inline Rubric
-            └── hypothesis_writer   ← UCB-scored mechanistic hypothesis generation
-    └── finalize_report node (finalize_report.py)
-          Deterministic 6-step: load inputs → token-budget gate → 1 LLM call
-          → validate (schema + cited-only) → render outputs → finalize workspace
-  END
+create_drug_target_agent (guarded_report)
+  DrugReportRunCleanupMiddleware
+    └── evidence_assessor   ← 3-stage funnel + inline rubric
+    └── report_writer       ← direct target_assessment.json + drug.md
+          └── DrugReportGuardrailMiddleware
+                validate/repair → Part 4/HTML → two audits/seven artifacts
 ```
 
-`evidence_assessor` and `hypothesis_writer` follow a **Plan -> Execute -> Reflect**
-cognitive cycle per stage. Report finalization is handled by the deterministic
-`finalize_report` LangGraph node — not a subagent (see §6).
+`evidence_assessor` runs the staged funnel. `report_writer` is the sole production
+author. The guardrail owns post-write output rather than an outer graph node.
 
 ### Input / Output
 
@@ -43,11 +40,11 @@ cognitive cycle per stage. Report finalization is handled by the deterministic
 ### Workflow Order
 
 ```
-load_lr_candidates → evidence_assessor → hypothesis_writer → [finalize_report node]
+load_lr_candidates → evidence_assessor → report_writer → REPORT_PIPELINE_COMPLETE
 ```
 
-`evidence_assessor` and `hypothesis_writer` run inside the `run_deep_agent` node.
-`finalize_report` is a separate deterministic LangGraph node connected by a static edge.
+The top-level task allowlist permits exactly these two subagents. The retained
+outer graph/finalizer is `legacy_hypothesis` compatibility only.
 
 ---
 
@@ -283,9 +280,9 @@ Query template: `"{target_name}"[tiab] AND "Clinical Trial"[pt] AND "adverse eve
 
 ---
 
-## 6. Finalize Report Node (post-2026-05-19)
+## 6. Legacy Finalize Report Node (post-2026-05-19, compatibility only)
 
-The `finalize_report` node (`src/agents/drug_target/finalize_report.py`) is a
+The retained `finalize_report` node (`src/agents/drug_target/finalize_report.py`) is a
 **deterministic LangGraph node**, not a subagent. It runs after `run_deep_agent`
 completes, connected by a static edge. It makes exactly **1 LLM call** (structured
 output, `ReportExpansionsPayload`). All other steps are plain Python.
@@ -580,15 +577,15 @@ targets.json (optional) ──────────────────�
 
 | File | Role | Key Contents |
 |------|------|-------------|
-| `src/agents/drug_target/super_graph.py` | LangGraph super-graph | `DrugTargetState`, `run_deep_agent()`, `build_drug_target_super_graph()` |
+| `src/agents/drug_target/super_graph.py` | Legacy compatibility super-graph | `DrugTargetState`, `run_deep_agent()`, `build_drug_target_super_graph()` |
 | `src/agents/drug_target/graph_builder.py` | Compiled graph entry | `drug_target_graph` (module-level `CompiledStateGraph`) |
-| `src/agents/drug_target/finalize_report.py` | Finalize node | `finalize_report()`, `_load_expansion_inputs()`, `_llm_fill_expansions_once()`, `_persist_and_validate()`, `_render_outputs()`, `_finalize_workspace()` |
+| `src/agents/drug_target/finalize_report.py` | Legacy finalizer | Retained explicit compatibility implementation |
 | `src/agents/drug_target/finalize_report_prompts.py` | LLM prompts for finalize | `FINALIZE_REPORT_SYSTEM_PROMPT`, `FINALIZE_REPORT_USER_TEMPLATE` |
 | `src/agents/drug_target/validators.py` | Cited-only validation | `validate_cited_only_provenance()` |
-| `src/agents/drug_target/middleware.py` | Subagent middleware | `HypothesisRetryLoopMiddleware` |
+| `src/agents/drug_target/middleware.py` | Guarded production middleware | Cleanup, task allowlist, filesystem, and report guardrails (plus legacy retry) |
 | `src/agents/drug_target/agent.py` | Orchestrator | `DrugTargetConfig`, `create_drug_target_agent()`, `ORCHESTRATOR_SYSTEM_PROMPT` |
-| `src/agents/drug_target/subagents/prompts.py` | Subagent prompts | `EVIDENCE_ASSESSOR_PROMPT`, `HYPOTHESIS_WRITER_PROMPT` |
-| `src/agents/drug_target/subagents/configs.py` | Subagent tool configs | `SUBAGENT_CONFIGS`, `get_subagents()`, `WORKFLOW_ORDER = ["evidence_assessor", "hypothesis_writer"]` |
+| `src/agents/drug_target/subagents/prompts.py` | Subagent prompts | `EVIDENCE_ASSESSOR_PROMPT`, `REPORT_WRITER_PROMPT`, legacy hypothesis prompt |
+| `src/agents/drug_target/subagents/configs.py` | Subagent tool configs | Guarded `get_subagents()`, explicit `get_legacy_subagents()`, `WORKFLOW_ORDER = ["evidence_assessor", "report_writer"]` |
 | `src/agents/drug_target/tools/__init__.py` | Tool registry | Tool re-exports with lazy imports |
 | `src/agents/drug_target/tools/stage_domain_tools.py` | Domain tools | CELLxGENE, KEGG, Reactome, STRING, VEP, OpenTargets, GWAS, DrugBank/ChEMBL, PubMed |
 | `src/agents/drug_target/tools/census_lr_validation_tools.py` | Census cross-validation | `run_compare_census_lr_pair()`, fuzzy matching logic |

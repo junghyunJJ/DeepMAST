@@ -1,155 +1,105 @@
 #!/usr/bin/env python3
-"""Run ONLY the report_writer subagent on existing evidence files.
+"""Run the canonical guarded report writer against existing evidence."""
 
-Skips evidence_assessor entirely — uses pre-collected evidence.
-Generates target_assessment.json and drug.md.
-
-Usage:
-    python scripts/run_report_writer_only.py --data-dir res_ipf --disease "idiopathic pulmonary fibrosis"
-    python scripts/run_report_writer_only.py --data-dir res_ipf --disease "IPF" --provider openrouter
-    python scripts/run_report_writer_only.py --data-dir res_ipf --disease "IPF" --provider ollama --model qwen3.5:122b
-"""
+from __future__ import annotations
 
 import argparse
 import asyncio
+import json
+import os
 import sys
-import time
 import uuid
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from dotenv import load_dotenv
-load_dotenv(PROJECT_ROOT / ".env")
-
-from deepagents import create_deep_agent
-from langgraph.checkpoint.memory import MemorySaver
-
 from src.agents.model import create_llm
-from src.agents.drug_target.subagents.prompts import SUBAGENT_PROMPTS
-from src.agents.drug_target.tools import (
-    load_lr_candidates,
-    load_evidence_files,
-    validate_evidence_completeness,
-    save_target_assessment,
-    save_drug_md,
-    sequential_thinking,
-    think_tool,
-    validate_quality,
+from src.agents.drug_target.agent import DrugTargetConfig, create_drug_target_agent
+from src.agents.drug_target.report_guardrails import clear_derived_report_artifacts
+
+REQUIRED_GUARDED_ARTIFACTS = (
+    "drug.md",
+    "target_assessment.json",
+    "drug_report_validation_initial.json",
+    "drug_report_validation_final.json",
+    "part4_candidate_selection.json",
+    "part4_therapeutic_synthesis.md",
+    "drug_report.html",
 )
 
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Run report_writer subagent only")
-    p.add_argument("--data-dir", required=True, help="Data directory with evidence/")
-    p.add_argument("--disease", required=True, help="Disease context")
-    p.add_argument("--provider", default="ollama", help="LLM provider (default: ollama)")
-    p.add_argument("--model", default=None, help="Model override (e.g. qwen3.5:122b)")
-    return p.parse_args()
+    parser = argparse.ArgumentParser(description="Run guarded report_writer on existing evidence")
+    parser.add_argument("--data-dir", required=True)
+    parser.add_argument("--disease", required=True)
+    parser.add_argument("--provider", default="ollama")
+    parser.add_argument("--model")
+    return parser.parse_args()
 
 
-async def main():
+def guarded_run_succeeded(data_dir: Path) -> bool:
+    audit_path = data_dir / "drug_report_validation_final.json"
+    try:
+        audit = json.loads(audit_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    publication = audit.get("publication") if isinstance(audit, dict) else {}
+    return (
+        audit.get("valid") is True
+        and isinstance(publication, dict)
+        and publication.get("status") in {"passed", "published"}
+        and all((data_dir / name).is_file() and (data_dir / name).stat().st_size > 0 for name in REQUIRED_GUARDED_ARTIFACTS)
+    )
+
+
+async def main() -> int:
     args = parse_args()
-    data_dir = str(Path(args.data_dir).expanduser().resolve())
-
-    print("=" * 70)
-    print("Report Writer Only")
-    print("=" * 70)
-    print(f"  Provider: {args.provider}")
-    print(f"  Model:    {args.model or 'default'}")
-    print(f"  Data dir: {data_dir}")
-    print(f"  Disease:  {args.disease}")
-    print()
-
-    # Verify evidence files exist
-    evidence_dir = Path(data_dir) / "evidence"
-    n_files = len(list(evidence_dir.glob("*.json")))
-    print(f"  Evidence files: {n_files}")
-    if n_files < 5:
-        print("ERROR: Not enough evidence files. Run full pipeline first.")
-        sys.exit(1)
-
-    # Create LLM
-    llm_kwargs = {}
-    if args.model:
-        llm_kwargs["model"] = args.model
-    llm = create_llm(provider=args.provider, **llm_kwargs)
-
-    tools = [
-        load_lr_candidates,
-        load_evidence_files,
-        validate_evidence_completeness,
-        save_target_assessment,
-        save_drug_md,
-        sequential_thinking,
-        think_tool,
-        validate_quality,
-    ]
-
-    data_dir_note = (
-        f"\n\n## Data Directory\n"
-        f"The data directory for this session is: `{data_dir}`\n"
-        f"Pass this exact path as `data_dir` to all tool calls "
-        f"(load_lr_candidates, load_evidence_files, save_target_assessment, save_drug_md).\n"
-        f"- **Disease context**: `{args.disease}`\n"
+    data_dir = Path(args.data_dir).expanduser().resolve()
+    if len(list((data_dir / "evidence").glob("*.json"))) < 5:
+        print("ERROR: Not enough evidence files. Run evidence assessment first.")
+        return 1
+    await asyncio.to_thread(
+        clear_derived_report_artifacts,
+        data_dir,
+        include_audits=True,
+        include_sources=True,
     )
-
-    system_prompt = SUBAGENT_PROMPTS["report_writer"] + data_dir_note
-
-    agent = create_deep_agent(
-        model=llm,
-        tools=tools,
-        subagents=[],
-        checkpointer=MemorySaver(),
-        system_prompt=system_prompt,
+    model = create_llm(provider=args.provider, model=args.model) if args.model else None
+    config = DrugTargetConfig(
+        provider=args.provider,
+        data_dir=str(data_dir),
+        disease=args.disease,
+        workflow_mode="guarded_report",
+        use_checkpointer=True,
+        report_writer_resume_instruction=(
+            "Write target_assessment.json and a complete drug.md from evidence already "
+            f"on disk. Data dir: {data_dir}"
+        ),
+        subagent_models={"report_writer": model} if model is not None else None,
     )
-
-    t0 = time.time()
-    print("\nInvoking report_writer agent...")
-    print("-" * 70)
-
-    initial_message = (
-        f"Generate the drug target assessment report for {args.disease}.\n\n"
-        f"Data directory: {data_dir}\n"
-        f"All evidence files are already collected (Stage 1, 2, 3 complete).\n\n"
-        f"Steps:\n"
-        f"1. Call load_lr_candidates(data_dir='{data_dir}', disease='{args.disease}') to get input pairs\n"
-        f"2. Call load_evidence_files(data_dir='{data_dir}') to load all evidence\n"
-        f"3. Call validate_evidence_completeness(data_dir='{data_dir}') to check readiness\n"
-        f"4. Plan the document structure using sequential_thinking\n"
-        f"5. Call save_target_assessment to create target_assessment.json\n"
-        f"6. Call save_drug_md(data_dir='{data_dir}', content=...) to write drug.md to disk\n"
-        f"7. Validate quality >= 0.7\n"
-    )
-
-    result = await agent.ainvoke(
-        {"messages": [{"role": "user", "content": initial_message}]},
-        config={"configurable": {"thread_id": str(uuid.uuid4())}},
-    )
-
-    elapsed = time.time() - t0
-    print("-" * 70)
-    print(f"\nCompleted in {elapsed / 60:.1f} minutes")
-
-    # Check outputs
-    drug_md = Path(data_dir) / "drug.md"
-    target_json = Path(data_dir) / "target_assessment.json"
-
-    if drug_md.exists():
-        content = drug_md.read_text()
-        print(f"\ndrug.md generated ({len(content)} chars, {content.count(chr(10))} lines)")
-        print(f"  Path: {drug_md}")
-    else:
-        print("\nWARNING: drug.md was not generated")
-
-    if target_json.exists():
-        print(f"target_assessment.json generated")
-        print(f"  Path: {target_json}")
-
-    print(f"\n{'=' * 70}")
-    print("DONE!")
+    old_skip = os.environ.get("DRUG_TARGET_SKIP_EVIDENCE_ASSESSOR")
+    os.environ["DRUG_TARGET_SKIP_EVIDENCE_ASSESSOR"] = "1"
+    backend = None
+    try:
+        agent, backend = create_drug_target_agent(config)
+        await agent.ainvoke(
+            {"messages": [{"role": "user", "content": "Write the guarded report from existing evidence."}]},
+            config={"configurable": {"thread_id": str(uuid.uuid4())}},
+        )
+    finally:
+        if old_skip is None:
+            os.environ.pop("DRUG_TARGET_SKIP_EVIDENCE_ASSESSOR", None)
+        else:
+            os.environ["DRUG_TARGET_SKIP_EVIDENCE_ASSESSOR"] = old_skip
+        if backend is not None and hasattr(backend, "cleanup"):
+            backend.cleanup()
+    if guarded_run_succeeded(data_dir):
+        print("DONE")
+        return 0
+    print("ERROR: guarded report audit or required artifacts failed")
+    return 1
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    raise SystemExit(asyncio.run(main()))

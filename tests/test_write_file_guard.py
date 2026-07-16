@@ -108,6 +108,26 @@ def test_write_file_blocks_hypothesis_report_when_file_path_conflicts_with_path(
     assert "save_hypothesis_report" in str(result.content)
 
 
+@pytest.mark.parametrize("tool_name", ["write_file", "edit_file"])
+@pytest.mark.parametrize(
+    "file_path",
+    ["drug.md", "target_assessment.json", "hypothesis_report_draft.json", "report_data.json"],
+)
+def test_mutation_tools_block_all_managed_report_artifacts(tool_name, file_path):
+    middleware = WriteFileArgGuardMiddleware()
+    request = _request(tool_name, {"file_path": file_path, "content": "x"})
+    called = False
+
+    def handler(_request):
+        nonlocal called
+        called = True
+        return ToolMessage(content="unexpected", tool_call_id="tc_1")
+
+    result = middleware.wrap_tool_call(request, handler)
+    assert called is False
+    assert "report_data.json" in str(result.content)
+
+
 def test_write_file_allows_hypothesis_report_near_miss():
     middleware = WriteFileArgGuardMiddleware()
     req = _request(

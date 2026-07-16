@@ -21,6 +21,12 @@ def _get_provider_literal_values(filepath: Path) -> list[str]:
     """Return the string members of the 'provider' Literal annotation in DrugTargetConfig."""
     source = filepath.read_text()
     tree = ast.parse(source)
+    aliases = {
+        node.target.id: node.value
+        for node in tree.body
+        if isinstance(node, ast.AnnAssign)
+        and isinstance(node.target, ast.Name)
+    }
     for node in ast.walk(tree):
         if isinstance(node, ast.ClassDef) and node.name == "DrugTargetConfig":
             for item in node.body:
@@ -29,19 +35,15 @@ def _get_provider_literal_values(filepath: Path) -> list[str]:
                     and isinstance(item.target, ast.Name)
                     and item.target.id == "provider"
                 ):
-                    ann_src = ast.get_source_segment(source, item.annotation)
-                    if ann_src:
-                        # Parse strings out of Literal["a", "b", ...]
-                        inner = ast.parse(ann_src, mode="eval")
-                        if (
-                            isinstance(inner.body, ast.Subscript)
-                            and isinstance(inner.body.slice, ast.Tuple)
-                        ):
-                            return [
-                                elt.value
-                                for elt in inner.body.slice.elts
-                                if isinstance(elt, ast.Constant)
-                            ]
+                    annotation = item.annotation
+                    if isinstance(annotation, ast.Name):
+                        annotation = aliases.get(annotation.id, annotation)
+                    if isinstance(annotation, ast.Subscript) and isinstance(annotation.slice, ast.Tuple):
+                        return [
+                            elt.value
+                            for elt in annotation.slice.elts
+                            if isinstance(elt, ast.Constant)
+                        ]
     return []
 
 
@@ -72,6 +74,22 @@ def test_drug_target_config_provider_literal_still_includes_existing_providers()
             f"DrugTargetConfig.provider Literal is missing pre-existing value "
             f"'{expected}'; got {provider_args}"
         )
+
+
+def test_drug_target_config_provider_uses_shared_provider_alias():
+    tree = ast.parse(_AGENT_SRC.read_text())
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ClassDef) and node.name == "DrugTargetConfig":
+            provider = next(
+                item for item in node.body
+                if isinstance(item, ast.AnnAssign)
+                and isinstance(item.target, ast.Name)
+                and item.target.id == "provider"
+            )
+            assert isinstance(provider.annotation, ast.Name)
+            assert provider.annotation.id == "Provider"
+            return
+    raise AssertionError("DrugTargetConfig.provider annotation not found")
 
 
 def test_subagent_models_field_annotation_accepts_basechatmodel_via_ast():
