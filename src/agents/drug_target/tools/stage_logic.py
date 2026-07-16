@@ -5584,9 +5584,13 @@ def validate_drug_report_finalization(
     for rel, artifact_path in required_json_inputs:
         try:
             payload = json.loads(artifact_path.read_text(encoding="utf-8"))
-            if not isinstance(payload, (dict, list)):
+            accepts_list = rel != "evidence/assessment_results.json"
+            if not isinstance(payload, dict) and not (
+                accepts_list and isinstance(payload, list)
+            ):
                 raise ValueError(
-                    f"expected mapping or list, got {type(payload).__name__}"
+                    f"expected {'mapping or list' if accepts_list else 'mapping'}, "
+                    f"got {type(payload).__name__}"
                 )
             required_json_payloads[rel] = payload
         except Exception as exc:
@@ -5749,6 +5753,14 @@ def validate_drug_report_finalization(
             })
             drug_text = ""
 
+        if publication_mode == "agent_markdown":
+            finalization_issues.extend(
+                _check_agent_markdown_hypotheses(
+                    drug_text,
+                    data_dir_path / "drug.md",
+                )
+            )
+
         if drug_text:
             finalization_issues.extend(_check_markdown_table_pipe_drift(drug_text))
             finalization_issues.extend(
@@ -5785,12 +5797,6 @@ def validate_drug_report_finalization(
                         drug_text,
                         data_dir_path,
                         scope=agent_disease_scope,
-                    )
-                )
-                finalization_issues.extend(
-                    _check_agent_markdown_hypotheses(
-                        drug_text,
-                        data_dir_path / "drug.md",
                     )
                 )
 

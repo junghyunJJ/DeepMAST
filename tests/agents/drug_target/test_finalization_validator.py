@@ -921,6 +921,33 @@ def test_agent_markdown_mode_preserves_disease_scope_check(tmp_path: Path) -> No
     assert _has_issue(result, "MISSING_DISEASE_SCOPE_NOTE")
 
 
+@pytest.mark.parametrize("content", ["", " \n\t "])
+def test_agent_markdown_mode_requires_section_4_for_blank_reports(
+    tmp_path: Path,
+    content: str,
+) -> None:
+    data_dir = _copy_valid_agent_markdown_fixture("clean", tmp_path)
+    (data_dir / "drug.md").write_text(content, encoding="utf-8")
+
+    result = _invoke(data_dir, publication_mode="agent_markdown")
+
+    assert result["valid"] is False
+    assert _has_issue(result, "AGENT_REPORT_HYPOTHESES_MISSING")
+
+
+def test_agent_markdown_mode_rejects_list_assessment_results(tmp_path: Path) -> None:
+    data_dir = _copy_valid_agent_markdown_fixture("clean", tmp_path)
+    assessment_path = data_dir / "evidence" / "assessment_results.json"
+    assessment_path.write_text("[]", encoding="utf-8")
+
+    result = _invoke(data_dir, publication_mode="agent_markdown")
+
+    assert result["valid"] is False
+    assert result["checks"]["required_artifacts"]["status"] == "fail"
+    assert "evidence/assessment_results.json" in result["checks"]["required_artifacts"]["invalid"]
+    assert _has_issue(result, "INVALID_REQUIRED_ARTIFACT")
+
+
 def test_agent_markdown_mode_requires_parseable_section_4(tmp_path: Path) -> None:
     data_dir = _copy_valid_agent_markdown_fixture("clean", tmp_path)
     drug_path = data_dir / "drug.md"
