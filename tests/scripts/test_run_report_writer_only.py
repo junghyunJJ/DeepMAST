@@ -8,6 +8,7 @@ import multiprocessing
 import sys
 import time
 from pathlib import Path
+from uuid import uuid4
 
 import pytest
 
@@ -32,6 +33,20 @@ class _Writer:
         self.configs.append(config)
         if self.callback:
             self.callback()
+        return {"messages": []}
+
+
+class _TracingWriter:
+    async def ainvoke(self, _writer_input, config=None):
+        callback = config["callbacks"][0]
+        callback.on_chat_model_start({}, [[]], run_id=uuid4())
+        callback.on_llm_end(None, run_id=uuid4())
+        callback.on_tool_start(
+            {"name": "load_evidence_files"},
+            "secret tool input must not be traced",
+            run_id=uuid4(),
+        )
+        callback.on_tool_end("secret tool output must not be traced", run_id=uuid4())
         return {"messages": []}
 
 
@@ -213,25 +228,44 @@ def test_parse_args_has_bounded_deadline_defaults(monkeypatch):
     assert args.trace_file is None
 
 
-def test_writer_child_passes_trace_callback(tmp_path, monkeypatch):
-    writer = _Writer()
-    monkeypatch.setattr(runner, "create_guarded_report_writer", lambda _config: writer)
-    results = _ChildResultQueue()
+@pytest.mark.asyncio
+async def test_writer_process_writes_trace_callback_boundaries(tmp_path, monkeypatch):
+    trace_file = tmp_path / "writer.trace"
     run_dir = tmp_path / "run"
+    monkeypatch.setattr(runner, "create_guarded_report_writer", lambda _config: _TracingWriter())
 
-    runner._run_guarded_writer_child(
-        results,
-        str(run_dir),
-        "breast cancer",
-        "ollama-openai",
-        "qwen3.5:122b",
-        60.0,
-        str(tmp_path / "writer.trace"),
+    status, detail = await runner._run_guarded_writer_with_deadline(
+        data_dir=run_dir,
+        args=_args(run_dir, trace_file=trace_file),
+        trace_file=str(trace_file),
     )
 
-    assert len(writer.configs) == 1
-    assert len(writer.configs[0]["callbacks"]) == 1
-    assert results.items == [("success", "")]
+    assert status == "success", detail
+    trace = [json.loads(line) for line in trace_file.read_text().splitlines()]
+    assert [entry["event"] for entry in trace] == ["llm_start", "llm_end", "tool_start", "tool_end"]
+    assert trace[2]["tool"] == "load_evidence_files"
+    assert all("secret" not in line for line in trace_file.read_text().splitlines())
+
+
+def test_trace_callback_records_error_classes_without_error_messages(tmp_path):
+    trace_file = tmp_path / "writer.trace"
+    callback = runner.ReportWriterTraceCallback(str(trace_file))
+    try:
+        callback.on_llm_error(ValueError("secret model output"), run_id=uuid4())
+        callback.on_tool_error(RuntimeError("secret tool output"), run_id=uuid4())
+    finally:
+        callback.close()
+
+    trace = [json.loads(line) for line in trace_file.read_text().splitlines()]
+    assert [
+        {"event": entry["event"], "error": entry["error"]}
+        for entry in trace
+    ] == [
+        {"event": "llm_error", "error": "ValueError"},
+        {"event": "tool_error", "error": "RuntimeError"},
+    ]
+    assert all(isinstance(entry["at"], float) for entry in trace)
+    assert "secret" not in trace_file.read_text()
 
 
 def test_writer_child_omits_trace_callback_without_trace_file(tmp_path, monkeypatch):

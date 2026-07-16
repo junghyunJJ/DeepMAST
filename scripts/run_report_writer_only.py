@@ -9,10 +9,12 @@ import json
 import multiprocessing
 import os
 import sys
+import time
 from queue import Empty
 from pathlib import Path
 from typing import Any, NoReturn, cast
 
+from langchain_core.callbacks import BaseCallbackHandler
 from langchain_core.runnables import RunnableConfig
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -35,6 +37,38 @@ REQUIRED_GUARDED_ARTIFACTS = (
     "drug_report.html",
 )
 _PROCESS_STOP_SECONDS = 0.1
+
+
+class ReportWriterTraceCallback(BaseCallbackHandler):
+    def __init__(self, trace_file: str) -> None:
+        self._file = Path(trace_file).open("a", encoding="utf-8")
+
+    def _write(self, event: str, **fields: object) -> None:
+        self._file.write(json.dumps({"event": event, "at": time.time(), **fields}) + "\n")
+        self._file.flush()
+
+    def on_chat_model_start(self, serialized: dict[str, Any], messages: list[list[Any]], **_kwargs: Any) -> None:
+        self._write("llm_start")
+
+    def on_llm_end(self, response: Any, **_kwargs: Any) -> None:
+        self._write("llm_end")
+
+    def on_llm_error(self, error: BaseException, **_kwargs: Any) -> None:
+        self._write("llm_error", error=type(error).__name__)
+
+    def on_tool_start(self, serialized: dict[str, Any], input_str: str, **_kwargs: Any) -> None:
+        tool = serialized.get("name")
+        self._write("tool_start", tool=tool if isinstance(tool, str) else "unknown")
+
+    def on_tool_end(self, output: Any, **_kwargs: Any) -> None:
+        self._write("tool_end")
+
+    def on_tool_error(self, error: BaseException, **_kwargs: Any) -> None:
+        self._write("tool_error", error=type(error).__name__)
+
+    def close(self) -> None:
+        if not self._file.closed:
+            self._file.close()
 
 
 def parse_args() -> argparse.Namespace:
@@ -155,13 +189,16 @@ def _run_guarded_writer_child(
                 subagent_models={},
             )
         )
-        if trace_file is None:
-            asyncio.run(report_writer.ainvoke(_writer_input(data_dir, disease)))
-        else:
-            from langchain_core.callbacks import FileCallbackHandler
-
-            invoke_config: RunnableConfig = {"callbacks": [FileCallbackHandler(trace_file)]}
-            asyncio.run(report_writer.ainvoke(_writer_input(data_dir, disease), config=invoke_config))
+        callback = ReportWriterTraceCallback(trace_file) if trace_file else None
+        try:
+            if callback is None:
+                asyncio.run(report_writer.ainvoke(_writer_input(data_dir, disease)))
+            else:
+                invoke_config: RunnableConfig = {"callbacks": [callback]}
+                asyncio.run(report_writer.ainvoke(_writer_input(data_dir, disease), config=invoke_config))
+        finally:
+            if callback:
+                callback.close()
     except Exception as exc:
         results.put(("error", f"{type(exc).__name__}: {exc}"))
     else:
