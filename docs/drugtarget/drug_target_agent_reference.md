@@ -669,7 +669,7 @@ the deadline or a measured elapsed duration. It completed three model calls plus
 `tool_start` for `build_evidence_summary`, with no matching `tool_end`. No
 guarded artifacts were left in the data directory. This is a tool-level stall,
 not evidence that the initial Qwen request, available tool schemas, or
-accumulated tool context is the bottleneck. The next diagnostic must instrument and bound `build_evidence_summary`'s internal stages before choosing a performance fix or considering report-writer subagent splitting.
+accumulated tool context is the bottleneck. The guarded writer no longer exposes `build_evidence_summary`; the next diagnostic must verify its absence in the JSONL trace and classify the next boundary only if the writer still fails.
 
 ---
 

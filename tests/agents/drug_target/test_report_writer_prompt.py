@@ -7,9 +7,9 @@ from src.agents.drug_target.subagents.prompts import (
 
 
 def test_report_writer_prompt_owns_sections_payload_and_repair_contract() -> None:
-    assert "build_evidence_summary" in REPORT_WRITER_PROMPT
-    assert "include_legacy_hypothesis=False" in REPORT_WRITER_PROMPT
-    assert 'scope="hypothesis"' in REPORT_WRITER_PROMPT
+    assert "build_evidence_summary" not in REPORT_WRITER_PROMPT
+    assert "include_legacy_hypothesis=False" not in REPORT_WRITER_PROMPT
+    assert 'Call load_evidence_files with scope="hypothesis"' in REPORT_WRITER_PROMPT
     assert "save_report_sections" in REPORT_WRITER_PROMPT
     assert "one and only terminal write" in REPORT_WRITER_PROMPT
     assert "hybrid_report_sections/v1" in REPORT_WRITER_PROMPT

@@ -4,14 +4,14 @@
   "evals": [
     {
       "id": "initial_direct_write",
-      "prompt": "Write the initial direct guarded report for the IPF run at /tmp/deep_interpreter_workspace/ipf_2026 from completed evidence.",
-      "expected_output": "Read the reporting skill, call build_evidence_summary once with legacy input disabled, load hypothesis-scope evidence, save target_assessment.json once, then save complete drug.md once.",
+      "prompt": "Write the initial guarded report sections for the IPF run at /tmp/deep_interpreter_workspace/ipf_2026 from completed evidence.",
+      "expected_output": "Read the reporting skill, call load_lr_candidates, call load_evidence_files with scope=\"hypothesis\", then call save_report_sections once with one sections payload and stop.",
       "files": []
     },
     {
       "id": "repair_only",
-      "prompt": "## REPAIR MODE\nFix only the listed validation issue in this embedded drug.md.",
-      "expected_output": "Change only the listed Markdown issue and save drug.md once; do not read skills, rebuild evidence, or regenerate target_assessment.json.",
+      "prompt": "## REPAIR MODE\nFix only the listed validation issue in this sections payload.",
+      "expected_output": "Change only the listed sections issue and save the corrected sections payload once; do not read skills or rebuild evidence.",
       "files": []
     }
   ]

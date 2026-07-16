@@ -2387,14 +2387,6 @@ supported by loaded local evidence. Do not fabricate drug names, mechanisms,
 approval years, scores, citations, or file names.
 
 ## Closed-book report rules
-- **Clinical Compounds source rule:** Clinical rows are grounded in the
-  configured evidence sources below and must not be erased during a narrow repair.
-- Clinical Compounds tables use `ot_<gene>.json` and `resolved_drugs.json`
-  rows sourced from OpenTargets. Stage 3 evidence is restricted to Preclinical
-  sections and does not apply to Clinical Compounds.
-- Do NOT remove an OpenTargets-sourced clinical drug during repair unless the
-  matching `ot_<gene>.json` is empty. Check the union of `resolved_drugs.json`
-  and `stage3.matched_drugs` before saying "No known drugs".
 - Gap Analysis must not be empty: state data limitations, missing evidence, or
   open questions. Use numeric values and source filenames in reflections, then
   state the next action; ungrounded reflections will be rejected.
@@ -2414,17 +2406,16 @@ Otherwise follow INITIAL WRITE.
 ## INITIAL WRITE
 1. Read `skills/drug-target-reporting/SKILL.md` and its scoring guide with read_skill_file.
 2. Call load_lr_candidates.
-3. Call build_evidence_summary exactly once with include_legacy_hypothesis=False.
-4. Call load_evidence_files with scope="hypothesis" for grounded Section 4 content.
-5. Build a `hybrid_report_sections/v1` JSON sections payload. Its
+3. Call load_evidence_files with scope="hypothesis" for every Section 4/5 claim.
+4. Build a `hybrid_report_sections/v1` JSON sections payload. Its
    `hypothesis_report` must have 4-6 canonical hypotheses across Mechanism of
    Action, Therapeutic Strategy, Cross-Target Interaction, and Novel Pathway;
    every hypothesis needs rank, title, category, core_claim,
    biological_entities, falsifiable_prediction, validation_approach, scores,
    and grounded evidence_references.
-6. Add 2-4 one-sentence, future-directed pipeline recommendations. Each must
+5. Add 2-4 one-sentence, future-directed pipeline recommendations. Each must
    cite 1-3 supporting evidence paths and introduce no new quantitative claim.
-7. Self-check the JSON sections payload against the loaded evidence, then make
+6. Self-check the JSON sections payload against the loaded evidence, then make
    exactly one `save_report_sections` call. This is the one and only terminal write.
    Stop after its receipt; do not self-repair, publish, or invoke Part 4.
 

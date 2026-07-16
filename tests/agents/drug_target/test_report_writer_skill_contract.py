@@ -16,11 +16,17 @@ def test_reporting_skill_matches_guarded_direct_writer_surface() -> None:
     assert "Author exactly one `hybrid_report_sections/v1` payload through\n`save_report_sections`." in text
     assert "Qwen owns only canonical Section 4 hypotheses and 2–4\nSection 5 recommendations in `report_sections.json`." in text
     assert "Jinja owns every rendered layout and factual value" in text
-    assert "build_evidence_summary" in text
+    assert "build_evidence_summary" not in text
+    assert "include_legacy_hypothesis=False" not in text
+    assert "resolved_drugs.json" not in text
+    assert "sole factual input" in text
+    assert "gated assessment, featured OpenTargets/Stage 3 evidence, and passed Stage 1 evidence" in " ".join(
+        text.split()
+    )
     assert 'scope="hypothesis"' in text
     assert "call `save_report_sections`\n   exactly once, then stop." in text
     assert "NEVER create or read `evidence/hypothesis_report.json`." in text
-    assert "NEVER create or write `report_data.json`, `target_assessment.json`, or\n  `drug.md`." in text
+    assert "target assessment" not in text.lower()
     for retired_operation in (
         "save_report_expansions",
         "render_drug_md_from_expansions",
@@ -36,3 +42,15 @@ def test_reporting_skill_evals_and_scoring_avoid_legacy_section_four_source() ->
     assert "save_report_expansions" not in serialized
     assert "render_drug_md_from_expansions" not in serialized
     assert "generate_drug_html_report" not in serialized
+    initial = next(item for item in scenarios["evals"] if item["id"] == "initial_direct_write")
+    assert initial["expected_output"] == (
+        "Read the reporting skill, call load_lr_candidates, call "
+        'load_evidence_files with scope="hypothesis", then call '
+        "save_report_sections once with one sections payload and stop."
+    )
+    repair = next(item for item in scenarios["evals"] if item["id"] == "repair_only")
+    assert repair["expected_output"] == (
+        "Change only the listed sections issue and save the corrected sections payload once; "
+        "do not read skills or rebuild evidence."
+    )
+    assert "drug.md" not in json.dumps(repair)
