@@ -12,9 +12,12 @@
 `run_drug_target_agent_bc.py`. `run_report_writer_only.py` only diagnoses the
 canonical writer against existing evidence.
 
-**Legacy compatibility wrapper integration**: `integration.py` invokes
-`drug_target_graph.ainvoke(...)`, whose graph forces `legacy_hypothesis`; it is
-not a guarded production entrypoint.
+**Production Reporter integration**: `integration.py` exposes
+`run_drug_target_assessment(data_dir, disease)` for the Deep Interpreter
+Reporter. It lazily imports `create_drug_target_agent`, builds it with
+`workflow_mode="guarded_report"`, and invokes the returned `agent.ainvoke(...)`.
+`super_graph.py` remains the Legacy compatibility super-graph for explicit
+`legacy_hypothesis` callers; the integration tool does not use it.
 
 ## 1. Overview
 
@@ -607,5 +610,5 @@ targets.json (optional) ──────────────────�
 | `src/agents/drug_target/tools/evidence_loader.py` | I/O helpers | `load_lr_candidates`, `load_evidence_files`, `save_evidence` |
 | `src/agents/drug_target/tools/report_expansion_schema.py` | Expansion schema | `ReportExpansionsPayload`, `validate_report_expansions()`, `_build_provenance_index()` |
 | `src/agents/drug_target/tools/common.py` | Cognitive tools | `sequential_thinking`, `think_tool`, `validate_quality` |
-| `src/agents/drug_target/integration.py` | Legacy compatibility reporter bridge | `run_drug_target_assessment()` invokes `drug_target_graph.ainvoke(...)`, which forces `legacy_hypothesis` |
+| `src/agents/drug_target/integration.py` | Production Reporter bridge | `run_drug_target_assessment()` lazily builds a guarded direct agent with `workflow_mode="guarded_report"` and invokes it |
 | `docs/drugtarget/output_schema.json` | JSON schema | Contract schema for `target_assessment.json` |

@@ -12,9 +12,12 @@
 `workflow_mode="guarded_report"`, or use `run_drug_target_e2e.py` and
 `run_drug_target_agent_bc.py`. `run_report_writer_only.py` is diagnostic-only.
 
-**Legacy compatibility wrapper integration**: `integration.py` calls
-`drug_target_graph.ainvoke(...)`; that graph forces `legacy_hypothesis` and is
-not the guarded production entrypoint.
+**Production Reporter integration**: `integration.py` exposes
+`run_drug_target_assessment(data_dir, disease)` for the Deep Interpreter
+Reporter. It lazily imports `create_drug_target_agent`, builds it with
+`workflow_mode="guarded_report"`, and invokes the returned `agent.ainvoke(...)`.
+`super_graph.py` remains the Legacy compatibility super-graph for explicit
+`legacy_hypothesis` callers; the integration tool does not use it.
 
 ## 1. Overview
 
@@ -46,21 +49,24 @@ The Drug Target Assessment Agent evaluates therapeutic potential of ligand-recep
 ### 2.1 Component Hierarchy
 
 ```
-Production entrypoints
-  -> create_drug_target_agent(config, workflow_mode="guarded_report") [agent.py]
+Production Reporter integration
+  -> run_drug_target_assessment(data_dir, disease) [integration.py]
+    -> create_drug_target_agent(config, workflow_mode="guarded_report") [agent.py]
      -> DrugReportRunCleanupMiddleware
      -> evidence_assessor (configured-run evidence tools)
      -> report_writer (save_report_sections exactly once)
      -> DrugReportGuardrailMiddleware (validate rendered Markdown, repair sections, publish Part 4 + HTML, audit)
+
+Other production entrypoints
+  -> create_drug_target_agent(config, workflow_mode="guarded_report") [agent.py]
   -> run_drug_target_e2e.py | run_drug_target_agent_bc.py
 
 Diagnostic-only
   -> run_report_writer_only.py (existing evidence -> canonical guarded report_writer)
 
-Legacy compatibility wrapper integration (not guarded production)
-  -> run_drug_target_assessment(data_dir, disease)    [integration.py]
-    -> drug_target_graph.ainvoke(...)                 [graph_builder.py]
-      -> legacy_hypothesis super-graph
+Legacy compatibility surface (not used by Reporter integration)
+  -> drug_target_graph [graph_builder.py]
+    -> legacy_hypothesis super-graph [super_graph.py]
 ```
 
 ### 2.2 Source File Map
@@ -86,7 +92,7 @@ Legacy compatibility wrapper integration (not guarded production)
 | `tools/report_expansion_schema.py` | `ReportExpansionsPayload` Pydantic model, `validate_report_expansions()`, `canonical_json_hash`, `_build_provenance_index` |
 | `tools/skill_reader.py` | Progressive disclosure: `read_skill_file()` |
 | `tools/common.py` | Cognitive tools: `sequential_thinking`, `think_tool`, `validate_quality` |
-| `integration.py` | Legacy compatibility reporter bridge: `run_drug_target_assessment()` async Step 9.5 tool invokes `drug_target_graph.ainvoke(...)`, which forces `legacy_hypothesis`. |
+| `integration.py` | Production Reporter bridge: `run_drug_target_assessment()` lazily builds a guarded direct agent and invokes it as Step 9.5. |
 
 ### 2.3 Subagent Configuration
 
@@ -303,8 +309,8 @@ This node performs exactly **1 LLM call** and is not a subagent.
 
 All writes in steps 6–7 are atomic (`tempfile` + `os.replace`).
 The `report_finalization_error` state field is the single observable failure
-surface for this node. `integration.run_drug_target_assessment()` reads it
-and sets `success=False` with `errors=[finalization_error]` in the return envelope.
+surface for this legacy node. The guarded Reporter integration instead gates
+success on its final audit and required artifacts.
 
 ---
 
@@ -641,11 +647,13 @@ latency before relabeling this invocation as verified.
 
 ---
 
-## 8. Legacy compatibility wrapper integration: Step 9.5
+## 8. Production Reporter integration: Step 9.5
 
-The legacy compatibility drug target graph integrates into the DeepMAST wrapper
-pipeline as **Step 9.5** via `integration.py`. Guarded production instead uses
-the direct agent factory or the two full-agent runners listed above;
+The Deep Interpreter Reporter calls `integration.py` as **Step 9.5**. Each
+`run_drug_target_assessment(data_dir, disease)` call lazily imports
+`create_drug_target_agent`, creates a fresh agent with
+`workflow_mode="guarded_report"`, and invokes the returned `agent.ainvoke(...)`.
+The full-agent runners use the same guarded topology;
 `run_report_writer_only.py` remains diagnostic-only:
 
 ```python
@@ -654,13 +662,13 @@ async def run_drug_target_assessment(data_dir: str, disease: str) -> str:
     """Run the Drug Target Assessment agent on lr_candidates.json."""
 ```
 
-**Legacy compatibility integration flow**:
+**Guarded integration flow**:
 1. Reporter subagent (deep_interpreter) calls `run_drug_target_assessment(data_dir, disease)`
-2. Function lazily imports `drug_target_graph` from `graph_builder` (breaks circular dependency)
-3. Invokes the super-graph: `drug_target_graph.ainvoke(initial_state, config={"recursion_limit": 10000, "configurable": {"thread_id": uuid4()}})`
-4. Reads `report_finalization_error` and `evidence_truncated` from final state
-5. On success: reads `drug.md` and `target_assessment.json` from disk and returns `json.dumps({success, drug_md, target_assessment, errors, evidence_truncated})`
-6. On failure: returns `json.dumps({success=False, drug_md=None, target_assessment=None, errors=[finalization_error], evidence_truncated})`
+2. Function lazily imports `DrugTargetConfig`, `Provider`, and `create_drug_target_agent` from `agent.py`.
+3. It creates `DrugTargetConfig(data_dir=..., disease=..., use_checkpointer=False, workflow_mode="guarded_report")`.
+4. It invokes the returned direct guarded agent with the Reporter request message and a per-call thread ID.
+5. It reads `drug_report_validation_final.json`, requires a valid publication result, then reads all required report/publication artifacts.
+6. On success it returns `json.dumps({success, drug_md, target_assessment, errors, evidence_truncated})`; on any exception or failed gate it returns the same envelope with `success=False`.
 
 **Return envelope** (invariant contract — `wrapper_agent.py` calls `json.loads(result)`):
 
@@ -674,9 +682,14 @@ async def run_drug_target_assessment(data_dir: str, disease: str) -> str:
 }
 ```
 
-**Legacy compatibility circular dependency handling**: `integration.py` uses a lazy import of `drug_target_graph` inside the tool function body to break the chain: `deep_interpreter.subagents.configs → drug_target.integration → drug_target.graph_builder → drug_target.super_graph`.
+**Legacy compatibility separation**: `graph_builder.py` and `super_graph.py` retain the
+Legacy compatibility super-graph for explicit `legacy_hypothesis` callers. The
+production Reporter integration does not construct or invoke that graph.
 
-**Legacy compatibility wrapper transparency**: The disk-artifact contract (`drug.md`, `drug_report.html`, `target_assessment.json`) is unchanged. `wrapper_agent.run_drug_target_node` continues to read these artifacts from disk without modification.
+**Wrapper transparency**: The disk-artifact contract (`drug.md`,
+`drug_report.html`, `target_assessment.json`) is unchanged.
+`wrapper_agent.run_drug_target_node` continues to read these artifacts from disk
+without modification.
 
 ---
 
