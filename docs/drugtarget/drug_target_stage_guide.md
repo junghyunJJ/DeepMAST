@@ -337,7 +337,7 @@ All writes in steps 6–7 use `tempfile` + `os.replace` for atomicity.
 ### 6.2 Error Classes
 
 All failures surface via the `report_finalization_error` state field. See
-[`drug_target_agent_reference.md` Section 2.5](drug_target_agent_reference.md#25-finalize_report-node--5-error-classes)
+[`drug_target_agent_reference.md` Section 2.5](drug_target_agent_reference.md#25-legacy-finalize_report-compatibility-node--historical-error-classes)
 for the complete error class table.
 
 ### 6.3 `target_assessment.json` Contract
@@ -395,7 +395,7 @@ the druggability_matrix before writing, and validates the schema contract.
 
 | File | Key Functions |
 |------|---------------|
-| `finalize_report.py` | `finalize_report()`, `_load_expansion_inputs()`, `_llm_fill_expansions_once()`, `_persist_and_validate()`, `_render_outputs()`, `_finalize_workspace()` |
+| `finalize_report.py` | Legacy compatibility `finalize_report()`, `_load_expansion_inputs()`, `_llm_fill_expansions_once()`, `_persist_and_validate()`, `_render_outputs()`, `_finalize_workspace()` |
 | `validators.py` | `validate_cited_only_provenance()` |
 | `tools/report_expansion_schema.py` | `ReportExpansionsPayload`, `validate_report_expansions()`, `_build_provenance_index()` |
 | `super_graph.py` | `DrugTargetState`, `run_deep_agent()`, `build_drug_target_super_graph()` |
@@ -489,17 +489,17 @@ Disease matching uses keyword variants (e.g., for breast cancer:
 
 ---
 
-## 9. Data Flow Diagram
+## 9. Legacy compatibility Data Flow Diagram (`legacy_hypothesis` only)
 
 ```
 lr_candidates.json ─────────────────────────────────────────────────────┐
 targets.json (optional) ────────────────────────────────────────────────┤
                                                                         │
          ┌──────────────────────────────────────────────────────────────▼──┐
-         │         run_deep_agent NODE (super_graph.py)                     │
+         │ LEGACY COMPATIBILITY run_deep_agent NODE (super_graph.py)        │
          │                                                                  │
          │  ┌──────────────────────────────────────────────────────────┐   │
-         │  │              ORCHESTRATOR (agent.py)                     │   │
+         │  │        LEGACY ORCHESTRATOR (agent.py)                    │   │
          │  │  load_lr_candidates() → gene_symbols, lr_pairs          │   │
          │  └──────────────────┬───────────────────────────────────────┘   │
          │                     │                                            │
@@ -540,7 +540,7 @@ targets.json (optional) ──────────────────�
          │  └──────────────────┬───────────────────────────────────────┘   │
          │                     │                                            │
          │  ┌──────────────────▼───────────────────────────────────────┐   │
-         │  │         HYPOTHESIS WRITER (subagent #2)                  │   │
+         │  │ LEGACY COMPATIBILITY HYPOTHESIS WRITER (subagent #2)     │   │
          │  │  UCB-scored mechanistic hypothesis generation             │   │
          │  │  → hypothesis_report.json                                 │   │
          │  └──────────────────┬───────────────────────────────────────┘   │
@@ -548,7 +548,7 @@ targets.json (optional) ──────────────────�
          └─────────────────────┼──────────────────────────────────────────-┘
                                │  static edge
          ┌─────────────────────▼──────────────────────────────────────────-┐
-         │         finalize_report NODE (finalize_report.py)               │
+         │ LEGACY COMPATIBILITY finalize_report NODE (finalize_report.py)  │
          │                                                                  │
          │  1. Idempotency check (drug.md exists? → skip)                  │
          │  2. load_evidence_files() + reference_card + spec               │
@@ -580,7 +580,7 @@ targets.json (optional) ──────────────────�
 | `src/agents/drug_target/super_graph.py` | Legacy compatibility super-graph | `DrugTargetState`, `run_deep_agent()`, `build_drug_target_super_graph()` |
 | `src/agents/drug_target/graph_builder.py` | Compiled graph entry | `drug_target_graph` (module-level `CompiledStateGraph`) |
 | `src/agents/drug_target/finalize_report.py` | Legacy finalizer | Retained explicit compatibility implementation |
-| `src/agents/drug_target/finalize_report_prompts.py` | LLM prompts for finalize | `FINALIZE_REPORT_SYSTEM_PROMPT`, `FINALIZE_REPORT_USER_TEMPLATE` |
+| `src/agents/drug_target/finalize_report_prompts.py` | Legacy finalizer LLM prompts | `FINALIZE_REPORT_SYSTEM_PROMPT`, `FINALIZE_REPORT_USER_TEMPLATE` |
 | `src/agents/drug_target/validators.py` | Cited-only validation | `validate_cited_only_provenance()` |
 | `src/agents/drug_target/middleware.py` | Guarded production middleware | Cleanup, task allowlist, filesystem, and report guardrails (plus legacy retry) |
 | `src/agents/drug_target/agent.py` | Orchestrator | `DrugTargetConfig`, `create_drug_target_agent()`, `ORCHESTRATOR_SYSTEM_PROMPT` |

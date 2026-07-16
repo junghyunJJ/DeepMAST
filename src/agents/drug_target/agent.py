@@ -1,15 +1,13 @@
 """Drug Target Assessment Agent using DeepAgents framework.
 
-2-Subagent Architecture:
+Production is a guarded two-subagent workflow:
 1. EVIDENCE_ASSESSOR: 3-stage funnel (Stage 2: validation & scoring ->
-   Stage 1: biological context -> Stage 3: ChEMBL drug profiles)
-   with inline rubric assessment.
-2. HYPOTHESIS_WRITER: Hypothesis generation with UCB scoring from all evidence.
+   Stage 1: biological context -> Stage 3: ChEMBL drug profiles).
+2. REPORT_WRITER: direct author of target_assessment.json and drug.md;
+   DrugReportGuardrailMiddleware validates, repairs, publishes, and audits.
 
-Report finalization (drug.md, HTML, target_assessment.json) is handled by the
-deterministic ``finalize_report`` LangGraph node in the super-graph
-(``src/agents/drug_target/finalize_report.py``), which runs after the
-DeepAgents harness completes.
+``legacy_hypothesis`` retains the hypothesis_writer plus deterministic
+``finalize_report`` super-graph only for explicit compatibility callers.
 
 All database queries are wrapped as @tool functions that run on the host process.
 Docker backend is OPTIONAL — set docker_image in DrugTargetConfig to enable
@@ -73,17 +71,28 @@ SkillActivationMode = Literal[
 ]
 Provider: TypeAlias = Literal["openai", "google", "ollama", "ollama-openai", "vllm", "claude", "openrouter"]
 WorkflowMode: TypeAlias = Literal["guarded_report", "legacy_hypothesis"]
+_WORKFLOW_MODES = frozenset({"guarded_report", "legacy_hypothesis"})
+
+
+def _validate_workflow_mode(value: str) -> WorkflowMode:
+    """Return an accepted workflow mode or fail before selecting any surface."""
+    if value not in _WORKFLOW_MODES:
+        raise ValueError(
+            "workflow_mode must be 'guarded_report' or 'legacy_hypothesis'; "
+            f"got {value!r}"
+        )
+    return cast(WorkflowMode, value)
 
 
 # =============================================================================
 # Orchestrator System Prompt
 # =============================================================================
 
-LEGACY_ORCHESTRATOR_SYSTEM_PROMPT_TEMPLATE = """You are the Drug Target Assessment orchestrator.
+LEGACY_ORCHESTRATOR_SYSTEM_PROMPT_TEMPLATE = """You are the legacy compatibility Drug Target Assessment orchestrator.
 Data directory: {data_dir} | Disease: {disease}
 
 ## Steps (execute in exact order)
-1. Call load_lr_candidates(data_dir="{data_dir}", disease="{disease}")
+1. Call {load_lr_candidates_invocation}
 2. Call task(subagent_type="evidence_assessor",
             instruction="Run Stage 1+2+3 for {disease}. Data dir: {data_dir}. <paste lr_candidates output>")
 3. Call task(subagent_type="hypothesis_writer",
@@ -94,14 +103,14 @@ Data directory: {data_dir} | Disease: {disease}
 - Execute steps 1-4 in order. Do not skip, reorder, or repeat.
 - Do not read files. Do not analyze evidence.
 - After step 4, stop. Any additional tool call is a failure.
-- Report finalization (drug.md, HTML, target_assessment.json) is handled by
-  the downstream finalize_report node — the orchestrator must not attempt it.
+- Legacy report finalization (drug.md, HTML, target_assessment.json) is handled by
+  the downstream legacy compatibility finalize_report node — do not attempt it.
 
 ## Input
 - lr_candidates.json: top-30 L-R pairs (loaded in step 1)
 
 ## Output
-- hypothesis_report.json, evidence/*.json (finalize_report node writes drug.md + HTML)
+- hypothesis_report.json, evidence/*.json (legacy finalize_report node writes drug.md + HTML)
 """
 
 
@@ -110,7 +119,7 @@ Data directory: {data_dir} | Disease: {disease}
 # script --skip-evidence-assessor flag). Use ONLY when evidence/*.json files
 # from a prior partial run are present on disk; the orchestrator does not
 # verify integrity — the caller is responsible.
-LEGACY_RESUME_ORCHESTRATOR_SYSTEM_PROMPT_TEMPLATE = """You are the Drug Target Assessment orchestrator (RESUME mode).
+LEGACY_RESUME_ORCHESTRATOR_SYSTEM_PROMPT_TEMPLATE = """You are the legacy compatibility Drug Target Assessment orchestrator (RESUME mode).
 Data directory: {data_dir} | Disease: {disease}
 
 ## Steps (execute in exact order)
@@ -125,11 +134,11 @@ Data directory: {data_dir} | Disease: {disease}
 - Execute steps 1-2 in order. Do not skip, reorder, or repeat.
 - Do not read files. Do not analyze evidence.
 - After step 2, stop. Any additional tool call is a failure.
-- Report finalization (drug.md, HTML, target_assessment.json) is handled by
-  the downstream finalize_report node — the orchestrator must not attempt it.
+- Legacy report finalization (drug.md, HTML, target_assessment.json) is handled by
+  the downstream legacy compatibility finalize_report node — do not attempt it.
 
 ## Output
-- hypothesis_report.json (finalize_report node writes drug.md + HTML)
+- hypothesis_report.json (legacy finalize_report node writes drug.md + HTML)
 """
 
 
@@ -187,9 +196,9 @@ class DrugTargetConfig:
             compatibility.
         agent_skill_names: Legacy fallback skill tuple retained for registry helpers.
         evidence_assessor_skill_names: Skills exposed to evidence_assessor.
-        hypothesis_writer_skill_names: Skills exposed to hypothesis_writer.
-        hypothesis_writer_prompt_mode: Prompt mode for hypothesis_writer.
-            ``default`` preserves production direct skill-read instructions;
+        hypothesis_writer_skill_names: Skills exposed to legacy hypothesis_writer.
+        hypothesis_writer_prompt_mode: Prompt mode for legacy hypothesis_writer.
+            ``default`` preserves legacy direct skill-read instructions;
             ``progressive_disclosure_only`` removes those prompt-level reads
             for pure progressive-disclosure benchmarks.
         skills_dir: Optional override for the project skills directory.
@@ -233,22 +242,25 @@ class DrugTargetConfig:
     skills_dir: str | None = None
     subagent_models: dict[str, BaseChatModel | str] | None = None
     # init_chat_model format per subagent, e.g.:
-    # {"evidence_assessor": "openai:gpt-4.1", "hypothesis_writer": "openai:gpt-4.1-mini"}
+    # Legacy example: {"evidence_assessor": "openai:gpt-4.1", "hypothesis_writer": "openai:gpt-4.1-mini"}
     # If None, auto-loads from SUBAGENT_{NAME}_PROVIDER env vars.
 
     def __post_init__(self):
+        self.workflow_mode = _validate_workflow_mode(self.workflow_mode)
         if self.workflow_mode == "guarded_report" and self.custom_tools:
             raise ValueError("custom_tools are not allowed in guarded_report mode")
         if self.subagent_models is None:
+            if self.workflow_mode == "guarded_report":
+                model_names = ["evidence_assessor", "report_writer"]
+            elif self.workflow_mode == "legacy_hypothesis":
+                model_names = ["evidence_assessor", "hypothesis_writer"]
+            else:
+                raise AssertionError(
+                    f"validated workflow mode unexpectedly missing: {self.workflow_mode!r}"
+                )
             self.subagent_models = cast(
                 dict[str, BaseChatModel | str] | None,
-                load_subagent_models_from_env(
-                    (
-                        ["evidence_assessor", "report_writer"]
-                        if self.workflow_mode == "guarded_report"
-                        else ["evidence_assessor", "hypothesis_writer"]
-                    )
-                ),
+                load_subagent_models_from_env(model_names),
             )
 
 
@@ -350,13 +362,15 @@ def _build_subagent_skill_name_map(
             ),
             "hypothesis_writer": tuple(config.hypothesis_writer_skill_names),
         }
-    return {
-        "evidence_assessor": _filter_census_skills(
-            config.evidence_assessor_skill_names,
-            enable_census=enable_census,
-        ),
-        "report_writer": tuple(config.report_writer_skill_names),
-    }
+    if config.workflow_mode == "guarded_report":
+        return {
+            "evidence_assessor": _filter_census_skills(
+                config.evidence_assessor_skill_names,
+                enable_census=enable_census,
+            ),
+            "report_writer": tuple(config.report_writer_skill_names),
+        }
+    raise AssertionError(f"validated workflow mode unexpectedly missing: {config.workflow_mode!r}")
 
 
 def create_drug_target_agent(
@@ -364,12 +378,15 @@ def create_drug_target_agent(
 ) -> tuple[Runnable, object | None]:
     """Create the Drug Target Assessment agent using DeepAgents framework.
 
-    Creates a fully configured agent with:
-    - 2 top-level subagents (evidence_assessor, hypothesis_writer)
+    Creates a fully configured production agent with:
+    - 2 top-level subagents (evidence_assessor, report_writer)
     - All database queries via @tool wrappers (host-side by default)
     - Optional DockerBackend when docker_image is set in config
-    - Report finalization is handled by the deterministic finalize_report
-      LangGraph node in the super-graph after this agent completes
+    - Report validation, repair, publication, and audits are handled by
+      DrugReportGuardrailMiddleware after report_writer completes
+
+    ``legacy_hypothesis`` explicitly retains its historical hypothesis_writer
+    and finalize_report compatibility surface.
 
     Args:
         config: Optional configuration. Uses defaults if not provided.
@@ -382,8 +399,8 @@ def create_drug_target_agent(
     if config is None:
         config = DrugTargetConfig()
 
+    workflow_mode = _validate_workflow_mode(config.workflow_mode)
     resolved_data_dir = str(Path(config.data_dir).expanduser().resolve())
-    workflow_mode = config.workflow_mode
     # data_dir is passed explicitly through config and injected into subagent prompts;
     # no os.environ mutation needed.
 
@@ -396,7 +413,14 @@ def create_drug_target_agent(
     if config.docker_image:
         backend = _create_docker_backend(config, resolved_data_dir)
         skills_dir = resolved_skills_dir
-        subagent_skill_names = {"evidence_assessor": (), "report_writer": ()}
+        if workflow_mode == "guarded_report":
+            subagent_skill_names = {"evidence_assessor": (), "report_writer": ()}
+        elif workflow_mode == "legacy_hypothesis":
+            subagent_skill_names = {"evidence_assessor": (), "hypothesis_writer": ()}
+        else:
+            raise AssertionError(
+                f"validated workflow mode unexpectedly missing: {workflow_mode!r}"
+            )
         subagent_skill_registries = None
     else:
         backend = FilesystemBackend(root_dir=resolved_data_dir, virtual_mode=True)
@@ -419,10 +443,12 @@ def create_drug_target_agent(
     # all cognitive/IO tools live in subagents.
     if workflow_mode == "guarded_report":
         tools: list = [load_lr_candidates]
-    else:
+    elif workflow_mode == "legacy_hypothesis":
         tools = [load_lr_candidates, read_skill_file]
         if config.custom_tools:
             tools.extend(config.custom_tools)
+    else:
+        raise AssertionError(f"validated workflow mode unexpectedly missing: {workflow_mode!r}")
 
     # 3. Create the orchestrator LLM.
     llm = create_llm(provider=config.provider)
@@ -458,12 +484,14 @@ def create_drug_target_agent(
             hypothesis_writer_prompt_mode=config.hypothesis_writer_prompt_mode,
             **subagent_kwargs,
         )
-    else:
+    elif workflow_mode == "legacy_hypothesis":
         subagent_specs = get_legacy_subagents(
             custom_tools=config.custom_tools,
             hypothesis_writer_prompt_mode=config.hypothesis_writer_prompt_mode,
             **subagent_kwargs,
         )
+    else:
+        raise AssertionError(f"validated workflow mode unexpectedly missing: {workflow_mode!r}")
 
     # 5. Create agent — orchestrator has NO skills (just delegates)
     checkpointer = MemorySaver() if config.use_checkpointer else None
@@ -475,8 +503,10 @@ def create_drug_target_agent(
     resume_mode = os.getenv("DRUG_TARGET_SKIP_EVIDENCE_ASSESSOR", "").lower() in {"1", "true", "yes"}
     if workflow_mode == "guarded_report":
         template = ORCHESTRATOR_RESUME_PROMPT_TEMPLATE if resume_mode else ORCHESTRATOR_SYSTEM_PROMPT_TEMPLATE
-    else:
+    elif workflow_mode == "legacy_hypothesis":
         template = LEGACY_RESUME_ORCHESTRATOR_SYSTEM_PROMPT_TEMPLATE if resume_mode else LEGACY_ORCHESTRATOR_SYSTEM_PROMPT_TEMPLATE
+    else:
+        raise AssertionError(f"validated workflow mode unexpectedly missing: {workflow_mode!r}")
     if resume_mode:
         logger.info("Orchestrator running in RESUME mode (evidence_assessor skipped).")
     safe_disease = config.disease.strip()
@@ -512,6 +542,10 @@ def create_drug_target_agent(
             DrugTargetTaskAllowlistMiddleware({"evidence_assessor", "report_writer"}),
             *middleware,
         ]
+    elif workflow_mode == "legacy_hypothesis":
+        pass
+    else:
+        raise AssertionError(f"validated workflow mode unexpectedly missing: {workflow_mode!r}")
 
     create_kwargs: dict[str, Any] = dict(
         model=llm,
@@ -526,11 +560,11 @@ def create_drug_target_agent(
     agent = create_deep_agent(**create_kwargs)
     # evidence_assessor alone can consume 500-800 steps for large gene panels
     # (41 genes × ~10 steps/gene for Stage 2, plus Stage 1 batch + rubric + gates).
-    # Both top-level subagents share this budget. Conservative estimate:
-    #   evidence_assessor: ~1500, hypothesis_writer: ~300,
+    # The guarded top-level subagents share this budget. Conservative estimate:
+    #   evidence_assessor: ~1500, report_writer: ~300,
     #   orchestrator: ~200 = ~2000 typical, 10000 for margin.
-    # Report finalization is handled by the deterministic finalize_report node
-    # in the super-graph and does not consume recursion budget here.
+    # In guarded production, report middleware does not consume this agent's
+    # recursion budget. The legacy finalize_report node is compatibility-only.
     agent = agent.with_config({"recursion_limit": 10000})
 
     return agent, backend

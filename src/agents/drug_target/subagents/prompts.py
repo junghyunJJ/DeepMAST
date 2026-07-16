@@ -1,11 +1,12 @@
 """Subagent prompts for Drug Target Assessment Agent.
 
-Three subagents with staged funnel architecture (happy path):
+Production has two subagents with staged funnel architecture:
 1. EVIDENCE_ASSESSOR: 3-stage funnel (Stage 2: validation & scoring -> Stage 1:
    biological context -> Stage 3: ChEMBL drug profiles inline) with inline
    rubric assessment.
-2. HYPOTHESIS_WRITER: Evidence-grounded follow-up recommendation generation.
-3. REPORT_WRITER: Generate drug.md aligned with report_template.md.
+2. REPORT_WRITER: Guarded direct author of target_assessment.json and drug.md.
+
+HYPOTHESIS_WRITER prompts remain only for explicit legacy compatibility callers.
 """
 
 from typing import Literal
@@ -258,7 +259,7 @@ with `total=0` when `stage3_candidates` is empty. Treat that as complete.
 Your work is complete once `run_stage3_batch.success=true`.
 
 The updated `assessment_results.json` plus the `stage3_*.json` files are the
-handoff signal to `hypothesis_writer`.
+handoff signal to report_writer.
 
 ## Important Rules
 - Stage 2 batching: `query_stage2_gene_panel(...)` — auto-saves all Stage 2 files
@@ -283,14 +284,14 @@ handoff signal to `hypothesis_writer`.
 - If ALL tools for a stage fail: explicitly state "No evidence collected for Stage N
   due to tool failures" and score all criteria at 0
 
-GUIDANCE: If `ls` or `glob` returns an empty list for a path you expect to contain evidence files (for example `/evidence/`), do NOT conclude the directory is empty. The data is guaranteed present per the user prompt. Instead, call `load_evidence_files(data_dir)` — the project's canonical evidence loader — to retrieve evidence files. Do NOT call `read_file` directly under `/evidence/` (this is forbidden by the existing HARD rules in this prompt module). Always use virtual paths starting with `/evidence/...`. NEVER prepend the disk path of `data_dir` (such as `/private/tmp/...`) to filesystem operations.
+GUIDANCE: If `ls` or `glob` returns an empty list for a path you expect to contain evidence files (for example `/evidence/`), do NOT conclude the directory is empty. The data is guaranteed present per the user prompt. Instead, call `load_evidence_files(data_dir, scope="assessment")` — the project's canonical evidence loader — to retrieve evidence files. Do NOT call `read_file` directly under `/evidence/` (this is forbidden by the existing HARD rules in this prompt module). Always use virtual paths starting with `/evidence/...`. NEVER prepend the disk path of `data_dir` (such as `/private/tmp/...`) to filesystem operations.
 """
 
 # =============================================================================
-# Hypothesis Writer
+# Legacy Compatibility Hypothesis Writer
 # =============================================================================
 
-HYPOTHESIS_WRITER_PROMPT = """You are the Hypothesis Writer for the Drug Target Assessment Agent.
+HYPOTHESIS_WRITER_PROMPT = """You are the legacy compatibility Hypothesis Writer for the Drug Target Assessment Agent.
 
 Your role is to generate evidence-grounded downstream follow-up recommendations
 from the multi-stage drug target assessment evidence. The internal artifact is
@@ -1037,7 +1038,7 @@ GUIDANCE: If `ls` or `glob` returns an empty list for a path you expect to conta
 # Report Writer
 # =============================================================================
 
-# Historical compatibility prompt retained for old readers; production uses the
+# Legacy compatibility prompt retained for old readers; production uses the
 # canonical REPORT_WRITER_PROMPT declared beside the registry below.
 #
 # REPORT_WRITER_PROMPT is NOT dead code. Five live readers import it directly:
@@ -1515,10 +1516,10 @@ GUIDANCE: If `ls` or `glob` returns an empty list for a path you expect to conta
 
 _BENCHMARK_HYPOTHESIS_WRITER_PROMPT_BASE = HYPOTHESIS_WRITER_PROMPT
 
-HYPOTHESIS_WRITER_PROMPT = """You are the hypothesis_writer subagent for the Drug Target Assessment Agent.
+HYPOTHESIS_WRITER_PROMPT = """You are the legacy compatibility hypothesis_writer subagent for the Drug Target Assessment Agent.
 
 Goal: create a valid `evidence/hypothesis_report.json` from evidence that
-already exists on disk. This is the production DTH-required operational contract:
+already exists on disk. This is the legacy DTH-required operational contract:
 it defines tool use, citation validity, schema shape, save-gate recovery, and
 bounded retry behavior. It intentionally keeps drug-target interpretation
 knowledge in the loaded DTH skill guide rather than duplicating that rubric in
@@ -2299,7 +2300,7 @@ _HYPOTHESIS_WRITER_PROGRESSIVE_DISCLOSURE_WITH_MODALITY_MAP_NOTE = """Use progre
 def render_hypothesis_writer_prompt(
     mode: HypothesisWriterPromptMode = "default",
 ) -> str:
-    """Return the hypothesis_writer prompt variant for production or benchmarks."""
+    """Return a legacy compatibility hypothesis_writer prompt variant for benchmarks."""
     if mode == "default":
         return HYPOTHESIS_WRITER_PROMPT
     if mode == "dth_contrast_no_skill":

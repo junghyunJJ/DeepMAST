@@ -1,6 +1,9 @@
 """Production report-writer prompt contract."""
 
-from src.agents.drug_target.subagents.prompts import REPORT_WRITER_PROMPT
+from src.agents.drug_target.subagents.prompts import (
+    EVIDENCE_ASSESSOR_PROMPT,
+    REPORT_WRITER_PROMPT,
+)
 
 
 def test_report_writer_prompt_owns_direct_markdown_and_repair_contract() -> None:
@@ -20,3 +23,12 @@ def test_report_writer_prompt_owns_direct_markdown_and_repair_contract() -> None
     assert "NEVER create or read evidence/hypothesis_report.json" in REPORT_WRITER_PROMPT
     assert "NEVER create or write report_data.json" in REPORT_WRITER_PROMPT
     assert REPORT_WRITER_PROMPT.index("save_target_assessment") < REPORT_WRITER_PROMPT.index("save_drug_md")
+
+
+def test_evidence_assessor_fallback_loader_is_limited_to_assessment_scope() -> None:
+    assert 'load_evidence_files(data_dir, scope="assessment")' in EVIDENCE_ASSESSOR_PROMPT
+
+
+def test_evidence_assessor_hands_off_to_the_production_report_writer() -> None:
+    assert "handoff signal to report_writer" in EVIDENCE_ASSESSOR_PROMPT
+    assert "handoff signal to `hypothesis_writer`" not in EVIDENCE_ASSESSOR_PROMPT

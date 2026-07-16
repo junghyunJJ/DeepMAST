@@ -1,17 +1,12 @@
 """Subagent configurations for Drug Target Assessment Agent.
 
-Two-subagent staged funnel (happy path):
-- evidence_assessor: 3-stage funnel (Stage 2: validation & scoring ->
-  Stage 1: biological context -> Stage 3: ChEMBL drug profiles inline)
-  with inline rubric assessment.
-- hypothesis_writer: Hypothesis generation with UCB scoring from all evidence.
+Production workflow: ``evidence_assessor -> report_writer``. The guarded
+report writer authors target_assessment.json and drug.md, then its middleware
+validates, repairs, publishes, and audits the result.
 
-Report finalization is handled by the deterministic ``finalize_report`` node in
-the LangGraph super-graph (``src/agents/drug_target/finalize_report.py``).
-That node renders drug.md + HTML + target_assessment.json with cited-only
-provenance and a token-budget fail-closed gate — no LLM summarizer subagent.
-
-Workflow order: evidence_assessor -> hypothesis_writer
+``hypothesis_writer`` and the deterministic ``finalize_report`` super-graph
+are retained only by :func:`get_legacy_subagents` for explicit
+``legacy_hypothesis`` compatibility callers.
 """
 
 import json
@@ -313,7 +308,8 @@ SUBAGENT_CONFIGS = {
     "hypothesis_writer": {
         "name": "hypothesis_writer",
         "description": (
-            "Hypothesis generation from Stage 1-3 evidence. Reads all evidence files, "
+            "Legacy compatibility hypothesis generation from Stage 1-3 evidence. "
+            "Reads all evidence files, "
             "generates 4-6 mechanistic hypotheses across 4 thematic categories, "
             "applies gap detection and UCB scoring, outputs hypothesis_report.json."
         ),
@@ -370,7 +366,7 @@ _DTH_SINGLE_READ_PROMPT_MODES = frozenset(
 _DTH_SKILL_PATH = "skills/drug-target-hypothesis/SKILL.md"
 
 WORKFLOW_DESCRIPTION = """
-Drug Target Assessment 2-Agent Workflow (Staged Funnel):
+Drug Target Assessment Production 2-Agent Workflow (Staged Funnel):
 
 1. EVIDENCE_ASSESSOR (Plan->Execute->Reflect per stage)
    Stage 2 FIRST (ALL unique genes): batch OpenTargets + batch GWAS + VEP (conditional)
@@ -386,6 +382,14 @@ Drug Target Assessment 2-Agent Workflow (Staged Funnel):
             assessment_results.json, rubric_scores.csv, stage3_{GENE}.json
    Gate: assessment_results.json must exist with stage3_candidates
 
+2. REPORT_WRITER (guarded direct author)
+   Reads bounded hypothesis-scope evidence and the reporting skill.
+   Writes target_assessment.json exactly once, then drug.md exactly once.
+   DrugReportGuardrailMiddleware validates, repairs, publishes, and writes
+   initial/final audit artifacts.
+
+Legacy compatibility topology only (explicit ``legacy_hypothesis`` callers):
+
 2. HYPOTHESIS_WRITER (Plan->Execute->Reflect)
    Reads all Stage 1-3 evidence files
    Generates 4-6 mechanistic hypotheses across 4 thematic categories
@@ -393,7 +397,7 @@ Drug Target Assessment 2-Agent Workflow (Staged Funnel):
    Outputs: hypothesis_report.json
    Gate: hypothesis_report.json must exist
 
-3. FINALIZE_REPORT NODE (deterministic post-agent): super-graph node renders
+3. LEGACY FINALIZE_REPORT NODE (deterministic post-agent): super-graph node renders
    drug.md + HTML + target_assessment.json with cited-only provenance +
    token-budget fail-closed gate. See src/agents/drug_target/finalize_report.py.
 """
@@ -426,8 +430,8 @@ def get_legacy_subagents(
       1. evidence_assessor — 3-stage funnel with inline rubric assessment.
       2. hypothesis_writer — hypothesis generation with UCB scoring.
 
-    Report finalization is handled by the deterministic ``finalize_report``
-    LangGraph node after the DeepAgents harness completes.
+    Legacy report finalization is handled by the deterministic
+    ``finalize_report`` LangGraph node after the DeepAgents harness completes.
 
     Args:
         custom_tools: Additional tools to inject into each subagent.
@@ -450,8 +454,8 @@ def get_legacy_subagents(
             benchmarks.
         skill_activation_mode: Optional explicit activation strategy. When
             omitted, derives from enable_skill_activator for compatibility.
-        hypothesis_writer_prompt_mode: Prompt variant for hypothesis_writer.
-            ``default`` preserves production prompt-level skill reads;
+        hypothesis_writer_prompt_mode: Prompt variant for legacy hypothesis_writer.
+            ``default`` preserves legacy prompt-level skill reads;
             ``progressive_disclosure_only`` removes those benchmark-confounding
             direct reads so SkillsMiddleware/activator/governor owns selection.
 

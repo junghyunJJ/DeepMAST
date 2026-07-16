@@ -98,9 +98,12 @@ keeping each critic invocation within context limits.
 > **Note**: The summarizer-side Layer 5 helpers (`run_summarizer_loop`, `RepairCycleCounterMiddleware`,
 > `synthesize_repair_instructions`) are **superseded** as of 2026-05-19. The `summarizer` subagent
 > and its repair loop were removed; `src/agents/drug_target/subagents/summarizer/` was deleted.
-> The following describes the **replacement** Layer 5 responsibilities in the `finalize_report` node.
+> The following describes the retained **legacy compatibility** Layer 5 responsibilities in the
+> `finalize_report` node; guarded production uses `report_writer` plus
+> `DrugReportGuardrailMiddleware` instead.
 
-The `finalize_report` node (`src/agents/drug_target/finalize_report.py`) enforces three
+The legacy compatibility `finalize_report` node (`src/agents/drug_target/finalize_report.py`)
+enforces three
 programmatic validation sub-layers inside `_persist_and_validate()`, **before any disk writes**:
 
 **Validation gate** — `validate_report_expansions(data_dir, payload.model_dump())`
@@ -114,12 +117,12 @@ classified as `validation_failed`.
 index (built by `_build_provenance_index(reference_card)`). Errors are classified as
 `cited_only_violation` and take precedence over schema errors in `_classify_validation_error()`.
 
-**Token-budget fail-closed gate** — enforced in `finalize_report` before the LLM call
+**Legacy token-budget fail-closed gate** — enforced in `finalize_report` before the LLM call
 (`finalize_report.py:81–84`): if `len(json.dumps(evidence)) // 4 > 20_000`, the node returns
 immediately with `evidence_truncated=True` and no LLM invocation. This is a hard pre-check,
 not a post-validation step.
 
-If any of these checks fail, `finalize_report` sets `report_finalization_error` and returns
+If any of these legacy compatibility checks fail, `finalize_report` sets `report_finalization_error` and returns
 without writing any artifact to disk. This replaces the previous LLM-driven repair loop with
 deterministic Python fail-closed semantics.
 
@@ -171,7 +174,8 @@ pytest tests/agents/drug_target/ -v
 **E2E reproduction (post-2026-05-19 migration — `run_drug_target_summarizer_only.py` deleted):**
 
 > `scripts/run_drug_target_summarizer_only.py` was deleted as part of the 2026-05-19
-> finalize_report node migration. Use `scripts/run_drug_target_traced.py` for E2E runs.
+> legacy finalizer migration. Use the guarded writer-only, E2E, or BC runners for production;
+> `scripts/run_drug_target_traced.py` remains a legacy compatibility runner.
 
 ```bash
 LLM_PROVIDER=openrouter \
@@ -251,7 +255,7 @@ Per-prompt smoke status (PR body MUST attest):
 
 **Plan:** `.omb/plans/2026-05-19-drug-target-finalize-node.md`
 
-**Outcome:** Layer 5 summarizer-side helpers (`run_summarizer_loop`, `RepairCycleCounterMiddleware`, `synthesize_repair_instructions`) superseded. The `summarizer` subagent and `subagents/summarizer/` directory were deleted. Layer 5 responsibilities migrated to three deterministic validation sub-layers inside `finalize_report._persist_and_validate()`:
+**Outcome:** Layer 5 summarizer-side helpers (`run_summarizer_loop`, `RepairCycleCounterMiddleware`, `synthesize_repair_instructions`) superseded. The `summarizer` subagent and `subagents/summarizer/` directory were deleted. Legacy compatibility responsibilities migrated to three deterministic validation sub-layers inside `finalize_report._persist_and_validate()`:
 - `validate_report_expansions()` (schema gate, existing)
 - `validate_cited_only_provenance()` (NEW, `validators.py`)
 - Token-budget fail-closed gate (NEW, `finalize_report.py:81–84`, before LLM call)

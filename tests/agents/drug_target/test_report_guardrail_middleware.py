@@ -19,8 +19,13 @@ from src.agents.drug_target.middleware import (
     DrugTargetTaskAllowlistMiddleware,
 )
 from src.agents.drug_target.production_report_tools import (
+    production_assessment_evidence_tool,
+    production_assessment_save_evidence_tool,
+    production_evidence_summary_tool,
     production_hypothesis_evidence_tool,
     production_save_drug_md_tool,
+    production_save_target_assessment_tool,
+    production_skill_reader_tool,
 )
 
 
@@ -547,6 +552,26 @@ async def test_run_cleanup_middleware_clears_sources_audits_and_publication_outp
     ))
 
 
+def test_top_level_cleanup_before_agent_removes_guarded_stale_artifacts_but_keeps_legacy_sidecars(
+    tmp_path: Path,
+) -> None:
+    _seed_managed(tmp_path)
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    for name in ("hypothesis_report.json", "report_data.json"):
+        (evidence / name).write_text("legacy", encoding="utf-8")
+    (tmp_path / "report_data.json").write_text("legacy", encoding="utf-8")
+
+    assert DrugReportRunCleanupMiddleware(tmp_path).before_agent({}, None) is None
+
+    assert not (tmp_path / "drug.md").exists()
+    assert not (tmp_path / "target_assessment.json").exists()
+    assert all(not path.exists() for path in _publication_paths(tmp_path))
+    assert (evidence / "hypothesis_report.json").read_text(encoding="utf-8") == "legacy"
+    assert (evidence / "report_data.json").read_text(encoding="utf-8") == "legacy"
+    assert (tmp_path / "report_data.json").read_text(encoding="utf-8") == "legacy"
+
+
 def test_production_hypothesis_loader_forces_scope_when_caller_requests_all(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -567,6 +592,92 @@ def test_production_hypothesis_loader_forces_scope_when_caller_requests_all(
 
     assert result == "ok"
     assert calls == [{"data_dir": str(tmp_path.resolve()), "scope": "hypothesis"}]
+
+
+def test_production_wrappers_force_run_directory_and_fixed_options(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Caller values cannot change a guarded wrapper's run directory or options."""
+    from src.agents.drug_target import production_report_tools
+
+    other = tmp_path / "other"
+    other.mkdir()
+    calls: list[tuple[str, dict[str, Any]]] = []
+    monkeypatch.setattr(
+        production_report_tools,
+        "load_evidence_files",
+        lambda **kwargs: calls.append(("evidence", kwargs)) or "evidence",
+    )
+    monkeypatch.setattr(
+        production_report_tools,
+        "build_evidence_summary",
+        lambda **kwargs: calls.append(("summary", kwargs)) or "summary",
+    )
+    monkeypatch.setattr(
+        production_report_tools,
+        "save_evidence",
+        lambda **kwargs: calls.append(("save_evidence", kwargs)) or "saved",
+    )
+    monkeypatch.setattr(
+        production_report_tools,
+        "save_target_assessment",
+        lambda **kwargs: calls.append(("assessment", kwargs)) or "assessment",
+    )
+
+    assert production_assessment_evidence_tool(tmp_path).invoke(
+        {"data_dir": str(other), "scope": "hypothesis"}
+    ) == "evidence"
+    assert production_evidence_summary_tool(tmp_path).invoke(
+        {"data_dir": str(other), "include_legacy_hypothesis": True}
+    ) == "summary"
+    assert production_assessment_save_evidence_tool(tmp_path).invoke(
+        {"data_dir": str(other), "filename": "stage2_note.json", "data": {"ok": True}}
+    ) == "saved"
+    assert production_save_target_assessment_tool(tmp_path).invoke(
+        {
+            "data_dir": str(other),
+            "project_meta": {"id": "x"},
+            "druggability_matrix": [],
+            "featured_candidates_deep_dive": [],
+        }
+    ) == "assessment"
+
+    safe = str(tmp_path.resolve())
+    assert calls == [
+        ("evidence", {"data_dir": safe, "scope": "assessment"}),
+        ("summary", {"data_dir": safe, "include_legacy_hypothesis": False}),
+        (
+            "save_evidence",
+            {"data_dir": safe, "filename": "stage2_note.json", "data": {"ok": True}},
+        ),
+        (
+            "assessment",
+            {
+                "data_dir": safe,
+                "project_meta": {"id": "x"},
+                "druggability_matrix": [],
+                "featured_candidates_deep_dive": [],
+            },
+        ),
+    ]
+
+
+def test_production_skill_reader_rejects_traversal_outside_and_symlink_escape(tmp_path: Path) -> None:
+    skills = tmp_path / "skills"
+    allowed = skills / "drug-target-reporting"
+    allowed.mkdir(parents=True)
+    (allowed / "SKILL.md").write_text("safe guidance", encoding="utf-8")
+    outside = tmp_path / "outside.md"
+    outside.write_text("outside", encoding="utf-8")
+    (allowed / "escape.md").symlink_to(outside)
+
+    reader = production_skill_reader_tool(skills, ("drug-target-reporting",))
+    assert "safe guidance" in reader.invoke(
+        {"skill_path": "skills/drug-target-reporting/SKILL.md"}
+    )
+    for attempted_path in ("../outside.md", str(outside), "drug-target-reporting/escape.md"):
+        result = reader.invoke({"skill_path": attempted_path})
+        assert "not in the allowed skills" in result
 
 
 def test_repair_agent_tools_cannot_switch_data_dir(
@@ -636,6 +747,30 @@ def test_managed_filesystem_guard_forces_configured_directory_sync(tmp_path: Pat
         _recording_handler(calls),
     )
     assert calls[0]["args"]["data_dir"] == str(tmp_path.resolve())
+
+
+def test_managed_filesystem_guard_rewrites_any_registered_data_dir_tool(tmp_path: Path) -> None:
+    """The data_dir rewrite is driven by the guarded tool schema, not hard-coded names."""
+    other = tmp_path / "other"
+    other.mkdir()
+    middleware = DrugTargetManagedFilesystemGuardMiddleware(
+        tmp_path, data_dir_tool_names={"future_domain_tool"}
+    )
+    calls: list[dict[str, Any]] = []
+
+    middleware.wrap_tool_call(
+        _request("future_domain_tool", {"data_dir": str(other), "query": "GENE1"}),
+        _recording_handler(calls),
+    )
+
+    assert calls == [
+        {
+            "id": "call-1",
+            "name": "future_domain_tool",
+            "args": {"data_dir": str(tmp_path.resolve()), "query": "GENE1"},
+            "type": "tool_call",
+        }
+    ]
 
 
 @pytest.mark.asyncio

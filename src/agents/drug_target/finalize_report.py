@@ -1,8 +1,9 @@
-"""LangGraph node: finalize_report.
+"""Legacy compatibility LangGraph node: finalize_report.
 
-Production finalization delegates to the no-LLM deterministic report MVP path.
-The former report-expansion implementation remains available as an explicit
-legacy path for transition tests and debugging.
+Guarded production does not dispatch this node: report_writer plus
+DrugReportGuardrailMiddleware own report validation and publication. This
+module remains for explicit ``legacy_hypothesis`` super-graph callers,
+transition tests, and debugging.
 """
 
 from __future__ import annotations
@@ -262,7 +263,7 @@ def _compact_evidence_if_needed(evidence: dict, reference_card: dict) -> tuple[d
 
 
 async def finalize_report(state: dict, config: RunnableConfig) -> dict:
-    """Production finalizer node. Returns a LangGraph state-update dict."""
+    """Legacy compatibility finalizer node. Returns a LangGraph state update."""
     from src.agents.drug_target.deterministic_report import finalize_report_mvp
 
     return await finalize_report_mvp(state, config)

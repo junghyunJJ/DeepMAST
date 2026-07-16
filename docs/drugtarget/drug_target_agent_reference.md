@@ -54,7 +54,7 @@ Wrapper Pipeline (Step 9.5)
 | `super_graph.py` | Explicit `legacy_hypothesis` compatibility super-graph only. |
 | `graph_builder.py` | Legacy graph entry surface. |
 | `finalize_report.py` | Explicit legacy finalizer compatibility implementation. |
-| `finalize_report_prompts.py` | Prompts for the `finalize_report` LLM call: `FINALIZE_REPORT_SYSTEM_PROMPT`, `FINALIZE_REPORT_USER_TEMPLATE` |
+| `finalize_report_prompts.py` | Legacy compatibility prompts for the `finalize_report` LLM call: `FINALIZE_REPORT_SYSTEM_PROMPT`, `FINALIZE_REPORT_USER_TEMPLATE` |
 | `validators.py` | `validate_cited_only_provenance(payload, reference_card)` — cited-only provenance check called inside `_persist_and_validate` |
 | `middleware.py` | Run cleanup, task allowlist, configured-filesystem, and report guardrail middleware. |
 | `agent.py` | Orchestrator factory: `DrugTargetConfig`, `create_drug_target_agent()`, system prompt |
@@ -108,7 +108,7 @@ Production middleware boundaries:
 | `skills_dir` | str\|None | `None` | Override project skills directory |
 | `subagent_models` | dict\|None | `None` | Per-subagent model overrides (init_chat_model format) |
 
-> **Note**: `critic_enabled` and `summarizer_skill_names` config fields were removed in the 2026-05-19 migration. The summarizer subagent no longer exists; report finalization is performed by the deterministic `finalize_report` LangGraph node.
+> **Legacy compatibility note**: `critic_enabled` and `summarizer_skill_names` config fields were removed in the 2026-05-19 migration. The summarizer subagent no longer exists; explicit `legacy_hypothesis` execution uses the deterministic `finalize_report` LangGraph node. Guarded production uses `report_writer` plus `DrugReportGuardrailMiddleware` instead.
 
 ### 2.5 Legacy `finalize_report` compatibility node — historical error classes
 
@@ -126,7 +126,7 @@ The retained `finalize_report` node (`src/agents/drug_target/finalize_report.py`
 
 **Idempotency** (Decision 12, line 77, `finalize_report.py`): if `drug.md` already exists at node entry, `finalize_report` skips all processing and returns success. This allows safe re-invocation without re-running the LLM call.
 
-### 2.6 Super-Graph State Schema (`DrugTargetState`)
+### 2.6 Legacy compatibility Super-Graph State Schema (`DrugTargetState`)
 
 Defined in `src/agents/drug_target/super_graph.py`:
 
@@ -136,8 +136,8 @@ Defined in `src/agents/drug_target/super_graph.py`:
 | `disease` | `str` | Disease context string |
 | `featured_lr_pairs` | `list[str] \| None` | Featured L-R pairs from evidence assessor |
 | `messages` | `Annotated[list[BaseMessage], add_messages]` | Accumulated messages; `run_deep_agent` returns only the last `AIMessage` |
-| `report_finalization_error` | `str \| None` | Set by `finalize_report` on any failure; `None` means success |
-| `evidence_truncated` | `bool` | `True` when token-budget gate fired; default `False` |
+| `report_finalization_error` | `str \| None` | Set by legacy `finalize_report` on any failure; `None` means success |
+| `evidence_truncated` | `bool` | `True` when the legacy token-budget gate fired; default `False` |
 
 ---
 
@@ -323,9 +323,9 @@ and sets `success=False` with `errors=[finalization_error]` in the return envelo
 | `think_tool` | Reflection and assessment (Reflect phase) |
 | `validate_quality` | Quality score check (threshold >= 0.7) |
 
-### 4.2 finalize_report Node Tools
+### 4.2 Legacy compatibility `finalize_report` Node Tools
 
-The `finalize_report` node calls tool `.func()` directly (not via LLM tool-calling). The following tools from `tools/__init__.py` are used internally:
+The legacy compatibility `finalize_report` node calls tool `.func()` directly (not via LLM tool-calling). The following tools from `tools/__init__.py` are used internally:
 
 | Tool | Called by | Purpose |
 |------|-----------|---------|
@@ -343,9 +343,9 @@ Validation functions called directly (not LangChain tools):
 | `validate_report_expansions` | `tools/report_expansion_schema.py` | Schema validation of expansion payload |
 | `validate_cited_only_provenance` | `validators.py` | Cited-only provenance check against reference card |
 
-> **Note**: The `summarizer` subagent and its associated tools (`build_evidence_summary`, `validate_drug_md`, `think_tool` in summarizer context) were removed in the 2026-05-19 migration. Report finalization now runs deterministically as a LangGraph node.
+> **Legacy compatibility note**: The `summarizer` subagent and its associated tools (`build_evidence_summary`, `validate_drug_md`, `think_tool` in summarizer context) were removed in the 2026-05-19 migration. Explicit `legacy_hypothesis` finalization runs as a deterministic LangGraph node; guarded production uses the writer/guardrail flow.
 
-See [Section 2.5](#25-finalize_report-node--5-error-classes) for the full error class table and gate description.
+See [Section 2.5](#25-legacy-finalize_report-compatibility-node--historical-error-classes) for the full error class table and gate description.
 
 ---
 
