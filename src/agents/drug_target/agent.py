@@ -1,9 +1,10 @@
 """Drug Target Assessment Agent using DeepAgents framework.
 
-Production is a guarded two-subagent workflow:
+Production is a guarded three-subagent workflow:
 1. EVIDENCE_ASSESSOR: 3-stage funnel (Stage 2: validation & scoring ->
    Stage 1: biological context -> Stage 3: ChEMBL drug profiles).
-2. REPORT_WRITER: renders a guarded hybrid report from validated sections;
+2. HYPOTHESIS_WRITER: saves the canonical validated evidence handoff.
+3. REPORT_WRITER: renders a guarded hybrid report from that handoff;
    DrugReportGuardrailMiddleware validates, repairs, publishes, and audits.
 
 ``legacy_hypothesis`` retains the hypothesis_writer plus deterministic
@@ -149,13 +150,14 @@ Data directory: {data_dir} | Disease: {disease}
 ## Steps (execute in exact order)
 1. Call {load_lr_candidates_invocation}
 2. Call task(subagent_type="evidence_assessor", instruction="Run Stage 1+2+3. Data dir: {data_dir}.")
-3. Call task(subagent_type="report_writer", instruction="Render guarded hybrid report from the collected evidence. Data dir: {data_dir}.")
-4. Reply with the single line: REPORT_PIPELINE_COMPLETE
+3. Call task(subagent_type="hypothesis_writer", instruction="Generate and save the canonical validated handoff. Data dir: {data_dir}.")
+4. Call task(subagent_type="report_writer", instruction="Read validated handoff and render the guarded report. Data dir: {data_dir}.")
+5. Reply with the single line: REPORT_PIPELINE_COMPLETE
 
 ## Rules
-- Execute steps 1-4 in order. Do not skip, reorder, or repeat.
+- Execute steps 1-5 in order. Do not skip, reorder, or repeat.
 - Do not read files or dispatch general-purpose subagents.
-- After step 4, stop. The report_writer guardrail owns deterministic validation,
+- After step 5, stop. The report_writer guardrail owns deterministic validation,
   repair, Part 4, HTML, audits, and publication.
 """
 
@@ -164,13 +166,14 @@ ORCHESTRATOR_RESUME_PROMPT_TEMPLATE = """You are the guarded Drug Target Assessm
 Data directory: {data_dir} | Disease: {disease}
 
 ## Steps (execute in exact order)
-1. Call task(subagent_type="report_writer", instruction="{report_writer_resume_instruction}")
-2. Reply with the single line: REPORT_PIPELINE_COMPLETE
+1. Call task(subagent_type="hypothesis_writer", instruction="{hypothesis_writer_resume_instruction}")
+2. Call task(subagent_type="report_writer", instruction="Read validated handoff and render the guarded report. Data dir: {data_dir}.")
+3. Reply with the single line: REPORT_PIPELINE_COMPLETE
 
 ## Rules
 - Evidence files are assumed to exist. Do not run evidence_assessor.
 - Do not read files or dispatch general-purpose subagents.
-- After step 2, stop.
+- After step 3, stop.
 """
 
 
@@ -201,8 +204,8 @@ class DrugTargetConfig:
             compatibility.
         agent_skill_names: Legacy fallback skill tuple retained for registry helpers.
         evidence_assessor_skill_names: Skills exposed to evidence_assessor.
-        hypothesis_writer_skill_names: Skills exposed to legacy hypothesis_writer.
-        hypothesis_writer_prompt_mode: Prompt mode for legacy hypothesis_writer.
+        hypothesis_writer_skill_names: Skills exposed to hypothesis_writer.
+        hypothesis_writer_prompt_mode: Prompt mode for hypothesis_writer.
             ``default`` preserves legacy direct skill-read instructions;
             ``progressive_disclosure_only`` removes those prompt-level reads
             for pure progressive-disclosure benchmarks.
@@ -237,7 +240,6 @@ class DrugTargetConfig:
     evidence_assessor_skill_names: tuple[str, ...] = ()
     report_writer_skill_names: tuple[str, ...] = ("drug-target-reporting",)
     report_writer_resume_instruction: str | None = None
-    # Deprecated legacy-hypothesis fields retained for benchmark/super-graph callers.
     hypothesis_writer_skill_names: tuple[str, ...] = (
         "drug-target-hypothesis",
         "opentargets-database",
@@ -258,7 +260,7 @@ class DrugTargetConfig:
             raise ValueError("custom_tools are not allowed in guarded_report mode")
         if self.subagent_models is None:
             if self.workflow_mode == "guarded_report":
-                model_names = ["evidence_assessor", "report_writer"]
+                model_names = ["evidence_assessor", "hypothesis_writer", "report_writer"]
             elif self.workflow_mode == "legacy_hypothesis":
                 model_names = ["evidence_assessor", "hypothesis_writer"]
             else:
@@ -382,6 +384,7 @@ def _build_subagent_skill_name_map(
                 config.evidence_assessor_skill_names,
                 enable_census=enable_census,
             ),
+            "hypothesis_writer": tuple(config.hypothesis_writer_skill_names),
             "report_writer": tuple(config.report_writer_skill_names),
         }
     raise AssertionError(f"validated workflow mode unexpectedly missing: {config.workflow_mode!r}")
@@ -422,14 +425,22 @@ def create_guarded_report_writer(config: DrugTargetConfig) -> Runnable:
     resolved_skills_dir = str(_resolve_skills_dir(config))
     if config.docker_image:
         skills_dir = resolved_skills_dir
-        subagent_skill_names = {"evidence_assessor": (), "report_writer": ()}
+        subagent_skill_names = {
+            "evidence_assessor": (),
+            "hypothesis_writer": (),
+            "report_writer": (),
+        }
         subagent_skill_registries = None
     else:
         skills_dir = resolved_skills_dir if config.enable_progressive_disclosure else None
         subagent_skill_names = (
             _build_subagent_skill_name_map(config, enable_census=config.enable_census)
             if config.enable_progressive_disclosure
-            else {"evidence_assessor": (), "report_writer": ()}
+            else {
+                "evidence_assessor": (),
+                "hypothesis_writer": (),
+                "report_writer": (),
+            }
         )
         subagent_skill_registries = {
             name: _build_skill_registry(config, names)
@@ -477,7 +488,7 @@ def create_drug_target_agent(
     """Create the Drug Target Assessment agent using DeepAgents framework.
 
     Creates a fully configured production agent with:
-    - 2 top-level subagents (evidence_assessor, report_writer)
+    - 3 top-level subagents (evidence_assessor, hypothesis_writer, report_writer)
     - All database queries via @tool wrappers (host-side by default)
     - Optional DockerBackend when docker_image is set in config
     - Report validation, repair, publication, and audits are handled by
@@ -512,7 +523,11 @@ def create_drug_target_agent(
         backend = _create_docker_backend(config, resolved_data_dir)
         skills_dir = resolved_skills_dir
         if workflow_mode == "guarded_report":
-            subagent_skill_names = {"evidence_assessor": (), "report_writer": ()}
+            subagent_skill_names = {
+                "evidence_assessor": (),
+                "hypothesis_writer": (),
+                "report_writer": (),
+            }
         elif workflow_mode == "legacy_hypothesis":
             subagent_skill_names = {"evidence_assessor": (), "hypothesis_writer": ()}
         else:
@@ -526,7 +541,11 @@ def create_drug_target_agent(
         subagent_skill_names = (
             _build_subagent_skill_name_map(config, enable_census=config.enable_census)
             if config.enable_progressive_disclosure
-            else {"evidence_assessor": (), "report_writer": ()}
+            else {
+                "evidence_assessor": (),
+                "hypothesis_writer": (),
+                "report_writer": (),
+            }
         )
         subagent_skill_registries = (
             {
@@ -570,7 +589,11 @@ def create_drug_target_agent(
     #    `subagent["skills"]` auto-loading.
     model_overrides = config.subagent_models
     if (config.model or config.request_timeout_seconds is not None) and workflow_mode == "guarded_report":
-        model_overrides = {**(model_overrides or {}), "report_writer": llm}
+        model_overrides = {
+            **(model_overrides or {}),
+            "hypothesis_writer": llm,
+            "report_writer": llm,
+        }
     subagent_kwargs: dict[str, Any] = dict(
         data_dir=resolved_data_dir,
         disease=config.disease,
@@ -652,7 +675,9 @@ def create_drug_target_agent(
                 resolved_data_dir,
                 data_dir_tool_names={"load_lr_candidates"},
             ),
-            DrugTargetTaskAllowlistMiddleware({"evidence_assessor", "report_writer"}),
+            DrugTargetTaskAllowlistMiddleware(
+                {"evidence_assessor", "hypothesis_writer", "report_writer"}
+            ),
             *middleware,
         ]
     elif workflow_mode == "legacy_hypothesis":
@@ -674,7 +699,7 @@ def create_drug_target_agent(
     # evidence_assessor alone can consume 500-800 steps for large gene panels
     # (41 genes × ~10 steps/gene for Stage 2, plus Stage 1 batch + rubric + gates).
     # The guarded top-level subagents share this budget. Conservative estimate:
-    #   evidence_assessor: ~1500, report_writer: ~300,
+    #   evidence_assessor: ~1500, hypothesis_writer: ~300, report_writer: ~300,
     #   orchestrator: ~200 = ~2000 typical, 10000 for margin.
     # In guarded production, report middleware does not consume this agent's
     # recursion budget. The legacy finalize_report node is compatibility-only.

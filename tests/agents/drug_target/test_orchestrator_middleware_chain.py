@@ -64,13 +64,17 @@ def test_guarded_orchestrator_exposes_only_bound_topology(tmp_path, monkeypatch)
     create_drug_target_agent(DrugTargetConfig(data_dir=str(tmp_path), provider="ollama"))
 
     assert {tool.name for tool in captured["tools"]} == {"load_lr_candidates"}
-    assert [item["name"] for item in captured["subagents"]] == ["evidence_assessor", "report_writer"]
+    assert [item["name"] for item in captured["subagents"]] == [
+        "evidence_assessor",
+        "hypothesis_writer",
+        "report_writer",
+    ]
     middleware = captured["middleware"]
     assert sum(isinstance(item, DrugReportRunCleanupMiddleware) for item in middleware) == 1
     assert sum(isinstance(item, DrugTargetManagedFilesystemGuardMiddleware) for item in middleware) == 1
     assert sum(isinstance(item, DrugTargetTaskAllowlistMiddleware) for item in middleware) == 1
     assert "REPORT_PIPELINE_COMPLETE" in captured["system_prompt"]
-    assert "hypothesis_writer" not in captured["system_prompt"]
+    assert "hypothesis_writer" in captured["system_prompt"]
 
 
 def test_legacy_orchestrator_keeps_compatibility_surface(tmp_path, monkeypatch):

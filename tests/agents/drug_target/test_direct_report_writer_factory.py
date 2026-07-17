@@ -34,6 +34,7 @@ def test_direct_factory_recompiles_the_canonical_guarded_report_writer(
         captured["writer_middleware"] = [guardrail]
         return [
             {"name": "evidence_assessor"},
+            {"name": "hypothesis_writer"},
             {
                 "name": "report_writer",
                 "model": selected_model,
@@ -155,6 +156,7 @@ def test_production_factory_still_builds_the_outer_deep_agent(
     captured: dict[str, object] = {}
     production_specs = [
         {"name": "evidence_assessor"},
+        {"name": "hypothesis_writer"},
         {"name": "report_writer", "model": selected_model},
     ]
 

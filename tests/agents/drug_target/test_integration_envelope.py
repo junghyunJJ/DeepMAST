@@ -9,7 +9,10 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.agents.drug_target.middleware import HypothesisRetryLoopMiddleware
+from src.agents.drug_target.middleware import (
+    HypothesisReportGuardrailMiddleware,
+    HypothesisRetryLoopMiddleware,
+)
 
 
 EXPECTED_KEYS = {"success", "drug_md", "target_assessment", "errors", "evidence_truncated"}
@@ -64,7 +67,31 @@ def _write_success_artifacts(
             (data_dir / name).write_text(content, encoding="utf-8")
 
 
-def test_guarded_report_writer_has_one_sections_write_boundary(tmp_path: Path) -> None:
+def test_guarded_interpreter_has_the_hypothesis_write_boundary(tmp_path: Path) -> None:
+    from src.agents.drug_target.subagents.configs import get_subagents
+
+    writer = next(
+        subagent
+        for subagent in get_subagents(data_dir=str(tmp_path), disease="IPF")
+        if subagent["name"] == "hypothesis_writer"
+    )
+    tool_names = {tool.name for tool in writer["tools"]}
+
+    assert {
+        "load_evidence_files",
+        "save_hypothesis_report",
+        "validate_evidence_references",
+    } <= tool_names
+    assert "save_report_sections" not in tool_names
+    assert any(
+        isinstance(middleware, HypothesisReportGuardrailMiddleware)
+        for middleware in writer["middleware"]
+    )
+
+
+def test_guarded_reporter_reads_handoff_and_only_saves_recommendations(
+    tmp_path: Path,
+) -> None:
     from src.agents.drug_target.subagents.configs import get_subagents
 
     writer = next(
@@ -74,14 +101,11 @@ def test_guarded_report_writer_has_one_sections_write_boundary(tmp_path: Path) -
     )
     tool_names = {tool.name for tool in writer["tools"]}
 
-    assert "save_report_sections" in tool_names
+    assert {"load_validated_hypothesis_report", "save_report_sections"} <= tool_names
     assert not {
-        "build_evidence_summary",
-        "save_drug_md",
-        "save_target_assessment",
         "save_hypothesis_report",
-        "save_report_expansions",
-        "render_drug_md_from_expansions",
+        "load_evidence_files",
+        "load_lr_candidates",
     } & tool_names
     terminal_save_middleware = [
         middleware

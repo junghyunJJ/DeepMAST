@@ -1,13 +1,13 @@
 """Subagent configurations for Drug Target Assessment Agent.
 
-Production workflow: ``evidence_assessor -> report_writer``. The guarded
-report writer authors validated report sections, then deterministic rendering
-produces report artifacts before middleware validation, repair, publication,
-and audit.
+Production workflow: ``evidence_assessor -> hypothesis_writer -> report_writer``.
+The hypothesis writer saves the validated canonical handoff; the report writer
+renders guarded report sections from it before deterministic validation,
+repair, publication, and audit.
 
-``hypothesis_writer`` and the deterministic ``finalize_report`` super-graph
-are retained only by :func:`get_legacy_subagents` for explicit
-``legacy_hypothesis`` compatibility callers.
+The deterministic ``finalize_report`` super-graph remains only in
+:func:`get_legacy_subagents` for explicit ``legacy_hypothesis`` compatibility
+callers.
 """
 
 import json
@@ -32,12 +32,15 @@ from src.agents.drug_target.subagents.prompts import (
 from src.agents.drug_target.middleware import (
     DrugReportGuardrailMiddleware,
     DrugTargetManagedFilesystemGuardMiddleware,
+    HypothesisReportGuardrailMiddleware,
     HypothesisRetryLoopMiddleware,
 )
 from src.agents.drug_target.production_report_tools import (
     production_assessment_evidence_tool,
     production_assessment_save_evidence_tool,
     production_hypothesis_evidence_tool,
+    production_load_validated_hypothesis_report_tool,
+    production_save_hypothesis_report_tool,
     production_save_report_sections_tool,
     production_skill_reader_tool,
 )
@@ -306,7 +309,7 @@ SUBAGENT_CONFIGS = {
     "hypothesis_writer": {
         "name": "hypothesis_writer",
         "description": (
-            "Legacy compatibility hypothesis generation from Stage 1-3 evidence. "
+            "Guarded canonical hypothesis interpretation from Stage 1-3 evidence. "
             "Reads all evidence files, "
             "generates 4-6 mechanistic hypotheses across 4 thematic categories, "
             "applies gap detection and UCB scoring, outputs hypothesis_report.json."
@@ -346,8 +349,8 @@ SUBAGENT_CONFIGS = {
 # Workflow Order
 # =============================================================================
 
-WORKFLOW_ORDER = ["evidence_assessor", "report_writer"]
-_TOP_LEVEL_SUBAGENTS = ("evidence_assessor", "report_writer")
+WORKFLOW_ORDER = ["evidence_assessor", "hypothesis_writer", "report_writer"]
+_TOP_LEVEL_SUBAGENTS = ("evidence_assessor", "hypothesis_writer", "report_writer")
 
 # Deprecated compatibility ordering for the outer super-graph and benchmarks.
 LEGACY_WORKFLOW_ORDER = ["evidence_assessor", "hypothesis_writer"]
@@ -700,14 +703,9 @@ def get_subagents(
     skill_activation_mode: SkillActivationMode | None = None,
     hypothesis_writer_prompt_mode: HypothesisWriterPromptMode = "default",
 ) -> list[dict]:
-    """Build the guarded production evidence-assessor/report-writer surface.
-
-    ``hypothesis_writer_prompt_mode`` is accepted for source compatibility but
-    deliberately ignored: it belongs only to :func:`get_legacy_subagents`.
-    """
+    """Build the guarded production evidence-interpreter-reporter surface."""
 
     _ = custom_tools, default_model, backend, skills_sources, skill_registry
-    _ = hypothesis_writer_prompt_mode
     if custom_tools:
         raise ValueError("custom_tools are not allowed in guarded_report mode")
     raw_data_dir = _sanitize_prompt_value(data_dir)
@@ -722,6 +720,7 @@ def get_subagents(
     root = _production_skills_dir(skills_dir)
     skill_names = subagent_skill_names or {
         "evidence_assessor": (),
+        "hypothesis_writer": ("drug-target-hypothesis",),
         "report_writer": ("drug-target-reporting",),
     }
     registries = subagent_skill_registries or {
@@ -760,17 +759,26 @@ def get_subagents(
             ]
             if allowed_names:
                 tools.append(production_skill_reader_tool(root, allowed_names))
-        else:
+        elif name == "hypothesis_writer":
             replacements = {
                 "load_evidence_files": production_hypothesis_evidence_tool(safe_data_dir),
-                "read_skill_file": production_skill_reader_tool(root, ("drug-target-reporting",)),
+                "save_hypothesis_report": production_save_hypothesis_report_tool(
+                    safe_data_dir
+                ),
+                "read_skill_file": production_skill_reader_tool(root, allowed_names),
             }
             tools = [
-                production_save_report_sections_tool(safe_data_dir, safe_disease)
-                if tool is production_save_report_sections_tool
-                else replacements.get(getattr(tool, "name", ""), tool)
+                replacements.get(getattr(tool, "name", ""), tool)
                 for tool in tools
+                if getattr(tool, "name", None) != "read_skill_file" or allowed_names
             ]
+        else:
+            tools = [
+                production_load_validated_hypothesis_report_tool(safe_data_dir),
+                production_save_report_sections_tool(safe_data_dir, safe_disease),
+            ]
+            if allowed_names:
+                tools.append(production_skill_reader_tool(root, allowed_names))
 
         if not enable_census and name == "evidence_assessor":
             census_names = {
@@ -788,7 +796,9 @@ def get_subagents(
             ]
         subagent["tools"] = tools
         prompt = subagent["system_prompt"]
-        if name == "report_writer":
+        if name == "hypothesis_writer":
+            prompt = render_hypothesis_writer_prompt(hypothesis_writer_prompt_mode)
+        elif name == "report_writer":
             prompt = REPORT_WRITER_PROMPT
         available = ", ".join(
             getattr(tool, "name", getattr(tool, "__name__", "tool")) for tool in tools
@@ -808,7 +818,14 @@ def get_subagents(
             ),
             WriteFileArgGuardMiddleware(backend_root=safe_data_dir),
         ]
-        if name == "report_writer":
+        if name == "hypothesis_writer":
+            middleware.extend(
+                [
+                    HypothesisRetryLoopMiddleware(max_hypothesis_save_attempts=3),
+                    HypothesisReportGuardrailMiddleware(safe_data_dir),
+                ]
+            )
+        elif name == "report_writer":
             middleware.append(
                 HypothesisRetryLoopMiddleware(
                     stop_after_first_save=True,
@@ -847,7 +864,10 @@ def get_subagents(
                 from src.agents.shared.skill_activation_governor import SkillActivationGovernor
 
                 hard_required = (
-                    ("drug-target-reporting",)
+                    ("drug-target-hypothesis",)
+                    if name == "hypothesis_writer"
+                    and "drug-target-hypothesis" in allowed_names
+                    else ("drug-target-reporting",)
                     if name == "report_writer" and "drug-target-reporting" in allowed_names
                     else ()
                 )
@@ -856,7 +876,13 @@ def get_subagents(
                         skill_registry=registries.get(name, {}),
                         hard_required_skill_names=hard_required,
                         candidate_skill_names=tuple(s for s in allowed_names if s not in hard_required),
-                        artifact_gate="save_report_sections" if name == "report_writer" else "final artifact",
+                        artifact_gate=(
+                            "save_hypothesis_report"
+                            if name == "hypothesis_writer"
+                            else "save_report_sections"
+                            if name == "report_writer"
+                            else "final artifact"
+                        ),
                     )
                 )
         subagent["middleware"] = middleware

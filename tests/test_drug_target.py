@@ -178,18 +178,18 @@ class TestSubagentConfigs:
 
     def test_workflow_order(self):
         from src.agents.drug_target.subagents.configs import WORKFLOW_ORDER
-        assert WORKFLOW_ORDER == ["evidence_assessor", "report_writer"]
+        assert WORKFLOW_ORDER == ["evidence_assessor", "hypothesis_writer", "report_writer"]
 
-    def test_get_subagents_returns_2(self, tmp_path):
+    def test_get_subagents_returns_3(self, tmp_path):
         from src.agents.drug_target.subagents.configs import get_subagents
         subagents = get_subagents(data_dir=str(tmp_path))
-        assert len(subagents) == 2
+        assert len(subagents) == 3
 
     def test_get_subagents_order(self, tmp_path):
         from src.agents.drug_target.subagents.configs import get_subagents
         subagents = get_subagents(data_dir=str(tmp_path))
         names = [s["name"] for s in subagents]
-        assert names == ["evidence_assessor", "report_writer"]
+        assert names == ["evidence_assessor", "hypothesis_writer", "report_writer"]
 
     def test_custom_tools_appended_to_interpretive_subagents_only(self):
         """Custom tools are appended to all 2 subagents; no summarizer present."""
@@ -5426,6 +5426,10 @@ class TestIntegration:
 
         async def mock_agent_ainvoke(payload, config=None):
             (mock_data_dir / "drug.md").write_text(mock_report, encoding="utf-8")
+            (mock_data_dir / "report_sections.json").write_text(
+                json.dumps({"schema_version": "hybrid_report_sections/v1"}),
+                encoding="utf-8",
+            )
             (mock_data_dir / "target_assessment.json").write_text(
                 json.dumps(mock_json), encoding="utf-8"
             )
@@ -5466,7 +5470,7 @@ class TestIntegration:
 
     @patch("src.agents.drug_target.agent.create_deep_agent")
     @patch("src.agents.drug_target.agent.create_llm")
-    def test_create_agent_passes_subagents_with_2_entries(
+    def test_create_agent_passes_subagents_with_3_entries(
         self, mock_create_llm, mock_create_deep_agent, tmp_path
     ):
         from src.agents.drug_target.agent import create_drug_target_agent, DrugTargetConfig
@@ -5479,7 +5483,7 @@ class TestIntegration:
 
         call_kwargs = mock_create_deep_agent.call_args
         subagents = call_kwargs.kwargs.get("subagents") or call_kwargs[1].get("subagents")
-        assert len(subagents) == 2
+        assert len(subagents) == 3
 
     def test_shared_skills_middleware_filters_allowed_skill_names(self, tmp_path):
         import asyncio
@@ -5513,7 +5517,7 @@ class TestIntegration:
     def test_create_drug_target_agent_attaches_reporting_skill_to_report_writer(
         self, mock_create_llm, mock_create_deep_agent, tmp_path
     ):
-        """The guarded writer owns the reporting skill; assessor stays skillless."""
+        """Interpretive subagents own their skills; assessor stays skillless."""
         from src.agents.drug_target.agent import create_drug_target_agent, DrugTargetConfig
         from src.agents.shared.skill_activator import SkillActivator
         from src.agents.shared.skills_middleware import SkillsMiddleware
@@ -5532,16 +5536,29 @@ class TestIntegration:
         assert "SubagentErrorGuardMiddleware" in mw_names
 
         subagents = call_kwargs.get("subagents", [])
-        # No summarizer in 2-subagent world
+        # No summarizer in the guarded three-subagent workflow.
         assert not any(s["name"] == "summarizer" for s in subagents)
         # evidence_assessor should NOT have SkillsMiddleware (it's not in _skill_subagents)
-        assert len(subagents) == 2
+        assert len(subagents) == 3
 
         ea = next(s for s in subagents if s["name"] == "evidence_assessor")
         ea_mw = ea.get("middleware", [])
         assert "skills" not in ea
         assert not any(isinstance(m, SkillsMiddleware) for m in ea_mw)
         assert not any(isinstance(m, SkillActivator) for m in ea_mw)
+
+        hypothesis_writer = next(s for s in subagents if s["name"] == "hypothesis_writer")
+        hypothesis_mw = hypothesis_writer.get("middleware", [])
+        assert any(isinstance(m, SkillsMiddleware) for m in hypothesis_mw)
+        hypothesis_activator = next(
+            m for m in hypothesis_mw if isinstance(m, SkillActivator)
+        )
+        assert set(hypothesis_activator.skill_registry) == {
+            "drug-target-hypothesis",
+            "opentargets-database",
+            "gwas-database",
+            "chembl-database",
+        }
 
         writer = next(s for s in subagents if s["name"] == "report_writer")
         writer_mw = writer.get("middleware", [])
