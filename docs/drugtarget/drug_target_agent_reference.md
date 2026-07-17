@@ -654,6 +654,12 @@ replaced with conservative deterministic prose, so model-selected references
 never enter the report. Non-Ollama providers retain the existing tool-call
 save contract.
 
+For native Ollama/Qwen publication, the report writer supplies two bounded recommendation sentences for Section 5 only.
+Python selects supporting sources from the validated handoff, builds the canonical payload, and calls
+`production_save_report_sections_tool` directly. Invalid prose is retried once
+and then replaced with a conservative deterministic sentence; the ordinary
+guardrail and Jinja2 audit remain the publication boundary.
+
 A successful publication run requires a fresh valid
 `evidence/hypothesis_report.json`, `report_sections.json`, `drug.md`, and
 `drug_report_validation_final.json` with `valid: true` and

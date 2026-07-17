@@ -43,6 +43,14 @@ def test_docs_describe_ollama_gene_card_contract() -> None:
         assert "interest-cell-intrinsic Stage 1" in text
 
 
+def test_docs_describe_bounded_ollama_report_sections() -> None:
+    for path in (REFERENCE, STAGE_GUIDE):
+        text = path.read_text(encoding="utf-8")
+        assert "two bounded recommendation sentences" in text
+        assert "production_save_report_sections_tool" in text
+        assert "Python selects supporting sources" in text
+
+
 def test_docs_describe_guarded_reporter_and_graph_builder_entrypoints() -> None:
     reference = REFERENCE.read_text(encoding="utf-8")
     stage_guide = STAGE_GUIDE.read_text(encoding="utf-8")
