@@ -26,6 +26,7 @@ from src.agents.drug_target.agent import (
     create_guarded_report_writer,
 )
 from src.agents.drug_target.middleware import clear_guarded_report_run_artifacts
+from src.agents.drug_target.tools.hypothesis_schema import validate_hypothesis_report_quality
 
 REQUIRED_GUARDED_ARTIFACTS = (
     "drug.md",
@@ -108,6 +109,10 @@ def guarded_run_succeeded(data_dir: Path) -> bool:
         and publication.get("status") == "passed"
         and all((data_dir / name).is_file() and (data_dir / name).stat().st_size > 0 for name in REQUIRED_GUARDED_ARTIFACTS)
     )
+
+
+def _validated_handoff_exists(data_dir: Path) -> bool:
+    return bool(validate_hypothesis_report_quality(data_dir).get("valid"))
 
 
 def _validate_timeouts(args: argparse.Namespace) -> None:
@@ -276,6 +281,12 @@ async def main() -> int:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
     data_dir = Path(args.data_dir).expanduser().resolve()
+    if not _validated_handoff_exists(data_dir):
+        print(
+            "ERROR: valid hypothesis_report.json is required for reporter-only diagnostic",
+            file=sys.stderr,
+        )
+        return 1
     if len(list((data_dir / "evidence").glob("*.json"))) < 5:
         print("ERROR: Not enough evidence files. Run evidence assessment first.")
         return 1

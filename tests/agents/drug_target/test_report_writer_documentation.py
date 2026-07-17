@@ -33,3 +33,8 @@ def test_docs_describe_guarded_reporter_and_graph_builder_entrypoints() -> None:
     assert "returned payload" not in reference
     assert "no longer exposes `build_evidence_summary`" in reference
     assert "verify its absence in the JSONL trace" in reference
+
+    for text in (reference, stage_guide):
+        assert "evidence_assessor -> hypothesis_writer -> report_writer" in text
+        assert "valid existing handoff" in text
+        assert "--skip-evidence-assessor" in text

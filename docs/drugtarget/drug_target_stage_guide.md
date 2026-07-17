@@ -5,7 +5,7 @@
 
 ---
 
-> **Current production contract:** `DrugReportRunCleanupMiddleware -> evidence_assessor -> report_writer -> DrugReportGuardrailMiddleware`. Production Section 4 is in `drug.md`; success needs two audits and seven artifacts including `drug_report_validation_final.json`. Configured-directory tools are forced safe, `general-purpose` is blocked, and custom tools are rejected. `legacy_hypothesis` is the explicit outer-super-graph/finalizer compatibility path. Full-agent, E2E, and BC paths are production entrypoints; `run_report_writer_only.py` is diagnostic-only.
+> **Current production contract:** `DrugReportRunCleanupMiddleware -> evidence_assessor -> hypothesis_writer -> report_writer -> DrugReportGuardrailMiddleware`. Production Section 4 is in `drug.md`; success needs two audits and seven artifacts including `drug_report_validation_final.json`. Configured-directory tools are forced safe, `general-purpose` is blocked, and custom tools are rejected. `legacy_hypothesis` is the explicit outer-super-graph/finalizer compatibility path. Full-agent, E2E, and BC paths are production entrypoints; `run_report_writer_only.py` is diagnostic-only and requires a valid existing handoff.
 
 **Production entrypoints**: construct `create_drug_target_agent` directly with
 `workflow_mode="guarded_report"`, or run `run_drug_target_e2e.py` and
@@ -30,13 +30,15 @@ identified from spatial transcriptomics cell-cell interaction (CCI) analysis.
 create_drug_target_agent (guarded_report)
   DrugReportRunCleanupMiddleware
     └── evidence_assessor   ← 3-stage funnel + inline rubric
+    └── hypothesis_writer   ← writes validated hypothesis_report.json
     └── report_writer       ← authors report_sections.json
           └── DrugReportGuardrailMiddleware
                 validate/repair → deterministic Jinja target_assessment.json + drug.md
                 → Part 4/HTML → two audits/seven artifacts
 ```
 
-`evidence_assessor` runs the staged funnel. `report_writer` authors only
+`evidence_assessor` runs the staged funnel. `hypothesis_writer` creates the
+validated handoff. `report_writer` authors only
 `report_sections.json`; deterministic Jinja rendering owns
 `target_assessment.json` and `drug.md`. The guardrail owns post-write output
 rather than an outer graph node. `request_timeout_seconds` is forwarded to
@@ -57,11 +59,22 @@ supported provider clients when supplied; omitted values retain provider default
 ### Workflow Order
 
 ```
-load_lr_candidates → evidence_assessor → report_writer → REPORT_PIPELINE_COMPLETE
+load_lr_candidates → evidence_assessor → hypothesis_writer → report_writer → REPORT_PIPELINE_COMPLETE
 ```
 
-The top-level task allowlist permits exactly these two subagents. The retained
+The top-level task allowlist permits exactly these three subagents. The retained
 outer graph/finalizer is `legacy_hypothesis` compatibility only.
+
+To resume an existing evidence run, regenerate its handoff and report through
+the full pipeline:
+
+```bash
+export OLLAMA_BASE_URL=http://localhost:6000
+python scripts/run_drug_target_agent_bc.py --data-dir /tmp/deepmast-bc-handoff-qwen --disease "breast cancer" --provider ollama-openai --model qwen3.5:122b --skip-evidence-assessor
+```
+
+`run_report_writer_only.py` is diagnostic-only: it tests a valid existing
+handoff's reporter phase and fails before model invocation without one.
 
 ---
 

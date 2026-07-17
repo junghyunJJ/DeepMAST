@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import asyncio
+import argparse
+import os
 import sys
 import uuid
 from pathlib import Path
@@ -15,24 +17,34 @@ from src.agents.drug_target.agent import DrugTargetConfig, create_drug_target_ag
 from src.agents.drug_target.report_guardrails import clear_derived_report_artifacts
 from scripts.run_report_writer_only import guarded_run_succeeded
 
-DATA_DIR = str(PROJECT_ROOT / "res_bc_ollama")
-DISEASE = "breast cancer"
-PROVIDER = "openrouter"
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Run the guarded drug target pipeline for breast cancer")
+    parser.add_argument("--data-dir", type=Path, default=PROJECT_ROOT / "res_bc_ollama")
+    parser.add_argument("--disease", default="breast cancer")
+    parser.add_argument("--provider", default="openrouter")
+    parser.add_argument("--model")
+    parser.add_argument("--skip-evidence-assessor", action="store_true")
+    return parser.parse_args()
 
 
 async def main() -> int:
-    data_dir = Path(DATA_DIR).expanduser().resolve()
+    args = parse_args()
+    data_dir = args.data_dir.expanduser().resolve()
     if not (data_dir / "lr_candidates.json").exists():
         print(f"ERROR: lr_candidates.json not found at {data_dir / 'lr_candidates.json'}")
         return 1
     clear_derived_report_artifacts(data_dir, include_audits=True, include_sources=True)
     backend = None
+    previous_skip_evidence_assessor = os.environ.get("DRUG_TARGET_SKIP_EVIDENCE_ASSESSOR")
     try:
+        if args.skip_evidence_assessor:
+            os.environ["DRUG_TARGET_SKIP_EVIDENCE_ASSESSOR"] = "1"
         agent, backend = create_drug_target_agent(
             DrugTargetConfig(
-                provider=PROVIDER,
+                provider=args.provider,
+                model=args.model,
                 data_dir=str(data_dir),
-                disease=DISEASE,
+                disease=args.disease,
                 workflow_mode="guarded_report",
             )
         )
@@ -49,6 +61,10 @@ async def main() -> int:
         print(f"ERROR: {exc}")
         return 1
     finally:
+        if previous_skip_evidence_assessor is None:
+            os.environ.pop("DRUG_TARGET_SKIP_EVIDENCE_ASSESSOR", None)
+        else:
+            os.environ["DRUG_TARGET_SKIP_EVIDENCE_ASSESSOR"] = previous_skip_evidence_assessor
         cleanup = getattr(backend, "cleanup", None)
         if callable(cleanup):
             cleanup()

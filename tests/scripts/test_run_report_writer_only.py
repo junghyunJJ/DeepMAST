@@ -241,6 +241,27 @@ def test_parse_args_has_bounded_deadline_defaults(monkeypatch):
     assert args.trace_file is None
 
 
+def test_bc_runner_parses_resume_ollama_arguments(monkeypatch):
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_drug_target_agent_bc.py",
+            "--data-dir", "/tmp/bc",
+            "--provider", "ollama-openai",
+            "--model", "qwen3.5:122b",
+            "--skip-evidence-assessor",
+        ],
+    )
+
+    args = bc_runner.parse_args()
+
+    assert args.data_dir == Path("/tmp/bc")
+    assert args.provider == "ollama-openai"
+    assert args.model == "qwen3.5:122b"
+    assert args.skip_evidence_assessor is True
+
+
 @pytest.mark.asyncio
 async def test_writer_process_writes_trace_callback_boundaries(tmp_path, monkeypatch):
     trace_file = tmp_path / "writer.trace"
@@ -356,6 +377,7 @@ def test_timeout_validation_rejects_invalid_deadlines(
 
 @pytest.mark.asyncio
 async def test_writer_only_requires_evidence_before_creating_writer(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(runner, "_validated_handoff_exists", lambda _path: True)
     monkeypatch.setattr(runner, "parse_args", lambda: _args(tmp_path))
     monkeypatch.setattr(
         runner,
@@ -367,12 +389,25 @@ async def test_writer_only_requires_evidence_before_creating_writer(tmp_path, mo
     assert capsys.readouterr().out == "ERROR: Not enough evidence files. Run evidence assessment first.\n"
 
 
+def test_report_writer_only_rejects_missing_valid_handoff(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(runner, "parse_args", lambda: _args(tmp_path))
+    monkeypatch.setattr(
+        runner,
+        "create_guarded_report_writer",
+        lambda _config: pytest.fail("writer must not start without handoff"),
+    )
+
+    assert asyncio.run(runner.main()) == 1
+    assert "valid hypothesis_report.json" in capsys.readouterr().err
+
+
 @pytest.mark.asyncio
 async def test_writer_only_uses_direct_factory_with_existing_evidence_context_and_no_env_mutation(
     tmp_path,
     monkeypatch,
 ):
     _evidence_ready(tmp_path)
+    monkeypatch.setattr(runner, "_validated_handoff_exists", lambda _path: True)
     writer = _Writer(callback=lambda: _passed_artifacts(tmp_path))
 
     monkeypatch.setattr(runner, "parse_args", lambda: _args(tmp_path, model="qwen3.5:122b"))
@@ -386,6 +421,7 @@ async def test_writer_only_uses_direct_factory_with_existing_evidence_context_an
 @pytest.mark.asyncio
 async def test_writer_only_clears_stale_outputs_before_direct_writer_runs(tmp_path, monkeypatch):
     _evidence_ready(tmp_path)
+    monkeypatch.setattr(runner, "_validated_handoff_exists", lambda _path: True)
     _passed_artifacts(tmp_path)
     for name in ("report_data.json", "drug_report_render.json"):
         (tmp_path / name).write_text("stale")
@@ -433,6 +469,7 @@ async def test_invalid_deadlines_fail_before_writer_creation(tmp_path, monkeypat
 @pytest.mark.asyncio
 async def test_writer_timeout_cleans_all_guarded_outputs(tmp_path, monkeypatch, capsys):
     _evidence_ready(tmp_path)
+    monkeypatch.setattr(runner, "_validated_handoff_exists", lambda _path: True)
     _passed_artifacts(tmp_path)
     (tmp_path / "report_sections.json").write_text("{}")
     for name in ("report_data.json", "drug_report_render.json"):
@@ -463,6 +500,7 @@ async def test_writer_timeout_hard_stops_threaded_guardrail_work_and_prevents_la
     capsys,
 ):
     _evidence_ready(tmp_path)
+    monkeypatch.setattr(runner, "_validated_handoff_exists", lambda _path: True)
     monkeypatch.setattr(
         runner,
         "parse_args",
@@ -491,6 +529,7 @@ async def test_writer_timeout_hard_stops_threaded_guardrail_work_and_prevents_la
 @pytest.mark.asyncio
 async def test_writer_timeout_kills_a_termination_resistant_child(tmp_path, monkeypatch, capsys):
     _evidence_ready(tmp_path)
+    monkeypatch.setattr(runner, "_validated_handoff_exists", lambda _path: True)
     process = _TerminationResistantProcess()
     monkeypatch.setattr(runner, "parse_args", lambda: _args(tmp_path, request_timeout_seconds=0.001, run_timeout_seconds=0.01))
     monkeypatch.setattr(runner, "_process_context", lambda: _ProcessContext(process))
@@ -510,6 +549,7 @@ async def test_writer_timeout_kills_a_termination_resistant_child(tmp_path, monk
 @pytest.mark.asyncio
 async def test_writer_child_start_failure_is_reported_by_parent(tmp_path, monkeypatch, capsys):
     _evidence_ready(tmp_path)
+    monkeypatch.setattr(runner, "_validated_handoff_exists", lambda _path: True)
     monkeypatch.setattr(runner, "parse_args", lambda: _args(tmp_path))
     monkeypatch.setattr(runner, "_process_context", lambda: _ProcessContext(_StartFailingProcess()))
 
@@ -519,6 +559,7 @@ async def test_writer_child_start_failure_is_reported_by_parent(tmp_path, monkey
 
 def test_cli_timeout_never_waits_for_an_unbounded_child_join(tmp_path, monkeypatch, capsys):
     _evidence_ready(tmp_path)
+    monkeypatch.setattr(runner, "_validated_handoff_exists", lambda _path: True)
     process = _CliLifecycleProcess()
     monkeypatch.setattr(runner, "parse_args", lambda: _args(tmp_path, request_timeout_seconds=0.001, run_timeout_seconds=0.01))
     monkeypatch.setattr(runner, "_process_context", lambda: _ProcessContext(process))
@@ -541,6 +582,7 @@ async def test_force_exit_clears_guarded_outputs_when_kill_is_ineffective(
     monkeypatch,
 ):
     _evidence_ready(tmp_path)
+    monkeypatch.setattr(runner, "_validated_handoff_exists", lambda _path: True)
     _passed_artifacts(tmp_path)
     (tmp_path / "report_sections.json").write_text("{}")
     for name in ("report_data.json", "drug_report_render.json"):

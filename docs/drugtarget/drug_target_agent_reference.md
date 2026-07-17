@@ -6,7 +6,7 @@
 
 ---
 
-> **Current production contract:** `evidence_assessor -> report_writer -> DrugReportGuardrailMiddleware -> guarded publication`. The writer owns only canonical `report_sections.json`; Jinja renders `drug.md` and the other pre-publication artifacts. Success requires valid initial/final audits plus Part 4 and HTML publication artifacts. Tools are forced to the configured directory, DeepAgents `general-purpose` is blocked, and custom tools are rejected. Full-agent, E2E, and BC paths are production entrypoints; `run_report_writer_only.py` is diagnostic-only. `legacy_hypothesis` is the only outer-super-graph/finalizer compatibility path.
+> **Current production contract:** `evidence_assessor -> hypothesis_writer -> report_writer -> DrugReportGuardrailMiddleware -> guarded publication`. The writer owns only canonical `report_sections.json`; Jinja renders `drug.md` and the other pre-publication artifacts. Success requires valid initial/final audits plus Part 4 and HTML publication artifacts. Tools are forced to the configured directory, DeepAgents `general-purpose` is blocked, and custom tools are rejected. Full-agent, E2E, and BC paths are production entrypoints; `run_report_writer_only.py` is diagnostic-only and requires a valid existing handoff. `legacy_hypothesis` is the only outer-super-graph/finalizer compatibility path.
 
 **Production entrypoints**: construct `create_drug_target_agent` directly with
 `workflow_mode="guarded_report"`, or use `run_drug_target_e2e.py` and
@@ -54,6 +54,7 @@ Production Reporter integration
     -> create_drug_target_agent(config, workflow_mode="guarded_report") [agent.py]
      -> DrugReportRunCleanupMiddleware
      -> evidence_assessor (configured-run evidence tools)
+     -> hypothesis_writer (validated hypothesis_report.json handoff)
      -> report_writer (save_report_sections exactly once)
      -> DrugReportGuardrailMiddleware (validate rendered Markdown, repair sections, publish Part 4 + HTML, audit)
 
@@ -99,7 +100,7 @@ Legacy compatibility surface (not used by Reporter integration)
 
 ### 2.3 Subagent Configuration
 
-**Workflow order**: `["evidence_assessor", "report_writer"]` (strict sequential, defined in `subagents/configs.py`). `report_writer` is the sole production author; `DrugReportGuardrailMiddleware` owns all post-write work.
+**Workflow order**: `["evidence_assessor", "hypothesis_writer", "report_writer"]` (strict sequential, defined in `subagents/configs.py`). `report_writer` is the sole production author; `DrugReportGuardrailMiddleware` owns all post-write work.
 
 | Component | Type | Tools | Role |
 |-----------|------|-------|------|
@@ -609,10 +610,16 @@ and Part 4 use one explicit model identity.
 ### 7.4 Supported Ollama guarded smoke invocation (live validation pending)
 
 Production continues to run the full Deep Agent topology:
-`evidence_assessor -> report_writer -> DrugReportGuardrailMiddleware`.
-`run_report_writer_only.py` is a diagnostic entrypoint instead: it requires
-existing evidence-assessor artifacts, then directly compiles the canonical
-guarded `report_writer` specification without an outer task-dispatch turn.
+`evidence_assessor -> hypothesis_writer -> report_writer -> DrugReportGuardrailMiddleware`.
+Use this resume command to regenerate the handoff and report:
+
+```bash
+export OLLAMA_BASE_URL=http://localhost:6000
+python scripts/run_drug_target_agent_bc.py --data-dir /tmp/deepmast-bc-handoff-qwen --disease "breast cancer" --provider ollama-openai --model qwen3.5:122b --skip-evidence-assessor
+```
+
+`run_report_writer_only.py` tests only the reporter phase of a valid existing
+handoff; it fails before model invocation when `hypothesis_report.json` is not valid.
 
 The explicit `--model` and `--request-timeout-seconds` selection is preserved
 for initial authoring, both guardrail repair paths, and the Part 4 selector.
