@@ -32,6 +32,17 @@ def test_docs_define_native_qwen_publication_success_profile() -> None:
         assert "writer's bounded repair path" in text
 
 
+def test_docs_describe_ollama_gene_card_contract() -> None:
+    for path in (REFERENCE, STAGE_GUIDE):
+        text = path.read_text(encoding="utf-8")
+        assert "gene-card" in text
+        assert "4 final hypotheses" in text
+        assert "assessment_results.json" in text
+        assert "ot_<GENE>.json" in text
+        assert "stage3_<GENE>.json" in text
+        assert "interest-cell-intrinsic Stage 1" in text
+
+
 def test_docs_describe_guarded_reporter_and_graph_builder_entrypoints() -> None:
     reference = REFERENCE.read_text(encoding="utf-8")
     stage_guide = STAGE_GUIDE.read_text(encoding="utf-8")

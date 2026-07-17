@@ -642,9 +642,16 @@ The deployed `:6000` Ollama 0.20.6 OpenAI-compatible API ignores output and
 thinking controls, while the native provider honors `think=false` and
 `num_predict`.
 
-For the native Ollama/Qwen path, `hypothesis_writer` returns exactly one JSON
-object with the top-level `hypotheses` field. Python validates and persists it
-as `evidence/hypothesis_report.json`; legacy providers retain the tool-call
+For the native Ollama/Qwen path, `hypothesis_writer` produces bounded prose
+for four deterministic gene-cards, not a full JSON report. Python reads
+FEATURED genes from `assessment_results.json`, selects the validator-required
+`ot_<GENE>.json` and `stage3_<GENE>.json` evidence for every FEATURED gene,
+and builds 4 final hypotheses before validating and persisting
+`evidence/hypothesis_report.json`. Only interest-cell-intrinsic Stage 1 pairs
+with strict-PASS status may accompany the malignant-cell anchor; spatial-niche-only and
+depleted-coexpression pairs do not. A rejected card is retried once and then
+replaced with conservative deterministic prose, so model-selected references
+never enter the report. Non-Ollama providers retain the existing tool-call
 save contract.
 
 A successful publication run requires a fresh valid

@@ -94,9 +94,17 @@ report audit is fail-closed behavior, not a published report. The coordinator
 retries one `HYPOTHESIS_REPORT_MISSING`; rejected saves remain under the
 writer's bounded repair path.
 
-On native Ollama/Qwen runs, the hypothesis writer returns one JSON object with
-the canonical `hypotheses` field. Python validates and persists that response;
-non-Ollama providers keep the existing tool-call save path.
+On native Ollama/Qwen runs, the hypothesis writer produces bounded prose for
+four deterministic gene-cards, not a full JSON report. Python reads FEATURED
+genes from `assessment_results.json`, selects the validator-required
+`ot_<GENE>.json` and `stage3_<GENE>.json` evidence for every FEATURED gene,
+and builds 4 final hypotheses before validating and persisting
+`evidence/hypothesis_report.json`. Only interest-cell-intrinsic Stage 1 pairs
+with strict-PASS status may accompany the malignant-cell anchor; spatial-niche-only and
+depleted-coexpression pairs do not. A rejected card is retried once and then
+replaced with conservative deterministic prose, so model-selected references
+never enter the report. Non-Ollama providers keep the existing tool-call save
+path.
 
 `run_report_writer_only.py` is diagnostic-only: it tests a valid existing
 handoff's reporter phase and fails before model invocation without one.
