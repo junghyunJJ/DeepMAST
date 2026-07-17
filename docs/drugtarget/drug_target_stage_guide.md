@@ -10,7 +10,7 @@
 > prepare -> validate_evidence -> hypothesis_writer
 >         -> validate_hypothesis -> report_writer -> final audit/publication
 > ```
-> The root LLM does not schedule guarded production phases. The report_writer is never invoked without a fresh valid hypothesis handoff. Production Section 4 is in `drug.md`; success needs two audits and seven artifacts including `drug_report_validation_final.json`. Configured-directory tools are forced safe, `general-purpose` is blocked, and custom tools are rejected. `legacy_hypothesis` is the explicit outer-super-graph/finalizer compatibility path. Full-agent, E2E, and BC paths are production entrypoints; `run_report_writer_only.py` is diagnostic-only and requires a valid existing handoff.
+> The root LLM does not schedule guarded production phases. The root LLM does not schedule guarded production retries. The report_writer is never invoked without a fresh valid hypothesis handoff. Production Section 4 is in `drug.md`; success needs two audits and seven artifacts including `drug_report_validation_final.json`. Configured-directory tools are forced safe, `general-purpose` is blocked, and custom tools are rejected. `legacy_hypothesis` is the explicit outer-super-graph/finalizer compatibility path. Full-agent, E2E, and BC paths are production entrypoints; `run_report_writer_only.py` is diagnostic-only and requires a valid existing handoff.
 
 **Production entrypoints**: construct `create_drug_target_agent` directly with
 `workflow_mode="guarded_report"`, or run `run_drug_target_e2e.py` and

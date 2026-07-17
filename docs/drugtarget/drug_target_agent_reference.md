@@ -11,7 +11,7 @@
 > prepare -> validate_evidence -> hypothesis_writer
 >         -> validate_hypothesis -> report_writer -> final audit/publication
 > ```
-> The root LLM does not schedule guarded production phases. The report_writer is never invoked without a fresh valid hypothesis handoff. The writer owns only canonical `report_sections.json`; Jinja renders `drug.md` and the other pre-publication artifacts. Success requires valid initial/final audits plus Part 4 and HTML publication artifacts. Tools are forced to the configured directory, DeepAgents `general-purpose` is blocked, and custom tools are rejected. Full-agent, E2E, and BC paths are production entrypoints; `run_report_writer_only.py` remains diagnostic-only and requires a valid existing handoff. `legacy_hypothesis` remains prompt-driven compatibility only.
+> The root LLM does not schedule guarded production phases. The root LLM does not schedule guarded production retries. The report_writer is never invoked without a fresh valid hypothesis handoff. The writer owns only canonical `report_sections.json`; Jinja renders `drug.md` and the other pre-publication artifacts. Success requires valid initial/final audits plus Part 4 and HTML publication artifacts. Tools are forced to the configured directory, DeepAgents `general-purpose` is blocked, and custom tools are rejected. Full-agent, E2E, and BC paths are production entrypoints; `run_report_writer_only.py` remains diagnostic-only and requires a valid existing handoff. `legacy_hypothesis` remains prompt-driven compatibility only.
 
 **Production entrypoints**: construct `create_drug_target_agent` directly with
 `workflow_mode="guarded_report"`, or use `run_drug_target_e2e.py` and

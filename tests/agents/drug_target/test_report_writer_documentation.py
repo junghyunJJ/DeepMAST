@@ -65,6 +65,7 @@ def test_docs_describe_code_enforced_guarded_phase_order() -> None:
         assert "validate_hypothesis -> report_writer" in text
         assert "report_writer is never invoked without a fresh valid hypothesis handoff" in text
         assert "root LLM does not schedule guarded production phases" in text
+        assert "root LLM does not schedule guarded production retries" in text
 
     reference = REFERENCE.read_text(encoding="utf-8")
     assert (
