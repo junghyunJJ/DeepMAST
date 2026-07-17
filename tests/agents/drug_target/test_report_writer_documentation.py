@@ -38,3 +38,11 @@ def test_docs_describe_guarded_reporter_and_graph_builder_entrypoints() -> None:
         assert "evidence_assessor -> hypothesis_writer -> report_writer" in text
         assert "valid existing handoff" in text
         assert "--skip-evidence-assessor" in text
+        assert "evidence_assessor -> report_writer" not in text
+        assert 'WORKFLOW_ORDER = ["evidence_assessor", "report_writer"]' not in text
+        assert 'WORKFLOW_ORDER = ["evidence_assessor", "hypothesis_writer", "report_writer"]' in text
+
+    assert "guarded 2-subagent" not in reference
+    assert "Guarded 2-Subagent" not in stage_guide
+    assert "Allows only evidence_assessor/report_writer" not in reference
+    assert "Allows only evidence_assessor, hypothesis_writer, and report_writer" in reference

@@ -21,7 +21,7 @@ Reporter. It lazily imports `create_drug_target_agent`, builds it with
 
 ## 1. Overview
 
-The Drug Target Assessment Agent evaluates therapeutic potential of ligand-receptor (L-R) pairs identified from spatial transcriptomics (ST) cell-cell interaction (CCI) analysis. Production uses a **guarded 2-subagent** architecture: the evidence assessor gathers evidence, the report writer authors bounded structured sections, and middleware validates, repairs, publishes, and audits the rendered result.
+The Drug Target Assessment Agent evaluates therapeutic potential of ligand-receptor (L-R) pairs identified from spatial transcriptomics (ST) cell-cell interaction (CCI) analysis. Production uses a **guarded 3-subagent** architecture: the evidence assessor gathers evidence, the hypothesis writer creates the validated handoff, the report writer authors bounded structured sections, and middleware validates, repairs, publishes, and audits the rendered result.
 
 ### Key Design Principles
 
@@ -84,8 +84,8 @@ Legacy compatibility surface (not used by Reporter integration)
 | `validators.py` | `validate_cited_only_provenance(payload, reference_card)` — cited-only provenance check called inside `_persist_and_validate` |
 | `middleware.py` | Run cleanup, task allowlist, configured-filesystem, and report guardrail middleware. |
 | `agent.py` | Orchestrator factory: `DrugTargetConfig`, `create_drug_target_agent()`, system prompt |
-| `subagents/configs.py` | Guarded `WORKFLOW_ORDER = ["evidence_assessor", "report_writer"]` and explicit legacy factory. |
-| `subagents/prompts.py` | Evidence assessor, canonical report writer, and retained legacy hypothesis prompts. |
+| `subagents/configs.py` | Guarded `WORKFLOW_ORDER = ["evidence_assessor", "hypothesis_writer", "report_writer"]` and explicit legacy factory. |
+| `subagents/prompts.py` | Evidence assessor, hypothesis writer, canonical report writer, and retained legacy prompts. |
 | `tools/__init__.py` | Tool re-exports with lazy imports for circular-dep breaking |
 | `tools/stage_domain_tools.py` | Stage 1-3 domain tools: CELLxGENE, KEGG, Reactome, STRING, VEP, OT, GWAS, DrugBank/ChEMBL, PubMed |
 | `tools/stage2_service.py` | Stage 2 batch orchestration: `build_stage2_gene_panel()`, parquet/API routing, workspace caching |
@@ -105,6 +105,7 @@ Legacy compatibility surface (not used by Reporter integration)
 | Component | Type | Tools | Role |
 |-----------|------|-------|------|
 | `evidence_assessor` | flat dict subagent | ~20 tools | 3-stage funnel: biological context -> validation & scoring -> deep dive + inline rubric |
+| `hypothesis_writer` | flat dict subagent | evidence and hypothesis tools | Creates the validated `hypothesis_report.json` handoff. |
 | `report_writer` | flat dict subagent | bound evidence tools + `save_report_sections` | Authors the canonical `report_sections.json` payload; only allow-listed skill content and the configured run directory are available. |
 
 Production middleware boundaries:
@@ -113,14 +114,14 @@ Production middleware boundaries:
 |---|---|---|
 | `DrugReportRunCleanupMiddleware` | top-level | Removes stale guarded output before dispatch. |
 | `DrugTargetManagedFilesystemGuardMiddleware` | top-level + subagents | Blocks generic filesystem/Docker tools and rewrites all `data_dir` arguments. |
-| `DrugTargetTaskAllowlistMiddleware` | top-level | Allows only evidence_assessor/report_writer; blocks automatic `general-purpose`. |
+| `DrugTargetTaskAllowlistMiddleware` | top-level | Allows only evidence_assessor, hypothesis_writer, and report_writer; blocks automatic `general-purpose`. |
 | `DrugReportGuardrailMiddleware` | report_writer | Validates, repairs, publishes, and writes audits. |
 
 **Sentinel**: The orchestrator ends with `REPORT_PIPELINE_COMPLETE` after the guarded writer returns.
 
 ### 2.4 Guarded hybrid ownership and recovery
 
-`evidence_assessor -> report_writer -> DrugReportGuardrailMiddleware -> guarded publication`
+`evidence_assessor -> hypothesis_writer -> report_writer -> DrugReportGuardrailMiddleware -> guarded publication`
 is the complete guarded production graph. The report writer (Qwen in the local
 smoke path) owns only the canonical Section 4 hypotheses and 2–4 Section 5
 recommendations in `report_sections.json`. It never writes Markdown, report

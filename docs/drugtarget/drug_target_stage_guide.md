@@ -21,7 +21,7 @@ Reporter. It lazily imports `create_drug_target_agent`, builds it with
 
 ## 1. Overview
 
-### Architecture: Guarded 2-Subagent + 3-Stage Funnel
+### Architecture: Guarded 3-Subagent + 3-Stage Funnel
 
 The Drug Target Assessment Agent evaluates therapeutic potential of ligand-receptor (L-R) pairs
 identified from spatial transcriptomics cell-cell interaction (CCI) analysis.
@@ -614,8 +614,8 @@ targets.json (optional) ──────────────────�
 | `src/agents/drug_target/validators.py` | Cited-only validation | `validate_cited_only_provenance()` |
 | `src/agents/drug_target/middleware.py` | Guarded production middleware | Cleanup, task allowlist, filesystem, and report guardrails (plus legacy retry) |
 | `src/agents/drug_target/agent.py` | Orchestrator | `DrugTargetConfig`, `create_drug_target_agent()`, `ORCHESTRATOR_SYSTEM_PROMPT` |
-| `src/agents/drug_target/subagents/prompts.py` | Subagent prompts | `EVIDENCE_ASSESSOR_PROMPT`, `REPORT_WRITER_PROMPT`, legacy hypothesis prompt |
-| `src/agents/drug_target/subagents/configs.py` | Subagent tool configs | Guarded `get_subagents()`, explicit `get_legacy_subagents()`, `WORKFLOW_ORDER = ["evidence_assessor", "report_writer"]` |
+| `src/agents/drug_target/subagents/prompts.py` | Subagent prompts | `EVIDENCE_ASSESSOR_PROMPT`, `HYPOTHESIS_WRITER_PROMPT`, `REPORT_WRITER_PROMPT`, legacy prompts |
+| `src/agents/drug_target/subagents/configs.py` | Subagent tool configs | Guarded `get_subagents()`, explicit `get_legacy_subagents()`, `WORKFLOW_ORDER = ["evidence_assessor", "hypothesis_writer", "report_writer"]` |
 | `src/agents/drug_target/tools/__init__.py` | Tool registry | Tool re-exports with lazy imports |
 | `src/agents/drug_target/tools/stage_domain_tools.py` | Domain tools | CELLxGENE, KEGG, Reactome, STRING, VEP, OpenTargets, GWAS, DrugBank/ChEMBL, PubMed |
 | `src/agents/drug_target/tools/census_lr_validation_tools.py` | Census cross-validation | `run_compare_census_lr_pair()`, fuzzy matching logic |
