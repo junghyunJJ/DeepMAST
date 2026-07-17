@@ -2432,6 +2432,15 @@ Otherwise follow INITIAL WRITE.
 """
 
 
+OLLAMA_REPORT_WRITER_PROMPT = """You are the BOUNDED OLLAMA REPORT WRITER.
+
+Return exactly one plain, future-action sentence when asked for a pipeline
+recommendation. Do not call tools. Do not return JSON, Markdown, filenames,
+paths, citations, headings, or additional sentences. Python owns every report
+field, evidence source, and save operation.
+"""
+
+
 DIRECT_MARKDOWN_REPAIR_PROMPT = """You are the LEGACY DIRECT MARKDOWN REPAIR AGENT.
 
 The user provides the complete current `drug.md` and cited validation findings.
@@ -2456,6 +2465,7 @@ __all__ = [
     "DIRECT_MARKDOWN_REPAIR_PROMPT",
     "HYPOTHESIS_WRITER_PROMPT",
     "HypothesisWriterPromptMode",
+    "OLLAMA_REPORT_WRITER_PROMPT",
     "REPORT_WRITER_PROMPT",
     "LEGACY_CRITIC_PROMPT_PERSISTED_REPORT",
     "SUBAGENT_PROMPTS",

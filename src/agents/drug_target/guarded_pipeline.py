@@ -15,7 +15,13 @@ from langchain_core.runnables import Runnable, RunnableConfig
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
 
-from src.agents.drug_target.middleware import clear_guarded_report_run_artifacts
+from src.agents.drug_target.hybrid_report_sections import (
+    build_ollama_report_recommendations,
+)
+from src.agents.drug_target.middleware import (
+    DrugReportGuardrailMiddleware,
+    clear_guarded_report_run_artifacts,
+)
 from src.agents.drug_target.ollama_hypothesis_cards import (
     build_ollama_card_specs,
     build_ollama_hypothesis_report,
@@ -25,6 +31,9 @@ from src.agents.drug_target.tools import check_stage1_completion
 from src.agents.drug_target.tools.hypothesis_schema import (
     save_hypothesis_report,
     validate_hypothesis_report_quality,
+)
+from src.agents.drug_target.production_report_tools import (
+    production_save_report_sections_tool,
 )
 
 
@@ -67,9 +76,12 @@ def _format_errors(errors: object) -> str:
     if not isinstance(errors, list):
         return "unknown validation error"
     text = "; ".join(
-        f"{item.get('code')}: {item.get('message')}"
+        (
+            f"{item.get('code')}: {item.get('message')}"
+            if isinstance(item, dict)
+            else str(item)
+        )
         for item in errors
-        if isinstance(item, dict)
     )
     return text or "unknown validation error"
 
@@ -92,6 +104,22 @@ def _ollama_card_instruction(spec: dict[str, object], *, repair: bool = False) -
     )
 
 
+def _ollama_report_instruction(label: str, *, repair: bool = False) -> str:
+    """Keep native Ollama reporting to one bounded recommendation sentence."""
+    correction = (
+        " Your previous response was invalid; correct it now."
+        if repair
+        else ""
+    )
+    return (
+        "Return exactly one plain, future-action sentence for a pipeline recommendation.\n"
+        f"Recommendation: {label}\n"
+        "Do not call tools. Do not return JSON, Markdown, filenames, paths, citations, "
+        "headings, or additional sentences."
+        f"{correction}"
+    )
+
+
 def build_guarded_pipeline(
     subagent_specs: Sequence[dict[str, Any]],
     *,
@@ -103,10 +131,28 @@ def build_guarded_pipeline(
 ) -> Runnable:
     """Compile existing role specs behind code-enforced phase edges."""
     run_dir = Path(data_dir).expanduser().resolve()
-    roles = {
-        spec["name"]: _compile_role(spec, default_model=default_model)
-        for spec in subagent_specs
-    }
+    ollama_report_guardrail: DrugReportGuardrailMiddleware | None = None
+    roles: dict[str, Runnable] = {}
+    for spec in subagent_specs:
+        compiled_spec = spec
+        if provider == "ollama" and spec["name"] == "report_writer":
+            middleware = list(spec.get("middleware", ()))
+            guardrails = [
+                item
+                for item in middleware
+                if isinstance(item, DrugReportGuardrailMiddleware)
+            ]
+            if guardrails:
+                ollama_report_guardrail = guardrails[-1]
+                compiled_spec = {
+                    **spec,
+                    "middleware": [
+                        item
+                        for item in middleware
+                        if not isinstance(item, DrugReportGuardrailMiddleware)
+                    ],
+                }
+        roles[spec["name"]] = _compile_role(compiled_spec, default_model=default_model)
     required = {"evidence_assessor", "hypothesis_writer", "report_writer"}
     if set(roles) != required:
         raise ValueError(f"guarded pipeline requires exactly {sorted(required)}")
@@ -242,6 +288,62 @@ def build_guarded_pipeline(
     async def run_report(
         _state: GuardedPipelineState, config: RunnableConfig
     ) -> dict[str, Any]:
+        if provider == "ollama":
+            texts: dict[str, str] = {}
+            last_result: dict[str, Any] = {"messages": []}
+            for index, label in enumerate(("primary", "secondary")):
+                result = await roles["report_writer"].ainvoke(
+                    {"messages": [{"role": "user", "content": _ollama_report_instruction(label)}]},
+                    config=config,
+                )
+                last_result = result
+                text = _ai_message_text(result)
+                candidate_payload = build_ollama_report_recommendations(
+                    run_dir,
+                    {**texts, label: text},
+                )
+                recommendations = candidate_payload.get("pipeline_recommendations", [])
+                accepted = (
+                    isinstance(recommendations, list)
+                    and index < len(recommendations)
+                    and isinstance(recommendations[index], dict)
+                    and recommendations[index].get("text") == text.strip()
+                )
+                if not accepted:
+                    result = await roles["report_writer"].ainvoke(
+                        {
+                            "messages": [
+                                {
+                                    "role": "user",
+                                    "content": _ollama_report_instruction(label, repair=True),
+                                }
+                            ]
+                        },
+                        config=config,
+                    )
+                    last_result = result
+                    text = _ai_message_text(result)
+                texts[label] = text
+
+            payload = build_ollama_report_recommendations(run_dir, texts)
+            raw_receipt = await asyncio.to_thread(
+                production_save_report_sections_tool(run_dir, disease).invoke,
+                {"payload": payload},
+            )
+            try:
+                receipt = json.loads(raw_receipt)
+            except (TypeError, json.JSONDecodeError) as exc:
+                raise RuntimeError(
+                    "Drug Target report sections save returned an invalid receipt"
+                ) from exc
+            if not isinstance(receipt, dict) or receipt.get("saved") is not True:
+                raise RuntimeError(
+                    "Drug Target report sections save failed: "
+                    + _format_errors(receipt.get("errors") if isinstance(receipt, dict) else None)
+                )
+            if ollama_report_guardrail is not None:
+                await ollama_report_guardrail.aafter_agent({}, None)
+            return {"messages": _last_ai_message(last_result)}
         return await invoke_role(
             "report_writer",
             f"Read the validated handoff and render the guarded report. Data dir: {run_dir}.",

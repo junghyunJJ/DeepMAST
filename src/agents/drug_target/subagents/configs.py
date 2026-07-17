@@ -26,6 +26,7 @@ from src.agents.deep_interpreter.middleware.write_file_guard import (
 from src.agents.drug_target.subagents.prompts import (
     HypothesisWriterPromptMode,
     OLLAMA_HYPOTHESIS_WRITER_PROMPT,
+    OLLAMA_REPORT_WRITER_PROMPT,
     REPORT_WRITER_PROMPT,
     SUBAGENT_PROMPTS,
     render_hypothesis_writer_prompt,
@@ -748,7 +749,7 @@ def get_subagents(
         name = subagent["name"]
         allowed_names = (
             ()
-            if name == "hypothesis_writer" and provider == "ollama"
+            if name in {"hypothesis_writer", "report_writer"} and provider == "ollama"
             else tuple(skill_names.get(name, ()))
         )
         tools = [tool for tool in subagent["tools"] if tool is not None]
@@ -781,12 +782,15 @@ def get_subagents(
                     if getattr(tool, "name", None) != "read_skill_file" or allowed_names
                 ]
         else:
-            tools = [
-                production_load_validated_hypothesis_report_tool(safe_data_dir),
-                production_save_report_sections_tool(safe_data_dir, safe_disease),
-            ]
-            if allowed_names:
-                tools.append(production_skill_reader_tool(root, allowed_names))
+            if provider == "ollama":
+                tools = []
+            else:
+                tools = [
+                    production_load_validated_hypothesis_report_tool(safe_data_dir),
+                    production_save_report_sections_tool(safe_data_dir, safe_disease),
+                ]
+                if allowed_names:
+                    tools.append(production_skill_reader_tool(root, allowed_names))
 
         if not enable_census and name == "evidence_assessor":
             census_names = {
@@ -811,7 +815,11 @@ def get_subagents(
                 else render_hypothesis_writer_prompt(hypothesis_writer_prompt_mode)
             )
         elif name == "report_writer":
-            prompt = REPORT_WRITER_PROMPT
+            prompt = (
+                OLLAMA_REPORT_WRITER_PROMPT
+                if provider == "ollama"
+                else REPORT_WRITER_PROMPT
+            )
         available = ", ".join(
             getattr(tool, "name", getattr(tool, "__name__", "tool")) for tool in tools
         ) or "no tools"
@@ -840,14 +848,15 @@ def get_subagents(
                 )
                 middleware.append(HypothesisReportGuardrailMiddleware(safe_data_dir))
         elif name == "report_writer":
-            middleware.append(
-                HypothesisRetryLoopMiddleware(
-                    stop_after_first_save=True,
-                    stop_after_first_successful_save=True,
-                    terminal_save_tool_names=("save_report_sections",),
-                    max_hypothesis_save_attempts=2,
+            if provider != "ollama":
+                middleware.append(
+                    HypothesisRetryLoopMiddleware(
+                        stop_after_first_save=True,
+                        stop_after_first_successful_save=True,
+                        terminal_save_tool_names=("save_report_sections",),
+                        max_hypothesis_save_attempts=2,
+                    )
                 )
-            )
             guardrail_kwargs: dict[str, Any] = {
                 "data_dir": safe_data_dir,
                 "provider": provider,

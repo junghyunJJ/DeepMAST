@@ -377,6 +377,27 @@ def test_ollama_generates_one_bounded_card_per_spec(
         "validate_hypothesis_report_quality",
         lambda *_args, **_kwargs: {"valid": True, "errors": []},
     )
+    payload = {
+        "schema_version": "hybrid_report_sections/v1",
+        "pipeline_recommendations": [
+            {
+                "text": "Prioritize ERBB2 validation before advancing target selection.",
+                "supporting_sources": ["evidence/ot_ERBB2.json"],
+            },
+            {
+                "text": "Evaluate ERBB3 evidence before planning follow-up studies.",
+                "supporting_sources": ["evidence/ot_ERBB3.json"],
+            },
+        ],
+    }
+    monkeypatch.setattr(
+        guarded_pipeline, "build_ollama_report_recommendations", lambda *_args: payload
+    )
+    monkeypatch.setattr(
+        guarded_pipeline,
+        "production_save_report_sections_tool",
+        lambda *_args: type("_ReportSaveTool", (), {"invoke": staticmethod(lambda _args: '{"saved": true}')})(),
+    )
     pipeline = guarded_pipeline.build_guarded_pipeline(
         _specs(),
         data_dir=str(tmp_path),
@@ -395,10 +416,15 @@ def test_ollama_generates_one_bounded_card_per_spec(
         "hypothesis_writer",
         "hypothesis_writer",
         "report_writer",
+        "report_writer",
+        "report_writer",
+        "report_writer",
     ]
-    assert [instruction.split("Card ID: ")[1].split("\n", 1)[0] for instruction in instructions] == [
-        spec["id"] for spec in specs
-    ]
+    assert [
+        instruction.split("Card ID: ")[1].split("\n", 1)[0]
+        for instruction in instructions
+        if "Card ID: " in instruction
+    ] == [spec["id"] for spec in specs]
     assert saved_reports == [report]
 
 
@@ -482,6 +508,27 @@ def test_rejected_ollama_card_retries_once_then_uses_fallback(
         "validate_hypothesis_report_quality",
         lambda *_args, **_kwargs: {"valid": True, "errors": []},
     )
+    payload = {
+        "schema_version": "hybrid_report_sections/v1",
+        "pipeline_recommendations": [
+            {
+                "text": "Prioritize ERBB2 validation before advancing target selection.",
+                "supporting_sources": ["evidence/ot_ERBB2.json"],
+            },
+            {
+                "text": "Evaluate ERBB3 evidence before planning follow-up studies.",
+                "supporting_sources": ["evidence/ot_ERBB3.json"],
+            },
+        ],
+    }
+    monkeypatch.setattr(
+        guarded_pipeline, "build_ollama_report_recommendations", lambda *_args: payload
+    )
+    monkeypatch.setattr(
+        guarded_pipeline,
+        "production_save_report_sections_tool",
+        lambda *_args: type("_ReportSaveTool", (), {"invoke": staticmethod(lambda _args: '{"saved": true}')})(),
+    )
     pipeline = guarded_pipeline.build_guarded_pipeline(
         _specs(),
         data_dir=str(tmp_path),
@@ -495,3 +542,179 @@ def test_rejected_ollama_card_retries_once_then_uses_fallback(
 
     assert calls.count("hypothesis_writer") == 5
     assert saved_card_texts["mechanism"] == specs[0]["fallback_hypothesis"]
+
+
+def test_ollama_report_route_saves_bounded_payload(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[str] = []
+    instructions: list[str] = []
+    saved_payloads: list[dict[str, object]] = []
+    responses = iter(
+        [
+            "Prioritize ERBB2 validation before advancing target selection.",
+            "Evaluate ERBB3 evidence before planning follow-up studies.",
+        ]
+    )
+    payload = {
+        "schema_version": "hybrid_report_sections/v1",
+        "pipeline_recommendations": [
+            {
+                "text": "Prioritize ERBB2 validation before advancing target selection.",
+                "supporting_sources": ["evidence/ot_ERBB2.json"],
+            },
+            {
+                "text": "Evaluate ERBB3 evidence before planning follow-up studies.",
+                "supporting_sources": ["evidence/ot_ERBB3.json"],
+            },
+        ],
+    }
+
+    class _ReportRole(_RoleAgent):
+        async def ainvoke(self, _input: dict[str, Any], config: Any = None):
+            _ = config
+            self.calls.append(self.name)
+            if self.name == "report_writer":
+                instructions.append(str(_input["messages"][0]["content"]))
+                return {"messages": [AIMessage(content=next(responses))]}
+            return {"messages": [AIMessage(content="done")]}
+
+    class _SaveTool:
+        @staticmethod
+        def invoke(arguments: dict[str, object]) -> str:
+            saved_payloads.append(arguments["payload"])
+            return json.dumps({"saved": True})
+
+    _install_fakes(monkeypatch, calls)
+    monkeypatch.setattr(
+        guarded_pipeline,
+        "create_agent",
+        lambda *, name, **_kwargs: _ReportRole(name, calls),
+    )
+    monkeypatch.setattr(guarded_pipeline, "build_ollama_card_specs", lambda _data_dir: [])
+    monkeypatch.setattr(
+        guarded_pipeline,
+        "build_ollama_hypothesis_report",
+        lambda _data_dir, _texts: {"hypotheses": []},
+    )
+    monkeypatch.setattr(
+        guarded_pipeline,
+        "save_hypothesis_report",
+        type("_HypothesisSaveTool", (), {"invoke": staticmethod(lambda _args: '{"saved": true}')})(),
+    )
+    monkeypatch.setattr(
+        guarded_pipeline,
+        "build_ollama_report_recommendations",
+        lambda _data_dir, _texts: payload,
+    )
+    monkeypatch.setattr(
+        guarded_pipeline,
+        "production_save_report_sections_tool",
+        lambda _data_dir, _disease: _SaveTool(),
+    )
+
+    pipeline = guarded_pipeline.build_guarded_pipeline(
+        _specs(),
+        data_dir=str(tmp_path),
+        default_model=DEFAULT_MODEL,
+        disease="breast cancer",
+        skip_evidence_assessor=True,
+        provider="ollama",
+    )
+
+    asyncio.run(pipeline.ainvoke({"messages": []}))
+
+    assert calls == ["prepare", "report_writer", "report_writer"]
+    assert [instruction.split("Recommendation: ")[1].split("\n", 1)[0] for instruction in instructions] == [
+        "primary",
+        "secondary",
+    ]
+    assert saved_payloads == [payload]
+
+
+def test_ollama_report_sentence_retries_once(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[str] = []
+    responses = iter(
+        [
+            "# invalid",
+            "Prioritize ERBB2 validation before advancing target selection.",
+            "Evaluate ERBB3 evidence before planning follow-up studies.",
+        ]
+    )
+    saved_payloads: list[dict[str, object]] = []
+
+    class _ReportRole(_RoleAgent):
+        async def ainvoke(self, _input: dict[str, Any], config: Any = None):
+            _ = config, _input
+            self.calls.append(self.name)
+            if self.name == "report_writer":
+                return {"messages": [AIMessage(content=next(responses))]}
+            return {"messages": [AIMessage(content="done")]}
+
+    class _SaveTool:
+        @staticmethod
+        def invoke(arguments: dict[str, object]) -> str:
+            saved_payloads.append(arguments["payload"])
+            return json.dumps({"saved": True})
+
+    def build_payload(_data_dir: str, texts: dict[str, str]) -> dict[str, object]:
+        primary = texts.get("primary", "")
+        primary_text = (
+            primary.strip()
+            if primary.startswith("Prioritize")
+            else "Prioritize ERBB2 validation before advancing target selection."
+        )
+        return {
+            "schema_version": "hybrid_report_sections/v1",
+            "pipeline_recommendations": [
+                {"text": primary_text, "supporting_sources": ["evidence/ot_ERBB2.json"]},
+                {
+                    "text": texts.get(
+                        "secondary",
+                        "Evaluate ERBB3 evidence before planning follow-up studies.",
+                    ).strip()
+                    or "Evaluate ERBB3 evidence before planning follow-up studies.",
+                    "supporting_sources": ["evidence/ot_ERBB3.json"],
+                },
+            ],
+        }
+
+    _install_fakes(monkeypatch, calls)
+    monkeypatch.setattr(
+        guarded_pipeline,
+        "create_agent",
+        lambda *, name, **_kwargs: _ReportRole(name, calls),
+    )
+    monkeypatch.setattr(guarded_pipeline, "build_ollama_card_specs", lambda _data_dir: [])
+    monkeypatch.setattr(
+        guarded_pipeline,
+        "build_ollama_hypothesis_report",
+        lambda _data_dir, _texts: {"hypotheses": []},
+    )
+    monkeypatch.setattr(
+        guarded_pipeline,
+        "save_hypothesis_report",
+        type("_HypothesisSaveTool", (), {"invoke": staticmethod(lambda _args: '{"saved": true}')})(),
+    )
+    monkeypatch.setattr(guarded_pipeline, "build_ollama_report_recommendations", build_payload)
+    monkeypatch.setattr(
+        guarded_pipeline,
+        "production_save_report_sections_tool",
+        lambda _data_dir, _disease: _SaveTool(),
+    )
+
+    pipeline = guarded_pipeline.build_guarded_pipeline(
+        _specs(),
+        data_dir=str(tmp_path),
+        default_model=DEFAULT_MODEL,
+        disease="breast cancer",
+        skip_evidence_assessor=True,
+        provider="ollama",
+    )
+
+    asyncio.run(pipeline.ainvoke({"messages": []}))
+
+    assert calls == ["prepare", "report_writer", "report_writer", "report_writer"]
+    assert len(saved_payloads) == 1

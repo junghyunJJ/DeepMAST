@@ -19,6 +19,7 @@ from src.agents.drug_target.middleware import (
     DrugReportRunCleanupMiddleware,
     DrugTargetManagedFilesystemGuardMiddleware,
     DrugTargetTaskAllowlistMiddleware,
+    HypothesisRetryLoopMiddleware,
 )
 
 
@@ -112,6 +113,30 @@ def test_guarded_factory_passes_resume_mode_to_deterministic_pipeline(
     )
 
     assert captured["skip_evidence_assessor"] is True
+
+
+def test_ollama_report_writer_is_tool_free_and_defers_terminal_save(tmp_path) -> None:
+    from src.agents.drug_target.middleware import DrugReportGuardrailMiddleware
+    from src.agents.drug_target.subagents.configs import get_subagents
+
+    writer = next(
+        subagent
+        for subagent in get_subagents(
+            data_dir=str(tmp_path), disease="breast cancer", provider="ollama"
+        )
+        if subagent["name"] == "report_writer"
+    )
+
+    assert writer["tools"] == []
+    assert "exactly one plain, future-action sentence" in writer["system_prompt"]
+    assert any(
+        isinstance(middleware, DrugReportGuardrailMiddleware)
+        for middleware in writer["middleware"]
+    )
+    assert not any(
+        isinstance(middleware, HypothesisRetryLoopMiddleware)
+        for middleware in writer["middleware"]
+    )
 
 
 def test_legacy_orchestrator_keeps_compatibility_surface(tmp_path, monkeypatch):
