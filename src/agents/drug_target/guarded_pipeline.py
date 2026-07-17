@@ -23,6 +23,7 @@ from src.agents.drug_target.middleware import (
     clear_guarded_report_run_artifacts,
 )
 from src.agents.drug_target.ollama_hypothesis_cards import (
+    OllamaCardSpec,
     build_ollama_card_specs,
     build_ollama_hypothesis_report,
     is_ollama_card_text_safe,
@@ -86,7 +87,7 @@ def _format_errors(errors: object) -> str:
     return text or "unknown validation error"
 
 
-def _ollama_card_instruction(spec: dict[str, object], *, repair: bool = False) -> str:
+def _ollama_card_instruction(spec: OllamaCardSpec, *, repair: bool = False) -> str:
     """Request only bounded prose; the coordinator owns every report field."""
     prefix = (
         "Rewrite the rejected card as" if repair else "Return"
@@ -95,12 +96,13 @@ def _ollama_card_instruction(spec: dict[str, object], *, repair: bool = False) -
         f"{prefix} exactly one plain sentence for this bounded hypothesis card.\n"
         f"Card ID: {spec['id']}\n"
         f"Category: {spec['category']}\n"
-        f"Genes: {', '.join(str(gene) for gene in spec['genes'])}\n"
-        f"Evidence references: {', '.join(str(ref) for ref in spec['evidence_references'])}\n"
+        f"Genes: {', '.join(spec['genes'])}\n"
+        f"Evidence references: {', '.join(spec['evidence_references'])}\n"
         f"Cell anchor: {spec['cell_anchor']}\n"
         "Do not call tools. Do not return JSON, Markdown, filenames, scores, "
         "drug claims, combination claims, synergy claims, direct-interaction claims, "
-        "or genes outside the listed Genes."
+        "or genes outside the listed Genes. Use exactly: '<listed Genes> are "
+        "evidence-supported candidates for validation in <cell anchor> context.'"
     )
 
 
@@ -202,9 +204,7 @@ def build_guarded_pipeline(
             specs = build_ollama_card_specs(run_dir)
             known_genes: list[str] = []
             for spec in specs:
-                symbols = spec.get("known_genes", spec["genes"])
-                if isinstance(symbols, (list, tuple, set)):
-                    known_genes.extend(str(gene) for gene in symbols)
+                known_genes.extend(spec["known_genes"])
             card_texts: dict[str, str] = {}
             last_result: dict[str, Any] = {"messages": []}
             for spec in specs:
@@ -232,14 +232,14 @@ def build_guarded_pipeline(
                     )
                     last_result = result
                     text = _ai_message_text(result)
-                card_texts[str(spec["id"])] = (
+                card_texts[spec["id"]] = (
                     text
                     if is_ollama_card_text_safe(
                         text,
                         allowed_genes=spec["genes"],
                         known_genes=known_genes,
                     )
-                    else str(spec["fallback_hypothesis"])
+                    else spec["fallback_hypothesis"]
                 )
             report = build_ollama_hypothesis_report(run_dir, card_texts)
             raw_receipt = await asyncio.to_thread(

@@ -333,8 +333,20 @@ def test_ollama_generates_one_bounded_card_per_spec(
             _ = config
             self.calls.append(self.name)
             if self.name == "hypothesis_writer":
-                instructions.append(str(_input["messages"][0]["content"]))
-                return {"messages": [AIMessage(content="Candidate warrants validation.")]}
+                instruction = str(_input["messages"][0]["content"])
+                instructions.append(instruction)
+                genes = instruction.split("Genes: ")[1].split("\n", 1)[0]
+                anchor = instruction.split("Cell anchor: ")[1].split("\n", 1)[0]
+                return {
+                    "messages": [
+                        AIMessage(
+                            content=(
+                                f"{genes} are evidence-supported candidates for "
+                                f"validation in {anchor} context."
+                            )
+                        )
+                    ]
+                }
             return {"messages": [AIMessage(content="done")]}
 
     monkeypatch.setattr(
@@ -454,9 +466,9 @@ def test_rejected_ollama_card_retries_once_then_uses_fallback(
         [
             "SDC1 warrants validation.",
             "SDC1 warrants validation.",
-            "Candidate warrants validation.",
-            "Candidate warrants validation.",
-            "Candidate warrants validation.",
+            "EPHB4 are evidence-supported candidates for validation in malignant cell context.",
+            "ERBB2 are evidence-supported candidates for validation in malignant cell context.",
+            "ERBB3 are evidence-supported candidates for validation in malignant cell context.",
         ]
     )
 

@@ -42,6 +42,10 @@ def test_docs_describe_ollama_gene_card_contract() -> None:
         assert "stage3_<GENE>.json" in text
         assert "interest-cell-intrinsic Stage 1" in text
 
+    reference = REFERENCE.read_text(encoding="utf-8")
+    assert "Qwen-authored canonical hypotheses" not in reference
+    assert "Python owns the canonical Section" in reference
+
 
 def test_docs_describe_bounded_ollama_report_sections() -> None:
     for path in (REFERENCE, STAGE_GUIDE):

@@ -7,6 +7,7 @@ import pytest
 from src.agents.drug_target.ollama_hypothesis_cards import (
     build_ollama_card_specs,
     build_ollama_hypothesis_report,
+    is_ollama_card_text_safe,
 )
 from src.agents.drug_target.tools.hypothesis_schema import (
     canonicalize_hypothesis_report,
@@ -72,6 +73,36 @@ def test_skeleton_replaces_unsafe_card_text_with_its_fallback(
     assert report["hypotheses"][0]["core_claim"] == (
         "ERBB3 and EFNB2 are evidence-supported candidates for validation "
         "in malignant cell context."
+    )
+
+
+def test_skeleton_replaces_causal_card_text_with_its_fallback(
+    bc_data_dir: Path,
+) -> None:
+    causal_claim = "ERBB3 drives breast cancer invasion."
+
+    assert not is_ollama_card_text_safe(
+        causal_claim,
+        allowed_genes=["ERBB3", "EFNB2"],
+        known_genes=["ERBB3", "EFNB2", "EPHB4"],
+    )
+    report = build_ollama_hypothesis_report(
+        bc_data_dir,
+        {"mechanism": causal_claim},
+    )
+
+    assert report["hypotheses"][0]["core_claim"] == (
+        "ERBB3 and EFNB2 are evidence-supported candidates for validation "
+        "in malignant cell context."
+    )
+
+
+def test_card_text_accepts_only_conservative_candidate_form() -> None:
+    assert is_ollama_card_text_safe(
+        "ERBB3 and EFNB2 are evidence-supported candidates for validation "
+        "in malignant cell context.",
+        allowed_genes=["ERBB3", "EFNB2"],
+        known_genes=["ERBB3", "EFNB2", "EPHB4"],
     )
 
 

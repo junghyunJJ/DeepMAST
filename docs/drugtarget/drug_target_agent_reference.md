@@ -46,7 +46,7 @@ The Drug Target Assessment Agent evaluates therapeutic potential of ligand-recep
 | **Input** | `lr_candidates.json` | Top-30 L-R pairs from CCI analysis |
 | **Input** | `targets.json` (optional) | User-selected interest cell types |
 | **Output** | `evidence/*.json` | Per-stage, per-pair/gene evidence files |
-| **Output** | `report_sections.json` | Qwen-authored canonical hypotheses and recommendations |
+| **Output** | `report_sections.json` | Validated canonical hypotheses and recommendations |
 | **Output** | `target_assessment.json`, `report_data.json`, `drug.md`, `drug_report_render.json` | Renderer-owned pre-publication artifacts |
 | **Output** | Part 4 JSON/Markdown and `drug_report.html` | Guarded-publication artifacts after final validation |
 
@@ -131,10 +131,10 @@ diagnostic entrypoints retain their separately documented boundaries.
 The guarded coordinator enforces `prepare -> validate_evidence ->
 hypothesis_writer -> validate_hypothesis -> report_writer -> final
 audit/publication`; evidence runs insert `evidence_assessor` before
-`validate_evidence`. The report writer (Qwen in the local smoke path) owns
-only the canonical Section 4 hypotheses and 2–4 Section 5 recommendations in
-`report_sections.json`. It never writes Markdown, report data, or target
-assessment artifacts directly.
+`validate_evidence`. For native Ollama/Qwen, Python owns the canonical Section
+4 hypotheses and `report_sections.json`; Qwen supplies only bounded gene-card
+prose and two Section 5 recommendation sentences. It never writes Markdown,
+report data, or target assessment artifacts directly.
 
 | Output | Owner | When written |
 |---|---|---|

@@ -6,7 +6,7 @@ import json
 import re
 from collections.abc import Iterable, Mapping
 from pathlib import Path
-from typing import Any
+from typing import Any, TypedDict
 
 from src.agents.drug_target.tools.evidence_loader import (
     _celltype_contract_labels,
@@ -22,11 +22,19 @@ CANONICAL_CATEGORIES = (
 )
 _CARD_IDS = ("mechanism", "therapy", "cross_target", "novel_pathway")
 _STAGE1_NAME_RE = re.compile(r"^stage1_([A-Za-z0-9-]+)--([A-Za-z0-9-]+)\.json$")
-_UNSAFE_CARD_TEXT_RE = re.compile(
-    r"synerg|combination therapy|direct interaction|inhibits",
-    re.IGNORECASE,
-)
 _FILENAME_RE = re.compile(r"\b[A-Za-z0-9_.-]+\.json\b", re.IGNORECASE)
+
+
+class OllamaCardSpec(TypedDict):
+    """The deterministic inputs and fallback for one bounded Ollama card."""
+
+    id: str
+    category: str
+    genes: list[str]
+    evidence_references: list[str]
+    cell_anchor: str
+    fallback_hypothesis: str
+    known_genes: list[str]
 
 
 def _read_assessment(evidence_dir: Path) -> dict[str, Any]:
@@ -97,9 +105,11 @@ def is_ollama_card_text_safe(
     """Return whether bounded model prose can enter a deterministic record."""
     if not text or len(text) >= 500 or "/" in text or "\\" in text:
         return False
-    if _UNSAFE_CARD_TEXT_RE.search(text) or _FILENAME_RE.search(text):
+    if _FILENAME_RE.search(text):
         return False
-    allowed = {gene.upper() for gene in allowed_genes}
+    allowed = tuple(gene.upper() for gene in allowed_genes)
+    if not allowed:
+        return False
     for gene in known_genes:
         if gene.upper() not in allowed and re.search(
             rf"(?<![A-Za-z0-9]){re.escape(gene)}(?![A-Za-z0-9])",
@@ -107,7 +117,14 @@ def is_ollama_card_text_safe(
             re.IGNORECASE,
         ):
             return False
-    return True
+    return bool(
+        re.fullmatch(
+            rf"{re.escape(' and '.join(allowed))} are evidence-supported candidates "
+            r"for validation in [A-Za-z][A-Za-z -]* context\.",
+            text.strip(),
+            re.IGNORECASE,
+        )
+    )
 
 
 def _fallback_hypothesis(genes: list[str], cell_anchor: str) -> str:
@@ -117,7 +134,7 @@ def _fallback_hypothesis(genes: list[str], cell_anchor: str) -> str:
     )
 
 
-def build_ollama_card_specs(data_dir: str | Path) -> list[dict[str, object]]:
+def build_ollama_card_specs(data_dir: str | Path) -> list[OllamaCardSpec]:
     """Build four deterministic, evidence-grounded input cards for Ollama."""
     evidence_dir = Path(data_dir).expanduser().resolve() / "evidence"
     genes = _featured_genes(evidence_dir)
@@ -132,7 +149,7 @@ def build_ollama_card_specs(data_dir: str | Path) -> list[dict[str, object]]:
     for index, gene in enumerate(genes):
         grouped[index % len(grouped)].append(gene)
 
-    specs: list[dict[str, object]] = []
+    specs: list[OllamaCardSpec] = []
     for card_id, category, card_genes in zip(_CARD_IDS, CANONICAL_CATEGORIES, grouped):
         references = [
             filename
@@ -172,8 +189,8 @@ def build_ollama_hypothesis_report(
     hypotheses: list[dict[str, object]] = []
 
     for rank, spec in enumerate(specs, start=1):
-        genes = list(spec["genes"])
-        card_id = str(spec["id"])
+        genes = spec["genes"]
+        card_id = spec["id"]
         candidate = card_texts.get(card_id, "")
         core_claim = (
             candidate
@@ -183,9 +200,9 @@ def build_ollama_hypothesis_report(
                 allowed_genes=genes,
                 known_genes=known_genes,
             )
-            else str(spec["fallback_hypothesis"])
+            else spec["fallback_hypothesis"]
         )
-        cell_anchor = str(spec["cell_anchor"])
+        cell_anchor = spec["cell_anchor"]
         hypotheses.append(
             {
                 "rank": rank,
@@ -196,7 +213,7 @@ def build_ollama_hypothesis_report(
                 "category": spec["category"],
                 "gap_type": "none",
                 "core_claim": core_claim,
-                "evidence_references": list(spec["evidence_references"]),
+                "evidence_references": spec["evidence_references"],
                 "evidence_reference_details": [
                     {"filename": filename, "usage": "primary"}
                     for filename in spec["evidence_references"]
