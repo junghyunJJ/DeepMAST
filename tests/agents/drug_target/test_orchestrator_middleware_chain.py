@@ -87,6 +87,7 @@ def test_guarded_factory_builds_deterministic_role_pipeline(tmp_path, monkeypatc
     ]
     assert captured["data_dir"] == str(tmp_path.resolve())
     assert captured["skip_evidence_assessor"] is False
+    assert captured["provider"] == "ollama"
     assert create_deep_calls == []
 
 

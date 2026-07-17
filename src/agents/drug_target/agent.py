@@ -580,6 +580,7 @@ def create_drug_target_agent(
             default_model=llm,
             disease=config.disease.strip(),
             skip_evidence_assessor=resume_mode,
+            provider=config.provider,
         )
         return pipeline, backend
     elif workflow_mode == "legacy_hypothesis":
