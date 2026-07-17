@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from src.agents.drug_target.tools import (
     save_evidence,
     save_hypothesis_report,
@@ -10,8 +12,26 @@ from src.agents.drug_target.tools import (
 )
 from src.agents.drug_target.tools.hypothesis_schema import (
     canonicalize_hypothesis_report,
+    save_hypothesis_report_from_text,
     validate_canonical_hypothesis_report,
 )
+
+
+def test_save_hypothesis_report_from_text_accepts_fenced_json(tmp_path: Path) -> None:
+    text = '```json\n{"hypotheses": []}\n```'
+
+    receipt = save_hypothesis_report_from_text(tmp_path, text)
+
+    assert receipt["saved"] is True
+    saved = json.loads(
+        (tmp_path / "evidence/hypothesis_report.json").read_text(encoding="utf-8")
+    )
+    assert saved["hypotheses"] == []
+
+
+def test_save_hypothesis_report_from_text_rejects_non_json(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="JSON"):
+        save_hypothesis_report_from_text(tmp_path, "No structured handoff was produced.")
 
 
 def _write_hypothesis_evidence(tmp_path: Path) -> Path:
