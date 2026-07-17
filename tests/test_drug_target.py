@@ -5880,22 +5880,19 @@ class TestCensusDiseaseTool:
         assert "query_chembl_target_profile" in EVIDENCE_ASSESSOR_PROMPT
 
     def test_report_writer_prompt_contains_skill_read(self):
-        """Phase H1: REPORT_WRITER_PROMPT must hardcode read_skill_file for drug-target-reporting.
-        Removing the hardcoded load makes report_writer depend on SkillActivator's conditional
-        classification, which previously misclassified report_writer's task as NO_SKILLS_NEEDED
-        and silently dropped every hallucination protection."""
+        """The guarded writer loads its reporting skill before using the handoff."""
         from src.agents.drug_target.subagents.prompts import REPORT_WRITER_PROMPT
 
         assert "Read `skills/drug-target-reporting/SKILL.md`" in REPORT_WRITER_PROMPT
-        assert "scoring guide" in REPORT_WRITER_PROMPT
+        assert "Call load_validated_hypothesis_report" in REPORT_WRITER_PROMPT
 
     def test_report_writer_skill_read_is_first_phase_1_step(self):
-        """The initial-write skill read precedes the data/reference-card calls."""
+        """The skill read precedes the guarded handoff load."""
         from src.agents.drug_target.subagents.prompts import REPORT_WRITER_PROMPT
 
         initial_idx = REPORT_WRITER_PROMPT.index("## INITIAL WRITE")
         skill_read_idx = REPORT_WRITER_PROMPT.index("Read `skills/drug-target-reporting/SKILL.md`")
-        load_idx = REPORT_WRITER_PROMPT.index("Call load_lr_candidates")
+        load_idx = REPORT_WRITER_PROMPT.index("Call load_validated_hypothesis_report")
         assert initial_idx < skill_read_idx < load_idx
 
     def test_hypothesis_writer_prompt_contains_skill_read(self):
