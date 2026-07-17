@@ -143,6 +143,54 @@ class DrugReportGuardrailMiddleware(_DrugReportRunDirectoryMiddleware):
         return await asyncio.to_thread(self._run)
 
 
+class HypothesisReportGuardrailMiddleware(_DrugReportRunDirectoryMiddleware):
+    """Require one fresh canonical handoff before report synthesis."""
+
+    _HANDOFF_FILES = (
+        "hypothesis_report.json",
+        "hypothesis_report_last_rejection.json",
+    )
+
+    def _clear_handoff(self) -> None:
+        evidence_dir = self._require_data_dir() / "evidence"
+        for name in self._HANDOFF_FILES:
+            (evidence_dir / name).unlink(missing_ok=True)
+
+    def before_agent(self, state: Any, runtime: Any) -> None:
+        self._clear_handoff()
+        return None
+
+    async def abefore_agent(self, state: Any, runtime: Any) -> None:
+        await asyncio.to_thread(self._clear_handoff)
+        return None
+
+    def _run(self) -> dict[str, Any]:
+        from src.agents.drug_target.tools.hypothesis_schema import (
+            validate_hypothesis_report_quality,
+        )
+
+        data_dir = self._require_data_dir()
+        quality = validate_hypothesis_report_quality(data_dir)
+        if not quality["valid"]:
+            errors = quality.get("errors", [])
+            detail = "; ".join(
+                f"{item.get('code')}: {item.get('message')}"
+                for item in errors
+                if isinstance(item, dict)
+            ) or "unknown handoff validation error"
+            raise RuntimeError(
+                f"Hypothesis report guardrail failed with {detail}; "
+                f"see {data_dir / 'evidence' / 'hypothesis_report.json'}"
+            )
+        return {}
+
+    def after_agent(self, state: Any, runtime: Any) -> dict[str, Any]:
+        return self._run()
+
+    async def aafter_agent(self, state: Any, runtime: Any) -> dict[str, Any]:
+        return await asyncio.to_thread(self._run)
+
+
 class DrugTargetManagedFilesystemGuardMiddleware(AgentMiddleware):
     """Block generic content tools and bind domain tools to one run directory."""
 
@@ -199,9 +247,11 @@ class DrugTargetManagedFilesystemGuardMiddleware(AgentMiddleware):
 
 
 class DrugTargetTaskAllowlistMiddleware(AgentMiddleware):
-    """Keep production orchestration to its two explicit domain subagents."""
+    """Keep production orchestration to its explicit domain subagents."""
 
-    _PRODUCTION_SUBAGENT_TYPES = frozenset({"evidence_assessor", "report_writer"})
+    _PRODUCTION_SUBAGENT_TYPES = frozenset(
+        {"evidence_assessor", "hypothesis_writer", "report_writer"}
+    )
 
     def __init__(self, allowed_subagent_types: Collection[str]) -> None:
         super().__init__()
@@ -220,7 +270,8 @@ class DrugTargetTaskAllowlistMiddleware(AgentMiddleware):
         return ToolMessage(
             content=(
                 "ERROR: task subagent_type is not allowed for guarded Drug Target "
-                "production. Allowed types: evidence_assessor, report_writer."
+                "production. Allowed types: evidence_assessor, hypothesis_writer, "
+                "report_writer."
             ),
             tool_call_id=request.tool_call.get("id", ""),
         )

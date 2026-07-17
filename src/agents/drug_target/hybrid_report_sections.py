@@ -32,6 +32,14 @@ class ReportSectionsPayload(BaseModel):
     )
 
 
+class ReportRecommendationsPayload(BaseModel):
+    schema_version: Literal["hybrid_report_sections/v1"]
+    pipeline_recommendations: list[PipelineRecommendation] = Field(
+        min_length=2,
+        max_length=4,
+    )
+
+
 _MARKDOWN_RECOMMENDATION_RE = re.compile(
     r"(^\s*(?:#{1,6}\s|[-*+]\s+|\d+[.)]\s|>\s)|"
     r"\[[^\]]+\]\([^)]*\)|\[source\s*:|\b[\w.-]+\.json\b|"

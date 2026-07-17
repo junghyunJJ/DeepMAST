@@ -16,6 +16,7 @@ from src.agents.drug_target.tools import (
     load_evidence_files,
     save_drug_md,
     save_evidence,
+    save_hypothesis_report,
     save_target_assessment,
 )
 from src.agents.drug_target.deterministic_report import (
@@ -24,8 +25,11 @@ from src.agents.drug_target.deterministic_report import (
 )
 from src.agents.drug_target.hybrid_report_sections import (
     REPORT_SECTIONS_FILENAME,
-    ReportSectionsPayload,
+    ReportRecommendationsPayload,
     canonicalize_report_sections,
+)
+from src.agents.drug_target.tools.hypothesis_schema import (
+    validate_hypothesis_report_quality,
 )
 
 
@@ -83,6 +87,63 @@ def production_hypothesis_evidence_tool(data_dir: str | Path) -> StructuredTool:
 def _is_forbidden_prior_report_output(filename: str) -> bool:
     name = Path(filename).name.casefold()
     return (name.startswith("hypothesis_report") and name.endswith(".json")) or name == "report_data.json"
+
+
+def _read_validated_hypothesis_report(run_dir: Path) -> dict[str, Any]:
+    quality = validate_hypothesis_report_quality(run_dir)
+    if not quality["valid"]:
+        raise ValueError(json.dumps({"valid": False, "errors": quality["errors"]}))
+    path = run_dir / "evidence" / "hypothesis_report.json"
+    report = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(report, dict):
+        raise ValueError("validated hypothesis_report.json must be a JSON object")
+    return report
+
+
+def production_save_hypothesis_report_tool(data_dir: str | Path) -> StructuredTool:
+    run_dir = _resolve_run_dir(data_dir)
+
+    def save_hypothesis_report_for_run(report: dict, data_dir: str = "") -> str:
+        _ = data_dir
+        return _invoke(
+            save_hypothesis_report,
+            data_dir=str(run_dir),
+            report=report,
+        )
+
+    return StructuredTool.from_function(
+        func=save_hypothesis_report_for_run,
+        name="save_hypothesis_report",
+        description="Validate and save hypothesis_report.json in this guarded run.",
+    )
+
+
+def production_load_validated_hypothesis_report_tool(
+    data_dir: str | Path,
+) -> StructuredTool:
+    run_dir = _resolve_run_dir(data_dir)
+
+    def load_validated_hypothesis_report() -> str:
+        try:
+            return json.dumps(
+                {
+                    "valid": True,
+                    "hypothesis_report": _read_validated_hypothesis_report(run_dir),
+                },
+                ensure_ascii=False,
+            )
+        except ValueError as exc:
+            try:
+                payload = json.loads(str(exc))
+            except json.JSONDecodeError:
+                payload = {"valid": False, "errors": [{"message": str(exc)}]}
+            return json.dumps(payload, ensure_ascii=False)
+
+    return StructuredTool.from_function(
+        func=load_validated_hypothesis_report,
+        name="load_validated_hypothesis_report",
+        description="Load the validated hypothesis handoff for report synthesis.",
+    )
 
 
 def production_assessment_save_evidence_tool(data_dir: str | Path) -> StructuredTool:
@@ -213,8 +274,13 @@ def production_save_report_sections_tool(
 
     run_dir = _resolve_run_dir(data_dir)
 
-    def save_report_sections_for_run(payload: ReportSectionsPayload) -> str:
+    def save_report_sections_for_run(payload: ReportRecommendationsPayload) -> str:
         try:
+            hypothesis_report = _read_validated_hypothesis_report(run_dir)
+            full_payload = {
+                **payload.model_dump(),
+                "hypothesis_report": hypothesis_report,
+            }
             report_data = build_report_data(
                 str(run_dir),
                 disease,
@@ -224,7 +290,7 @@ def production_save_report_sections_tool(
             if not report_data.get("valid"):
                 raise ValueError("deterministic report data is invalid")
             canonical, errors = canonicalize_report_sections(
-                payload.model_dump(),
+                full_payload,
                 run_dir / "evidence",
                 _hybrid_source_paths(run_dir),
                 report_data,

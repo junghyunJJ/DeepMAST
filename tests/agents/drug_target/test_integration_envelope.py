@@ -113,7 +113,6 @@ def test_guarded_report_writer_has_one_sections_write_boundary(tmp_path: Path) -
     payload_schema = resolve_reference(schema["properties"]["payload"])
     assert set(payload_schema.get("required", ())) == {
         "schema_version",
-        "hypothesis_report",
         "pipeline_recommendations",
     }
     recommendation_schema = resolve_reference(

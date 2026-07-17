@@ -7,10 +7,12 @@ import pytest
 
 from src.agents.drug_target.hybrid_report_sections import (
     REPORT_SECTIONS_FILENAME,
+    ReportRecommendationsPayload,
     canonicalize_report_sections,
 )
 from src.agents.drug_target.tools.hypothesis_schema import (
     canonicalize_hypothesis_report,
+    persist_hypothesis_report,
     validate_canonical_hypothesis_report,
 )
 
@@ -185,6 +187,53 @@ def _report_data() -> dict:
             {"gene": "FN1", "drugs": []},
         ]
     }
+
+
+def test_report_recommendations_payload_has_no_hypothesis_field() -> None:
+    schema = ReportRecommendationsPayload.model_json_schema()
+
+    assert set(schema["required"]) == {
+        "schema_version",
+        "pipeline_recommendations",
+    }
+    assert "hypothesis_report" not in schema["properties"]
+
+
+def test_bound_hypothesis_reader_requires_valid_handoff(tmp_path: Path) -> None:
+    from src.agents.drug_target.production_report_tools import (
+        production_load_validated_hypothesis_report_tool,
+    )
+
+    receipt = json.loads(
+        production_load_validated_hypothesis_report_tool(tmp_path).invoke({})
+    )
+
+    assert receipt["valid"] is False
+    assert receipt["errors"][0]["code"] == "HYPOTHESIS_REPORT_MISSING"
+
+
+def test_sections_save_host_injects_saved_handoff(tmp_path: Path) -> None:
+    from src.agents.drug_target.production_report_tools import (
+        production_save_report_sections_tool,
+    )
+
+    _write_renderer_evidence(tmp_path)
+    persist_hypothesis_report(tmp_path, _hypothesis_report())
+    receipt = json.loads(
+        production_save_report_sections_tool(tmp_path, "IPF").invoke(
+            {
+                "payload": {
+                    "schema_version": "hybrid_report_sections/v1",
+                    "pipeline_recommendations": _payload()["pipeline_recommendations"],
+                },
+            }
+        )
+    )
+
+    assert receipt["saved"] is True
+    saved = json.loads((tmp_path / REPORT_SECTIONS_FILENAME).read_text())
+    handoff = json.loads((tmp_path / "evidence" / "hypothesis_report.json").read_text())
+    assert saved["hypothesis_report"]["hypotheses"] == handoff["hypotheses"]
 
 
 def test_validate_canonical_hypothesis_report_accepts_current_contract_without_write(

@@ -18,6 +18,7 @@ from src.agents.drug_target.middleware import (
     DrugReportRunCleanupMiddleware,
     DrugTargetManagedFilesystemGuardMiddleware,
     DrugTargetTaskAllowlistMiddleware,
+    HypothesisReportGuardrailMiddleware,
     clear_guarded_report_run_artifacts,
 )
 from src.agents.drug_target.production_report_tools import (
@@ -44,6 +45,25 @@ DRUG_MD_WITH_HYPOTHESIS = """# Drug Target Report
 **Falsifiable Prediction:** GENE1 perturbation changes the endpoint.
 **Validation Approach:** Perturb GENE1 and measure the endpoint.
 """
+
+
+def test_hypothesis_guardrail_removes_stale_handoff_before_agent(tmp_path: Path) -> None:
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    (evidence / "hypothesis_report.json").write_text("{}", encoding="utf-8")
+    (evidence / "hypothesis_report_last_rejection.json").write_text(
+        "{}", encoding="utf-8"
+    )
+
+    HypothesisReportGuardrailMiddleware(tmp_path).before_agent({}, None)
+
+    assert not (evidence / "hypothesis_report.json").exists()
+    assert not (evidence / "hypothesis_report_last_rejection.json").exists()
+
+
+def test_hypothesis_guardrail_rejects_missing_handoff(tmp_path: Path) -> None:
+    with pytest.raises(RuntimeError, match="Hypothesis report guardrail failed"):
+        HypothesisReportGuardrailMiddleware(tmp_path).after_agent({}, None)
 
 
 def _validation(*, valid: bool, issues: list[dict] | None = None) -> dict:
@@ -1243,13 +1263,23 @@ async def test_task_allowlist_rejects_general_purpose_without_dispatch_async() -
     assert calls == []
 
 
-def test_task_allowlist_allows_only_evidence_assessor_and_report_writer() -> None:
-    middleware = DrugTargetTaskAllowlistMiddleware({"evidence_assessor", "report_writer"})
+def test_task_allowlist_allows_only_production_subagents() -> None:
+    middleware = DrugTargetTaskAllowlistMiddleware(
+        {"evidence_assessor", "hypothesis_writer", "report_writer"}
+    )
     calls: list[dict[str, Any]] = []
-    for name in ("evidence_assessor", "report_writer"):
-        middleware.wrap_tool_call(_request("task", {"subagent_type": name}), _recording_handler(calls))
-    middleware.wrap_tool_call(_request("task", {"subagent_type": "other"}), _recording_handler(calls))
-    assert [call["args"]["subagent_type"] for call in calls] == ["evidence_assessor", "report_writer"]
+    for name in ("evidence_assessor", "hypothesis_writer", "report_writer"):
+        middleware.wrap_tool_call(
+            _request("task", {"subagent_type": name}), _recording_handler(calls)
+        )
+    middleware.wrap_tool_call(
+        _request("task", {"subagent_type": "other"}), _recording_handler(calls)
+    )
+    assert [call["args"]["subagent_type"] for call in calls] == [
+        "evidence_assessor",
+        "hypothesis_writer",
+        "report_writer",
+    ]
 
 
 def test_middleware_after_hooks_return_metadata_on_success(
