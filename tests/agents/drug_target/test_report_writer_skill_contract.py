@@ -24,6 +24,8 @@ def test_reporting_skill_matches_guarded_direct_writer_surface() -> None:
         text.split()
     )
     assert 'scope="hypothesis"' in text
+    assert "1-5 supporting evidence paths" in text
+    assert "1-3 supporting evidence paths" not in text
     assert '"schema_version": "hybrid_report_sections/v1"' in text
     assert '"hypothesis_report": {"hypotheses": [...], "gap_analysis": {...}}' in text
     assert '"text": "one future-directed sentence."' in text

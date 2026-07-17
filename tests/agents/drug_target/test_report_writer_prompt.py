@@ -15,6 +15,8 @@ def test_report_writer_prompt_owns_sections_payload_and_repair_contract() -> Non
     assert "hybrid_report_sections/v1" in REPORT_WRITER_PROMPT
     assert "4-6 canonical hypotheses" in REPORT_WRITER_PROMPT
     assert "2-4 one-sentence" in REPORT_WRITER_PROMPT
+    assert "1-5 supporting evidence paths" in REPORT_WRITER_PROMPT
+    assert "1-3 supporting evidence paths" not in REPORT_WRITER_PROMPT
     assert '"schema_version": "hybrid_report_sections/v1"' in REPORT_WRITER_PROMPT
     assert '"hypothesis_report": {"hypotheses": [...], "gap_analysis": {...}}' in REPORT_WRITER_PROMPT
     assert '"text": "one future-directed sentence."' in REPORT_WRITER_PROMPT

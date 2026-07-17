@@ -2421,7 +2421,7 @@ Otherwise follow INITIAL WRITE.
    Never use `recommendation` or `sources` as keys.
    Include all three top-level keys even when an evidence limitation is discussed.
 5. Add 2-4 one-sentence, future-directed pipeline recommendations. Each must
-   cite 1-3 supporting evidence paths and introduce no new quantitative claim.
+   cite 1-5 supporting evidence paths and introduce no new quantitative claim.
 6. Self-check the JSON sections payload against the loaded evidence, then make
    exactly one `save_report_sections` call. This is the one and only terminal write.
    Stop after its receipt; do not self-repair, publish, or invoke Part 4.

@@ -46,7 +46,7 @@ mechanism, approval year, or safety claim absent from the evidence.
    Never use `recommendation` or `sources` as keys.
    Include all three top-level keys even when an evidence limitation is discussed.
    - `pipeline_recommendations` has 2–4 single-sentence, future-directed
-     recommendations. Each has 1–3 deterministic supporting evidence paths and
+     recommendations. Each has 1-5 supporting evidence paths and
      introduces no new quantitative claim.
 5. Self-check the payload against loaded evidence, call `save_report_sections`
    exactly once, then stop.
