@@ -96,6 +96,28 @@ def test_guarded_interpreter_has_the_hypothesis_write_boundary(tmp_path: Path) -
     )
 
 
+def test_guarded_ollama_writer_is_a_tool_free_prose_card_agent(tmp_path: Path) -> None:
+    from src.agents.drug_target.subagents.configs import get_subagents
+
+    writer = next(
+        subagent
+        for subagent in get_subagents(
+            data_dir=str(tmp_path), disease="IPF", provider="ollama"
+        )
+        if subagent["name"] == "hypothesis_writer"
+    )
+
+    assert writer["tools"] == []
+    assert "exactly one plain sentence" in writer["system_prompt"]
+    assert not any(
+        isinstance(
+            middleware,
+            (ReadFileBlockMiddleware, HypothesisRetryLoopMiddleware, HypothesisReportGuardrailMiddleware),
+        )
+        for middleware in writer["middleware"]
+    )
+
+
 def test_guarded_reporter_reads_handoff_and_only_saves_recommendations(
     tmp_path: Path,
 ) -> None:

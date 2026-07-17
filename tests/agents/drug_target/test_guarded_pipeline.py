@@ -303,28 +303,44 @@ def test_nonmissing_hypothesis_error_is_not_retried(
     assert calls == ["prepare", "hypothesis_writer"]
 
 
-def test_ollama_hypothesis_persists_final_json_before_report(
+def test_ollama_generates_one_bounded_card_per_spec(
     tmp_path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     calls: list[str] = []
-    persisted: list[str] = []
+    instructions: list[str] = []
+    saved_reports: list[dict[str, object]] = []
+    specs = [
+        {
+            "id": card_id,
+            "category": category,
+            "genes": [gene],
+            "evidence_references": [f"ot_{gene}.json", f"stage3_{gene}.json"],
+            "cell_anchor": "malignant cell",
+            "fallback_hypothesis": f"{gene} is a validation candidate.",
+            "known_genes": ("EFNB2", "EPHB4", "ERBB2", "ERBB3", "SDC1"),
+        }
+        for card_id, category, gene in (
+            ("mechanism", "Mechanism of Action", "EFNB2"),
+            ("therapy", "Therapeutic Strategy", "EPHB4"),
+            ("cross_target", "Cross-Target Interaction", "ERBB2"),
+            ("novel_pathway", "Novel Pathway", "ERBB3"),
+        )
+    ]
+    report = {"hypotheses": []}
 
-    class _JsonRole(_RoleAgent):
+    class _CardRole(_RoleAgent):
         async def ainvoke(self, _input: dict[str, Any], config: Any = None):
             _ = config
             self.calls.append(self.name)
             if self.name == "hypothesis_writer":
-                return {
-                    "messages": [
-                        AIMessage(content='{"hypotheses": []}')
-                    ]
-                }
+                instructions.append(str(_input["messages"][0]["content"]))
+                return {"messages": [AIMessage(content="Candidate warrants validation.")]}
             return {"messages": [AIMessage(content="done")]}
 
     monkeypatch.setattr(
         guarded_pipeline,
         "create_agent",
-        lambda *, name, **_kwargs: _JsonRole(name, calls),
+        lambda *, name, **_kwargs: _CardRole(name, calls),
     )
     monkeypatch.setattr(
         guarded_pipeline,
@@ -333,9 +349,22 @@ def test_ollama_hypothesis_persists_final_json_before_report(
     )
     monkeypatch.setattr(
         guarded_pipeline,
-        "save_hypothesis_report_from_text",
-        lambda _data_dir, text: persisted.append(text) or {"saved": True},
+        "build_ollama_card_specs",
+        lambda _data_dir: specs,
     )
+    monkeypatch.setattr(
+        guarded_pipeline,
+        "build_ollama_hypothesis_report",
+        lambda _data_dir, _card_texts: report,
+    )
+
+    class _SaveTool:
+        @staticmethod
+        def invoke(arguments: dict[str, object]) -> str:
+            saved_reports.append(arguments["report"])
+            return json.dumps({"saved": True})
+
+    monkeypatch.setattr(guarded_pipeline, "save_hypothesis_report", _SaveTool())
 
     class _StageGate:
         @staticmethod
@@ -359,5 +388,110 @@ def test_ollama_hypothesis_persists_final_json_before_report(
 
     asyncio.run(pipeline.ainvoke({"messages": []}))
 
-    assert calls == ["prepare", "hypothesis_writer", "report_writer"]
-    assert persisted == ['{"hypotheses": []}']
+    assert calls == [
+        "prepare",
+        "hypothesis_writer",
+        "hypothesis_writer",
+        "hypothesis_writer",
+        "hypothesis_writer",
+        "report_writer",
+    ]
+    assert [instruction.split("Card ID: ")[1].split("\n", 1)[0] for instruction in instructions] == [
+        spec["id"] for spec in specs
+    ]
+    assert saved_reports == [report]
+
+
+def test_rejected_ollama_card_retries_once_then_uses_fallback(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[str] = []
+    saved_card_texts: dict[str, str] = {}
+    specs = [
+        {
+            "id": card_id,
+            "category": category,
+            "genes": [gene],
+            "evidence_references": [f"ot_{gene}.json", f"stage3_{gene}.json"],
+            "cell_anchor": "malignant cell",
+            "fallback_hypothesis": f"{gene} is a validation candidate.",
+            "known_genes": ("EFNB2", "EPHB4", "ERBB2", "ERBB3", "SDC1"),
+        }
+        for card_id, category, gene in (
+            ("mechanism", "Mechanism of Action", "EFNB2"),
+            ("therapy", "Therapeutic Strategy", "EPHB4"),
+            ("cross_target", "Cross-Target Interaction", "ERBB2"),
+            ("novel_pathway", "Novel Pathway", "ERBB3"),
+        )
+    ]
+    responses = iter(
+        [
+            "SDC1 warrants validation.",
+            "SDC1 warrants validation.",
+            "Candidate warrants validation.",
+            "Candidate warrants validation.",
+            "Candidate warrants validation.",
+        ]
+    )
+
+    class _CardRole(_RoleAgent):
+        async def ainvoke(self, _input: dict[str, Any], config: Any = None):
+            _ = config
+            self.calls.append(self.name)
+            if self.name == "hypothesis_writer":
+                return {"messages": [AIMessage(content=next(responses))]}
+            return {"messages": [AIMessage(content="done")]}
+
+    monkeypatch.setattr(
+        guarded_pipeline,
+        "create_agent",
+        lambda *, name, **_kwargs: _CardRole(name, calls),
+    )
+    monkeypatch.setattr(
+        guarded_pipeline,
+        "clear_guarded_report_run_artifacts",
+        lambda _data_dir: calls.append("prepare"),
+    )
+    monkeypatch.setattr(
+        guarded_pipeline,
+        "build_ollama_card_specs",
+        lambda _data_dir: specs,
+    )
+    monkeypatch.setattr(
+        guarded_pipeline,
+        "build_ollama_hypothesis_report",
+        lambda _data_dir, card_texts: saved_card_texts.update(card_texts)
+        or {"hypotheses": []},
+    )
+
+    class _SaveTool:
+        @staticmethod
+        def invoke(_arguments: dict[str, object]) -> str:
+            return json.dumps({"saved": True})
+
+    monkeypatch.setattr(guarded_pipeline, "save_hypothesis_report", _SaveTool())
+
+    class _StageGate:
+        @staticmethod
+        def invoke(_args: dict[str, str]) -> str:
+            return json.dumps({"stage1_complete": True})
+
+    monkeypatch.setattr(guarded_pipeline, "check_stage1_completion", _StageGate())
+    monkeypatch.setattr(
+        guarded_pipeline,
+        "validate_hypothesis_report_quality",
+        lambda *_args, **_kwargs: {"valid": True, "errors": []},
+    )
+    pipeline = guarded_pipeline.build_guarded_pipeline(
+        _specs(),
+        data_dir=str(tmp_path),
+        default_model=DEFAULT_MODEL,
+        disease="breast cancer",
+        skip_evidence_assessor=True,
+        provider="ollama",
+    )
+
+    asyncio.run(pipeline.ainvoke({"messages": []}))
+
+    assert calls.count("hypothesis_writer") == 5
+    assert saved_card_texts["mechanism"] == specs[0]["fallback_hypothesis"]

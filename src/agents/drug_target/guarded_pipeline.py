@@ -16,9 +16,14 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
 
 from src.agents.drug_target.middleware import clear_guarded_report_run_artifacts
+from src.agents.drug_target.ollama_hypothesis_cards import (
+    build_ollama_card_specs,
+    build_ollama_hypothesis_report,
+    is_ollama_card_text_safe,
+)
 from src.agents.drug_target.tools import check_stage1_completion
 from src.agents.drug_target.tools.hypothesis_schema import (
-    save_hypothesis_report_from_text,
+    save_hypothesis_report,
     validate_hypothesis_report_quality,
 )
 
@@ -67,6 +72,24 @@ def _format_errors(errors: object) -> str:
         if isinstance(item, dict)
     )
     return text or "unknown validation error"
+
+
+def _ollama_card_instruction(spec: dict[str, object], *, repair: bool = False) -> str:
+    """Request only bounded prose; the coordinator owns every report field."""
+    prefix = (
+        "Rewrite the rejected card as" if repair else "Return"
+    )
+    return (
+        f"{prefix} exactly one plain sentence for this bounded hypothesis card.\n"
+        f"Card ID: {spec['id']}\n"
+        f"Category: {spec['category']}\n"
+        f"Genes: {', '.join(str(gene) for gene in spec['genes'])}\n"
+        f"Evidence references: {', '.join(str(ref) for ref in spec['evidence_references'])}\n"
+        f"Cell anchor: {spec['cell_anchor']}\n"
+        "Do not call tools. Do not return JSON, Markdown, filenames, scores, "
+        "drug claims, combination claims, synergy claims, direct-interaction claims, "
+        "or genes outside the listed Genes."
+    )
 
 
 def build_guarded_pipeline(
@@ -130,25 +153,65 @@ def build_guarded_pipeline(
         _state: GuardedPipelineState, config: RunnableConfig
     ) -> dict[str, Any]:
         if provider == "ollama":
-            result = await roles["hypothesis_writer"].ainvoke(
-                {
-                    "messages": [
+            specs = build_ollama_card_specs(run_dir)
+            known_genes: list[str] = []
+            for spec in specs:
+                symbols = spec.get("known_genes", spec["genes"])
+                if isinstance(symbols, (list, tuple, set)):
+                    known_genes.extend(str(gene) for gene in symbols)
+            card_texts: dict[str, str] = {}
+            last_result: dict[str, Any] = {"messages": []}
+            for spec in specs:
+                result = await roles["hypothesis_writer"].ainvoke(
+                    {"messages": [{"role": "user", "content": _ollama_card_instruction(spec)}]},
+                    config=config,
+                )
+                last_result = result
+                text = _ai_message_text(result)
+                if not is_ollama_card_text_safe(
+                    text,
+                    allowed_genes=spec["genes"],
+                    known_genes=known_genes,
+                ):
+                    result = await roles["hypothesis_writer"].ainvoke(
                         {
-                            "role": "user",
-                            "content": (
-                                f"Return exactly one canonical JSON object with a top-level "
-                                f"hypotheses array for {disease}. Do not use tools or prose. "
-                                f"Data dir: {run_dir}."
-                            ),
-                        }
-                    ]
-                },
-                config=config,
+                            "messages": [
+                                {
+                                    "role": "user",
+                                    "content": _ollama_card_instruction(spec, repair=True),
+                                }
+                            ]
+                        },
+                        config=config,
+                    )
+                    last_result = result
+                    text = _ai_message_text(result)
+                card_texts[str(spec["id"])] = (
+                    text
+                    if is_ollama_card_text_safe(
+                        text,
+                        allowed_genes=spec["genes"],
+                        known_genes=known_genes,
+                    )
+                    else str(spec["fallback_hypothesis"])
+                )
+            report = build_ollama_hypothesis_report(run_dir, card_texts)
+            raw_receipt = await asyncio.to_thread(
+                save_hypothesis_report.invoke,
+                {"data_dir": str(run_dir), "report": report},
             )
-            await asyncio.to_thread(
-                save_hypothesis_report_from_text, run_dir, _ai_message_text(result)
-            )
-            return {"messages": _last_ai_message(result)}
+            try:
+                receipt = json.loads(raw_receipt)
+            except (TypeError, json.JSONDecodeError) as exc:
+                raise RuntimeError(
+                    "Drug Target hypothesis save returned an invalid receipt"
+                ) from exc
+            if not isinstance(receipt, dict) or receipt.get("saved") is not True:
+                raise RuntimeError(
+                    "Drug Target hypothesis save failed: "
+                    + _format_errors(receipt.get("errors") if isinstance(receipt, dict) else None)
+                )
+            return {"messages": _last_ai_message(last_result)}
         instruction = (
             f"Generate and save the canonical validated handoff. Data dir: {run_dir}."
         )

@@ -26,6 +26,7 @@ _UNSAFE_CARD_TEXT_RE = re.compile(
     r"synerg|combination therapy|direct interaction|inhibits",
     re.IGNORECASE,
 )
+_FILENAME_RE = re.compile(r"\b[A-Za-z0-9_.-]+\.json\b", re.IGNORECASE)
 
 
 def _read_assessment(evidence_dir: Path) -> dict[str, Any]:
@@ -96,7 +97,7 @@ def is_ollama_card_text_safe(
     """Return whether bounded model prose can enter a deterministic record."""
     if not text or len(text) >= 500 or "/" in text or "\\" in text:
         return False
-    if _UNSAFE_CARD_TEXT_RE.search(text):
+    if _UNSAFE_CARD_TEXT_RE.search(text) or _FILENAME_RE.search(text):
         return False
     allowed = {gene.upper() for gene in allowed_genes}
     for gene in known_genes:
@@ -125,6 +126,7 @@ def build_ollama_card_specs(data_dir: str | Path) -> list[dict[str, object]]:
     if not cell_anchor:
         raise ValueError("celltype_resolution.json has no resolved cell-type anchor")
     intrinsic_stage1 = _intrinsic_stage1_files(evidence_dir)
+    known_genes = sorted(_known_gene_symbols(evidence_dir))
 
     grouped = [[] for _ in CANONICAL_CATEGORIES]
     for index, gene in enumerate(genes):
@@ -152,6 +154,7 @@ def build_ollama_card_specs(data_dir: str | Path) -> list[dict[str, object]]:
                 "evidence_references": references,
                 "cell_anchor": cell_anchor,
                 "fallback_hypothesis": _fallback_hypothesis(card_genes, cell_anchor),
+                "known_genes": known_genes,
             }
         )
     return specs

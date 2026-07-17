@@ -19,26 +19,23 @@ def test_hypothesis_writer_prompt_names_primary_runtime_tools() -> None:
     assert "Do not finish with a prose answer before calling `save_hypothesis_report`." in text
 
 
-def test_native_ollama_prompt_uses_response_json_without_changing_legacy_prompt() -> None:
+def test_native_ollama_prompt_requests_bounded_plain_prose_without_changing_legacy_prompt() -> None:
     legacy = prompts.HYPOTHESIS_WRITER_PROMPT
     ollama = prompts.OLLAMA_HYPOTHESIS_WRITER_PROMPT
 
-    assert ollama.startswith(legacy)
-    assert "Return exactly one JSON object" in ollama
-    assert "do not use a tool call" in ollama
-    assert "canonical\ntop-level `hypotheses` field" in ollama
-    assert "Python will validate and save" in ollama
-    assert "Return exactly one JSON object" not in legacy
+    assert "exactly one plain sentence" in ollama
+    assert "Do not call tools" in ollama
+    assert "Do not return JSON" in ollama
+    assert "save_hypothesis_report" not in ollama
+    assert "exactly one plain sentence" not in legacy
 
 
-def test_native_ollama_prompt_covers_missing_featured_genes_before_json() -> None:
+def test_native_ollama_prompt_keeps_gene_and_evidence_selection_in_python() -> None:
     text = prompts.OLLAMA_HYPOTHESIS_WRITER_PROMPT
 
-    assert "inspect the" in text
-    assert "`topn_coverage.missing` FEATURED-gene list" in text
-    assert "one `[FEATURED-GAP]` hypothesis" in text
-    assert "primary\nepithelial-intrinsic coverage requirement" in text
-    assert "exact supporting\nevidence citations" in text
+    assert "coordinator supplies" in text
+    assert "Do not add genes" in text
+    assert "evidence references" in text
 
 
 def test_hypothesis_writer_default_matches_minimal_dth_required_contract() -> None:

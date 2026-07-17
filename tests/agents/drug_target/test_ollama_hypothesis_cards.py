@@ -40,6 +40,7 @@ def test_card_specs_cover_all_featured_genes_with_four_categories(
         "NECTIN4",
     }
     assert all(spec["evidence_references"] for spec in specs)
+    assert "SDC1" in specs[0]["known_genes"]
 
 
 def test_skeleton_is_schema_valid_without_model_selected_references(
@@ -66,6 +67,20 @@ def test_skeleton_replaces_unsafe_card_text_with_its_fallback(
     report = build_ollama_hypothesis_report(
         bc_data_dir,
         {"mechanism": "ERBB3 has synergistic effects with EPHB4."},
+    )
+
+    assert report["hypotheses"][0]["core_claim"] == (
+        "ERBB3 and EFNB2 are evidence-supported candidates for validation "
+        "in malignant cell context."
+    )
+
+
+def test_skeleton_replaces_card_text_that_repeats_a_filename(
+    bc_data_dir: Path,
+) -> None:
+    report = build_ollama_hypothesis_report(
+        bc_data_dir,
+        {"mechanism": "ERBB3 is supported by ot_ERBB3.json."},
     )
 
     assert report["hypotheses"][0]["core_claim"] == (

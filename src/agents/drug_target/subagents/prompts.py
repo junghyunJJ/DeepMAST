@@ -2263,27 +2263,19 @@ HYPOTHESIS_WRITER_PROMPT = _render_minimal_operational_contract_hypothesis_write
     _THIN_BASIC_DTH_SKILL_PATHS
 )
 
-# Native Ollama cannot reliably complete the long tool-calling contract. Keep
-# the legacy prompt unchanged and add a provider-specific final-response
-# contract for the response parser used by the guarded coordinator.
-OLLAMA_HYPOTHESIS_WRITER_PROMPT = (
-    HYPOTHESIS_WRITER_PROMPT
-    + """
+# Native Ollama writes only bounded prose. The coordinator supplies every
+# selected gene and evidence field, validates the response, and persists the
+# canonical handoff through the ordinary save path.
+OLLAMA_HYPOTHESIS_WRITER_PROMPT = """You write bounded prose for one Drug Target hypothesis card.
 
-## Native Ollama response contract
-For the native Ollama provider only, do not use a tool call for persistence.
-Before returning JSON, load the hypothesis-scope evidence and inspect the
-`topn_coverage.missing` FEATURED-gene list. Emit one `[FEATURED-GAP]` hypothesis
-for every missing gene, with the same required schema fields, exact supporting
-evidence citations, and conservative grounding rules as every other retained
-hypothesis. Do not return until the missing list is covered and the primary
-epithelial-intrinsic coverage requirement is satisfied.
-Return exactly one JSON object in your final response, with the canonical
-top-level `hypotheses` field (and all other required schema fields). Do not
-return Markdown fences, prose, or a tool call; Python will validate and save
-this JSON through the existing hypothesis persistence path.
+The coordinator supplies the card ID, category, allowed genes, evidence references,
+and cell anchor. Return exactly one plain sentence that says the listed genes are
+evidence-supported candidates for validation in the supplied cell context.
+
+Do not call tools. Do not return JSON, Markdown, filenames, citations, scores, or
+drug claims. Do not add genes, evidence references, pair axes, mechanism claims,
+direct-interaction claims, combination claims, or synergy claims.
 """
-)
 
 HypothesisWriterPromptMode = Literal[
     "default",

@@ -1418,27 +1418,3 @@ def validate_hypothesis_report_quality(
 def save_hypothesis_report(data_dir: str, report: dict) -> str:
     """Save canonical schema-validated evidence/hypothesis_report.json."""
     return json.dumps(persist_hypothesis_report(data_dir, report), indent=2)
-
-
-def save_hypothesis_report_from_text(
-    data_dir: str | Path,
-    text: str,
-) -> dict[str, Any]:
-    """Parse one model JSON response and persist it through the canonical tool."""
-    candidate = text.strip()
-    fenced = re.search(r"```(?:json)?\s*(.*?)\s*```", candidate, re.DOTALL | re.IGNORECASE)
-    if fenced:
-        candidate = fenced.group(1).strip()
-    try:
-        report = json.loads(candidate)
-    except json.JSONDecodeError as exc:
-        raise ValueError(f"response does not contain valid JSON: {exc}") from exc
-    if not isinstance(report, dict):
-        raise ValueError("response JSON must be an object")
-    receipt = save_hypothesis_report.invoke(
-        {"data_dir": str(data_dir), "report": report}
-    )
-    parsed_receipt = json.loads(receipt)
-    if not isinstance(parsed_receipt, dict):
-        raise ValueError("save_hypothesis_report returned an invalid receipt")
-    return parsed_receipt

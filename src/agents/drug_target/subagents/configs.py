@@ -746,7 +746,11 @@ def get_subagents(
     ]
     for subagent in subagents:
         name = subagent["name"]
-        allowed_names = tuple(skill_names.get(name, ()))
+        allowed_names = (
+            ()
+            if name == "hypothesis_writer" and provider == "ollama"
+            else tuple(skill_names.get(name, ()))
+        )
         tools = [tool for tool in subagent["tools"] if tool is not None]
         if name == "evidence_assessor":
             tools = [
@@ -761,18 +765,21 @@ def get_subagents(
             if allowed_names:
                 tools.append(production_skill_reader_tool(root, allowed_names))
         elif name == "hypothesis_writer":
-            replacements = {
-                "load_evidence_files": production_hypothesis_evidence_tool(safe_data_dir),
-                "save_hypothesis_report": production_save_hypothesis_report_tool(
-                    safe_data_dir
-                ),
-                "read_skill_file": production_skill_reader_tool(root, allowed_names),
-            }
-            tools = [
-                replacements.get(getattr(tool, "name", ""), tool)
-                for tool in tools
-                if getattr(tool, "name", None) != "read_skill_file" or allowed_names
-            ]
+            if provider == "ollama":
+                tools = []
+            else:
+                replacements = {
+                    "load_evidence_files": production_hypothesis_evidence_tool(safe_data_dir),
+                    "save_hypothesis_report": production_save_hypothesis_report_tool(
+                        safe_data_dir
+                    ),
+                    "read_skill_file": production_skill_reader_tool(root, allowed_names),
+                }
+                tools = [
+                    replacements.get(getattr(tool, "name", ""), tool)
+                    for tool in tools
+                    if getattr(tool, "name", None) != "read_skill_file" or allowed_names
+                ]
         else:
             tools = [
                 production_load_validated_hypothesis_report_tool(safe_data_dir),
@@ -807,7 +814,7 @@ def get_subagents(
             prompt = REPORT_WRITER_PROMPT
         available = ", ".join(
             getattr(tool, "name", getattr(tool, "__name__", "tool")) for tool in tools
-        )
+        ) or "no tools"
         subagent["system_prompt"] = (
             f"{prompt}\n\n## Data Directory\n"
             f"The configured data directory is: `{safe_data_dir}`.\n"
@@ -824,13 +831,13 @@ def get_subagents(
             WriteFileArgGuardMiddleware(backend_root=safe_data_dir),
         ]
         if name == "hypothesis_writer":
-            middleware.extend(
-                [
-                    ReadFileBlockMiddleware(),
-                    HypothesisRetryLoopMiddleware(max_hypothesis_save_attempts=3),
-                ]
-            )
             if provider != "ollama":
+                middleware.extend(
+                    [
+                        ReadFileBlockMiddleware(),
+                        HypothesisRetryLoopMiddleware(max_hypothesis_save_attempts=3),
+                    ]
+                )
                 middleware.append(HypothesisReportGuardrailMiddleware(safe_data_dir))
         elif name == "report_writer":
             middleware.append(
