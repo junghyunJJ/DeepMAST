@@ -93,6 +93,49 @@ def test_terminal_save_tool_requests_end_after_first_sections_save() -> None:
     assert middleware.after_model({}, None) == {"jump_to": "end"}  # type: ignore[arg-type]
 
 
+def test_success_only_terminal_save_retries_failed_sections_save_once() -> None:
+    middleware = HypothesisRetryLoopMiddleware(
+        stop_after_first_save=True,
+        stop_after_first_successful_save=True,
+        terminal_save_tool_names=("save_report_sections",),
+        max_hypothesis_save_attempts=2,
+    )
+    receipts = iter((False, True))
+
+    def handler(req: ToolCallRequest) -> ToolMessage:
+        return ToolMessage(
+            content=json.dumps({"saved": next(receipts), "errors": ["score"]}),
+            tool_call_id=req.tool_call["id"],
+        )
+
+    middleware.wrap_tool_call(_sections_save_request("sections-1"), handler)
+    assert middleware.after_model({}, None) is None  # type: ignore[arg-type]
+
+    middleware.wrap_tool_call(_sections_save_request("sections-2"), handler)
+    assert middleware.after_model({}, None) == {"jump_to": "end"}  # type: ignore[arg-type]
+
+
+def test_success_only_terminal_save_ends_after_second_failed_sections_save() -> None:
+    middleware = HypothesisRetryLoopMiddleware(
+        stop_after_first_save=True,
+        stop_after_first_successful_save=True,
+        terminal_save_tool_names=("save_report_sections",),
+        max_hypothesis_save_attempts=2,
+    )
+
+    def handler(req: ToolCallRequest) -> ToolMessage:
+        return ToolMessage(
+            content=json.dumps({"saved": False, "errors": ["score"]}),
+            tool_call_id=req.tool_call["id"],
+        )
+
+    middleware.wrap_tool_call(_sections_save_request("sections-1"), handler)
+    assert middleware.after_model({}, None) is None  # type: ignore[arg-type]
+
+    middleware.wrap_tool_call(_sections_save_request("sections-2"), handler)
+    assert middleware.after_model({}, None) == {"jump_to": "end"}  # type: ignore[arg-type]
+
+
 def test_stop_after_first_save_blocks_additional_save_calls() -> None:
     middleware = HypothesisRetryLoopMiddleware(stop_after_first_save=True)
     first = _save_request("call-1")

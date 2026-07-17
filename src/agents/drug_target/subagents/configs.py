@@ -812,7 +812,9 @@ def get_subagents(
             middleware.append(
                 HypothesisRetryLoopMiddleware(
                     stop_after_first_save=True,
+                    stop_after_first_successful_save=True,
                     terminal_save_tool_names=("save_report_sections",),
+                    max_hypothesis_save_attempts=2,
                 )
             )
             guardrail_kwargs: dict[str, Any] = {

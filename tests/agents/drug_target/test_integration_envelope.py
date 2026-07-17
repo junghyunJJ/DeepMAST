@@ -88,7 +88,9 @@ def test_guarded_report_writer_has_one_sections_write_boundary(tmp_path: Path) -
         for middleware in writer["middleware"]
         if isinstance(middleware, HypothesisRetryLoopMiddleware)
         and middleware._stop_after_first_save is True
+        and middleware._stop_after_first_successful_save is True
         and middleware._terminal_save_tool_names == ("save_report_sections",)
+        and middleware._max_hypothesis_save_attempts == 2
     ]
 
     assert len(terminal_save_middleware) == 1

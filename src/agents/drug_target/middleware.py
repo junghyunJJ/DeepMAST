@@ -255,12 +255,14 @@ class HypothesisRetryLoopMiddleware(AgentMiddleware):
         self,
         *,
         stop_after_first_save: bool = False,
+        stop_after_first_successful_save: bool = False,
         terminal_save_tool_names: Sequence[str] = (),
         max_hypothesis_save_attempts: int | None = None,
         single_read_skill_paths: Sequence[str] = (),
     ) -> None:
         super().__init__()
         self._stop_after_first_save = stop_after_first_save
+        self._stop_after_first_successful_save = stop_after_first_successful_save
         self._terminal_save_tool_names = tuple(terminal_save_tool_names)
         self._max_hypothesis_save_attempts = max_hypothesis_save_attempts
         self._single_read_skill_paths = tuple(single_read_skill_paths)
@@ -309,10 +311,14 @@ class HypothesisRetryLoopMiddleware(AgentMiddleware):
             and args.get("filename") == "hypothesis_report.json"
         )
 
-    def _record_hypothesis_save_result(self, request: ToolCallRequest) -> None:
+    def _record_hypothesis_save_result(
+        self, request: ToolCallRequest, result: ToolMessage | Command
+    ) -> None:
         if not self._stop_after_first_save:
             return
         if not self._is_hypothesis_report_save_request(request):
+            return
+        if self._stop_after_first_successful_save and self._result_saved_false(result):
             return
         self._hypothesis_save_seen = True
         self._hypothesis_stop_requested = True
@@ -441,7 +447,7 @@ class HypothesisRetryLoopMiddleware(AgentMiddleware):
                 return self._blocked_after_attempt_limit_response(request)
             result = handler(request)
             self._record_save_attempt(request)
-            self._record_hypothesis_save_result(request)
+            self._record_hypothesis_save_result(request, result)
             if (
                 self._is_hypothesis_report_save_request(request)
                 and self._save_attempt_limit_reached()
@@ -458,7 +464,7 @@ class HypothesisRetryLoopMiddleware(AgentMiddleware):
             return self._blocked_response(request, payload_hash)
         result = handler(request)
         self._record_save_attempt(request)
-        self._record_hypothesis_save_result(request)
+        self._record_hypothesis_save_result(request, result)
         self._record_if_rejected(payload_hash, result)
         if self._save_attempt_limit_reached():
             self._hypothesis_stop_requested = True
@@ -487,7 +493,7 @@ class HypothesisRetryLoopMiddleware(AgentMiddleware):
                 return self._blocked_after_attempt_limit_response(request)
             result = await handler(request)
             self._record_save_attempt(request)
-            self._record_hypothesis_save_result(request)
+            self._record_hypothesis_save_result(request, result)
             if (
                 self._is_hypothesis_report_save_request(request)
                 and self._save_attempt_limit_reached()
@@ -504,7 +510,7 @@ class HypothesisRetryLoopMiddleware(AgentMiddleware):
             return self._blocked_response(request, payload_hash)
         result = await handler(request)
         self._record_save_attempt(request)
-        self._record_hypothesis_save_result(request)
+        self._record_hypothesis_save_result(request, result)
         self._record_if_rejected(payload_hash, result)
         if self._save_attempt_limit_reached():
             self._hypothesis_stop_requested = True
