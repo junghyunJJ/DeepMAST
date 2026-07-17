@@ -66,6 +66,25 @@ def test_hypothesis_guardrail_rejects_missing_handoff(tmp_path: Path) -> None:
         HypothesisReportGuardrailMiddleware(tmp_path).after_agent({}, None)
 
 
+def test_hypothesis_guardrail_missing_handoff_persists_terminal_rejection(
+    tmp_path: Path,
+) -> None:
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+
+    with pytest.raises(RuntimeError, match="HYPOTHESIS_REPORT_MISSING"):
+        HypothesisReportGuardrailMiddleware(tmp_path).after_agent({}, None)
+
+    rejection = json.loads(
+        (evidence / "hypothesis_report_last_rejection.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert rejection["saved"] is False
+    assert rejection["stage"] == "hypothesis_report_guardrail"
+    assert any(error["code"] == "HYPOTHESIS_REPORT_MISSING" for error in rejection["errors"])
+
+
 def _validation(*, valid: bool, issues: list[dict] | None = None) -> dict:
     return {
         "valid": valid,

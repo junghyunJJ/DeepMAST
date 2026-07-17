@@ -166,12 +166,18 @@ class HypothesisReportGuardrailMiddleware(_DrugReportRunDirectoryMiddleware):
 
     def _run(self) -> dict[str, Any]:
         from src.agents.drug_target.tools.hypothesis_schema import (
+            _write_hypothesis_rejection,
             validate_hypothesis_report_quality,
         )
 
         data_dir = self._require_data_dir()
         quality = validate_hypothesis_report_quality(data_dir)
         if not quality["valid"]:
+            _write_hypothesis_rejection(
+                data_dir / "evidence",
+                quality,
+                stage="hypothesis_report_guardrail",
+            )
             errors = quality.get("errors", [])
             detail = "; ".join(
                 f"{item.get('code')}: {item.get('message')}"
