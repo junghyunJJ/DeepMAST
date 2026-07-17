@@ -608,16 +608,30 @@ In guarded mode, select the report writer with `DrugTargetConfig.model`; a
 `subagent_models["report_writer"]` override is rejected so authoring, repair,
 and Part 4 use one explicit model identity.
 
-### 7.4 Supported Ollama guarded smoke invocation (live validation pending)
+### 7.4 Supported Ollama guarded smoke invocation
 
 Production continues to run the full Deep Agent topology:
 `evidence_assessor -> hypothesis_writer -> report_writer -> DrugReportGuardrailMiddleware`.
-Use this resume command to regenerate the handoff and report:
+Use this native Ollama resume command to regenerate the handoff and report:
 
 ```bash
+export OLLAMA_HOST=http://localhost:6000
 export OLLAMA_BASE_URL=http://localhost:6000
-python scripts/run_drug_target_agent_bc.py --data-dir /tmp/deepmast-bc-handoff-qwen --disease "breast cancer" --provider ollama-openai --model qwen3.5:122b --skip-evidence-assessor
+export OLLAMA_REASONING=false
+export OLLAMA_NUM_PREDICT=2048
+
+python -X faulthandler -u scripts/run_drug_target_agent_bc.py \
+  --data-dir "$RUN_DIR" \
+  --disease "breast cancer" \
+  --provider ollama \
+  --model qwen3.5:122b \
+  --skip-evidence-assessor \
+  --heartbeat-seconds 15
 ```
+
+The deployed `:6000` Ollama 0.20.6 OpenAI-compatible API ignores output and
+thinking controls, while the native provider honors `think=false` and
+`num_predict`.
 
 `run_report_writer_only.py` tests only the reporter phase of a valid existing
 handoff; it fails before model invocation when `hypothesis_report.json` is not valid.
