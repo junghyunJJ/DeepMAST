@@ -47,6 +47,7 @@ from src.agents.deep_interpreter.middleware.think_tool_quality_gate import (
 from deepagents.backends import FilesystemBackend
 from src.agents.drug_target.subagents.configs import get_legacy_subagents, get_subagents
 from src.agents.drug_target.subagents.prompts import HypothesisWriterPromptMode
+from src.agents.drug_target.guarded_pipeline import build_guarded_pipeline
 from src.agents.drug_target.tools import (
     check_stage1_completion,
     check_hypothesis_completion,
@@ -58,12 +59,6 @@ from src.agents.drug_target.tools import (
     think_tool,
     validate_quality,
 )
-from src.agents.drug_target.middleware import (
-    DrugReportRunCleanupMiddleware,
-    DrugTargetManagedFilesystemGuardMiddleware,
-    DrugTargetTaskAllowlistMiddleware,
-)
-
 logger = logging.getLogger(__name__)
 
 SkillActivationMode = Literal[
@@ -87,7 +82,7 @@ def _validate_workflow_mode(value: str) -> WorkflowMode:
 
 
 # =============================================================================
-# Orchestrator System Prompt
+# Legacy Orchestrator System Prompt
 # =============================================================================
 
 LEGACY_ORCHESTRATOR_SYSTEM_PROMPT_TEMPLATE = """You are the legacy compatibility Drug Target Assessment orchestrator.
@@ -141,39 +136,6 @@ Data directory: {data_dir} | Disease: {disease}
 
 ## Output
 - hypothesis_report.json (legacy finalize_report node writes drug.md + HTML)
-"""
-
-
-ORCHESTRATOR_SYSTEM_PROMPT_TEMPLATE = """You are the guarded Drug Target Assessment orchestrator.
-Data directory: {data_dir} | Disease: {disease}
-
-## Steps (execute in exact order)
-1. Call {load_lr_candidates_invocation}
-2. Call task(subagent_type="evidence_assessor", instruction="Run Stage 1+2+3. Data dir: {data_dir}.")
-3. Call task(subagent_type="hypothesis_writer", instruction="Generate and save the canonical validated handoff. Data dir: {data_dir}.")
-4. Call task(subagent_type="report_writer", instruction="Read validated handoff and render the guarded report. Data dir: {data_dir}.")
-5. Reply with the single line: REPORT_PIPELINE_COMPLETE
-
-## Rules
-- Execute steps 1-5 in order. Do not skip, reorder, or repeat.
-- Do not read files or dispatch general-purpose subagents.
-- After step 5, stop. The report_writer guardrail owns deterministic validation,
-  repair, Part 4, HTML, audits, and publication.
-"""
-
-
-ORCHESTRATOR_RESUME_PROMPT_TEMPLATE = """You are the guarded Drug Target Assessment orchestrator (RESUME mode).
-Data directory: {data_dir} | Disease: {disease}
-
-## Steps (execute in exact order)
-1. Call task(subagent_type="hypothesis_writer", instruction="{hypothesis_writer_resume_instruction}")
-2. Call task(subagent_type="report_writer", instruction="Read validated handoff and render the guarded report. Data dir: {data_dir}.")
-3. Reply with the single line: REPORT_PIPELINE_COMPLETE
-
-## Rules
-- Evidence files are assumed to exist. Do not run evidence_assessor.
-- Do not read files or dispatch general-purpose subagents.
-- After step 3, stop.
 """
 
 
@@ -556,18 +518,7 @@ def create_drug_target_agent(
             else None
         )
 
-    # 2. Build orchestrator-level tools — orchestrator only dispatches;
-    # all cognitive/IO tools live in subagents.
-    if workflow_mode == "guarded_report":
-        tools: list = [load_lr_candidates]
-    elif workflow_mode == "legacy_hypothesis":
-        tools = [load_lr_candidates, read_skill_file]
-        if config.custom_tools:
-            tools.extend(config.custom_tools)
-    else:
-        raise AssertionError(f"validated workflow mode unexpectedly missing: {workflow_mode!r}")
-
-    # 3. Create the orchestrator LLM.
+    # 2. Create the model used by guarded role specs and legacy orchestration.
     llm_kwargs: dict[str, Any] = {"provider": config.provider}
     if config.model:
         llm_kwargs["model"] = config.model
@@ -584,7 +535,7 @@ def create_drug_target_agent(
         )
     )
 
-    # 4. Get subagent specs — primary subagents use allow-listed shared
+    # 3. Get subagent specs — primary subagents use allow-listed shared
     #    SkillsMiddleware + activation middleware instead of deepagents native
     #    `subagent["skills"]` auto-loading.
     model_overrides = config.subagent_models
@@ -620,6 +571,16 @@ def create_drug_target_agent(
                 config.request_timeout_seconds
             )
         subagent_specs = get_subagents(**report_writer_kwargs)
+        resume_mode = os.getenv(
+            "DRUG_TARGET_SKIP_EVIDENCE_ASSESSOR", ""
+        ).lower() in {"1", "true", "yes"}
+        pipeline = build_guarded_pipeline(
+            subagent_specs,
+            data_dir=resolved_data_dir,
+            disease=config.disease.strip(),
+            skip_evidence_assessor=resume_mode,
+        )
+        return pipeline, backend
     elif workflow_mode == "legacy_hypothesis":
         subagent_specs = get_legacy_subagents(
             custom_tools=config.custom_tools,
@@ -629,20 +590,22 @@ def create_drug_target_agent(
     else:
         raise AssertionError(f"validated workflow mode unexpectedly missing: {workflow_mode!r}")
 
-    # 5. Create agent — orchestrator has NO skills (just delegates)
+    # 4. Create the legacy Deep Agent — it only dispatches compatibility roles.
     checkpointer = MemorySaver() if config.use_checkpointer else None
+    tools: list = [load_lr_candidates, read_skill_file]
+    if config.custom_tools:
+        tools.extend(config.custom_tools)
 
     # Render system prompt with config values so the LLM knows
     # data_dir / disease without parsing the user message.
     # Resume mode (DRUG_TARGET_SKIP_EVIDENCE_ASSESSOR=1) skips evidence_assessor
     # — used by trace script --skip-evidence-assessor for partial re-runs.
     resume_mode = os.getenv("DRUG_TARGET_SKIP_EVIDENCE_ASSESSOR", "").lower() in {"1", "true", "yes"}
-    if workflow_mode == "guarded_report":
-        template = ORCHESTRATOR_RESUME_PROMPT_TEMPLATE if resume_mode else ORCHESTRATOR_SYSTEM_PROMPT_TEMPLATE
-    elif workflow_mode == "legacy_hypothesis":
-        template = LEGACY_RESUME_ORCHESTRATOR_SYSTEM_PROMPT_TEMPLATE if resume_mode else LEGACY_ORCHESTRATOR_SYSTEM_PROMPT_TEMPLATE
-    else:
-        raise AssertionError(f"validated workflow mode unexpectedly missing: {workflow_mode!r}")
+    template = (
+        LEGACY_RESUME_ORCHESTRATOR_SYSTEM_PROMPT_TEMPLATE
+        if resume_mode
+        else LEGACY_ORCHESTRATOR_SYSTEM_PROMPT_TEMPLATE
+    )
     if resume_mode:
         logger.info("Orchestrator running in RESUME mode (evidence_assessor skipped).")
     safe_disease = config.disease.strip()
@@ -668,23 +631,6 @@ def create_drug_target_agent(
         ReadFileBlockMiddleware(),
         SubagentErrorGuardMiddleware(),
     ]
-    if workflow_mode == "guarded_report":
-        middleware = [
-            DrugReportRunCleanupMiddleware(resolved_data_dir),
-            DrugTargetManagedFilesystemGuardMiddleware(
-                resolved_data_dir,
-                data_dir_tool_names={"load_lr_candidates"},
-            ),
-            DrugTargetTaskAllowlistMiddleware(
-                {"evidence_assessor", "hypothesis_writer", "report_writer"}
-            ),
-            *middleware,
-        ]
-    elif workflow_mode == "legacy_hypothesis":
-        pass
-    else:
-        raise AssertionError(f"validated workflow mode unexpectedly missing: {workflow_mode!r}")
-
     create_kwargs: dict[str, Any] = dict(
         model=llm,
         tools=tools,

@@ -42,7 +42,9 @@ def test_orchestrator_middleware_includes_think_tool_quality_gate(tmp_path):
     ):
         from src.agents.drug_target.agent import create_drug_target_agent
 
-        config = DrugTargetConfig(data_dir=str(tmp_path))
+        config = DrugTargetConfig(
+            data_dir=str(tmp_path), workflow_mode="legacy_hypothesis"
+        )
         create_drug_target_agent(config=config)
 
     middleware_list = captured_kwargs.get("middleware", [])
@@ -54,27 +56,61 @@ def test_orchestrator_middleware_includes_think_tool_quality_gate(tmp_path):
     )
 
 
-def test_guarded_orchestrator_exposes_only_bound_topology(tmp_path, monkeypatch):
+def test_guarded_factory_builds_deterministic_role_pipeline(tmp_path, monkeypatch):
     captured: dict = {}
-    monkeypatch.setattr("src.agents.drug_target.agent.create_llm", lambda **_: FakeListChatModel(responses=["ok"]))
-    monkeypatch.setattr("src.agents.drug_target.agent.create_deep_agent", lambda **kwargs: captured.update(kwargs) or _make_stub_agent())
+    sentinel = _make_stub_agent()
+    monkeypatch.setattr(
+        "src.agents.drug_target.agent.create_llm",
+        lambda **_: FakeListChatModel(responses=["ok"]),
+    )
+    monkeypatch.setattr(
+        "src.agents.drug_target.agent.build_guarded_pipeline",
+        lambda specs, **kwargs: captured.update(specs=specs, **kwargs) or sentinel,
+    )
+    create_deep_calls: list[dict] = []
+    monkeypatch.setattr(
+        "src.agents.drug_target.agent.create_deep_agent",
+        lambda **kwargs: create_deep_calls.append(kwargs) or _make_stub_agent(),
+    )
 
     from src.agents.drug_target.agent import create_drug_target_agent
 
-    create_drug_target_agent(DrugTargetConfig(data_dir=str(tmp_path), provider="ollama"))
+    result, _backend = create_drug_target_agent(
+        DrugTargetConfig(data_dir=str(tmp_path), provider="ollama")
+    )
 
-    assert {tool.name for tool in captured["tools"]} == {"load_lr_candidates"}
-    assert [item["name"] for item in captured["subagents"]] == [
+    assert result is sentinel
+    assert [item["name"] for item in captured["specs"]] == [
         "evidence_assessor",
         "hypothesis_writer",
         "report_writer",
     ]
-    middleware = captured["middleware"]
-    assert sum(isinstance(item, DrugReportRunCleanupMiddleware) for item in middleware) == 1
-    assert sum(isinstance(item, DrugTargetManagedFilesystemGuardMiddleware) for item in middleware) == 1
-    assert sum(isinstance(item, DrugTargetTaskAllowlistMiddleware) for item in middleware) == 1
-    assert "REPORT_PIPELINE_COMPLETE" in captured["system_prompt"]
-    assert "hypothesis_writer" in captured["system_prompt"]
+    assert captured["data_dir"] == str(tmp_path.resolve())
+    assert captured["skip_evidence_assessor"] is False
+    assert create_deep_calls == []
+
+
+def test_guarded_factory_passes_resume_mode_to_deterministic_pipeline(
+    tmp_path, monkeypatch
+):
+    captured: dict = {}
+    monkeypatch.setenv("DRUG_TARGET_SKIP_EVIDENCE_ASSESSOR", "1")
+    monkeypatch.setattr(
+        "src.agents.drug_target.agent.create_llm",
+        lambda **_: FakeListChatModel(responses=["ok"]),
+    )
+    monkeypatch.setattr(
+        "src.agents.drug_target.agent.build_guarded_pipeline",
+        lambda _specs, **kwargs: captured.update(kwargs) or _make_stub_agent(),
+    )
+
+    from src.agents.drug_target.agent import create_drug_target_agent
+
+    create_drug_target_agent(
+        DrugTargetConfig(data_dir=str(tmp_path), provider="ollama")
+    )
+
+    assert captured["skip_evidence_assessor"] is True
 
 
 def test_legacy_orchestrator_keeps_compatibility_surface(tmp_path, monkeypatch):
@@ -93,15 +129,14 @@ def test_legacy_orchestrator_keeps_compatibility_surface(tmp_path, monkeypatch):
     assert "hypothesis_writer" in captured["system_prompt"]
 
 
-@pytest.mark.parametrize("workflow_mode", ["guarded_report", "legacy_hypothesis"])
 @pytest.mark.parametrize(
     ("disease", "expects_disease_argument"),
     [("idiopathic pulmonary fibrosis", True), ("", False)],
 )
-def test_normal_orchestrator_uses_sanitized_lr_invocation_for_both_modes(
-    tmp_path, monkeypatch, workflow_mode, disease, expects_disease_argument
+def test_legacy_orchestrator_uses_sanitized_lr_invocation(
+    tmp_path, monkeypatch, disease, expects_disease_argument
 ):
-    """Normal guarded and legacy prompts must never send a prose sentinel as disease=."""
+    """Legacy prompts must never send a prose sentinel as disease=."""
     captured: dict = {}
     monkeypatch.setattr(
         "src.agents.drug_target.agent.create_llm",
@@ -119,7 +154,7 @@ def test_normal_orchestrator_uses_sanitized_lr_invocation_for_both_modes(
             data_dir=str(tmp_path),
             disease=disease,
             provider="ollama",
-            workflow_mode=cast(WorkflowMode, workflow_mode),
+            workflow_mode="legacy_hypothesis",
             subagent_models={},
         )
     )

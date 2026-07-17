@@ -146,7 +146,7 @@ def test_direct_factory_matches_production_docker_skill_middleware(tmp_path, mon
     )
 
 
-def test_production_factory_still_builds_the_outer_deep_agent(
+def test_production_factory_builds_deterministic_role_pipeline(
     tmp_path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -164,8 +164,9 @@ def test_production_factory_still_builds_the_outer_deep_agent(
     monkeypatch.setattr(agent, "get_subagents", lambda **_kwargs: production_specs)
     monkeypatch.setattr(
         agent,
-        "create_deep_agent",
-        lambda **kwargs: captured.update(kwargs) or compiled_agent,
+        "build_guarded_pipeline",
+        lambda specs, **kwargs: captured.update(spec_names=[spec["name"] for spec in specs])
+        or compiled_agent,
     )
 
     result, _ = agent.create_drug_target_agent(
@@ -173,4 +174,8 @@ def test_production_factory_still_builds_the_outer_deep_agent(
     )
 
     assert result is compiled_agent
-    assert captured["subagents"] is production_specs
+    assert captured["spec_names"] == [
+        "evidence_assessor",
+        "hypothesis_writer",
+        "report_writer",
+    ]

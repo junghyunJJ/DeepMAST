@@ -136,6 +136,7 @@ def test_selected_model_is_shared_by_guarded_orchestrator_and_report_writer(
         captured["subagent_kwargs"] = kwargs
         return [
             {"name": "evidence_assessor"},
+            {"name": "hypothesis_writer", "model": selected_model},
             {"name": "report_writer", "model": selected_model},
         ]
 
@@ -146,8 +147,8 @@ def test_selected_model_is_shared_by_guarded_orchestrator_and_report_writer(
     )
     monkeypatch.setattr(
         agent,
-        "create_deep_agent",
-        lambda **kwargs: captured.update(kwargs) or compiled_agent,
+        "build_guarded_pipeline",
+        lambda specs, **kwargs: captured.update(specs=specs, **kwargs) or compiled_agent,
     )
     monkeypatch.setattr(
         agent,
@@ -174,10 +175,13 @@ def test_selected_model_is_shared_by_guarded_orchestrator_and_report_writer(
     assert captured["subagent_kwargs"]["report_writer_model"] == "qwen3.5:122b"
     assert captured["subagent_kwargs"]["report_writer_request_timeout_seconds"] == 45.0
     assert captured["subagent_kwargs"]["model_overrides"]["report_writer"] is selected_model
-    assert captured["model"] is selected_model
-    report_writer = next(
-        subagent for subagent in captured["subagents"] if subagent["name"] == "report_writer"
+    hypothesis_writer = next(
+        item for item in captured["specs"] if item["name"] == "hypothesis_writer"
     )
+    report_writer = next(
+        item for item in captured["specs"] if item["name"] == "report_writer"
+    )
+    assert hypothesis_writer["model"] is selected_model
     assert report_writer["model"] is selected_model
 
 
@@ -208,8 +212,8 @@ def test_unset_timeout_is_omitted_from_guarded_report_construction(
     )
     monkeypatch.setattr(
         agent,
-        "create_deep_agent",
-        lambda **kwargs: captured.update(kwargs) or compiled_agent,
+        "build_guarded_pipeline",
+        lambda specs, **kwargs: captured.update(specs=specs, **kwargs) or compiled_agent,
     )
 
     agent.create_drug_target_agent(
