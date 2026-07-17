@@ -94,6 +94,10 @@ report audit is fail-closed behavior, not a published report. The coordinator
 retries one `HYPOTHESIS_REPORT_MISSING`; rejected saves remain under the
 writer's bounded repair path.
 
+On native Ollama/Qwen runs, the hypothesis writer returns one JSON object with
+the canonical `hypotheses` field. Python validates and persists that response;
+non-Ollama providers keep the existing tool-call save path.
+
 `run_report_writer_only.py` is diagnostic-only: it tests a valid existing
 handoff's reporter phase and fails before model invocation without one.
 

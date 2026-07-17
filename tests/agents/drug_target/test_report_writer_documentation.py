@@ -21,6 +21,8 @@ def test_docs_define_native_qwen_publication_success_profile() -> None:
     for path in (REFERENCE, STAGE_GUIDE):
         text = path.read_text(encoding="utf-8")
         assert "OLLAMA_NUM_PREDICT=4096" in text
+        assert "qwen3.5:122b" in text
+        assert "OLLAMA_REASONING=false" in text
         assert "evidence/hypothesis_report.json" in text
         assert "report_sections.json" in text
         assert "drug.md" in text

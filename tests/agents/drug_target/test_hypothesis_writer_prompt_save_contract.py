@@ -19,6 +19,18 @@ def test_hypothesis_writer_prompt_names_primary_runtime_tools() -> None:
     assert "Do not finish with a prose answer before calling `save_hypothesis_report`." in text
 
 
+def test_native_ollama_prompt_uses_response_json_without_changing_legacy_prompt() -> None:
+    legacy = prompts.HYPOTHESIS_WRITER_PROMPT
+    ollama = prompts.OLLAMA_HYPOTHESIS_WRITER_PROMPT
+
+    assert ollama.startswith(legacy)
+    assert "Return exactly one JSON object" in ollama
+    assert "do not use a tool call" in ollama
+    assert "canonical\ntop-level `hypotheses` field" in ollama
+    assert "Python will validate and save" in ollama
+    assert "Return exactly one JSON object" not in legacy
+
+
 def test_hypothesis_writer_default_matches_minimal_dth_required_contract() -> None:
     text = prompts.HYPOTHESIS_WRITER_PROMPT
     minimal_dth = prompts.render_hypothesis_writer_prompt(

@@ -2263,6 +2263,22 @@ HYPOTHESIS_WRITER_PROMPT = _render_minimal_operational_contract_hypothesis_write
     _THIN_BASIC_DTH_SKILL_PATHS
 )
 
+# Native Ollama cannot reliably complete the long tool-calling contract. Keep
+# the legacy prompt unchanged and add a provider-specific final-response
+# contract for the response parser used by the guarded coordinator.
+OLLAMA_HYPOTHESIS_WRITER_PROMPT = (
+    HYPOTHESIS_WRITER_PROMPT
+    + """
+
+## Native Ollama response contract
+For the native Ollama provider only, do not use a tool call for persistence.
+Return exactly one JSON object in your final response, with the canonical
+top-level `hypotheses` field (and all other required schema fields). Do not
+return Markdown fences, prose, or a tool call; Python will validate and save
+this JSON through the existing hypothesis persistence path.
+"""
+)
+
 HypothesisWriterPromptMode = Literal[
     "default",
     "dth_contrast_no_skill",

@@ -642,6 +642,11 @@ The deployed `:6000` Ollama 0.20.6 OpenAI-compatible API ignores output and
 thinking controls, while the native provider honors `think=false` and
 `num_predict`.
 
+For the native Ollama/Qwen path, `hypothesis_writer` returns exactly one JSON
+object with the top-level `hypotheses` field. Python validates and persists it
+as `evidence/hypothesis_report.json`; legacy providers retain the tool-call
+save contract.
+
 A successful publication run requires a fresh valid
 `evidence/hypothesis_report.json`, `report_sections.json`, `drug.md`, and
 `drug_report_validation_final.json` with `valid: true` and
