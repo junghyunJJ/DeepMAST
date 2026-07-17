@@ -444,6 +444,21 @@ def test_create_ollama_llm_reads_ollama_reasoning_false_env(monkeypatch):
     assert kwargs["think"] is False
 
 
+def test_native_ollama_profile_honors_reasoning_and_generation_caps(monkeypatch):
+    """Native Ollama must forward the bounded benchmark profile unchanged."""
+    monkeypatch.setenv("OLLAMA_BASE_URL", "http://localhost:6000")
+    monkeypatch.setenv("OLLAMA_REASONING", "false")
+    monkeypatch.setenv("OLLAMA_NUM_PREDICT", "2048")
+    with patch("src.agents.model._ChatOllamaWithThink", autospec=True) as model:
+        model.return_value = MagicMock()
+        create_llm(provider="ollama", model="qwen3.5:122b")
+
+    kwargs = model.call_args.kwargs
+    assert kwargs["base_url"] == "http://localhost:6000"
+    assert kwargs["num_predict"] == 2048
+    assert kwargs["think"] is False
+
+
 def test_chat_ollama_with_think_injects_native_payload_flag():
     """The compatibility wrapper must put `think` at Ollama /api/chat top level."""
     from langchain_core.messages import HumanMessage
