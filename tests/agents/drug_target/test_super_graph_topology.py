@@ -80,7 +80,7 @@ def test_production_export_uses_environment_guarded_configuration(monkeypatch) -
         assert configs[0].provider == "google"
         assert configs[0].disease == "IPF"
         assert configs[0].workflow_mode == "guarded_report"
-        assert create_kwargs
+        assert create_kwargs == []
 
     with _reloaded_guarded_export(
         monkeypatch,
@@ -89,9 +89,7 @@ def test_production_export_uses_environment_guarded_configuration(monkeypatch) -
         assert configs[0].provider == "openrouter"
         assert configs[0].disease == ""
         assert configs[0].workflow_mode == "guarded_report"
-        system_prompt = create_kwargs[0]["system_prompt"]
-        assert "load_lr_candidates(data_dir=" in system_prompt
-        assert "disease=" not in system_prompt
+        assert create_kwargs == []
 
 
 def test_production_docs_describe_guarded_report_path() -> None:

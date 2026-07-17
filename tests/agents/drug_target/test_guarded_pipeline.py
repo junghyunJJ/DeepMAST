@@ -9,6 +9,9 @@ import pytest
 from src.agents.drug_target import guarded_pipeline
 
 
+DEFAULT_MODEL = object()
+
+
 class _RoleAgent:
     def __init__(self, name: str, calls: list[str]) -> None:
         self.name = name
@@ -75,6 +78,7 @@ def test_compile_role_preserves_legacy_spec_without_model(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     captured: dict[str, Any] = {}
+    default_model = object()
     spec = {
         "name": "report_writer",
         "tools": [object()],
@@ -88,9 +92,38 @@ def test_compile_role_preserves_legacy_spec_without_model(
         lambda **kwargs: captured.update(kwargs) or object(),
     )
 
-    guarded_pipeline._compile_role(spec)
+    guarded_pipeline._compile_role(spec, default_model=default_model)
 
-    assert captured == {"model": None, **spec}
+    assert captured == {"model": default_model, **spec}
+
+
+def test_pipeline_uses_default_model_only_for_missing_role_models(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[str] = []
+    models: dict[str, object] = {}
+    specs = _specs()
+    explicit_model = specs[0]["model"]
+    specs[-1].pop("model")
+    _install_fakes(monkeypatch, calls)
+
+    def capture_model(*, name: str, model: object, **_kwargs: Any) -> _RoleAgent:
+        models[name] = model
+        return _RoleAgent(name, calls)
+
+    monkeypatch.setattr(guarded_pipeline, "create_agent", capture_model)
+    pipeline = guarded_pipeline.build_guarded_pipeline(
+        specs,
+        data_dir=str(tmp_path),
+        default_model=DEFAULT_MODEL,
+        disease="breast cancer",
+        skip_evidence_assessor=False,
+    )
+
+    asyncio.run(pipeline.ainvoke({"messages": []}))
+
+    assert models["evidence_assessor"] is explicit_model
+    assert models["report_writer"] is DEFAULT_MODEL
 
 
 def test_full_pipeline_runs_roles_in_code_enforced_order(
@@ -101,6 +134,7 @@ def test_full_pipeline_runs_roles_in_code_enforced_order(
     pipeline = guarded_pipeline.build_guarded_pipeline(
         _specs(),
         data_dir=str(tmp_path),
+        default_model=DEFAULT_MODEL,
         disease="breast cancer",
         skip_evidence_assessor=False,
     )
@@ -123,6 +157,7 @@ def test_resume_pipeline_skips_only_evidence_assessor(
     pipeline = guarded_pipeline.build_guarded_pipeline(
         _specs(),
         data_dir=str(tmp_path),
+        default_model=DEFAULT_MODEL,
         disease="breast cancer",
         skip_evidence_assessor=True,
     )
@@ -140,6 +175,7 @@ def test_invalid_evidence_stops_before_hypothesis_and_report(
     pipeline = guarded_pipeline.build_guarded_pipeline(
         _specs(),
         data_dir=str(tmp_path),
+        default_model=DEFAULT_MODEL,
         disease="breast cancer",
         skip_evidence_assessor=True,
     )
@@ -158,6 +194,7 @@ def test_invalid_hypothesis_never_invokes_report_writer(
     pipeline = guarded_pipeline.build_guarded_pipeline(
         _specs(),
         data_dir=str(tmp_path),
+        default_model=DEFAULT_MODEL,
         disease="breast cancer",
         skip_evidence_assessor=True,
     )

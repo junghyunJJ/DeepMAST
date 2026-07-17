@@ -577,6 +577,7 @@ def create_drug_target_agent(
         pipeline = build_guarded_pipeline(
             subagent_specs,
             data_dir=resolved_data_dir,
+            default_model=llm,
             disease=config.disease.strip(),
             skip_evidence_assessor=resume_mode,
         )

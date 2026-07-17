@@ -27,9 +27,9 @@ class GuardedPipelineState(TypedDict):
     run_started_at: NotRequired[float]
 
 
-def _compile_role(spec: dict[str, Any]) -> Runnable:
+def _compile_role(spec: dict[str, Any], *, default_model: Any) -> Runnable:
     return create_agent(
-        model=spec.get("model"),
+        model=spec.get("model", default_model),
         name=spec["name"],
         **{
             key: spec[key] for key in ("tools", "system_prompt", "middleware")
@@ -58,12 +58,16 @@ def build_guarded_pipeline(
     subagent_specs: Sequence[dict[str, Any]],
     *,
     data_dir: str,
+    default_model: Any,
     disease: str,
     skip_evidence_assessor: bool,
 ) -> Runnable:
     """Compile existing role specs behind code-enforced phase edges."""
     run_dir = Path(data_dir).expanduser().resolve()
-    roles = {spec["name"]: _compile_role(spec) for spec in subagent_specs}
+    roles = {
+        spec["name"]: _compile_role(spec, default_model=default_model)
+        for spec in subagent_specs
+    }
     required = {"evidence_assessor", "hypothesis_writer", "report_writer"}
     if set(roles) != required:
         raise ValueError(f"guarded pipeline requires exactly {sorted(required)}")
