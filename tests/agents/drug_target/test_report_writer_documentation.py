@@ -56,3 +56,18 @@ def test_docs_describe_guarded_reporter_and_graph_builder_entrypoints() -> None:
     assert "Guarded 2-Subagent" not in stage_guide
     assert "Allows only evidence_assessor/report_writer" not in reference
     assert "Allows only evidence_assessor, hypothesis_writer, and report_writer" in reference
+
+
+def test_docs_describe_code_enforced_guarded_phase_order() -> None:
+    for path in (REFERENCE, STAGE_GUIDE):
+        text = path.read_text(encoding="utf-8")
+        assert "prepare -> validate_evidence -> hypothesis_writer" in text
+        assert "validate_hypothesis -> report_writer" in text
+        assert "report_writer is never invoked without a fresh valid hypothesis handoff" in text
+        assert "root LLM does not schedule guarded production phases" in text
+
+
+def test_docs_keep_legacy_and_diagnostic_paths_outside_production() -> None:
+    reference = REFERENCE.read_text(encoding="utf-8")
+    assert "legacy_hypothesis remains prompt-driven compatibility only" in reference
+    assert "run_report_writer_only.py remains diagnostic-only" in reference

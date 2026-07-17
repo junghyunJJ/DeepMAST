@@ -6,11 +6,18 @@
 
 ---
 
-> **Current production contract:** `evidence_assessor -> hypothesis_writer -> report_writer -> DrugReportGuardrailMiddleware -> guarded publication`. The writer owns only canonical `report_sections.json`; Jinja renders `drug.md` and the other pre-publication artifacts. Success requires valid initial/final audits plus Part 4 and HTML publication artifacts. Tools are forced to the configured directory, DeepAgents `general-purpose` is blocked, and custom tools are rejected. Full-agent, E2E, and BC paths are production entrypoints; `run_report_writer_only.py` is diagnostic-only and requires a valid existing handoff. `legacy_hypothesis` is the only outer-super-graph/finalizer compatibility path.
+> **Current production contract:**
+> ```text
+> prepare -> validate_evidence -> hypothesis_writer
+>         -> validate_hypothesis -> report_writer -> final audit/publication
+> ```
+> The root LLM does not schedule guarded production phases. The report_writer is never invoked without a fresh valid hypothesis handoff. The writer owns only canonical `report_sections.json`; Jinja renders `drug.md` and the other pre-publication artifacts. Success requires valid initial/final audits plus Part 4 and HTML publication artifacts. Tools are forced to the configured directory, DeepAgents `general-purpose` is blocked, and custom tools are rejected. Full-agent, E2E, and BC paths are production entrypoints; `run_report_writer_only.py` remains diagnostic-only and requires a valid existing handoff. `legacy_hypothesis` remains prompt-driven compatibility only.
 
 **Production entrypoints**: construct `create_drug_target_agent` directly with
 `workflow_mode="guarded_report"`, or use `run_drug_target_e2e.py` and
 `run_drug_target_agent_bc.py`. `run_report_writer_only.py` is diagnostic-only.
+run_report_writer_only.py remains diagnostic-only; it is not a production
+entrypoint.
 
 **Production Reporter integration**: `integration.py` exposes
 `run_drug_target_assessment(data_dir, disease)` for the Deep Interpreter
@@ -18,6 +25,7 @@ Reporter. It lazily imports `create_drug_target_agent`, builds it with
 `workflow_mode="guarded_report"`, and invokes the returned `agent.ainvoke(...)`.
 `super_graph.py` remains the Legacy compatibility super-graph for explicit
 `legacy_hypothesis` callers; the integration tool does not use it.
+For production separation, legacy_hypothesis remains prompt-driven compatibility only.
 
 ## 1. Overview
 
@@ -51,12 +59,10 @@ The Drug Target Assessment Agent evaluates therapeutic potential of ligand-recep
 ```
 Production Reporter integration
   -> run_drug_target_assessment(data_dir, disease) [integration.py]
-    -> create_drug_target_agent(config, workflow_mode="guarded_report") [agent.py]
-     -> DrugReportRunCleanupMiddleware
-     -> evidence_assessor (configured-run evidence tools)
-     -> hypothesis_writer (validated hypothesis_report.json handoff)
-     -> report_writer (save_report_sections exactly once)
-     -> DrugReportGuardrailMiddleware (validate rendered Markdown, repair sections, publish Part 4 + HTML, audit)
+    -> guarded_pipeline [guarded_pipeline.py]
+     -> prepare -> evidence_assessor (unless resuming) -> validate_evidence
+     -> hypothesis_writer -> validate_hypothesis -> report_writer
+     -> final audit/publication
 
 Other production entrypoints
   -> create_drug_target_agent(config, workflow_mode="guarded_report") [agent.py]
@@ -100,7 +106,7 @@ Legacy compatibility surface (not used by Reporter integration)
 
 ### 2.3 Subagent Configuration
 
-**Workflow order**: `["evidence_assessor", "hypothesis_writer", "report_writer"]` (strict sequential, defined in `subagents/configs.py`). `report_writer` is the sole production author; `DrugReportGuardrailMiddleware` owns all post-write work.
+**Subagent order**: `evidence_assessor -> hypothesis_writer -> report_writer` (defined in `subagents/configs.py`). Guarded production is enforced by graph edges: `prepare -> validate_evidence -> hypothesis_writer -> validate_hypothesis -> report_writer -> final audit/publication`. On evidence resume, `prepare` proceeds directly to `validate_evidence`; an invalid evidence or hypothesis handoff fails closed before the next role runs. `report_writer` is the sole production author; `DrugReportGuardrailMiddleware` owns all post-write work.
 
 | Component | Type | Tools | Role |
 |-----------|------|-------|------|
@@ -610,9 +616,9 @@ and Part 4 use one explicit model identity.
 
 ### 7.4 Supported Ollama guarded smoke invocation
 
-Production continues to run the full Deep Agent topology:
-`evidence_assessor -> hypothesis_writer -> report_writer -> DrugReportGuardrailMiddleware`.
-Use this native Ollama resume command to regenerate the handoff and report:
+Production uses the deterministic guarded phase order above. Use this native
+Ollama evidence-resume command to validate existing evidence, regenerate the
+fresh hypothesis handoff, and write the report:
 
 ```bash
 export OLLAMA_HOST=http://localhost:6000

@@ -5,7 +5,12 @@
 
 ---
 
-> **Current production contract:** `DrugReportRunCleanupMiddleware -> evidence_assessor -> hypothesis_writer -> report_writer -> DrugReportGuardrailMiddleware`. Production Section 4 is in `drug.md`; success needs two audits and seven artifacts including `drug_report_validation_final.json`. Configured-directory tools are forced safe, `general-purpose` is blocked, and custom tools are rejected. `legacy_hypothesis` is the explicit outer-super-graph/finalizer compatibility path. Full-agent, E2E, and BC paths are production entrypoints; `run_report_writer_only.py` is diagnostic-only and requires a valid existing handoff.
+> **Current production contract:**
+> ```text
+> prepare -> validate_evidence -> hypothesis_writer
+>         -> validate_hypothesis -> report_writer -> final audit/publication
+> ```
+> The root LLM does not schedule guarded production phases. The report_writer is never invoked without a fresh valid hypothesis handoff. Production Section 4 is in `drug.md`; success needs two audits and seven artifacts including `drug_report_validation_final.json`. Configured-directory tools are forced safe, `general-purpose` is blocked, and custom tools are rejected. `legacy_hypothesis` is the explicit outer-super-graph/finalizer compatibility path. Full-agent, E2E, and BC paths are production entrypoints; `run_report_writer_only.py` is diagnostic-only and requires a valid existing handoff.
 
 **Production entrypoints**: construct `create_drug_target_agent` directly with
 `workflow_mode="guarded_report"`, or run `run_drug_target_e2e.py` and
@@ -28,13 +33,11 @@ identified from spatial transcriptomics cell-cell interaction (CCI) analysis.
 
 ```
 create_drug_target_agent (guarded_report)
-  DrugReportRunCleanupMiddleware
-    └── evidence_assessor   ← 3-stage funnel + inline rubric
-    └── hypothesis_writer   ← writes validated hypothesis_report.json
-    └── report_writer       ← authors report_sections.json
-          └── DrugReportGuardrailMiddleware
-                validate/repair → deterministic Jinja target_assessment.json + drug.md
-                → Part 4/HTML → two audits/seven artifacts
+  guarded_pipeline
+    └── prepare
+    └── evidence_assessor (unless resuming) → validate_evidence
+    └── hypothesis_writer → validate_hypothesis
+    └── report_writer → final audit/publication
 ```
 
 `evidence_assessor` runs the staged funnel. `hypothesis_writer` creates the
@@ -59,14 +62,19 @@ supported provider clients when supplied; omitted values retain provider default
 ### Workflow Order
 
 ```
-load_lr_candidates → evidence_assessor → hypothesis_writer → report_writer → REPORT_PIPELINE_COMPLETE
+prepare -> validate_evidence -> hypothesis_writer
+        -> validate_hypothesis -> report_writer -> final audit/publication
 ```
 
-The top-level task allowlist permits exactly these three subagents. The retained
-outer graph/finalizer is `legacy_hypothesis` compatibility only.
+The graph, not the root LLM, enforces this phase order. Evidence validation
+fails closed before `hypothesis_writer`; hypothesis validation fails closed
+before `report_writer`. The top-level task allowlist permits exactly these
+three subagents in the role order `evidence_assessor -> hypothesis_writer -> report_writer`.
+The retained outer graph/finalizer is `legacy_hypothesis`
+compatibility only.
 
-To resume an existing evidence run, regenerate its handoff and report through
-the full pipeline:
+To resume existing evidence, the coordinator takes `prepare -> validate_evidence`
+and then regenerates the fresh hypothesis handoff before report writing:
 
 ```bash
 export OLLAMA_BASE_URL=http://localhost:6000
