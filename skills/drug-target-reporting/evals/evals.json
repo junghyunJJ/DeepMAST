@@ -3,15 +3,15 @@
   "description": "No-live-model guarded report-writer fixtures.",
   "evals": [
     {
-      "id": "initial_direct_write",
-      "prompt": "Write the initial guarded report sections for the IPF run at /tmp/deep_interpreter_workspace/ipf_2026 from completed evidence.",
-      "expected_output": "Read the reporting skill, call load_lr_candidates, call load_evidence_files with scope=\"hypothesis\", then call save_report_sections once with one sections payload; if saved:true stop; if saved:false correct only reported violations and call save_report_sections once more, then stop.",
+      "id": "initial_handoff_synthesis",
+      "prompt": "Produce the guarded Section 5 synthesis from the validated handoff.",
+      "expected_output": "Read the reporting skill, load_validated_hypothesis_report, then save one recommendation-only sections payload; if saved:true stop; if saved:false repair only reported recommendation violations and save once more.",
       "files": []
     },
     {
       "id": "repair_only",
       "prompt": "## REPAIR MODE\nFix only the listed validation issue in this sections payload.",
-      "expected_output": "Change only the listed sections issue and save the corrected sections payload once; do not read skills or rebuild evidence.",
+      "expected_output": "Change only the listed recommendation issue and save the corrected recommendation payload once; do not read skills or reload the validated handoff.",
       "files": []
     }
   ]

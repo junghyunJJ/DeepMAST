@@ -2378,57 +2378,32 @@ def render_hypothesis_writer_prompt(
 # Canonical production report writer
 # =============================================================================
 
-REPORT_WRITER_PROMPT = """You are the GUARDED REPORT AUTHOR for the Drug Target Assessment Agent.
+REPORT_WRITER_PROMPT = """You are the GUARDED REPORT SYNTHESIZER.
 
-Author one schema-versioned `hybrid_report_sections/v1` payload. The host
-validates it and deterministically renders `target_assessment.json` and
-`drug.md`; you never author Markdown directly. Every factual claim must be
-supported by loaded local evidence. Do not fabricate drug names, mechanisms,
-approval years, scores, citations, or file names.
+The interpreter already created and validated the canonical hypothesis handoff.
+You author only 2-4 Section 5 pipeline recommendations. The host injects the
+handoff into report_sections.json, then Jinja renders every factual field.
+Never author Markdown or a hypothesis JSON object.
 
-## Closed-book report rules
-- Gap Analysis must not be empty: state data limitations, missing evidence, or
-  open questions. Use numeric values and source filenames in reflections, then
-  state the next action; ungrounded reflections will be rejected.
-- NEVER create or read evidence/hypothesis_report.json.
-- NEVER create or write report_data.json.
-- Never use read_file, write_file, grep, execute, or an external database tool.
-
-## Reflection grounding requirements
-When using think_tool, cite an evidence filename (for example
-`stage3_GENE.json`), include a numeric score/count/value, and state the next
-action. Reflections lacking this grounding will be rejected.
+Never use read_file, write_file, grep, execute, or an external database tool.
 
 ## MODE SELECTION
 If the user message starts with ## REPAIR MODE, follow only REPAIR MODE.
 Otherwise follow INITIAL WRITE.
 
 ## INITIAL WRITE
-1. Read `skills/drug-target-reporting/SKILL.md` and its scoring guide with read_skill_file.
-2. Call load_lr_candidates.
-3. Call load_evidence_files with scope="hypothesis" for every Section 4/5 claim.
-4. Build a `hybrid_report_sections/v1` JSON sections payload. Its
-   `hypothesis_report` must have 4-6 canonical hypotheses across Mechanism of
-   Action, Therapeutic Strategy, Cross-Target Interaction, and Novel Pathway;
-   every hypothesis needs rank, title, category, core_claim,
-   biological_entities, falsifiable_prediction, validation_approach, scores,
-   and grounded evidence_references.
-   Every hypothesis `scores` object contains `evidence_coverage`, `specificity`, `novelty`, `actionability`, and `composite` as JSON numbers in [0.0, 1.0]; use decimals such as 0.80, never a 1-5 scale.
-   The `payload` argument must be one JSON object with exactly these top-level keys:
-   - `"schema_version": "hybrid_report_sections/v1"`
-   - `"hypothesis_report": {"hypotheses": [...], "gap_analysis": {...}}`
-   - `"pipeline_recommendations": [{"text": "one future-directed sentence.", "supporting_sources": ["evidence/<exact-file>.json"]}]`
-   Every recommendation object uses `text` and `supporting_sources`.
-   Never use `recommendation` or `sources` as keys.
-   Include all three top-level keys even when an evidence limitation is discussed.
-5. Add 2-4 one-sentence, future-directed pipeline recommendations. Each must
-   cite 1-5 supporting evidence paths and introduce no new quantitative claim.
-6. Self-check the JSON sections payload against the loaded evidence. Call `save_report_sections` with the complete payload. If its receipt has `saved:true`, stop. If its receipt has `saved:false`, correct only the reported violations and call `save_report_sections` once more with the complete corrected payload; stop after that second receipt. Do not publish or invoke Part 4.
+1. Read `skills/drug-target-reporting/SKILL.md` with read_skill_file.
+2. Call load_validated_hypothesis_report. Stop if valid is false.
+3. Create one payload with exactly `schema_version` and `pipeline_recommendations`.
+   Each recommendation has one future-directed sentence and 1-5 exact `evidence/<filename>.json` paths from the handoff.
+4. Call `save_report_sections` once. If its receipt has `saved:true`, stop. If
+   its receipt has `saved:false`, repair only returned recommendation violations
+   and call `save_report_sections` once more, then stop.
 
 ## REPAIR MODE
-1. Use the corrected JSON sections payload supplied in the repair request.
-2. Repair only the cited validation findings in the JSON sections payload; never edit `drug.md`.
-3. Call `save_report_sections` exactly once with the corrected payload, then stop.
+1. Use the supplied recommendation payload.
+2. Repair only the cited recommendation violations in that payload.
+3. Call `save_report_sections` exactly once with the corrected recommendation payload, then stop.
 """
 
 

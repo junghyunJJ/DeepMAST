@@ -1,73 +1,45 @@
 ---
 name: drug-target-reporting
-description: Generate guarded, evidence-grounded hybrid report sections from completed evidence.
+description: Generate guarded Section 5 recommendations from a validated hypothesis handoff.
 ---
 
 # Drug Target Reporting
 
-## Your role: guarded report author
+## Your role: guarded report synthesizer
 
-Author exactly one `hybrid_report_sections/v1` payload through
-`save_report_sections`. Qwen owns only canonical Section 4 hypotheses and 2–4
-Section 5 recommendations in `report_sections.json`.
+Qwen owns only 2–4 Section 5 recommendations in `report_sections.json`.
+The interpreter already created and validated the canonical hypothesis handoff.
+The host injects that handoff, then Jinja renders every factual field. Never
+author Markdown or a hypothesis JSON object.
 
 Jinja owns every rendered layout and factual value, the deterministic Section
 5.1 execution summary, source-tag placement, and renderer-owned output
 artifacts. The guardrail validates the rendered output, repairs sections when
 needed, and publishes only after final validation.
 
-## Evidence hierarchy and calibration
-
-`load_evidence_files(scope="hypothesis")` is the sole factual input. It
-supplies the gated assessment, featured OpenTargets/Stage 3 evidence, and
-passed Stage 1 evidence; do not replace it with memory or general knowledge.
-
-Preserve integer rubric values and classification labels exactly. Use hedged
-language for exploratory or novel evidence. Do not infer an indication,
-mechanism, approval year, or safety claim absent from the evidence.
+`hypothesis_report.json` is read only via `load_validated_hypothesis_report` and is never cited.
 
 ## Initial write
 
-1. Read this skill and `references/scoring_guide.md` with `read_skill_file`.
-2. Call `load_lr_candidates`.
-3. Call `load_evidence_files` with `scope="hypothesis"` for every Section 4/5
-   claim.
-4. Build one `hybrid_report_sections/v1` payload:
-   - `hypothesis_report` has 4–6 canonical hypotheses across Mechanism of
-     Action, Therapeutic Strategy, Cross-Target Interaction, and Novel Pathway.
-     Every hypothesis includes rank, title, category, core claim, biological
-     entities, falsifiable prediction, validation approach, scores, and
-     grounded evidence references.
-     Every hypothesis `scores` object contains `evidence_coverage`, `specificity`, `novelty`, `actionability`, and `composite` as JSON numbers in [0.0, 1.0]; use decimals such as 0.80, never a 1-5 scale.
-   The `payload` argument must be one JSON object with exactly these top-level keys:
-   - `"schema_version": "hybrid_report_sections/v1"`
-   - `"hypothesis_report": {"hypotheses": [...], "gap_analysis": {...}}`
-   - `"pipeline_recommendations": [{"text": "one future-directed sentence.", "supporting_sources": ["evidence/<exact-file>.json"]}]`
-   Every recommendation object uses `text` and `supporting_sources`.
-   Never use `recommendation` or `sources` as keys.
-   Include all three top-level keys even when an evidence limitation is discussed.
-   - `pipeline_recommendations` has 2–4 single-sentence, future-directed
-     recommendations. Each has 1-5 supporting evidence paths and
-     introduces no new quantitative claim.
-5. Self-check the payload against loaded evidence. Call `save_report_sections` with the complete payload. If its receipt has `saved:true`, stop. If its receipt has `saved:false`, correct only the reported violations and call `save_report_sections` once more with the complete corrected payload; stop after that second receipt. Do not publish or invoke Part 4.
+1. Read this skill with `read_skill_file`.
+2. Call `load_validated_hypothesis_report`. Stop if `valid` is false.
+3. Create one payload with exactly `schema_version` and `pipeline_recommendations`.
+   Each of the 2–4 recommendations has one future-directed sentence and 1-5 exact `evidence/<filename>.json` paths from the handoff.
+4. Call `save_report_sections` once. If its receipt has `saved:true`, stop. If
+   its receipt has `saved:false`, repair only returned recommendation violations
+   and call `save_report_sections` once more, then stop.
 
 ## Repair mode
 
-When the request begins `## REPAIR MODE`, use only the supplied current
-sections payload and bounded validation findings. Repair only those findings,
-call `save_report_sections` exactly once with the complete corrected payload,
+When the request begins `## REPAIR MODE`, use only the supplied recommendation
+payload and bounded validation findings. Repair only those findings. Call
+`save_report_sections` exactly once with the corrected recommendation payload,
 then stop.
-
-The guardrail re-renders and revalidates after every save. After at most three
-failed repairs it does not publish Part 4 or HTML.
 
 ## Non-negotiable boundaries
 
-- NEVER create or read `evidence/hypothesis_report.json`.
 - Do not use `read_file`, `write_file`, `grep`, `execute`, general-purpose
   subagents, external databases, or a second writer.
-- Gap Analysis must not be empty: state data limitations, missing evidence, or
-  open questions.
 
 ## Supported local Ollama diagnostic invocation
 
