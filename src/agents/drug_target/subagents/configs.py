@@ -25,6 +25,7 @@ from src.agents.deep_interpreter.middleware.write_file_guard import (
 )
 from src.agents.drug_target.subagents.prompts import (
     HypothesisWriterPromptMode,
+    OLLAMA_HYPOTHESIS_WRITER_PROMPT,
     REPORT_WRITER_PROMPT,
     SUBAGENT_PROMPTS,
     render_hypothesis_writer_prompt,
@@ -797,7 +798,11 @@ def get_subagents(
         subagent["tools"] = tools
         prompt = subagent["system_prompt"]
         if name == "hypothesis_writer":
-            prompt = render_hypothesis_writer_prompt(hypothesis_writer_prompt_mode)
+            prompt = (
+                OLLAMA_HYPOTHESIS_WRITER_PROMPT
+                if provider == "ollama"
+                else render_hypothesis_writer_prompt(hypothesis_writer_prompt_mode)
+            )
         elif name == "report_writer":
             prompt = REPORT_WRITER_PROMPT
         available = ", ".join(
