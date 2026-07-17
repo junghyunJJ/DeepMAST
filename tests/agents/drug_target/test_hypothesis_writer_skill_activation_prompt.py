@@ -216,7 +216,7 @@ def test_operational_contract_prompt_modes_isolate_dth_skill_read() -> None:
     shared_minimal_phrases = (
         'load_evidence_files(data_dir=data_dir, scope="hypothesis")',
         "No drug-target interpretation rubric is provided by this base prompt",
-        "Generate 4-6 retained recommendations.",
+        "Prefer exactly four retained recommendations; expand to five or six only when needed to cover every FEATURED gene.",
         "`Mechanism of Action`, `Therapeutic Strategy`, `Cross-Target Interaction`,",
         "and `Novel Pathway`;",
         "Build a JSON-compatible object:",

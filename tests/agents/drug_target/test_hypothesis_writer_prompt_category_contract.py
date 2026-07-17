@@ -34,7 +34,8 @@ def test_hypothesis_writer_prompt_removes_three_of_four_category_contract() -> N
 def test_hypothesis_writer_prompt_requires_four_to_six_retained_recommendations() -> None:
     text = prompts.HYPOTHESIS_WRITER_PROMPT
 
-    assert "Generate 4-6 retained recommendations" in text
+    assert "Prefer exactly four retained recommendations" in text
+    assert "expand to five or six only when needed to cover every FEATURED gene" in text
 
 
 def test_dth_skill_keeps_category_and_evidence_interpretation_details() -> None:
