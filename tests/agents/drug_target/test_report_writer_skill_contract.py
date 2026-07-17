@@ -24,6 +24,12 @@ def test_reporting_skill_matches_guarded_direct_writer_surface() -> None:
         text.split()
     )
     assert 'scope="hypothesis"' in text
+    assert '"schema_version": "hybrid_report_sections/v1"' in text
+    assert '"hypothesis_report": {"hypotheses": [...], "gap_analysis": {...}}' in text
+    assert '"text": "one future-directed sentence."' in text
+    assert '"supporting_sources": ["evidence/<exact-file>.json"]' in text
+    assert "Never use `recommendation` or `sources` as keys." in text
+    assert "Include all three top-level keys even when an evidence limitation is discussed." in text
     assert "call `save_report_sections`\n   exactly once, then stop." in text
     assert "NEVER create or read `evidence/hypothesis_report.json`." in text
     assert "target assessment" not in text.lower()

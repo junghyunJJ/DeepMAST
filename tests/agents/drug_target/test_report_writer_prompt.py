@@ -15,6 +15,12 @@ def test_report_writer_prompt_owns_sections_payload_and_repair_contract() -> Non
     assert "hybrid_report_sections/v1" in REPORT_WRITER_PROMPT
     assert "4-6 canonical hypotheses" in REPORT_WRITER_PROMPT
     assert "2-4 one-sentence" in REPORT_WRITER_PROMPT
+    assert '"schema_version": "hybrid_report_sections/v1"' in REPORT_WRITER_PROMPT
+    assert '"hypothesis_report": {"hypotheses": [...], "gap_analysis": {...}}' in REPORT_WRITER_PROMPT
+    assert '"text": "one future-directed sentence."' in REPORT_WRITER_PROMPT
+    assert '"supporting_sources": ["evidence/<exact-file>.json"]' in REPORT_WRITER_PROMPT
+    assert "Never use `recommendation` or `sources` as keys." in REPORT_WRITER_PROMPT
+    assert "Include all three top-level keys even when an evidence limitation is discussed." in REPORT_WRITER_PROMPT
     assert "## REPAIR MODE" in REPORT_WRITER_PROMPT
     assert "JSON sections payload" in REPORT_WRITER_PROMPT
     assert "never edit `drug.md`" in REPORT_WRITER_PROMPT

@@ -38,6 +38,13 @@ mechanism, approval year, or safety claim absent from the evidence.
      Every hypothesis includes rank, title, category, core claim, biological
      entities, falsifiable prediction, validation approach, scores, and
      grounded evidence references.
+   The `payload` argument must be one JSON object with exactly these top-level keys:
+   - `"schema_version": "hybrid_report_sections/v1"`
+   - `"hypothesis_report": {"hypotheses": [...], "gap_analysis": {...}}`
+   - `"pipeline_recommendations": [{"text": "one future-directed sentence.", "supporting_sources": ["evidence/<exact-file>.json"]}]`
+   Every recommendation object uses `text` and `supporting_sources`.
+   Never use `recommendation` or `sources` as keys.
+   Include all three top-level keys even when an evidence limitation is discussed.
    - `pipeline_recommendations` has 2–4 single-sentence, future-directed
      recommendations. Each has 1–3 deterministic supporting evidence paths and
      introduces no new quantitative claim.

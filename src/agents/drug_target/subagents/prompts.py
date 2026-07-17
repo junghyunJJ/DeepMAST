@@ -2413,6 +2413,13 @@ Otherwise follow INITIAL WRITE.
    every hypothesis needs rank, title, category, core_claim,
    biological_entities, falsifiable_prediction, validation_approach, scores,
    and grounded evidence_references.
+   The `payload` argument must be one JSON object with exactly these top-level keys:
+   - `"schema_version": "hybrid_report_sections/v1"`
+   - `"hypothesis_report": {"hypotheses": [...], "gap_analysis": {...}}`
+   - `"pipeline_recommendations": [{"text": "one future-directed sentence.", "supporting_sources": ["evidence/<exact-file>.json"]}]`
+   Every recommendation object uses `text` and `supporting_sources`.
+   Never use `recommendation` or `sources` as keys.
+   Include all three top-level keys even when an evidence limitation is discussed.
 5. Add 2-4 one-sentence, future-directed pipeline recommendations. Each must
    cite 1-3 supporting evidence paths and introduce no new quantitative claim.
 6. Self-check the JSON sections payload against the loaded evidence, then make
