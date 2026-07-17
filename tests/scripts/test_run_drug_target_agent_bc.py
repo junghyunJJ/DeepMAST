@@ -34,6 +34,12 @@ def _args(data_dir):
     )
 
 
+@pytest.mark.parametrize("value", ["nan", "inf", "-inf"])
+def test_positive_seconds_rejects_non_finite_values(value: str) -> None:
+    with pytest.raises(argparse.ArgumentTypeError, match="positive"):
+        runner._positive_seconds(value)
+
+
 @pytest.mark.asyncio
 async def test_bc_runner_emits_heartbeat_and_keeps_guarded_success_contract(
     tmp_path, monkeypatch, capsys

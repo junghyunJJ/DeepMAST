@@ -6,6 +6,7 @@ from __future__ import annotations
 import asyncio
 import argparse
 import contextlib
+import math
 import os
 import sys
 import time
@@ -22,7 +23,7 @@ from scripts.run_report_writer_only import guarded_run_succeeded
 
 def _positive_seconds(value: str) -> float:
     seconds = float(value)
-    if seconds <= 0:
+    if not math.isfinite(seconds) or seconds <= 0:
         raise argparse.ArgumentTypeError("heartbeat seconds must be positive")
     return seconds
 

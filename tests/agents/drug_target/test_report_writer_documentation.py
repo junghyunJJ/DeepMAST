@@ -10,7 +10,8 @@ STAGE_GUIDE = Path("docs/drugtarget/drug_target_stage_guide.md")
 def test_reference_documents_native_ollama_resume_profile() -> None:
     text = REFERENCE.read_text(encoding="utf-8")
 
-    assert "--provider ollama" in text
+    assert "  --provider ollama \\\n" in text
+    assert "  --provider ollama-openai \\\n" in text
     assert "OLLAMA_REASONING=false" in text
     assert "OLLAMA_NUM_PREDICT=2048" in text
     assert "--heartbeat-seconds 15" in text
