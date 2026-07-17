@@ -38,6 +38,7 @@ mechanism, approval year, or safety claim absent from the evidence.
      Every hypothesis includes rank, title, category, core claim, biological
      entities, falsifiable prediction, validation approach, scores, and
      grounded evidence references.
+     Every hypothesis `scores` object contains `evidence_coverage`, `specificity`, `novelty`, `actionability`, and `composite` as JSON numbers in [0.0, 1.0]; use decimals such as 0.80, never a 1-5 scale.
    The `payload` argument must be one JSON object with exactly these top-level keys:
    - `"schema_version": "hybrid_report_sections/v1"`
    - `"hypothesis_report": {"hypotheses": [...], "gap_analysis": {...}}`
@@ -48,8 +49,7 @@ mechanism, approval year, or safety claim absent from the evidence.
    - `pipeline_recommendations` has 2–4 single-sentence, future-directed
      recommendations. Each has 1-5 supporting evidence paths and
      introduces no new quantitative claim.
-5. Self-check the payload against loaded evidence, call `save_report_sections`
-   exactly once, then stop.
+5. Self-check the payload against loaded evidence. Call `save_report_sections` with the complete payload. If its receipt has `saved:true`, stop. If its receipt has `saved:false`, correct only the reported violations and call `save_report_sections` once more with the complete corrected payload; stop after that second receipt. Do not publish or invoke Part 4.
 
 ## Repair mode
 

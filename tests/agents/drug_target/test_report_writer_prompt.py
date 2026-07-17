@@ -11,7 +11,6 @@ def test_report_writer_prompt_owns_sections_payload_and_repair_contract() -> Non
     assert "include_legacy_hypothesis=False" not in REPORT_WRITER_PROMPT
     assert 'Call load_evidence_files with scope="hypothesis"' in REPORT_WRITER_PROMPT
     assert "save_report_sections" in REPORT_WRITER_PROMPT
-    assert "one and only terminal write" in REPORT_WRITER_PROMPT
     assert "hybrid_report_sections/v1" in REPORT_WRITER_PROMPT
     assert "4-6 canonical hypotheses" in REPORT_WRITER_PROMPT
     assert "2-4 one-sentence" in REPORT_WRITER_PROMPT
@@ -23,10 +22,17 @@ def test_report_writer_prompt_owns_sections_payload_and_repair_contract() -> Non
     assert '"supporting_sources": ["evidence/<exact-file>.json"]' in REPORT_WRITER_PROMPT
     assert "Never use `recommendation` or `sources` as keys." in REPORT_WRITER_PROMPT
     assert "Include all three top-level keys even when an evidence limitation is discussed." in REPORT_WRITER_PROMPT
+    assert "`evidence_coverage`, `specificity`, `novelty`, `actionability`, and `composite`" in REPORT_WRITER_PROMPT
+    assert "JSON numbers in [0.0, 1.0]" in REPORT_WRITER_PROMPT
+    assert "If its receipt has `saved:true`, stop." in REPORT_WRITER_PROMPT
+    assert "If its receipt has `saved:false`, correct only the reported violations" in REPORT_WRITER_PROMPT
+    assert "call `save_report_sections` once more" in REPORT_WRITER_PROMPT
+    assert REPORT_WRITER_PROMPT.count("call `save_report_sections` once more") == 1
+    assert "stop after that second receipt. Do not publish or invoke Part 4." in REPORT_WRITER_PROMPT
     assert "## REPAIR MODE" in REPORT_WRITER_PROMPT
     assert "JSON sections payload" in REPORT_WRITER_PROMPT
     assert "never edit `drug.md`" in REPORT_WRITER_PROMPT
-    assert "exactly one `save_report_sections` call" in REPORT_WRITER_PROMPT
+    assert "Call `save_report_sections` exactly once with the corrected payload, then stop." in REPORT_WRITER_PROMPT
     assert "Load the current sections receipt" not in REPORT_WRITER_PROMPT
     assert "Use the corrected JSON sections payload supplied" in REPORT_WRITER_PROMPT
     assert "save_report_expansions" not in REPORT_WRITER_PROMPT

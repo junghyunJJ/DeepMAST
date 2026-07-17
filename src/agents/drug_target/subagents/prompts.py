@@ -2413,6 +2413,7 @@ Otherwise follow INITIAL WRITE.
    every hypothesis needs rank, title, category, core_claim,
    biological_entities, falsifiable_prediction, validation_approach, scores,
    and grounded evidence_references.
+   Every hypothesis `scores` object contains `evidence_coverage`, `specificity`, `novelty`, `actionability`, and `composite` as JSON numbers in [0.0, 1.0]; use decimals such as 0.80, never a 1-5 scale.
    The `payload` argument must be one JSON object with exactly these top-level keys:
    - `"schema_version": "hybrid_report_sections/v1"`
    - `"hypothesis_report": {"hypotheses": [...], "gap_analysis": {...}}`
@@ -2422,9 +2423,7 @@ Otherwise follow INITIAL WRITE.
    Include all three top-level keys even when an evidence limitation is discussed.
 5. Add 2-4 one-sentence, future-directed pipeline recommendations. Each must
    cite 1-5 supporting evidence paths and introduce no new quantitative claim.
-6. Self-check the JSON sections payload against the loaded evidence, then make
-   exactly one `save_report_sections` call. This is the one and only terminal write.
-   Stop after its receipt; do not self-repair, publish, or invoke Part 4.
+6. Self-check the JSON sections payload against the loaded evidence. Call `save_report_sections` with the complete payload. If its receipt has `saved:true`, stop. If its receipt has `saved:false`, correct only the reported violations and call `save_report_sections` once more with the complete corrected payload; stop after that second receipt. Do not publish or invoke Part 4.
 
 ## REPAIR MODE
 1. Use the corrected JSON sections payload supplied in the repair request.

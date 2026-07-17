@@ -32,7 +32,14 @@ def test_reporting_skill_matches_guarded_direct_writer_surface() -> None:
     assert '"supporting_sources": ["evidence/<exact-file>.json"]' in text
     assert "Never use `recommendation` or `sources` as keys." in text
     assert "Include all three top-level keys even when an evidence limitation is discussed." in text
-    assert "call `save_report_sections`\n   exactly once, then stop." in text
+    assert "`evidence_coverage`, `specificity`, `novelty`, `actionability`, and `composite`" in text
+    assert "JSON numbers in [0.0, 1.0]" in text
+    assert "If its receipt has `saved:true`, stop." in text
+    assert "If its receipt has `saved:false`, correct only the reported violations" in text
+    assert "call `save_report_sections` once more" in text
+    assert text.count("call `save_report_sections` once more") == 1
+    assert "stop after that second receipt. Do not publish or invoke Part 4." in text
+    assert "call `save_report_sections` exactly once with the complete corrected payload,\nthen stop." in text
     assert "NEVER create or read `evidence/hypothesis_report.json`." in text
     assert "target assessment" not in text.lower()
     for retired_operation in (
