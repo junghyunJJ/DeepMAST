@@ -113,11 +113,19 @@ def build_guarded_pipeline(
     async def run_hypothesis(
         _state: GuardedPipelineState, config: RunnableConfig
     ) -> dict[str, Any]:
-        return await invoke_role(
-            "hypothesis_writer",
-            f"Generate and save the canonical validated handoff. Data dir: {run_dir}.",
-            config,
+        instruction = (
+            f"Generate and save the canonical validated handoff. Data dir: {run_dir}."
         )
+        try:
+            return await invoke_role("hypothesis_writer", instruction, config)
+        except RuntimeError as exc:
+            if "HYPOTHESIS_REPORT_MISSING" not in str(exc):
+                raise
+            return await invoke_role(
+                "hypothesis_writer",
+                f"The handoff was not saved. Call save_hypothesis_report now with a valid canonical payload. Data dir: {run_dir}.",
+                config,
+            )
 
     async def validate_hypothesis(state: GuardedPipelineState) -> dict[str, Any]:
         quality = await asyncio.to_thread(

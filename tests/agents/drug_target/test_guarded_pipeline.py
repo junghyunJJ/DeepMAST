@@ -13,15 +13,29 @@ DEFAULT_MODEL = object()
 
 
 class _RoleAgent:
-    def __init__(self, name: str, calls: list[str]) -> None:
+    def __init__(
+        self,
+        name: str,
+        calls: list[str],
+        *,
+        instructions: list[str] | None = None,
+        first_error: RuntimeError | None = None,
+    ) -> None:
         self.name = name
         self.calls = calls
+        self.instructions = instructions
+        self.first_error = first_error
 
     async def ainvoke(
         self, _input: dict[str, Any], config: Any = None
     ) -> dict[str, Any]:
         _ = config
+        if self.instructions is not None:
+            self.instructions.append(str(_input["messages"][0]["content"]))
         self.calls.append(self.name)
+        if self.first_error is not None:
+            error, self.first_error = self.first_error, None
+            raise error
         return {"messages": [{"role": "assistant", "content": f"{self.name}:done"}]}
 
 
@@ -200,6 +214,89 @@ def test_invalid_hypothesis_never_invokes_report_writer(
     )
 
     with pytest.raises(RuntimeError, match="hypothesis gate failed"):
+        asyncio.run(pipeline.ainvoke({"messages": []}))
+
+    assert calls == ["prepare", "hypothesis_writer"]
+
+
+def test_missing_hypothesis_report_retries_writer_once_before_report(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[str] = []
+    instructions: list[str] = []
+    missing = RuntimeError("Hypothesis report guardrail failed with HYPOTHESIS_REPORT_MISSING")
+
+    def fake_create_agent(*, name: str, **_kwargs: Any) -> _RoleAgent:
+        return _RoleAgent(
+            name,
+            calls,
+            instructions=instructions if name == "hypothesis_writer" else None,
+            first_error=missing if name == "hypothesis_writer" else None,
+        )
+
+    monkeypatch.setattr(guarded_pipeline, "create_agent", fake_create_agent)
+    monkeypatch.setattr(
+        guarded_pipeline,
+        "clear_guarded_report_run_artifacts",
+        lambda _data_dir: calls.append("prepare"),
+    )
+    class _StageGate:
+        @staticmethod
+        def invoke(_args: dict[str, str]) -> str:
+            return json.dumps({"stage1_complete": True})
+
+    monkeypatch.setattr(guarded_pipeline, "check_stage1_completion", _StageGate())
+    monkeypatch.setattr(
+        guarded_pipeline,
+        "validate_hypothesis_report_quality",
+        lambda *_args, **_kwargs: {"valid": True, "errors": []},
+    )
+
+    pipeline = guarded_pipeline.build_guarded_pipeline(
+        _specs(),
+        data_dir=str(tmp_path),
+        default_model=DEFAULT_MODEL,
+        disease="breast cancer",
+        skip_evidence_assessor=True,
+    )
+
+    asyncio.run(pipeline.ainvoke({"messages": []}))
+
+    assert calls == ["prepare", "hypothesis_writer", "hypothesis_writer", "report_writer"]
+    assert "save_hypothesis_report" in instructions[1]
+
+
+def test_nonmissing_hypothesis_error_is_not_retried(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[str] = []
+    error = RuntimeError("Hypothesis report guardrail failed with HYPOTHESIS_LAST_SAVE_REJECTION")
+
+    def fake_create_agent(*, name: str, **_kwargs: Any) -> _RoleAgent:
+        return _RoleAgent(name, calls, first_error=error if name == "hypothesis_writer" else None)
+
+    monkeypatch.setattr(guarded_pipeline, "create_agent", fake_create_agent)
+    monkeypatch.setattr(
+        guarded_pipeline,
+        "clear_guarded_report_run_artifacts",
+        lambda _data_dir: calls.append("prepare"),
+    )
+    class _StageGate:
+        @staticmethod
+        def invoke(_args: dict[str, str]) -> str:
+            return json.dumps({"stage1_complete": True})
+
+    monkeypatch.setattr(guarded_pipeline, "check_stage1_completion", _StageGate())
+
+    pipeline = guarded_pipeline.build_guarded_pipeline(
+        _specs(),
+        data_dir=str(tmp_path),
+        default_model=DEFAULT_MODEL,
+        disease="breast cancer",
+        skip_evidence_assessor=True,
+    )
+
+    with pytest.raises(RuntimeError, match="HYPOTHESIS_LAST_SAVE_REJECTION"):
         asyncio.run(pipeline.ainvoke({"messages": []}))
 
     assert calls == ["prepare", "hypothesis_writer"]
