@@ -9,6 +9,9 @@ from types import SimpleNamespace
 
 import pytest
 
+from src.agents.deep_interpreter.middleware.write_file_guard import (
+    ReadFileBlockMiddleware,
+)
 from src.agents.drug_target.middleware import (
     HypothesisReportGuardrailMiddleware,
     HypothesisRetryLoopMiddleware,
@@ -83,6 +86,10 @@ def test_guarded_interpreter_has_the_hypothesis_write_boundary(tmp_path: Path) -
         "validate_evidence_references",
     } <= tool_names
     assert "save_report_sections" not in tool_names
+    assert any(
+        isinstance(middleware, ReadFileBlockMiddleware)
+        for middleware in writer["middleware"]
+    )
     assert any(
         isinstance(middleware, HypothesisReportGuardrailMiddleware)
         for middleware in writer["middleware"]

@@ -821,6 +821,7 @@ def get_subagents(
         if name == "hypothesis_writer":
             middleware.extend(
                 [
+                    ReadFileBlockMiddleware(),
                     HypothesisRetryLoopMiddleware(max_hypothesis_save_attempts=3),
                     HypothesisReportGuardrailMiddleware(safe_data_dir),
                 ]
