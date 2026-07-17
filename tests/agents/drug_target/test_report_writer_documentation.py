@@ -66,6 +66,12 @@ def test_docs_describe_code_enforced_guarded_phase_order() -> None:
         assert "report_writer is never invoked without a fresh valid hypothesis handoff" in text
         assert "root LLM does not schedule guarded production phases" in text
 
+    reference = REFERENCE.read_text(encoding="utf-8")
+    assert (
+        "evidence_assessor -> hypothesis_writer -> report_writer -> "
+        "DrugReportGuardrailMiddleware -> guarded publication"
+    ) not in reference
+
 
 def test_docs_keep_legacy_and_diagnostic_paths_outside_production() -> None:
     reference = REFERENCE.read_text(encoding="utf-8")

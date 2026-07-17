@@ -127,11 +127,13 @@ Production middleware boundaries:
 
 ### 2.4 Guarded hybrid ownership and recovery
 
-`evidence_assessor -> hypothesis_writer -> report_writer -> DrugReportGuardrailMiddleware -> guarded publication`
-is the complete guarded production graph. The report writer (Qwen in the local
-smoke path) owns only the canonical Section 4 hypotheses and 2–4 Section 5
-recommendations in `report_sections.json`. It never writes Markdown, report
-data, or target assessment artifacts directly.
+The guarded coordinator enforces `prepare -> validate_evidence ->
+hypothesis_writer -> validate_hypothesis -> report_writer -> final
+audit/publication`; evidence runs insert `evidence_assessor` before
+`validate_evidence`. The report writer (Qwen in the local smoke path) owns
+only the canonical Section 4 hypotheses and 2–4 Section 5 recommendations in
+`report_sections.json`. It never writes Markdown, report data, or target
+assessment artifacts directly.
 
 | Output | Owner | When written |
 |---|---|---|
