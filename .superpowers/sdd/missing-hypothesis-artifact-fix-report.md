@@ -79,3 +79,53 @@ No model-backed live tests were run.
   a new abstraction.
 - The existing untracked benchmark `__pycache__/` directory was not modified
   or staged.
+
+## Empty-run directory follow-up
+
+### RED
+
+The original regression pre-created `evidence/`, so it could not establish the
+empty-run contract. Replaced the redundant error-only test with
+`test_hypothesis_guardrail_missing_handoff_from_empty_run_persists_terminal_rejection`.
+It asserts that `tmp_path / "evidence"` is absent before invoking the real
+middleware path, then keeps the same exception and sidecar assertions.
+
+Before the serializer change, ran:
+
+```text
+pytest -q tests/agents/drug_target/test_report_guardrail_middleware.py -k empty_run_persists_terminal_rejection
+```
+
+Result: **1 failed, 75 deselected**. The middleware raised the expected
+`HYPOTHESIS_REPORT_MISSING`, then the test failed with `FileNotFoundError`
+because the serializer did not create `evidence/`.
+
+### GREEN
+
+Added `evidence_dir.mkdir(parents=True, exist_ok=True)` inside the existing
+`try` block in `_write_hypothesis_rejection()`, immediately before the existing
+sidecar write. Directory-creation failures are still `OSError` values handled
+by the same pre-existing silent return, so the serializer's failure behavior
+is unchanged.
+
+```text
+pytest -q tests/agents/drug_target/test_report_guardrail_middleware.py -k empty_run_persists_terminal_rejection
+1 passed, 75 deselected
+
+pytest -q tests/agents/drug_target/test_report_guardrail_middleware.py \
+  tests/agents/drug_target/test_hypothesis_schema.py \
+  tests/agents/drug_target/test_guarded_pipeline.py
+120 passed in 1.77s
+
+ruff check src/agents/drug_target/middleware.py \
+  src/agents/drug_target/tools/hypothesis_schema.py \
+  tests/agents/drug_target/test_report_guardrail_middleware.py
+All checks passed!
+
+git diff --check
+exit 0
+```
+
+No model-backed live tests were run. The existing-directory setup was removed
+because the empty-run regression strictly covers the required durable sidecar
+behavior without duplicate test setup.

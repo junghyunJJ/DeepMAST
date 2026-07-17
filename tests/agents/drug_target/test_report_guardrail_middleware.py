@@ -61,16 +61,11 @@ def test_hypothesis_guardrail_removes_stale_handoff_before_agent(tmp_path: Path)
     assert not (evidence / "hypothesis_report_last_rejection.json").exists()
 
 
-def test_hypothesis_guardrail_rejects_missing_handoff(tmp_path: Path) -> None:
-    with pytest.raises(RuntimeError, match="Hypothesis report guardrail failed"):
-        HypothesisReportGuardrailMiddleware(tmp_path).after_agent({}, None)
-
-
-def test_hypothesis_guardrail_missing_handoff_persists_terminal_rejection(
+def test_hypothesis_guardrail_missing_handoff_from_empty_run_persists_terminal_rejection(
     tmp_path: Path,
 ) -> None:
     evidence = tmp_path / "evidence"
-    evidence.mkdir()
+    assert not evidence.exists()
 
     with pytest.raises(RuntimeError, match="HYPOTHESIS_REPORT_MISSING"):
         HypothesisReportGuardrailMiddleware(tmp_path).after_agent({}, None)

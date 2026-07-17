@@ -119,6 +119,7 @@ def _write_hypothesis_rejection(
         "prediction_grounding_summary": result.get("prediction_grounding_summary"),
     }
     try:
+        evidence_dir.mkdir(parents=True, exist_ok=True)
         _hypothesis_rejection_path(evidence_dir).write_text(
             json.dumps(payload, indent=2, sort_keys=True),
             encoding="utf-8",
