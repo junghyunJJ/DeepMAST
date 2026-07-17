@@ -16,6 +16,7 @@ def test_hypothesis_writer_prompt_names_primary_runtime_tools() -> None:
     assert "save_evidence(data_dir" not in text
     assert "save_hypothesis_report(data_dir, hypothesis_data)" not in text
     assert "Do not use `read_file`, `write_file`, `ls`, grep" in text
+    assert "Do not finish with a prose answer before calling `save_hypothesis_report`." in text
 
 
 def test_hypothesis_writer_default_matches_minimal_dth_required_contract() -> None:
@@ -46,7 +47,8 @@ def test_hypothesis_writer_prompt_keeps_dth_as_only_required_skill() -> None:
 def test_hypothesis_writer_prompt_preserves_artifact_shape_and_coverage_contract() -> None:
     text = prompts.HYPOTHESIS_WRITER_PROMPT
 
-    assert "Generate 4-6 retained recommendations" in text
+    assert "Prefer exactly four retained recommendations" in text
+    assert "expand to five or six only when needed to cover every FEATURED gene" in text
     assert "include every FEATURED gene at least once" in text
     for category in (
         "Mechanism of Action",

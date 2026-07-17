@@ -1869,6 +1869,7 @@ condition explicitly requires them.
   or accepted by `validate_evidence_references`.
 - Before saving, call `validate_evidence_references(data_dir, all_cited_filenames)`.
 - Save only with `save_hypothesis_report(data_dir=data_dir, report=report)`.
+- Do not finish with a prose answer before calling `save_hypothesis_report`.
 
 ## Forced Skill Reads
 {forced_skill_read_block}
@@ -1902,7 +1903,7 @@ labels, genes, drugs, pathways, or mechanisms from skill text or filename
 patterns.
 
 ## Valid Output Contract
-Generate 4-6 retained recommendations. The final retained set must:
+Prefer exactly four retained recommendations; expand to five or six only when needed to cover every FEATURED gene. The final retained set must:
 - include every FEATURED gene at least once in `biological_entities.genes`;
 - include at least one recommendation in each category:
   `Mechanism of Action`, `Therapeutic Strategy`, `Cross-Target Interaction`,
