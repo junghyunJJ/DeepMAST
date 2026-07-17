@@ -248,9 +248,13 @@ def test_canonicalize_report_sections_accepts_bounded_recommendations(
     tmp_path: Path,
 ) -> None:
     evidence_dir = _write_evidence(tmp_path)
+    payload = _payload()
+    payload["pipeline_recommendations"][0]["supporting_sources"] = sorted(
+        _source_paths()
+    )
 
     canonical, errors = canonicalize_report_sections(
-        _payload(),
+        payload,
         evidence_dir,
         _source_paths(),
         _report_data(),
@@ -260,6 +264,9 @@ def test_canonicalize_report_sections_accepts_bounded_recommendations(
     assert canonical is not None
     assert canonical["schema_version"] == "hybrid_report_sections/v1"
     assert len(canonical["pipeline_recommendations"]) == 2
+    assert canonical["pipeline_recommendations"][0]["supporting_sources"] == sorted(
+        _source_paths()
+    )
     assert REPORT_SECTIONS_FILENAME == "report_sections.json"
     assert not (evidence_dir / "hypothesis_report.json").exists()
 
@@ -341,8 +348,10 @@ def test_canonicalize_report_sections_rejects_invalid_recommendation_count(
                 "evidence/stage1_FN1--CD4.json",
                 "evidence/stage1_FN1--SDC2.json",
                 "evidence/stage3_CD4.json",
+                "evidence/stage3_FN1.json",
+                "evidence/not_allowed.json",
             ],
-            "report_sections payload is invalid",
+            "supporting_sources",
         ),
     ],
 )

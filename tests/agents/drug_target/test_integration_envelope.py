@@ -121,6 +121,7 @@ def test_guarded_report_writer_has_one_sections_write_boundary(tmp_path: Path) -
         "text",
         "supporting_sources",
     }
+    assert recommendation_schema["properties"]["supporting_sources"]["maxItems"] == 5
 
 
 def test_legacy_hypothesis_writer_retains_legacy_tools_and_prompt(

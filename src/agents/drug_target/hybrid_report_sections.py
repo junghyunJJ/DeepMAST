@@ -20,7 +20,7 @@ REPORT_SECTIONS_FILENAME = "report_sections.json"
 
 class PipelineRecommendation(BaseModel):
     text: str = Field(min_length=24, max_length=360)
-    supporting_sources: list[str] = Field(min_length=1, max_length=3)
+    supporting_sources: list[str] = Field(min_length=1, max_length=5)
 
 
 class ReportSectionsPayload(BaseModel):
