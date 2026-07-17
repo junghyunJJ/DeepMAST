@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 from collections.abc import Collection, Mapping
 from pathlib import Path
@@ -93,6 +94,117 @@ def _recommendation_validation_card(
         "allowed_terms": [],
         "allowed_numbers": [],
         "allowed_sources": sorted(source_paths),
+    }
+
+
+def _ollama_featured_genes(evidence_dir: Path) -> list[str]:
+    try:
+        assessment = json.loads(
+            (evidence_dir / "assessment_results.json").read_text(encoding="utf-8")
+        )
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"could not read FEATURED genes: {exc}") from exc
+    candidates = assessment.get("stage3_candidates") if isinstance(assessment, dict) else None
+    if not isinstance(candidates, list):
+        raise ValueError("assessment_results.json stage3_candidates must be a list")
+    genes: list[str] = []
+    for candidate in candidates:
+        if not isinstance(candidate, Mapping):
+            continue
+        gene = str(candidate.get("gene") or candidate.get("gene_symbol") or "").strip().upper()
+        if gene and gene not in genes:
+            genes.append(gene)
+    if not genes:
+        raise ValueError("assessment_results.json has no FEATURED genes")
+    return genes
+
+
+def _ollama_hypothesis_sources(
+    evidence_dir: Path,
+    hypothesis_report: Mapping[str, Any],
+) -> list[str]:
+    sources: list[str] = []
+    hypotheses = hypothesis_report.get("hypotheses")
+    if not isinstance(hypotheses, list):
+        raise ValueError("hypothesis_report.json hypotheses must be a list")
+    for hypothesis in hypotheses:
+        if not isinstance(hypothesis, Mapping):
+            continue
+        references = hypothesis.get("evidence_references")
+        if not isinstance(references, list):
+            continue
+        for reference in references:
+            if not isinstance(reference, str):
+                continue
+            filename = Path(reference).name
+            if (
+                filename == reference
+                and filename.endswith(".json")
+                and (evidence_dir / filename).is_file()
+            ):
+                source = f"evidence/{filename}"
+                if source not in sources:
+                    sources.append(source)
+    if not sources:
+        raise ValueError("hypothesis_report.json has no existing evidence references")
+    return sources
+
+
+def _is_safe_ollama_recommendation(
+    text: object,
+    card: Mapping[str, Any],
+) -> bool:
+    if not isinstance(text, str):
+        return False
+    stripped = text.strip()
+    return (
+        24 <= len(stripped) <= 360
+        and "\n" not in stripped
+        and "\r" not in stripped
+        and stripped[-1:] in {".", "!", "?"}
+        and len(re.findall(r"[.!?]", stripped)) == 1
+        and not _MARKDOWN_RECOMMENDATION_RE.search(stripped)
+        and bool(_FUTURE_ACTION_RE.search(stripped))
+        and not validate_interpretation_text(card, stripped)
+    )
+
+
+def build_ollama_report_recommendations(
+    data_dir: str | Path,
+    texts: Mapping[str, str],
+) -> dict[str, object]:
+    """Build the two source-bound Ollama recommendations for the report save tool."""
+    base = Path(data_dir).expanduser().resolve()
+    evidence_dir = base / "evidence"
+    try:
+        hypothesis_report = json.loads(
+            (evidence_dir / "hypothesis_report.json").read_text(encoding="utf-8")
+        )
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"could not read canonical hypothesis report: {exc}") from exc
+    if not isinstance(hypothesis_report, Mapping):
+        raise ValueError("hypothesis_report.json must be a JSON object")
+
+    sources = _ollama_hypothesis_sources(evidence_dir, hypothesis_report)
+    if len(sources) == 1:
+        sources.append(sources[0])
+    genes = _ollama_featured_genes(evidence_dir)
+    card = _recommendation_validation_card(
+        {"candidates": [{"gene": gene} for gene in genes]},
+        set(sources),
+    )
+    fallbacks = (
+        f"Prioritize {genes[0]} validation before advancing target selection.",
+        f"Evaluate {genes[1] if len(genes) > 1 else genes[0]} evidence before planning follow-up studies.",
+    )
+    recommendations = []
+    for index, label in enumerate(("primary", "secondary")):
+        candidate = texts.get(label, "")
+        text = candidate.strip() if _is_safe_ollama_recommendation(candidate, card) else fallbacks[index]
+        recommendations.append({"text": text, "supporting_sources": [sources[index]]})
+    return {
+        "schema_version": "hybrid_report_sections/v1",
+        "pipeline_recommendations": recommendations,
     }
 
 

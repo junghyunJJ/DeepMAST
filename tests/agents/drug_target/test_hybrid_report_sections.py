@@ -8,6 +8,7 @@ import pytest
 from src.agents.drug_target.hybrid_report_sections import (
     REPORT_SECTIONS_FILENAME,
     ReportRecommendationsPayload,
+    build_ollama_report_recommendations,
     canonicalize_report_sections,
 )
 from src.agents.drug_target.tools.hypothesis_schema import (
@@ -189,6 +190,11 @@ def _report_data() -> dict:
     }
 
 
+def _write_valid_hypothesis_report(tmp_path: Path) -> None:
+    _write_evidence(tmp_path)
+    persist_hypothesis_report(tmp_path, _hypothesis_report())
+
+
 def test_report_recommendations_payload_has_no_hypothesis_field() -> None:
     schema = ReportRecommendationsPayload.model_json_schema()
 
@@ -197,6 +203,43 @@ def test_report_recommendations_payload_has_no_hypothesis_field() -> None:
         "pipeline_recommendations",
     }
     assert "hypothesis_report" not in schema["properties"]
+
+
+def test_ollama_recommendation_payload_uses_hypothesis_sources(
+    tmp_path: Path,
+) -> None:
+    _write_valid_hypothesis_report(tmp_path)
+
+    payload = build_ollama_report_recommendations(
+        tmp_path,
+        {
+            "primary": "Prioritize FN1 validation before advancing target selection.",
+            "secondary": "Evaluate CD4 evidence before planning follow-up studies.",
+        },
+    )
+
+    assert payload["schema_version"] == "hybrid_report_sections/v1"
+    assert len(payload["pipeline_recommendations"]) == 2
+    assert all(
+        len(item["supporting_sources"]) == 1
+        for item in payload["pipeline_recommendations"]
+    )
+    assert all(
+        path.startswith("evidence/")
+        for item in payload["pipeline_recommendations"]
+        for path in item["supporting_sources"]
+    )
+
+
+def test_ollama_recommendation_payload_replaces_unsafe_text(tmp_path: Path) -> None:
+    _write_valid_hypothesis_report(tmp_path)
+
+    payload = build_ollama_report_recommendations(
+        tmp_path,
+        {"primary": "# bad\ntext"},
+    )
+
+    assert payload["pipeline_recommendations"][0]["text"].startswith("Prioritize")
 
 
 def test_bound_hypothesis_reader_requires_valid_handoff(tmp_path: Path) -> None:
