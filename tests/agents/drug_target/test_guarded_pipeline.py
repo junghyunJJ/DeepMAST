@@ -71,6 +71,28 @@ def _install_fakes(
     )
 
 
+def test_compile_role_preserves_legacy_spec_without_model(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, Any] = {}
+    spec = {
+        "name": "report_writer",
+        "tools": [object()],
+        "system_prompt": "write report",
+        "middleware": [object()],
+    }
+
+    monkeypatch.setattr(
+        guarded_pipeline,
+        "create_agent",
+        lambda **kwargs: captured.update(kwargs) or object(),
+    )
+
+    guarded_pipeline._compile_role(spec)
+
+    assert captured == {"model": None, **spec}
+
+
 def test_full_pipeline_runs_roles_in_code_enforced_order(
     tmp_path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

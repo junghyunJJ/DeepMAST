@@ -29,11 +29,12 @@ class GuardedPipelineState(TypedDict):
 
 def _compile_role(spec: dict[str, Any]) -> Runnable:
     return create_agent(
-        model=spec["model"],
-        tools=spec["tools"],
-        system_prompt=spec["system_prompt"],
-        middleware=spec["middleware"],
+        model=spec.get("model"),
         name=spec["name"],
+        **{
+            key: spec[key] for key in ("tools", "system_prompt", "middleware")
+            if key in spec
+        },
     )
 
 
