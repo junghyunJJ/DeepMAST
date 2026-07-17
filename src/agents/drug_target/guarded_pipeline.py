@@ -18,6 +18,7 @@ from langgraph.graph.message import add_messages
 from src.agents.drug_target.middleware import clear_guarded_report_run_artifacts
 from src.agents.drug_target.tools import check_stage1_completion
 from src.agents.drug_target.tools.hypothesis_schema import (
+    save_hypothesis_report_from_text,
     validate_hypothesis_report_quality,
 )
 
@@ -43,6 +44,20 @@ def _last_ai_message(result: dict[str, Any]) -> list[AIMessage]:
     return [message for message in messages[-3:] if isinstance(message, AIMessage)][-1:]
 
 
+def _ai_message_text(result: dict[str, Any]) -> str:
+    messages = _last_ai_message(result)
+    if not messages:
+        return ""
+    content = messages[-1].content
+    if isinstance(content, str):
+        return content
+    return "".join(
+        part.get("text", "")
+        for part in content
+        if isinstance(part, dict) and isinstance(part.get("text"), str)
+    )
+
+
 def _format_errors(errors: object) -> str:
     if not isinstance(errors, list):
         return "unknown validation error"
@@ -61,6 +76,7 @@ def build_guarded_pipeline(
     default_model: Any,
     disease: str,
     skip_evidence_assessor: bool,
+    provider: str | None = None,
 ) -> Runnable:
     """Compile existing role specs behind code-enforced phase edges."""
     run_dir = Path(data_dir).expanduser().resolve()
@@ -113,6 +129,26 @@ def build_guarded_pipeline(
     async def run_hypothesis(
         _state: GuardedPipelineState, config: RunnableConfig
     ) -> dict[str, Any]:
+        if provider == "ollama":
+            result = await roles["hypothesis_writer"].ainvoke(
+                {
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": (
+                                f"Return exactly one canonical JSON object with a top-level "
+                                f"hypotheses array for {disease}. Do not use tools or prose. "
+                                f"Data dir: {run_dir}."
+                            ),
+                        }
+                    ]
+                },
+                config=config,
+            )
+            await asyncio.to_thread(
+                save_hypothesis_report_from_text, run_dir, _ai_message_text(result)
+            )
+            return {"messages": _last_ai_message(result)}
         instruction = (
             f"Generate and save the canonical validated handoff. Data dir: {run_dir}."
         )

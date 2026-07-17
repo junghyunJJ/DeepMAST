@@ -823,9 +823,10 @@ def get_subagents(
                 [
                     ReadFileBlockMiddleware(),
                     HypothesisRetryLoopMiddleware(max_hypothesis_save_attempts=3),
-                    HypothesisReportGuardrailMiddleware(safe_data_dir),
                 ]
             )
+            if provider != "ollama":
+                middleware.append(HypothesisReportGuardrailMiddleware(safe_data_dir))
         elif name == "report_writer":
             middleware.append(
                 HypothesisRetryLoopMiddleware(

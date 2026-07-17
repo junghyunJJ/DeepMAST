@@ -5,6 +5,7 @@ import json
 from typing import Any
 
 import pytest
+from langchain_core.messages import AIMessage
 
 from src.agents.drug_target import guarded_pipeline
 
@@ -300,3 +301,63 @@ def test_nonmissing_hypothesis_error_is_not_retried(
         asyncio.run(pipeline.ainvoke({"messages": []}))
 
     assert calls == ["prepare", "hypothesis_writer"]
+
+
+def test_ollama_hypothesis_persists_final_json_before_report(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[str] = []
+    persisted: list[str] = []
+
+    class _JsonRole(_RoleAgent):
+        async def ainvoke(self, _input: dict[str, Any], config: Any = None):
+            _ = config
+            self.calls.append(self.name)
+            if self.name == "hypothesis_writer":
+                return {
+                    "messages": [
+                        AIMessage(content='{"hypotheses": []}')
+                    ]
+                }
+            return {"messages": [AIMessage(content="done")]}
+
+    monkeypatch.setattr(
+        guarded_pipeline,
+        "create_agent",
+        lambda *, name, **_kwargs: _JsonRole(name, calls),
+    )
+    monkeypatch.setattr(
+        guarded_pipeline,
+        "clear_guarded_report_run_artifacts",
+        lambda _data_dir: calls.append("prepare"),
+    )
+    monkeypatch.setattr(
+        guarded_pipeline,
+        "save_hypothesis_report_from_text",
+        lambda _data_dir, text: persisted.append(text) or {"saved": True},
+    )
+
+    class _StageGate:
+        @staticmethod
+        def invoke(_args: dict[str, str]) -> str:
+            return json.dumps({"stage1_complete": True})
+
+    monkeypatch.setattr(guarded_pipeline, "check_stage1_completion", _StageGate())
+    monkeypatch.setattr(
+        guarded_pipeline,
+        "validate_hypothesis_report_quality",
+        lambda *_args, **_kwargs: {"valid": True, "errors": []},
+    )
+    pipeline = guarded_pipeline.build_guarded_pipeline(
+        _specs(),
+        data_dir=str(tmp_path),
+        default_model=DEFAULT_MODEL,
+        disease="breast cancer",
+        skip_evidence_assessor=True,
+        provider="ollama",
+    )
+
+    asyncio.run(pipeline.ainvoke({"messages": []}))
+
+    assert calls == ["prepare", "hypothesis_writer", "report_writer"]
+    assert persisted == ['{"hypotheses": []}']
