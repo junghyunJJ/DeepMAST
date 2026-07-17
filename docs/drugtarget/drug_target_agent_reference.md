@@ -120,10 +120,11 @@ Production middleware boundaries:
 |---|---|---|
 | `DrugReportRunCleanupMiddleware` | top-level | Removes stale guarded output before dispatch. |
 | `DrugTargetManagedFilesystemGuardMiddleware` | top-level + subagents | Blocks generic filesystem/Docker tools and rewrites all `data_dir` arguments. |
-| `DrugTargetTaskAllowlistMiddleware` | top-level | Allows only evidence_assessor, hypothesis_writer, and report_writer; blocks automatic `general-purpose`. |
 | `DrugReportGuardrailMiddleware` | report_writer | Validates, repairs, publishes, and writes audits. |
 
-**Sentinel**: The orchestrator ends with `REPORT_PIPELINE_COMPLETE` after the guarded writer returns.
+**Coordinator boundary**: guarded production invokes deterministic graph nodes
+directly; it has no root task allowlist or completion sentinel. Legacy and
+diagnostic entrypoints retain their separately documented boundaries.
 
 ### 2.4 Guarded hybrid ownership and recovery
 

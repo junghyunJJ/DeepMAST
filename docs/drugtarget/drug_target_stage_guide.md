@@ -68,10 +68,12 @@ prepare -> validate_evidence -> hypothesis_writer
 
 The graph, not the root LLM, enforces this phase order. Evidence validation
 fails closed before `hypothesis_writer`; hypothesis validation fails closed
-before `report_writer`. The top-level task allowlist permits exactly these
-three subagents in the role order `evidence_assessor -> hypothesis_writer -> report_writer`.
-The retained outer graph/finalizer is `legacy_hypothesis`
-compatibility only.
+before `report_writer`. The deterministic coordinator invokes the role nodes
+directly; guarded production has no root task allowlist or completion
+sentinel. When evidence is generated, the role order is
+`evidence_assessor -> hypothesis_writer -> report_writer`, with validation
+gates between roles. The retained outer graph/finalizer is
+`legacy_hypothesis` compatibility only.
 
 To resume existing evidence, the coordinator takes `prepare -> validate_evidence`
 and then regenerates the fresh hypothesis handoff before report writing:

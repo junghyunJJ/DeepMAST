@@ -55,7 +55,9 @@ def test_docs_describe_guarded_reporter_and_graph_builder_entrypoints() -> None:
     assert "guarded 2-subagent" not in reference
     assert "Guarded 2-Subagent" not in stage_guide
     assert "Allows only evidence_assessor/report_writer" not in reference
-    assert "Allows only evidence_assessor, hypothesis_writer, and report_writer" in reference
+    assert "Allows only evidence_assessor, hypothesis_writer, and report_writer" not in reference
+    assert "The top-level task allowlist permits exactly these three subagents" not in stage_guide
+    assert "REPORT_PIPELINE_COMPLETE" not in reference
 
 
 def test_docs_describe_code_enforced_guarded_phase_order() -> None:
