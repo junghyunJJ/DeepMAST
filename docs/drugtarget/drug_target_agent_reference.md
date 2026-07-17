@@ -627,7 +627,7 @@ fresh hypothesis handoff, and write the report:
 export OLLAMA_HOST=http://localhost:6000
 export OLLAMA_BASE_URL=http://localhost:6000
 export OLLAMA_REASONING=false
-export OLLAMA_NUM_PREDICT=2048
+export OLLAMA_NUM_PREDICT=4096
 
 python -X faulthandler -u scripts/run_drug_target_agent_bc.py \
   --data-dir "$RUN_DIR" \
@@ -641,6 +641,14 @@ python -X faulthandler -u scripts/run_drug_target_agent_bc.py \
 The deployed `:6000` Ollama 0.20.6 OpenAI-compatible API ignores output and
 thinking controls, while the native provider honors `think=false` and
 `num_predict`.
+
+A successful publication run requires a fresh valid
+`evidence/hypothesis_report.json`, `report_sections.json`, `drug.md`, and
+`drug_report_validation_final.json` with `valid: true` and
+`publication.status: "passed"`. A durable hypothesis rejection without a
+report audit is fail-closed behavior, not a published report. The coordinator
+retries one `HYPOTHESIS_REPORT_MISSING`; rejected saves remain under the
+writer's bounded repair path.
 
 `run_report_writer_only.py` tests only the reporter phase of a valid existing
 handoff; it fails before model invocation when `hypothesis_report.json` is not valid.

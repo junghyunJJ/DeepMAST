@@ -79,9 +79,20 @@ To resume existing evidence, the coordinator takes `prepare -> validate_evidence
 and then regenerates the fresh hypothesis handoff before report writing:
 
 ```bash
+export OLLAMA_HOST=http://localhost:6000
 export OLLAMA_BASE_URL=http://localhost:6000
+export OLLAMA_REASONING=false
+export OLLAMA_NUM_PREDICT=4096
 python scripts/run_drug_target_agent_bc.py --data-dir /tmp/deepmast-bc-handoff-qwen --disease "breast cancer" --provider ollama-openai --model qwen3.5:122b --skip-evidence-assessor
 ```
+
+A successful publication run requires a fresh valid
+`evidence/hypothesis_report.json`, `report_sections.json`, `drug.md`, and
+`drug_report_validation_final.json` with `valid: true` and
+`publication.status: "passed"`. A durable hypothesis rejection without a
+report audit is fail-closed behavior, not a published report. The coordinator
+retries one `HYPOTHESIS_REPORT_MISSING`; rejected saves remain under the
+writer's bounded repair path.
 
 `run_report_writer_only.py` is diagnostic-only: it tests a valid existing
 handoff's reporter phase and fails before model invocation without one.

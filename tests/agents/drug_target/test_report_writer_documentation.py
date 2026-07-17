@@ -13,8 +13,21 @@ def test_reference_documents_native_ollama_resume_profile() -> None:
     assert "  --provider ollama \\\n" in text
     assert "  --provider ollama-openai \\\n" in text
     assert "OLLAMA_REASONING=false" in text
-    assert "OLLAMA_NUM_PREDICT=2048" in text
+    assert "OLLAMA_NUM_PREDICT=4096" in text
     assert "--heartbeat-seconds 15" in text
+
+
+def test_docs_define_native_qwen_publication_success_profile() -> None:
+    for path in (REFERENCE, STAGE_GUIDE):
+        text = path.read_text(encoding="utf-8")
+        assert "OLLAMA_NUM_PREDICT=4096" in text
+        assert "evidence/hypothesis_report.json" in text
+        assert "report_sections.json" in text
+        assert "drug.md" in text
+        assert "drug_report_validation_final.json" in text
+        assert 'publication.status: "passed"' in text
+        assert "HYPOTHESIS_REPORT_MISSING" in text
+        assert "writer's bounded repair path" in text
 
 
 def test_docs_describe_guarded_reporter_and_graph_builder_entrypoints() -> None:
