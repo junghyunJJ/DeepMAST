@@ -5,7 +5,7 @@
     {
       "id": "initial_direct_write",
       "prompt": "Write the initial guarded report sections for the IPF run at /tmp/deep_interpreter_workspace/ipf_2026 from completed evidence.",
-      "expected_output": "Read the reporting skill, call load_lr_candidates, call load_evidence_files with scope=\"hypothesis\", then call save_report_sections once with one sections payload and stop.",
+      "expected_output": "Read the reporting skill, call load_lr_candidates, call load_evidence_files with scope=\"hypothesis\", then call save_report_sections once with one sections payload; if saved:true stop; if saved:false correct only reported violations and call save_report_sections once more, then stop.",
       "files": []
     },
     {

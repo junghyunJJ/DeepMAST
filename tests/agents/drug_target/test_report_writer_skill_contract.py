@@ -61,7 +61,9 @@ def test_reporting_skill_evals_and_scoring_avoid_legacy_section_four_source() ->
     assert initial["expected_output"] == (
         "Read the reporting skill, call load_lr_candidates, call "
         'load_evidence_files with scope="hypothesis", then call '
-        "save_report_sections once with one sections payload and stop."
+        "save_report_sections once with one sections payload; if saved:true stop; "
+        "if saved:false correct only reported violations and call "
+        "save_report_sections once more, then stop."
     )
     repair = next(item for item in scenarios["evals"] if item["id"] == "repair_only")
     assert repair["expected_output"] == (
