@@ -24,6 +24,7 @@ from src.agents.drug_target.deterministic_report import (
 )
 from src.agents.drug_target.hybrid_report_sections import (
     REPORT_SECTIONS_FILENAME,
+    ReportSectionsPayload,
     canonicalize_report_sections,
 )
 
@@ -212,7 +213,7 @@ def production_save_report_sections_tool(
 
     run_dir = _resolve_run_dir(data_dir)
 
-    def save_report_sections_for_run(payload: dict[str, Any]) -> str:
+    def save_report_sections_for_run(payload: ReportSectionsPayload) -> str:
         try:
             report_data = build_report_data(
                 str(run_dir),
@@ -223,7 +224,7 @@ def production_save_report_sections_tool(
             if not report_data.get("valid"):
                 raise ValueError("deterministic report data is invalid")
             canonical, errors = canonicalize_report_sections(
-                payload,
+                payload.model_dump(),
                 run_dir / "evidence",
                 _hybrid_source_paths(run_dir),
                 report_data,
@@ -278,10 +279,15 @@ def production_save_report_sections_tool(
             _clear_hybrid_artifacts(run_dir)
             return json.dumps({"saved": False, "errors": [str(exc)]})
 
+    def handle_sections_validation_error(exc: Exception) -> str:
+        _clear_hybrid_artifacts(run_dir)
+        return json.dumps({"saved": False, "errors": [str(exc)]})
+
     return StructuredTool.from_function(
         func=save_report_sections_for_run,
         name="save_report_sections",
         description="Validate canonical report sections and render the guarded report.",
+        handle_validation_error=handle_sections_validation_error,
     )
 
 

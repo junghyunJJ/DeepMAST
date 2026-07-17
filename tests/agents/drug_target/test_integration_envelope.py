@@ -93,6 +93,35 @@ def test_guarded_report_writer_has_one_sections_write_boundary(tmp_path: Path) -
 
     assert len(terminal_save_middleware) == 1
 
+    sections_tool = next(
+        tool for tool in writer["tools"] if tool.name == "save_report_sections"
+    )
+    schema = sections_tool.args_schema.model_json_schema()
+
+    def resolve_reference(node):
+        while reference := node.get("$ref"):
+            assert reference.startswith("#/$defs/")
+            resolved = schema.get("$defs", {}).get(
+                reference.removeprefix("#/$defs/")
+            )
+            assert isinstance(resolved, dict)
+            node = resolved
+        return node
+
+    payload_schema = resolve_reference(schema["properties"]["payload"])
+    assert set(payload_schema.get("required", ())) == {
+        "schema_version",
+        "hypothesis_report",
+        "pipeline_recommendations",
+    }
+    recommendation_schema = resolve_reference(
+        payload_schema["properties"]["pipeline_recommendations"]["items"]
+    )
+    assert set(recommendation_schema.get("required", ())) == {
+        "text",
+        "supporting_sources",
+    }
+
 
 def test_legacy_hypothesis_writer_retains_legacy_tools_and_prompt(
     tmp_path: Path,
