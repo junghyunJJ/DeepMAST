@@ -107,6 +107,15 @@ def test_hypothesis_writer_prompt_preserves_bounded_repair_contract() -> None:
         assert phrase in text
 
 
+def test_hypothesis_writer_prompt_repairs_primary_intrinsic_coverage() -> None:
+    from src.agents.drug_target.subagents.prompts import HYPOTHESIS_WRITER_PROMPT
+
+    assert "PRIMARY_EPITHELIAL_INTRINSIC_COVERAGE_MISSING" in HYPOTHESIS_WRITER_PROMPT
+    assert "interest_cell_intrinsic_stage1_pair_files" in HYPOTHESIS_WRITER_PROMPT
+    assert "required_cell_context_anchor" in HYPOTHESIS_WRITER_PROMPT
+    assert "Do not use a spatial-niche-only Stage 1 file" in HYPOTHESIS_WRITER_PROMPT
+
+
 def test_hypothesis_writer_prompt_does_not_embed_dth_interpretation_rubric() -> None:
     text = prompts.HYPOTHESIS_WRITER_PROMPT
 

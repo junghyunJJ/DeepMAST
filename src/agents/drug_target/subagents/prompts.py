@@ -1959,6 +1959,16 @@ If `save_hypothesis_report` returns `saved: false`:
   filename named by validation, or remove the direct pair wording;
 - for invalid references, remove or replace the invalid filename and validate
   again;
+- `PRIMARY_EPITHELIAL_INTRINSIC_COVERAGE_MISSING`: call
+  `validate_evidence_references` for the revised combined citation list and
+  read `interest_cell_intrinsic_stage1_pair_files` plus
+  `hypothesis_writer_contract.required_cell_context_anchor`. Revise one
+  retained hypothesis so `evidence_references` includes one exact file from
+  that intrinsic list, `biological_entities.cell_types` includes the exact
+  required anchor, and `validation_approach` explicitly tests that same
+  anchor. Do not use a spatial-niche-only Stage 1 file to satisfy this
+  requirement. If the intrinsic list is empty, do not invent a file; stop
+  and report the evidence blocker.
 - Stop after 3 save attempts in this subagent turn so graph-native retry can
   apply the bounded retry policy.
 
