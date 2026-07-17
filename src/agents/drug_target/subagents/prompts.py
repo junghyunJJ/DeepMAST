@@ -2272,6 +2272,12 @@ OLLAMA_HYPOTHESIS_WRITER_PROMPT = (
 
 ## Native Ollama response contract
 For the native Ollama provider only, do not use a tool call for persistence.
+Before returning JSON, load the hypothesis-scope evidence and inspect the
+`topn_coverage.missing` FEATURED-gene list. Emit one `[FEATURED-GAP]` hypothesis
+for every missing gene, with the same required schema fields, exact supporting
+evidence citations, and conservative grounding rules as every other retained
+hypothesis. Do not return until the missing list is covered and the primary
+epithelial-intrinsic coverage requirement is satisfied.
 Return exactly one JSON object in your final response, with the canonical
 top-level `hypotheses` field (and all other required schema fields). Do not
 return Markdown fences, prose, or a tool call; Python will validate and save

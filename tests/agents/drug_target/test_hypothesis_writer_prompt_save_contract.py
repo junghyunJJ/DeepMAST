@@ -31,6 +31,16 @@ def test_native_ollama_prompt_uses_response_json_without_changing_legacy_prompt(
     assert "Return exactly one JSON object" not in legacy
 
 
+def test_native_ollama_prompt_covers_missing_featured_genes_before_json() -> None:
+    text = prompts.OLLAMA_HYPOTHESIS_WRITER_PROMPT
+
+    assert "inspect the" in text
+    assert "`topn_coverage.missing` FEATURED-gene list" in text
+    assert "one `[FEATURED-GAP]` hypothesis" in text
+    assert "primary\nepithelial-intrinsic coverage requirement" in text
+    assert "exact supporting\nevidence citations" in text
+
+
 def test_hypothesis_writer_default_matches_minimal_dth_required_contract() -> None:
     text = prompts.HYPOTHESIS_WRITER_PROMPT
     minimal_dth = prompts.render_hypothesis_writer_prompt(
