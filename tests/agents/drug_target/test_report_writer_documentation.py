@@ -78,11 +78,17 @@ def test_docs_describe_rich_section4_validation_contract() -> None:
             in contract_text
         )
         assert "assay modalities, controls, comparators, and readouts" in contract_text
+        assert "are permitted only for proposed prediction and validation designs" in contract_text
         assert "proposals, not evidence or established biological claims" in contract_text
         assert "Source, candidate, and category selection remains deterministic" in contract_text
         assert "at most three safe repairs" in contract_text
         assert "Section 3 and Section 5 remain short, bounded sentence units" in contract_text
         assert "not comprehensive medication NER" in contract_text
+        assert (
+            "prompt constraints, existing entity checks, and deterministic common-name/stem matching"
+            in contract_text
+        )
+        assert "there is no medication dictionary, network lookup, dependency, or assay-modality allowlist" in contract_text
 
 
 def test_docs_describe_guarded_reporter_and_graph_builder_entrypoints() -> None:

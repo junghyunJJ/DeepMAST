@@ -106,6 +106,8 @@ def test_native_ollama_initial_card_instruction_requires_rich_bounded_prose() ->
 
     assert "exactly four labelled, plain-text lines" in card_instruction
     assert "exactly two plain sentences on each labelled line" in card_instruction
+    assert "exactly two plain sentences on each labelled line" not in card_repair
+    assert "one or two plain sentences on each labelled line" in card_repair
     assert "Validation Focus: Mechanistic follow-up" in card_instruction
     assert "Category:" not in card_instruction
     for requirement in (
@@ -123,6 +125,7 @@ def test_native_ollama_initial_card_instruction_requires_rich_bounded_prose() ->
     ):
         assert line not in card_instruction
         assert f"Use this safe template: {line}" in card_repair
+    assert "rejected model prose" not in card_repair
     assert "exactly one plain sentence" not in card_instruction
 
     assert "ERBB3" in candidate_instruction

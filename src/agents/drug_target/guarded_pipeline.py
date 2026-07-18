@@ -256,8 +256,9 @@ def _ollama_card_instruction(
         },
         sentence_rule="Keep each labelled line to one or two plain sentences.",
     )
+    sentence_count = "one or two" if errors else "exactly two"
     return (
-        "Return exactly four labelled, plain-text lines, with exactly two plain sentences on each labelled line, for this bounded hypothesis card.\n"
+        f"Return exactly four labelled, plain-text lines, with {sentence_count} plain sentences on each labelled line, for this bounded hypothesis card.\n"
         f"Card ID: {spec['id']}\n"
         f"Validation Focus: {spec['validation_focus']}\n"
         f"Genes: {', '.join(spec['genes'])}\n"
