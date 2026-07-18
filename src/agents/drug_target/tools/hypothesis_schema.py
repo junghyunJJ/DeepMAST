@@ -8,11 +8,17 @@ import os
 import re
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Mapping
+from typing import TYPE_CHECKING, Any, Mapping
 
 from langchain_core.tools import tool
 
 from src.agents.drug_target.tools.hypothesis_grounding import validate_hypothesis_grounding
+
+if TYPE_CHECKING:
+    from src.agents.drug_target.ollama_hypothesis_cards import (
+        OllamaCardSpec,
+        OllamaHypothesisText,
+    )
 
 _SCHEMA_VERSION = "hypothesis_report.v2"
 _SCORE_KEYS = (
@@ -521,7 +527,7 @@ def canonicalize_hypothesis_report(
     if not isinstance(hypotheses, list):
         return None, ["hypotheses must be a list"], diagnostics
 
-    ollama_specs: list[dict[str, Any]] | None = None
+    ollama_specs: list[OllamaCardSpec] | None = None
     for idx, hyp in enumerate(hypotheses):
         if not isinstance(hyp, dict):
             errors.append(f"hypotheses[{idx}] must be an object")
@@ -600,27 +606,37 @@ def canonicalize_hypothesis_report(
                 except ValueError:
                     ollama_specs = []
             rank = hyp.get("rank")
-            spec = (
-                ollama_specs[rank - 1]
-                if isinstance(rank, int) and not isinstance(rank, bool)
-                and 1 <= rank <= len(ollama_specs)
-                else None
-            )
-            if spec is None:
+            if (
+                not isinstance(rank, int)
+                or isinstance(rank, bool)
+                or not 1 <= rank <= len(ollama_specs)
+            ):
                 errors.append(f"hypotheses[{idx}].ollama_enrichment:CARD_SPEC")
                 continue
+            spec = ollama_specs[rank - 1]
             from src.agents.drug_target.ollama_hypothesis_cards import (
                 validate_ollama_hypothesis_card,
             )
 
-            card = {
-                field: hyp.get(field) if isinstance(hyp.get(field), str) else ""
-                for field in (
-                    "core_claim",
-                    "interpretation_note",
-                    "falsifiable_prediction",
-                    "validation_approach",
-                )
+            card: OllamaHypothesisText = {
+                "core_claim": (
+                    hyp["core_claim"] if isinstance(hyp.get("core_claim"), str) else ""
+                ),
+                "interpretation_note": (
+                    hyp["interpretation_note"]
+                    if isinstance(hyp.get("interpretation_note"), str)
+                    else ""
+                ),
+                "falsifiable_prediction": (
+                    hyp["falsifiable_prediction"]
+                    if isinstance(hyp.get("falsifiable_prediction"), str)
+                    else ""
+                ),
+                "validation_approach": (
+                    hyp["validation_approach"]
+                    if isinstance(hyp.get("validation_approach"), str)
+                    else ""
+                ),
             }
             errors.extend(
                 f"hypotheses[{idx}].ollama_enrichment:{error}"
