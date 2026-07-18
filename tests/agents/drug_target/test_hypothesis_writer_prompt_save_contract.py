@@ -24,7 +24,8 @@ def test_native_ollama_prompt_requests_bounded_plain_prose_without_changing_lega
     ollama = prompts.OLLAMA_HYPOTHESIS_WRITER_PROMPT
 
     assert "exactly four labelled, plain-text lines" in ollama
-    assert "one or two plain sentences per line" in ollama
+    assert "initial card must have exactly two plain sentences per line" in ollama
+    assert "repair requests may use one or two plain sentences per line" in ollama
     assert "Do not call tools" in ollama
     assert "Do not return JSON" in ollama
     assert "save_hypothesis_report" not in ollama

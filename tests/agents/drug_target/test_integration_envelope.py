@@ -109,7 +109,8 @@ def test_guarded_ollama_writer_is_a_tool_free_prose_card_agent(tmp_path: Path) -
 
     assert writer["tools"] == []
     assert "exactly four labelled, plain-text lines" in writer["system_prompt"]
-    assert "one or two plain sentences per line" in writer["system_prompt"]
+    assert "initial card must have exactly two plain sentences per line" in writer["system_prompt"]
+    assert "repair requests may use one or two plain sentences per line" in writer["system_prompt"]
     assert "CORE:" in writer["system_prompt"]
     assert "CONSTRAINT:" in writer["system_prompt"]
     assert "PREDICTION:" in writer["system_prompt"]

@@ -27,6 +27,7 @@ from src.agents.drug_target.middleware import (
     clear_guarded_report_run_artifacts,
 )
 from src.agents.drug_target.ollama_hypothesis_cards import (
+    OllamaAttemptContext,
     OllamaCardSpec,
     OllamaHypothesisText,
     build_ollama_card_specs,
@@ -69,6 +70,10 @@ _REPAIR_GUIDANCE = {
     "CONSTRAINT_REQUIRED_TERMS": "CONSTRAINT must say this does not establish a causal mechanism.",
     "PREDICTION_REQUIRED_TERMS": "PREDICTION must use Test and perturbation.",
     "VALIDATION_REQUIRED_TERMS": "VALIDATION must use Evaluate and perturbation.",
+    "CORE_DESIGN_PLACEMENT": "Move generic assay, control, comparator, or readout design to PREDICTION or VALIDATION.",
+    "CONSTRAINT_DESIGN_PLACEMENT": "Move generic assay, control, comparator, or readout design to PREDICTION or VALIDATION.",
+    "PREDICTION_REPORTED_RESULT": "Describe only a proposed future test, not a reported result.",
+    "VALIDATION_REPORTED_RESULT": "Describe only a proposed future test, not a reported result.",
     "UNSUPPORTED_GENE": "Use only the listed Genes.",
     "UNSUPPORTED_NUMBER": "Remove unsupported numbers.",
     "CANDIDATE_FOLLOWUP_UNSUPPORTED_ENTITY": "Use only the supplied gene and ordinary action words.",
@@ -312,7 +317,7 @@ async def _bounded_ollama_response(
     *,
     initial_instruction: str,
     repair_instruction: Callable[[tuple[str, ...]], str],
-    validate: Callable[[str], tuple[T | None, tuple[str, ...]]],
+    validate: Callable[[str, OllamaAttemptContext], tuple[T | None, tuple[str, ...]]],
     config: RunnableConfig,
     audit: dict[str, Any],
     unit_id: str,
@@ -331,7 +336,10 @@ async def _bounded_ollama_response(
             {"messages": [{"role": "user", "content": instruction}]},
             config=config,
         )
-        value, codes = validate(_ai_message_text(last_result))
+        attempt_context: OllamaAttemptContext = (
+            "initial" if attempt == 0 else "repair"
+        )
+        value, codes = validate(_ai_message_text(last_result), attempt_context)
         history.append(
             {
                 "attempt": attempt,
@@ -454,11 +462,20 @@ def build_guarded_pipeline(
             }
             for spec in specs:
                 def validate_card(
-                    text: str, *, card_spec: OllamaCardSpec = spec
+                    text: str,
+                    attempt_context: OllamaAttemptContext,
+                    *,
+                    card_spec: OllamaCardSpec = spec,
                 ) -> tuple[OllamaHypothesisText | None, tuple[str, ...]]:
                     card, errors = parse_ollama_hypothesis_card(text)
                     if card is not None:
-                        errors.extend(validate_ollama_hypothesis_card(card, spec=card_spec))
+                        errors.extend(
+                            validate_ollama_hypothesis_card(
+                                card,
+                                spec=card_spec,
+                                attempt_context=attempt_context,
+                            )
+                        )
                     return (card if not errors else None), tuple(errors)
 
                 card, _ = await _bounded_ollama_response(
@@ -546,7 +563,10 @@ def build_guarded_pipeline(
                 gene = spec["gene"]
 
                 def validate_followup(
-                    text: str, *, candidate_gene: str = gene
+                    text: str,
+                    _attempt_context: OllamaAttemptContext,
+                    *,
+                    candidate_gene: str = gene,
                 ) -> tuple[dict[str, str] | None, tuple[str, ...]]:
                     followups = build_ollama_candidate_followups(
                         run_dir, {candidate_gene: text}
@@ -587,6 +607,7 @@ def build_guarded_pipeline(
 
                 def validate_recommendation(
                     text: str,
+                    _attempt_context: OllamaAttemptContext,
                     *,
                     recommendation_index: int = index,
                     recommendation_label: str = label,

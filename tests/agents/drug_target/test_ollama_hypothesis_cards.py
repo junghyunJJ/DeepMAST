@@ -82,7 +82,16 @@ def test_parse_bounded_hypothesis_card_returns_named_fields() -> None:
     assert errors == []
     assert card is not None
     assert card["interpretation_note"] == "This follow-up does not establish a causal mechanism."
-    assert validate_ollama_hypothesis_card(card, spec=_mechanism_spec()) == []
+    assert "CORE_SENTENCE" in validate_ollama_hypothesis_card(
+        card,
+        spec=_mechanism_spec(),
+        attempt_context="initial",
+    )
+    assert validate_ollama_hypothesis_card(
+        card,
+        spec=_mechanism_spec(),
+        attempt_context="repair",
+    ) == []
 
 
 def test_bounded_hypothesis_card_accepts_two_sentence_fields() -> None:
@@ -95,7 +104,11 @@ def test_bounded_hypothesis_card_accepts_two_sentence_fields() -> None:
 
     assert errors == []
     assert card is not None
-    assert validate_ollama_hypothesis_card(card, spec=_mechanism_spec()) == []
+    assert validate_ollama_hypothesis_card(
+        card,
+        spec=_mechanism_spec(),
+        attempt_context="initial",
+    ) == []
 
 
 def test_hypothesis_report_uses_all_fallback_fields(bc_data_dir: Path) -> None:
@@ -160,7 +173,81 @@ def test_bounded_hypothesis_card_accepts_each_action_term_side(
     assert card is not None
     card[field] = value
 
-    assert validate_ollama_hypothesis_card(card, spec=_mechanism_spec()) == []
+    assert validate_ollama_hypothesis_card(
+        card,
+        spec=_mechanism_spec(),
+        attempt_context="repair",
+    ) == []
+
+
+def test_card_validator_limits_generic_design_to_future_fields() -> None:
+    from src.agents.drug_target.ollama_hypothesis_cards import (
+        parse_ollama_hypothesis_card,
+        validate_ollama_hypothesis_card,
+    )
+
+    card, errors = parse_ollama_hypothesis_card(RICH_CARD)
+    assert errors == []
+    assert card is not None
+    assert validate_ollama_hypothesis_card(
+        card,
+        spec=_mechanism_spec(),
+        attempt_context="initial",
+    ) == []
+
+    core_design = card.copy()
+    core_design["core_claim"] = core_design["core_claim"].replace(
+        "malignant-cell context.",
+        "malignant-cell context with a generic assay.",
+    )
+    assert "CORE_DESIGN_PLACEMENT" in validate_ollama_hypothesis_card(
+        core_design,
+        spec=_mechanism_spec(),
+        attempt_context="initial",
+    )
+
+    constraint_design = card.copy()
+    constraint_design["interpretation_note"] = constraint_design[
+        "interpretation_note"
+    ].replace(
+        "bounded candidate-level hypothesis.",
+        "bounded candidate-level assay hypothesis.",
+    )
+    assert "CONSTRAINT_DESIGN_PLACEMENT" in validate_ollama_hypothesis_card(
+        constraint_design,
+        spec=_mechanism_spec(),
+        attempt_context="initial",
+    )
+
+
+@pytest.mark.parametrize("field", ["falsifiable_prediction", "validation_approach"])
+def test_card_validator_rejects_reported_results_in_future_fields(field: str) -> None:
+    from src.agents.drug_target.ollama_hypothesis_cards import (
+        parse_ollama_hypothesis_card,
+        validate_ollama_hypothesis_card,
+    )
+
+    card, errors = parse_ollama_hypothesis_card(RICH_CARD)
+    assert errors == []
+    assert card is not None
+    if field == "falsifiable_prediction":
+        card[field] = card[field].replace(
+            "Test whether separate ERBB3 perturbation shifts a prespecified malignant-cell readout.",
+            "Test whether separate ERBB3 perturbation shifts a prespecified malignant-cell readout; the assay showed a shift.",
+        )
+        expected = "PREDICTION_REPORTED_RESULT"
+    else:
+        card[field] = card[field].replace(
+            "Evaluate ERBB3 perturbation using a generic primary assay with matched controls and prespecified readouts.",
+            "Evaluate ERBB3 perturbation using a generic primary assay showed a shift with matched controls and prespecified readouts.",
+        )
+        expected = "VALIDATION_REPORTED_RESULT"
+
+    assert expected in validate_ollama_hypothesis_card(
+        card,
+        spec=_mechanism_spec(),
+        attempt_context="initial",
+    )
 
 
 @pytest.mark.parametrize(

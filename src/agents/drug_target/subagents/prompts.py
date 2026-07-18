@@ -2269,7 +2269,8 @@ HYPOTHESIS_WRITER_PROMPT = _render_minimal_operational_contract_hypothesis_write
 OLLAMA_HYPOTHESIS_WRITER_PROMPT = """You write bounded prose for one Drug Target hypothesis card.
 
 The coordinator supplies the card ID, validation focus, allowed genes, and cell anchor.
-Return exactly four labelled, plain-text lines, with one or two plain sentences per line,
+Return exactly four labelled, plain-text lines. The initial card must have exactly two plain sentences per line;
+repair requests may use one or two plain sentences per line,
 in this order:
 CORE: <listed genes> are evidence-supported candidates for validation in the supplied cell context.
 CONSTRAINT: This follow-up does not establish a causal mechanism.

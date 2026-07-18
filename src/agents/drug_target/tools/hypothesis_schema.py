@@ -640,7 +640,11 @@ def canonicalize_hypothesis_report(
             }
             errors.extend(
                 f"hypotheses[{idx}].ollama_enrichment:{error}"
-                for error in validate_ollama_hypothesis_card(card, spec=spec)
+                for error in validate_ollama_hypothesis_card(
+                    card,
+                    spec=spec,
+                    attempt_context="repair",
+                )
             )
 
     gap_analysis = canonical.get("gap_analysis")

@@ -6,7 +6,7 @@ import json
 import re
 from collections.abc import Iterable, Mapping
 from pathlib import Path
-from typing import Any, TypedDict
+from typing import Any, Literal, TypedDict
 
 from src.agents.drug_target.tools.evidence_loader import (
     _celltype_contract_labels,
@@ -61,6 +61,17 @@ _PLAIN_TEXT_SYNTAX_RE = re.compile(
     r"(?:[*`\[\]~#]|<[^>]+>|(?:^|\n)\s*(?:[-+]|>)\s|"
     r"__[^_\n]+__|(?<![A-Za-z0-9])_[^_\n]+_(?![A-Za-z0-9]))"
 )
+_DESIGN_MARKER_RE = re.compile(
+    r"\b(?:assays?|controls?|comparators?|readouts?)\b", re.IGNORECASE
+)
+_REPORTED_RESULT_RE = re.compile(
+    r"\b(?:assays?|experiments?|tests?|controls?|comparators?|readouts?|perturbations?)\s+"
+    r"(?:that\s+)?(?:showed|demonstrated|revealed|found|produced|yielded)\b|"
+    r"\b(?:was|were)\s+(?:observed|detected|measured)\b",
+    re.IGNORECASE,
+)
+
+OllamaAttemptContext = Literal["initial", "repair"]
 
 
 class OllamaHypothesisText(TypedDict):
@@ -128,9 +139,9 @@ def parse_ollama_hypothesis_card(
     }, []
 
 
-def _has_one_or_two_sentences(text: str) -> bool:
+def _has_sentence_count(text: str, *, minimum: int, maximum: int) -> bool:
     sentences = re.findall(r"[^.!?]+[.!?]", text)
-    return 1 <= len(sentences) <= 2 and " ".join(
+    return minimum <= len(sentences) <= maximum and " ".join(
         sentence.strip() for sentence in sentences
     ) == text
 
@@ -151,6 +162,7 @@ def validate_ollama_hypothesis_card(
     card: OllamaHypothesisText,
     *,
     spec: OllamaCardSpec,
+    attempt_context: OllamaAttemptContext = "repair",
 ) -> list[str]:
     """Return symbolic errors for the bounded model-owned fields."""
     errors: list[str] = []
@@ -197,7 +209,10 @@ def validate_ollama_hypothesis_card(
             continue
         if not minimum_length <= len(text) <= 360:
             errors.append(f"{prefix}_LENGTH")
-        if not _has_one_or_two_sentences(text):
+        minimum_sentences = 2 if attempt_context == "initial" else 1
+        if not _has_sentence_count(
+            text, minimum=minimum_sentences, maximum=2
+        ):
             errors.append(f"{prefix}_SENTENCE")
         if (
             "\n" in text
@@ -212,6 +227,14 @@ def validate_ollama_hypothesis_card(
         unsafe_claim = unsafe_ollama_claim_code(text)
         if unsafe_claim is not None:
             errors.append(f"{prefix}_{unsafe_claim}")
+        if key in {"core_claim", "interpretation_note"} and _DESIGN_MARKER_RE.search(
+            text
+        ):
+            errors.append(f"{prefix}_DESIGN_PLACEMENT")
+        if key in {"falsifiable_prediction", "validation_approach"} and _REPORTED_RESULT_RE.search(
+            text
+        ):
+            errors.append(f"{prefix}_REPORTED_RESULT")
         unsupported_claim = _unsupported_card_claim_code(text)
         if unsupported_claim is not None:
             errors.append(unsupported_claim)
@@ -419,7 +442,11 @@ def build_ollama_hypothesis_report(
         card = (
             enriched_card
             if enriched_card is not None
-            and not validate_ollama_hypothesis_card(enriched_card, spec=spec)
+            and not validate_ollama_hypothesis_card(
+                enriched_card,
+                spec=spec,
+                attempt_context="repair",
+            )
             else spec["fallback_card"]
         )
         cell_anchor = spec["cell_anchor"]

@@ -56,10 +56,10 @@ def _specs() -> list[dict[str, Any]]:
 
 def _bounded_card(gene: str, anchor: str = "malignant cell") -> str:
     return "\n".join((
-        f"CORE: {gene} is an evidence-supported candidate for validation in {anchor} context.",
-        "CONSTRAINT: This follow-up does not establish a causal mechanism.",
-        f"PREDICTION: Test whether separate {gene} perturbation shifts a prespecified {anchor} readout.",
-        f"VALIDATION: Evaluate separate {gene} perturbation with a generic primary assay, matched controls, and prespecified {anchor} readouts.",
+        f"CORE: {gene} is an evidence-supported candidate for validation in {anchor} context. Its prioritization remains a bounded follow-up question.",
+        "CONSTRAINT: This follow-up does not establish a causal mechanism. It remains a bounded candidate-level interpretation.",
+        f"PREDICTION: Test whether separate {gene} perturbation shifts a prespecified {anchor} readout. Compare the perturbation with a matched non-targeting control.",
+        f"VALIDATION: Evaluate separate {gene} perturbation with a generic primary assay, matched controls, and prespecified {anchor} readouts. Add an orthogonal comparator only as a future design choice.",
     ))
 
 
@@ -907,6 +907,7 @@ def test_unsafe_ollama_report_sentence_repairs_then_uses_fallback(
 
 def test_bounded_ollama_response_repairs_three_times_before_fallback() -> None:
     calls: list[str] = []
+    contexts: list[str] = []
 
     class _RejectedRole:
         async def ainvoke(self, _input: dict[str, Any], config: Any = None) -> dict[str, Any]:
@@ -920,7 +921,11 @@ def test_bounded_ollama_response_repairs_three_times_before_fallback() -> None:
             _RejectedRole(),
             initial_instruction="initial",
             repair_instruction=lambda codes: f"repair {','.join(codes)}",
-            validate=lambda text: (None, ("BAD",)) if text == "bad" else (text, ()),
+            validate=lambda text, context: (
+                contexts.append(context) or (None, ("BAD",))
+                if text == "bad"
+                else (text, ())
+            ),
             config={},
             audit=audit,
             unit_id="hypothesis.mechanism",
@@ -933,6 +938,7 @@ def test_bounded_ollama_response_repairs_three_times_before_fallback() -> None:
     assert value is None
     assert result == {"messages": [AIMessage(content="bad")]}
     assert calls == ["initial", "repair BAD", "repair BAD", "repair BAD"]
+    assert contexts == ["initial", "repair", "repair", "repair"]
     assert audit["units"]["hypothesis.mechanism"] == {
         "phase": "hypothesis",
         "status": "fallback",
@@ -942,6 +948,67 @@ def test_bounded_ollama_response_repairs_three_times_before_fallback() -> None:
             for index in range(4)
         ],
     }
+
+
+def test_card_repair_guidance_excludes_rejected_model_prose() -> None:
+    from src.agents.drug_target.ollama_hypothesis_cards import (
+        parse_ollama_hypothesis_card,
+        validate_ollama_hypothesis_card,
+    )
+
+    sentinel = "raw-secret-sentinel"
+    rejected = _bounded_card("ERBB3").replace(
+        "in malignant cell context.",
+        f"in malignant cell context where {sentinel} drives disease.",
+        1,
+    )
+    instructions: list[str] = []
+    spec = _ollama_card_spec("mechanism", "Mechanism of Action", "ERBB3")
+
+    class _RejectedCardRole:
+        async def ainvoke(
+            self, payload: dict[str, Any], config: Any = None
+        ) -> dict[str, Any]:
+            _ = config
+            instructions.append(str(payload["messages"][0]["content"]))
+            return {"messages": [AIMessage(content=rejected)]}
+
+    def validate_card(
+        text: str, attempt_context: str
+    ) -> tuple[object | None, tuple[str, ...]]:
+        card, errors = parse_ollama_hypothesis_card(text)
+        if card is not None:
+            errors.extend(
+                validate_ollama_hypothesis_card(
+                    card,
+                    spec=spec,
+                    attempt_context=attempt_context,
+                )
+            )
+        return (card if not errors else None), tuple(errors)
+
+    async def run() -> dict[str, Any]:
+        audit: dict[str, Any] = {"units": {}}
+        await guarded_pipeline._bounded_ollama_response(
+            _RejectedCardRole(),
+            initial_instruction=guarded_pipeline._ollama_card_instruction(spec),
+            repair_instruction=lambda codes: guarded_pipeline._ollama_card_instruction(
+                spec, codes
+            ),
+            validate=validate_card,
+            config={},
+            audit=audit,
+            unit_id="hypothesis.mechanism",
+            phase="hypothesis",
+        )
+        return audit
+
+    audit = asyncio.run(run())
+
+    assert "CORE_UNSAFE_CLAIM" in audit["units"]["hypothesis.mechanism"]["attempts"][0]["codes"]
+    assert "Use this safe template: CORE: ERBB3 is an evidence-supported candidate" in instructions[1]
+    assert sentinel not in instructions[1]
+    assert sentinel not in json.dumps(audit)
 
 
 def test_rejected_candidate_followup_repairs_three_times_then_is_omitted(
