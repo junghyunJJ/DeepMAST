@@ -263,6 +263,28 @@ def test_canonicalize_report_sections_accepts_source_bound_candidate_followup(
     assert canonical["candidate_followups"][0]["gene"] == "FN1"
 
 
+def test_canonicalize_report_sections_keeps_internal_underscore_identifiers(
+    tmp_path: Path,
+) -> None:
+    evidence_dir = _write_evidence(tmp_path)
+    payload = _payload()
+    payload["candidate_followups"] = [{
+        "gene": "FN1",
+        "text": "Prioritize FN1_variant perturbation follow-up before advancing target selection.",
+        "supporting_source": "evidence/stage3_FN1.json",
+    }]
+
+    canonical, errors = canonicalize_report_sections(
+        payload,
+        evidence_dir,
+        _source_paths(),
+        _report_data(),
+    )
+
+    assert errors == []
+    assert canonical is not None
+
+
 def test_canonicalize_report_sections_rejects_unknown_followup_gene(
     tmp_path: Path,
 ) -> None:
@@ -450,6 +472,7 @@ def test_canonicalize_report_sections_accepts_bounded_recommendations(
         "Prioritize 7 experiments before advancing target selection.",
         "[source: evidence/assessment_results.json] Prioritize FN1 validation.",
         "Prioritize **FN1** validation before advancing target selection.",
+        "Prioritize _FN1_ validation before advancing target selection.",
         "Prioritize `FN1` validation before advancing target selection.",
         "Prioritize <script>FN1</script> validation before advancing target selection.",
         "FN1 is a supported candidate in deterministic analysis.",
@@ -567,6 +590,41 @@ def test_canonicalize_report_sections_ignores_caller_entity_allowlist(
 
     assert canonical is None
     assert "Unsupported entity token" in "\n".join(errors)
+
+
+def test_hybrid_renderer_preserves_canonical_candidate_followup_sources(
+    tmp_path: Path,
+) -> None:
+    from src.agents.drug_target.deterministic_report import render_hybrid_report
+
+    evidence_dir = _write_renderer_evidence(tmp_path)
+    payload = _payload()
+    payload["candidate_followups"] = [
+        {
+            "gene": "CD4",
+            "text": "Evaluate CD4 perturbation follow-up before advancing target selection.",
+            "supporting_source": "evidence/stage3_CD4.json",
+        },
+        {
+            "gene": "FN1",
+            "text": "Prioritize FN1 perturbation follow-up before advancing target selection.",
+            "supporting_source": "evidence/stage3_FN1.json",
+        },
+    ]
+    canonical, errors = canonicalize_report_sections(
+        payload,
+        evidence_dir,
+        _source_paths(),
+        _report_data(),
+    )
+
+    assert errors == []
+    assert canonical is not None
+
+    markdown, _ = render_hybrid_report(str(tmp_path), "IPF", canonical)
+
+    assert "[from evidence/stage3_CD4.json]" in markdown
+    assert "[from evidence/stage3_FN1.json]" in markdown
 
 
 def test_hybrid_renderer_uses_canonical_sections_with_host_owned_provenance(

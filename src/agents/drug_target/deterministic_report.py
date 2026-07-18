@@ -2295,7 +2295,10 @@ def render_hybrid_report(
     interpretations = {
         "candidates": {
             item["gene"].upper(): {
-                "recommendation": f"- {item['text']} [source: gene]"
+                "recommendation": (
+                    f"- {item['text']} [source: gene] "
+                    f"[from {item['supporting_source']}]"
+                )
             }
             for item in candidate_followups
         }

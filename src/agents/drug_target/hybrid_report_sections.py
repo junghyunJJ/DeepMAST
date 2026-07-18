@@ -61,7 +61,8 @@ class ReportRecommendationsPayload(BaseModel):
 _MARKDOWN_RECOMMENDATION_RE = re.compile(
     r"(^\s*(?:#{1,6}\s|[-*+]\s+|\d+[.)]\s|>\s)|"
     r"\[[^\]]+\]\([^)]*\)|\[source\s*:|\b[\w.-]+\.json\b|"
-    r"`|\*{1,3}|~~|<[/!]?[A-Za-z][^>\n]*>)",
+    r"`|\*{1,3}|~~|<[/!]?[A-Za-z][^>\n]*>|"
+    r"__[^_\n]+__|(?<![A-Za-z0-9])_[^_\n]+_(?![A-Za-z0-9]))",
     re.IGNORECASE,
 )
 _FUTURE_ACTION_RE = re.compile(
