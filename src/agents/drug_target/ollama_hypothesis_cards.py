@@ -66,7 +66,8 @@ _DESIGN_MARKER_RE = re.compile(
 )
 _REPORTED_RESULT_RE = re.compile(
     r"\b(?:assays?|experiments?|tests?|controls?|comparators?|readouts?|perturbations?)\s+"
-    r"(?:that\s+)?(?:showed|demonstrated|revealed|found|produced|yielded)\b|"
+    r"(?:that\s+)?(?:showed|demonstrated|revealed|found|produced|yielded|"
+    r"increased|decreased|reduced|altered)\b|"
     r"\b(?:was|were)\s+(?:observed|detected|measured)\b",
     re.IGNORECASE,
 )

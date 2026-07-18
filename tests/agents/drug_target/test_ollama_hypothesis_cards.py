@@ -250,6 +250,37 @@ def test_card_validator_rejects_reported_results_in_future_fields(field: str) ->
     )
 
 
+def test_card_validator_rejects_past_directional_perturbation_outcomes() -> None:
+    from src.agents.drug_target.ollama_hypothesis_cards import (
+        parse_ollama_hypothesis_card,
+        validate_ollama_hypothesis_card,
+    )
+
+    card, errors = parse_ollama_hypothesis_card(RICH_CARD)
+    assert errors == []
+    assert card is not None
+
+    card["falsifiable_prediction"] = (
+        "Test whether separate ERBB3 perturbation shifts a prespecified malignant-cell "
+        "readout. The perturbation increased the readout."
+    )
+    assert "PREDICTION_REPORTED_RESULT" in validate_ollama_hypothesis_card(
+        card,
+        spec=_mechanism_spec(),
+        attempt_context="initial",
+    )
+
+    card["falsifiable_prediction"] = (
+        "Test whether separate ERBB3 perturbation increases a prespecified malignant-cell "
+        "readout. Compare the perturbation with a matched non-targeting control."
+    )
+    assert validate_ollama_hypothesis_card(
+        card,
+        spec=_mechanism_spec(),
+        attempt_context="initial",
+    ) == []
+
+
 @pytest.mark.parametrize(
     ("text", "code"),
     [
