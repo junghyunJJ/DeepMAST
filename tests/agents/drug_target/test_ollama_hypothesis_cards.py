@@ -78,12 +78,69 @@ def test_hypothesis_report_uses_all_fallback_fields(bc_data_dir: Path) -> None:
     assert hypothesis["validation_approach"].startswith("Evaluate")
 
 
+def test_hypothesis_report_keeps_valid_mapped_card(bc_data_dir: Path) -> None:
+    from src.agents.drug_target.ollama_hypothesis_cards import parse_ollama_hypothesis_card
+
+    card, errors = parse_ollama_hypothesis_card(_bounded_card())
+    assert errors == []
+    assert card is not None
+
+    hypothesis = build_ollama_hypothesis_report(
+        bc_data_dir,
+        {"mechanism": card},
+    )["hypotheses"][0]
+
+    assert hypothesis["core_claim"] == card["core_claim"]
+    assert hypothesis["interpretation_note"] == card["interpretation_note"]
+    assert hypothesis["falsifiable_prediction"] == card["falsifiable_prediction"]
+    assert hypothesis["validation_approach"] == card["validation_approach"]
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        (
+            "falsifiable_prediction",
+            "Test ERBB3 and EFNB2 using prespecified malignant cell readouts.",
+        ),
+        (
+            "falsifiable_prediction",
+            "Use separate ERBB3 and EFNB2 perturbation readouts in malignant cells.",
+        ),
+        (
+            "validation_approach",
+            "Evaluate ERBB3 and EFNB2 readouts in malignant cell context.",
+        ),
+        (
+            "validation_approach",
+            "Use separate ERBB3 and EFNB2 perturbation readouts in malignant cell context.",
+        ),
+    ],
+)
+def test_bounded_hypothesis_card_accepts_each_action_term_side(
+    field: str,
+    value: str,
+) -> None:
+    from src.agents.drug_target.ollama_hypothesis_cards import (
+        parse_ollama_hypothesis_card,
+        validate_ollama_hypothesis_card,
+    )
+
+    card, errors = parse_ollama_hypothesis_card(_bounded_card())
+    assert errors == []
+    assert card is not None
+    card[field] = value
+
+    assert validate_ollama_hypothesis_card(card, spec=_mechanism_spec()) == []
+
+
 @pytest.mark.parametrize(
     ("text", "code"),
     [
         (_bounded_card().replace("ERBB3 and EFNB2", "ERBB3 and SDC1"), "UNSUPPORTED_GENE"),
         (_bounded_card().replace("does not establish", "proves"), "CONSTRAINT_UNSAFE_CLAIM"),
         (_bounded_card().replace("prespecified", "99% prespecified"), "UNSUPPORTED_NUMBER"),
+        (_bounded_card().replace("prespecified", "a .json marker in"), "PREDICTION_UNSAFE_CONTENT"),
         (_bounded_card() + "\nEXTRA: text", "CARD_FORMAT"),
     ],
 )

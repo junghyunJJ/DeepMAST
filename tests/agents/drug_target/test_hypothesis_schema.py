@@ -5,6 +5,9 @@ from pathlib import Path
 
 import pytest
 
+from src.agents.drug_target.ollama_hypothesis_cards import (
+    build_ollama_hypothesis_report,
+)
 from src.agents.drug_target.tools import (
     save_evidence,
     save_hypothesis_report,
@@ -144,6 +147,28 @@ def _write_malignant_intrinsic_evidence(tmp_path: Path) -> Path:
         encoding="utf-8",
     )
     return tmp_path
+
+
+def _write_ollama_enrichment_evidence(tmp_path: Path) -> Path:
+    data_dir = _write_malignant_intrinsic_evidence(tmp_path)
+    evidence_dir = data_dir / "evidence"
+    (evidence_dir / "assessment_results.json").write_text(
+        json.dumps({
+            "stage3_candidates": [
+                {"gene": "EGF"},
+                {"gene": "ERBB2"},
+                {"gene": "TP53"},
+                {"gene": "KRAS"},
+            ]
+        }),
+        encoding="utf-8",
+    )
+    for gene in ("TP53", "KRAS"):
+        (evidence_dir / f"stage3_{gene}.json").write_text(
+            json.dumps({"gene_symbol": gene}),
+            encoding="utf-8",
+        )
+    return data_dir
 
 
 def _strict_report() -> dict:
@@ -992,12 +1017,16 @@ def test_save_hypothesis_report_accepts_primary_epithelial_intrinsic_coverage(
     assert result["saved"] is True, result
 
 
-def test_save_hypothesis_report_canonicalizes_labels_and_refs(tmp_path: Path) -> None:
+def test_save_hypothesis_report_keeps_unmarked_report_compatible_and_canonicalizes_labels_and_refs(
+    tmp_path: Path,
+) -> None:
     data_dir = _write_hypothesis_evidence(tmp_path)
+    report = _strict_report()
+    assert "interpretation_note" not in report["hypotheses"][0]
 
     result = json.loads(
         save_hypothesis_report.invoke(
-            {"data_dir": str(data_dir), "report": _strict_report()}
+            {"data_dir": str(data_dir), "report": report}
         )
     )
 
@@ -1020,6 +1049,24 @@ def test_save_hypothesis_report_canonicalizes_labels_and_refs(tmp_path: Path) ->
         "orphan_files": ["stage1_FN1--SDC2.json", "stage3_FN1.json"],
     }
     assert saved["evidence_coverage_pct"] == 50.0
+
+
+def test_save_hypothesis_report_rejects_marked_ollama_enrichment(
+    tmp_path: Path,
+) -> None:
+    data_dir = _write_ollama_enrichment_evidence(tmp_path)
+    report = build_ollama_hypothesis_report(data_dir, {})
+    report["hypotheses"][0]["interpretation_note"] = (
+        "This follow-up proves a causal mechanism."
+    )
+
+    result = json.loads(
+        save_hypothesis_report.invoke({"data_dir": str(data_dir), "report": report})
+    )
+
+    assert result["saved"] is False
+    assert "hypotheses[0].ollama_enrichment:CONSTRAINT_UNSAFE_CLAIM" in result["errors"]
+    assert not (data_dir / "evidence" / "hypothesis_report.json").exists()
 
 
 def test_save_hypothesis_report_recomputes_gap_analysis_from_actual_citations(

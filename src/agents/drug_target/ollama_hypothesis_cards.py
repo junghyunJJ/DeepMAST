@@ -113,10 +113,16 @@ def validate_ollama_hypothesis_card(
     allowed_genes = {gene.upper() for gene in spec["genes"]}
     known_genes = tuple(spec["known_genes"])
     requirements = {
-        "core_claim": ("CORE", (r"\bcandidates?\b", r"\bvalidation\b")),
-        "interpretation_note": ("CONSTRAINT", (r"\bnot\b", r"\bcausal\b")),
-        "falsifiable_prediction": ("PREDICTION", (r"\btest\b", r"\bperturbation\b")),
-        "validation_approach": ("VALIDATION", (r"\bevaluate\b", r"\bperturbation\b")),
+        "core_claim": ("CORE", ((r"\bcandidates?\b",), (r"\bvalidation\b",))),
+        "interpretation_note": ("CONSTRAINT", ((r"\bnot\b",), (r"\bcausal\b",))),
+        "falsifiable_prediction": (
+            "PREDICTION",
+            ((r"\btest\b", r"\bperturbations?\b"),),
+        ),
+        "validation_approach": (
+            "VALIDATION",
+            ((r"\bevaluate\b", r"\bperturbations?\b"),),
+        ),
     }
 
     for key, (prefix, terms) in requirements.items():
@@ -126,7 +132,12 @@ def validate_ollama_hypothesis_card(
             continue
         if not _is_single_sentence(text):
             errors.append(f"{prefix}_SENTENCE")
-        if "\n" in text or "/" in text or "\\" in text or _FILENAME_RE.search(text):
+        if (
+            "\n" in text
+            or "/" in text
+            or "\\" in text
+            or ".json" in text.lower()
+        ):
             errors.append(f"{prefix}_UNSAFE_CONTENT")
         if _MARKDOWN_RE.search(text):
             errors.append(f"{prefix}_MARKDOWN")
@@ -144,7 +155,10 @@ def validate_ollama_hypothesis_card(
             for gene in known_genes
         ):
             errors.append("UNSUPPORTED_GENE")
-        if not all(re.search(pattern, text, re.IGNORECASE) for pattern in terms):
+        if not all(
+            any(re.search(pattern, text, re.IGNORECASE) for pattern in alternatives)
+            for alternatives in terms
+        ):
             errors.append(f"{prefix}_REQUIRED_TERMS")
     return errors
 
