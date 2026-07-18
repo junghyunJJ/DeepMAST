@@ -43,11 +43,9 @@ _UNSAFE_CLAIM_RE = re.compile(
     r"effective treatment)\b",
     re.IGNORECASE,
 )
-# ponytail: no evidence-backed drug list is available to this card validator;
-# replace this suffix heuristic if OllamaCardSpec gains allowed-drug context.
 _NAMED_DRUG_RE = re.compile(
     r"\b(?:aspirin|[A-Za-z][A-Za-z0-9-]*(?:mab|nib|tinib|statin|cillin|cycline|"
-    r"azole|vir|xaban|parin|platin|taxel|mycin|xifen|farin|formin))\b",
+    r"azole|vir|xaban|parin|platin|taxel|mycin|xifen|farin|formin|profen))\b",
     re.IGNORECASE,
 )
 _SOURCE_EVIDENCE_CLAIM_RE = re.compile(

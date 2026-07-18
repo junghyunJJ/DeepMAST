@@ -248,6 +248,7 @@ def test_bounded_hypothesis_card_rejects_hyphenated_direct_interaction() -> None
     ("replacement", "code"),
     [
         ("with aspirin.", "UNSUPPORTED_DRUG"),
+        ("with ibuprofen.", "UNSUPPORTED_DRUG"),
         ("with tamoxifen.", "UNSUPPORTED_DRUG"),
         ("with warfarin.", "UNSUPPORTED_DRUG"),
         ("with metformin.", "UNSUPPORTED_DRUG"),
