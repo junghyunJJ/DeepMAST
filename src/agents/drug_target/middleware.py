@@ -50,6 +50,7 @@ def clear_guarded_report_run_artifacts(data_dir: str | Path) -> None:
         path = run_dir / name
         for candidate in (path, path.with_suffix(f"{path.suffix}.tmp")):
             candidate.unlink(missing_ok=True)
+    (run_dir / "evidence" / "llm_enrichment_audit.json").unlink(missing_ok=True)
     for staging_dir in run_dir.glob(".report-sections-*"):
         if staging_dir.is_dir() and not staging_dir.is_symlink():
             shutil.rmtree(staging_dir)

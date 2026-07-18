@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -51,6 +52,34 @@ def _specs() -> list[dict[str, Any]]:
         }
         for name in ("evidence_assessor", "hypothesis_writer", "report_writer")
     ]
+
+
+def _bounded_card(gene: str, anchor: str = "malignant cell") -> str:
+    return "\n".join((
+        f"CORE: {gene} is an evidence-supported candidate for validation in {anchor} context.",
+        "CONSTRAINT: This follow-up does not establish a causal mechanism.",
+        f"PREDICTION: Test whether separate {gene} perturbation changes prespecified {anchor} readouts.",
+        f"VALIDATION: Evaluate separate {gene} perturbation readouts in {anchor} context.",
+    ))
+
+
+def _ollama_card_spec(card_id: str, category: str, gene: str) -> dict[str, object]:
+    card = {
+        "core_claim": f"{gene} is an evidence-supported candidate for validation in malignant cell context.",
+        "interpretation_note": "This follow-up does not establish a causal mechanism.",
+        "falsifiable_prediction": f"Test whether separate {gene} perturbation changes prespecified malignant cell readouts.",
+        "validation_approach": f"Evaluate separate {gene} perturbation readouts in malignant cell context.",
+    }
+    return {
+        "id": card_id,
+        "category": category,
+        "genes": [gene],
+        "evidence_references": [f"ot_{gene}.json", f"stage3_{gene}.json"],
+        "cell_anchor": "malignant cell",
+        "fallback_hypothesis": card["core_claim"],
+        "fallback_card": card,
+        "known_genes": ("EFNB2", "EPHB4", "ERBB2", "ERBB3", "SDC1"),
+    }
 
 
 def _install_fakes(
@@ -310,15 +339,7 @@ def test_ollama_generates_one_bounded_card_per_spec(
     instructions: list[str] = []
     saved_reports: list[dict[str, object]] = []
     specs = [
-        {
-            "id": card_id,
-            "category": category,
-            "genes": [gene],
-            "evidence_references": [f"ot_{gene}.json", f"stage3_{gene}.json"],
-            "cell_anchor": "malignant cell",
-            "fallback_hypothesis": f"{gene} is a validation candidate.",
-            "known_genes": ("EFNB2", "EPHB4", "ERBB2", "ERBB3", "SDC1"),
-        }
+        _ollama_card_spec(card_id, category, gene)
         for card_id, category, gene in (
             ("mechanism", "Mechanism of Action", "EFNB2"),
             ("therapy", "Therapeutic Strategy", "EPHB4"),
@@ -340,10 +361,7 @@ def test_ollama_generates_one_bounded_card_per_spec(
                 return {
                     "messages": [
                         AIMessage(
-                            content=(
-                                f"{genes} are evidence-supported candidates for "
-                                f"validation in {anchor} context."
-                            )
+                            content=_bounded_card(genes, anchor)
                         )
                     ]
                 }
@@ -403,7 +421,19 @@ def test_ollama_generates_one_bounded_card_per_spec(
         ],
     }
     monkeypatch.setattr(
-        guarded_pipeline, "build_ollama_report_recommendations", lambda *_args: payload
+        guarded_pipeline, "build_ollama_candidate_followup_specs", lambda _data_dir: []
+    )
+    monkeypatch.setattr(
+        guarded_pipeline, "build_ollama_candidate_followups", lambda _data_dir, _texts: []
+    )
+    monkeypatch.setattr(
+        guarded_pipeline, "build_ollama_report_recommendations", lambda _data_dir, texts: {
+            **payload,
+            "pipeline_recommendations": [
+                {"text": texts.get("primary", "fallback primary"), "supporting_sources": ["evidence/ot_ERBB2.json"]},
+                {"text": texts.get("secondary", "fallback secondary"), "supporting_sources": ["evidence/ot_ERBB3.json"]},
+            ],
+        }
     )
     monkeypatch.setattr(
         guarded_pipeline,
@@ -429,8 +459,6 @@ def test_ollama_generates_one_bounded_card_per_spec(
         "hypothesis_writer",
         "report_writer",
         "report_writer",
-        "report_writer",
-        "report_writer",
     ]
     assert [
         instruction.split("Card ID: ")[1].split("\n", 1)[0]
@@ -440,21 +468,13 @@ def test_ollama_generates_one_bounded_card_per_spec(
     assert saved_reports == [report]
 
 
-def test_rejected_ollama_card_retries_once_then_uses_fallback(
+def test_rejected_ollama_card_repairs_three_times_then_uses_fallback(
     tmp_path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     calls: list[str] = []
     saved_card_texts: dict[str, str] = {}
     specs = [
-        {
-            "id": card_id,
-            "category": category,
-            "genes": [gene],
-            "evidence_references": [f"ot_{gene}.json", f"stage3_{gene}.json"],
-            "cell_anchor": "malignant cell",
-            "fallback_hypothesis": f"{gene} is a validation candidate.",
-            "known_genes": ("EFNB2", "EPHB4", "ERBB2", "ERBB3", "SDC1"),
-        }
+        _ollama_card_spec(card_id, category, gene)
         for card_id, category, gene in (
             ("mechanism", "Mechanism of Action", "EFNB2"),
             ("therapy", "Therapeutic Strategy", "EPHB4"),
@@ -464,11 +484,13 @@ def test_rejected_ollama_card_retries_once_then_uses_fallback(
     ]
     responses = iter(
         [
-            "SDC1 warrants validation.",
-            "SDC1 warrants validation.",
-            "EPHB4 are evidence-supported candidates for validation in malignant cell context.",
-            "ERBB2 are evidence-supported candidates for validation in malignant cell context.",
-            "ERBB3 are evidence-supported candidates for validation in malignant cell context.",
+            "bad",
+            "bad",
+            "bad",
+            "bad",
+            _bounded_card("EPHB4"),
+            _bounded_card("ERBB2"),
+            _bounded_card("ERBB3"),
         ]
     )
 
@@ -534,7 +556,19 @@ def test_rejected_ollama_card_retries_once_then_uses_fallback(
         ],
     }
     monkeypatch.setattr(
-        guarded_pipeline, "build_ollama_report_recommendations", lambda *_args: payload
+        guarded_pipeline, "build_ollama_candidate_followup_specs", lambda _data_dir: []
+    )
+    monkeypatch.setattr(
+        guarded_pipeline, "build_ollama_candidate_followups", lambda _data_dir, _texts: []
+    )
+    monkeypatch.setattr(
+        guarded_pipeline, "build_ollama_report_recommendations", lambda _data_dir, texts: {
+            **payload,
+            "pipeline_recommendations": [
+                {"text": texts.get("primary", "fallback primary"), "supporting_sources": ["evidence/ot_ERBB2.json"]},
+                {"text": texts.get("secondary", "fallback secondary"), "supporting_sources": ["evidence/ot_ERBB3.json"]},
+            ],
+        }
     )
     monkeypatch.setattr(
         guarded_pipeline,
@@ -552,8 +586,12 @@ def test_rejected_ollama_card_retries_once_then_uses_fallback(
 
     asyncio.run(pipeline.ainvoke({"messages": []}))
 
-    assert calls.count("hypothesis_writer") == 5
-    assert saved_card_texts["mechanism"] == specs[0]["fallback_hypothesis"]
+    assert calls.count("hypothesis_writer") == 7
+    assert saved_card_texts["mechanism"] == specs[0]["fallback_card"]
+    audit = json.loads((tmp_path / "evidence" / "llm_enrichment_audit.json").read_text())
+    assert audit["units"]["hypothesis.mechanism"]["repair_attempt_count"] == 3
+    assert audit["units"]["hypothesis.mechanism"]["status"] == "fallback"
+    assert "bad" not in json.dumps(audit)
 
 
 def test_ollama_report_route_saves_bounded_payload(
@@ -618,6 +656,12 @@ def test_ollama_report_route_saves_bounded_payload(
         guarded_pipeline,
         "build_ollama_report_recommendations",
         lambda _data_dir, _texts: payload,
+    )
+    monkeypatch.setattr(
+        guarded_pipeline, "build_ollama_candidate_followup_specs", lambda _data_dir: []
+    )
+    monkeypatch.setattr(
+        guarded_pipeline, "build_ollama_candidate_followups", lambda _data_dir, _texts: []
     )
     monkeypatch.setattr(
         guarded_pipeline,
@@ -712,6 +756,12 @@ def test_ollama_report_sentence_retries_once(
     )
     monkeypatch.setattr(guarded_pipeline, "build_ollama_report_recommendations", build_payload)
     monkeypatch.setattr(
+        guarded_pipeline, "build_ollama_candidate_followup_specs", lambda _data_dir: []
+    )
+    monkeypatch.setattr(
+        guarded_pipeline, "build_ollama_candidate_followups", lambda _data_dir, _texts: []
+    )
+    monkeypatch.setattr(
         guarded_pipeline,
         "production_save_report_sections_tool",
         lambda _data_dir, _disease: _SaveTool(),
@@ -730,3 +780,120 @@ def test_ollama_report_sentence_retries_once(
 
     assert calls == ["prepare", "report_writer", "report_writer", "report_writer"]
     assert len(saved_payloads) == 1
+
+
+def test_bounded_ollama_response_repairs_three_times_before_fallback() -> None:
+    calls: list[str] = []
+
+    class _RejectedRole:
+        async def ainvoke(self, _input: dict[str, Any], config: Any = None) -> dict[str, Any]:
+            _ = config
+            calls.append(str(_input["messages"][0]["content"]))
+            return {"messages": [AIMessage(content="bad")]}
+
+    async def run() -> tuple[object | None, dict[str, Any], dict[str, Any]]:
+        audit: dict[str, Any] = {"units": {}}
+        value, result = await guarded_pipeline._bounded_ollama_response(
+            _RejectedRole(),
+            initial_instruction="initial",
+            repair_instruction=lambda codes: f"repair {','.join(codes)}",
+            validate=lambda text: (None, ("BAD",)) if text == "bad" else (text, ()),
+            config={},
+            audit=audit,
+            unit_id="hypothesis.mechanism",
+            phase="hypothesis",
+        )
+        return value, result, audit
+
+    value, result, audit = asyncio.run(run())
+
+    assert value is None
+    assert result == {"messages": [AIMessage(content="bad")]}
+    assert calls == ["initial", "repair BAD", "repair BAD", "repair BAD"]
+    assert audit["units"]["hypothesis.mechanism"] == {
+        "phase": "hypothesis",
+        "status": "fallback",
+        "repair_attempt_count": 3,
+        "attempts": [
+            {"attempt": index, "status": "rejected", "codes": ["BAD"]}
+            for index in range(4)
+        ],
+    }
+
+
+def test_rejected_candidate_followup_repairs_three_times_then_is_omitted(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[str] = []
+    saved_payloads: list[dict[str, object]] = []
+    responses = iter(
+        ["bad"] * 4
+        + [
+            "Prioritize FN1 validation before advancing target selection.",
+            "Evaluate FN1 evidence before planning follow-up studies.",
+        ]
+    )
+
+    class _ReportRole(_RoleAgent):
+        async def ainvoke(self, _input: dict[str, Any], config: Any = None) -> dict[str, Any]:
+            _ = config, _input
+            self.calls.append(self.name)
+            if self.name == "report_writer":
+                return {"messages": [AIMessage(content=next(responses))]}
+            return {"messages": [AIMessage(content="done")]}
+
+    class _SaveTool:
+        @staticmethod
+        def invoke(arguments: dict[str, object]) -> str:
+            saved_payloads.append(arguments["payload"])
+            return json.dumps({"saved": True})
+
+    def recommendations(_data_dir: str, texts: dict[str, str]) -> dict[str, object]:
+        return {
+            "schema_version": "hybrid_report_sections/v1",
+            "pipeline_recommendations": [
+                {"text": texts.get("primary", "fallback primary"), "supporting_sources": ["evidence/stage3_FN1.json"]},
+                {"text": texts.get("secondary", "fallback secondary"), "supporting_sources": ["evidence/stage3_FN1.json"]},
+            ],
+        }
+
+    _install_fakes(monkeypatch, calls)
+    monkeypatch.setattr(
+        guarded_pipeline, "create_agent", lambda *, name, **_kwargs: _ReportRole(name, calls)
+    )
+    monkeypatch.setattr(guarded_pipeline, "build_ollama_card_specs", lambda _data_dir: [])
+    monkeypatch.setattr(
+        guarded_pipeline, "build_ollama_hypothesis_report", lambda _data_dir, _texts: {"hypotheses": []}
+    )
+    monkeypatch.setattr(
+        guarded_pipeline,
+        "save_hypothesis_report",
+        type("_HypothesisSaveTool", (), {"invoke": staticmethod(lambda _args: '{"saved": true}')})(),
+    )
+    monkeypatch.setattr(
+        guarded_pipeline,
+        "build_ollama_candidate_followup_specs",
+        lambda _data_dir: [{"gene": "FN1", "supporting_source": "evidence/stage3_FN1.json"}],
+    )
+    monkeypatch.setattr(guarded_pipeline, "build_ollama_candidate_followups", lambda _data_dir, _texts: [])
+    monkeypatch.setattr(guarded_pipeline, "build_ollama_report_recommendations", recommendations)
+    monkeypatch.setattr(
+        guarded_pipeline, "production_save_report_sections_tool", lambda _data_dir, _disease: _SaveTool()
+    )
+
+    pipeline = guarded_pipeline.build_guarded_pipeline(
+        _specs(),
+        data_dir=str(tmp_path),
+        default_model=DEFAULT_MODEL,
+        disease="breast cancer",
+        skip_evidence_assessor=True,
+        provider="ollama",
+    )
+
+    asyncio.run(pipeline.ainvoke({"messages": []}))
+
+    assert calls.count("report_writer") == 6
+    assert saved_payloads[0]["candidate_followups"] == []
+    audit = json.loads((tmp_path / "evidence" / "llm_enrichment_audit.json").read_text())
+    assert audit["units"]["candidate.FN1"]["status"] == "fallback"
+    assert audit["units"]["candidate.FN1"]["repair_attempt_count"] == 3

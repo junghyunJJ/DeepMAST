@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import time
-from collections.abc import Sequence
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import Annotated, Any, NotRequired, TypedDict
 
@@ -16,6 +16,8 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
 
 from src.agents.drug_target.hybrid_report_sections import (
+    build_ollama_candidate_followup_specs,
+    build_ollama_candidate_followups,
     build_ollama_report_recommendations,
 )
 from src.agents.drug_target.middleware import (
@@ -24,9 +26,11 @@ from src.agents.drug_target.middleware import (
 )
 from src.agents.drug_target.ollama_hypothesis_cards import (
     OllamaCardSpec,
+    OllamaHypothesisText,
     build_ollama_card_specs,
     build_ollama_hypothesis_report,
-    is_ollama_card_text_safe,
+    parse_ollama_hypothesis_card,
+    validate_ollama_hypothesis_card,
 )
 from src.agents.drug_target.tools import check_stage1_completion
 from src.agents.drug_target.tools.hypothesis_schema import (
@@ -41,6 +45,11 @@ from src.agents.drug_target.production_report_tools import (
 class GuardedPipelineState(TypedDict):
     messages: Annotated[list[BaseMessage], add_messages]
     run_started_at: NotRequired[float]
+    enrichment_audit: NotRequired[dict[str, Any]]
+
+
+MAX_OLLAMA_ENRICHMENT_REPAIRS = 3
+LLM_ENRICHMENT_AUDIT_FILENAME = "llm_enrichment_audit.json"
 
 
 def _compile_role(spec: dict[str, Any], *, default_model: Any) -> Runnable:
@@ -87,13 +96,18 @@ def _format_errors(errors: object) -> str:
     return text or "unknown validation error"
 
 
-def _ollama_card_instruction(spec: OllamaCardSpec, *, repair: bool = False) -> str:
+def _ollama_card_instruction(
+    spec: OllamaCardSpec,
+    errors: tuple[str, ...] = (),
+) -> str:
     """Request only bounded prose; the coordinator owns every report field."""
-    prefix = (
-        "Rewrite the rejected card as" if repair else "Return"
+    correction = (
+        " The prior card was rejected for: " + ", ".join(errors) + "."
+        if errors
+        else ""
     )
     return (
-        f"{prefix} exactly one plain sentence for this bounded hypothesis card.\n"
+        "Return exactly four labelled, plain-text sentences for this bounded hypothesis card.\n"
         f"Card ID: {spec['id']}\n"
         f"Category: {spec['category']}\n"
         f"Genes: {', '.join(spec['genes'])}\n"
@@ -101,24 +115,94 @@ def _ollama_card_instruction(spec: OllamaCardSpec, *, repair: bool = False) -> s
         f"Cell anchor: {spec['cell_anchor']}\n"
         "Do not call tools. Do not return JSON, Markdown, filenames, scores, "
         "drug claims, combination claims, synergy claims, direct-interaction claims, "
-        "or genes outside the listed Genes. Use exactly: '<listed Genes> are "
-        "evidence-supported candidates for validation in <cell anchor> context.'"
+        "or genes outside the listed Genes. Use exactly these labels in order: "
+        "CORE, CONSTRAINT, PREDICTION, VALIDATION."
+        f"{correction}"
     )
 
 
-def _ollama_report_instruction(label: str, *, repair: bool = False) -> str:
+def _ollama_report_instruction(label: str, errors: tuple[str, ...] = ()) -> str:
     """Keep native Ollama reporting to one bounded recommendation sentence."""
-    correction = (
-        " Your previous response was invalid; correct it now."
-        if repair
-        else ""
-    )
+    correction = f" Previous rejection codes: {', '.join(errors)}." if errors else ""
     return (
         "Return exactly one plain, future-action sentence for a pipeline recommendation.\n"
         f"Recommendation: {label}\n"
         "Do not call tools. Do not return JSON, Markdown, filenames, paths, citations, "
         "headings, or additional sentences."
         f"{correction}"
+    )
+
+
+def _ollama_candidate_instruction(
+    spec: Mapping[str, str], errors: tuple[str, ...] = ()
+) -> str:
+    correction = f" Previous rejection codes: {', '.join(errors)}." if errors else ""
+    return (
+        "Return exactly one plain, future-action sentence for the named candidate follow-up.\n"
+        f"Candidate: {spec['gene']}\n"
+        f"Supporting source: {spec['supporting_source']}\n"
+        "Do not call tools. Do not return JSON, Markdown, filenames, paths, citations, "
+        "headings, or additional sentences."
+        f"{correction}"
+    )
+
+
+async def _bounded_ollama_response(
+    role: Runnable,
+    *,
+    initial_instruction: str,
+    repair_instruction: Callable[[tuple[str, ...]], str],
+    validate: Callable[[str], tuple[object | None, tuple[str, ...]]],
+    config: RunnableConfig,
+    audit: dict[str, Any],
+    unit_id: str,
+    phase: str,
+) -> tuple[object | None, dict[str, Any]]:
+    """Try one bounded prompt and at most three local repairs."""
+    history: list[dict[str, object]] = []
+    last_result: dict[str, Any] = {"messages": []}
+    for attempt in range(MAX_OLLAMA_ENRICHMENT_REPAIRS + 1):
+        instruction = (
+            initial_instruction
+            if attempt == 0
+            else repair_instruction(tuple(history[-1]["codes"]))
+        )
+        last_result = await role.ainvoke(
+            {"messages": [{"role": "user", "content": instruction}]},
+            config=config,
+        )
+        value, codes = validate(_ai_message_text(last_result))
+        history.append(
+            {
+                "attempt": attempt,
+                "status": "accepted" if not codes else "rejected",
+                "codes": list(codes),
+            }
+        )
+        if not codes:
+            audit["units"][unit_id] = {
+                "phase": phase,
+                "status": "accepted",
+                "repair_attempt_count": attempt,
+                "attempts": history,
+            }
+            return value, last_result
+    audit["units"][unit_id] = {
+        "phase": phase,
+        "status": "fallback",
+        "repair_attempt_count": MAX_OLLAMA_ENRICHMENT_REPAIRS,
+        "attempts": history,
+    }
+    return None, last_result
+
+
+def write_ollama_enrichment_audit(data_dir: Path, audit: Mapping[str, Any]) -> None:
+    """Persist audit metadata only after the structured save boundary succeeds."""
+    evidence_dir = data_dir / "evidence"
+    evidence_dir.mkdir(parents=True, exist_ok=True)
+    (evidence_dir / LLM_ENRICHMENT_AUDIT_FILENAME).write_text(
+        json.dumps(audit, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
     )
 
 
@@ -202,44 +286,36 @@ def build_guarded_pipeline(
     ) -> dict[str, Any]:
         if provider == "ollama":
             specs = build_ollama_card_specs(run_dir)
-            known_genes: list[str] = []
-            for spec in specs:
-                known_genes.extend(spec["known_genes"])
-            card_texts: dict[str, str] = {}
+            card_texts: dict[str, OllamaHypothesisText] = {}
             last_result: dict[str, Any] = {"messages": []}
+            audit: dict[str, Any] = {
+                "schema_version": "drug_target.ollama_enrichment_audit.v1",
+                "max_repair_attempts": MAX_OLLAMA_ENRICHMENT_REPAIRS,
+                "units": {},
+            }
             for spec in specs:
-                result = await roles["hypothesis_writer"].ainvoke(
-                    {"messages": [{"role": "user", "content": _ollama_card_instruction(spec)}]},
+                def validate_card(
+                    text: str, *, card_spec: OllamaCardSpec = spec
+                ) -> tuple[OllamaHypothesisText | None, tuple[str, ...]]:
+                    card, errors = parse_ollama_hypothesis_card(text)
+                    if card is not None:
+                        errors.extend(validate_ollama_hypothesis_card(card, spec=card_spec))
+                    return (card if not errors else None), tuple(errors)
+
+                card, last_result = await _bounded_ollama_response(
+                    roles["hypothesis_writer"],
+                    initial_instruction=_ollama_card_instruction(spec),
+                    repair_instruction=lambda errors, card_spec=spec: _ollama_card_instruction(
+                        card_spec, errors
+                    ),
+                    validate=validate_card,
                     config=config,
+                    audit=audit,
+                    unit_id=f"hypothesis.{spec['id']}",
+                    phase="hypothesis",
                 )
-                last_result = result
-                text = _ai_message_text(result)
-                if not is_ollama_card_text_safe(
-                    text,
-                    allowed_genes=spec["genes"],
-                    known_genes=known_genes,
-                ):
-                    result = await roles["hypothesis_writer"].ainvoke(
-                        {
-                            "messages": [
-                                {
-                                    "role": "user",
-                                    "content": _ollama_card_instruction(spec, repair=True),
-                                }
-                            ]
-                        },
-                        config=config,
-                    )
-                    last_result = result
-                    text = _ai_message_text(result)
                 card_texts[spec["id"]] = (
-                    text
-                    if is_ollama_card_text_safe(
-                        text,
-                        allowed_genes=spec["genes"],
-                        known_genes=known_genes,
-                    )
-                    else spec["fallback_hypothesis"]
+                    card if isinstance(card, dict) else spec["fallback_card"]
                 )
             report = build_ollama_hypothesis_report(run_dir, card_texts)
             raw_receipt = await asyncio.to_thread(
@@ -257,7 +333,10 @@ def build_guarded_pipeline(
                     "Drug Target hypothesis save failed: "
                     + _format_errors(receipt.get("errors") if isinstance(receipt, dict) else None)
                 )
-            return {"messages": _last_ai_message(last_result)}
+            return {
+                "messages": _last_ai_message(last_result),
+                "enrichment_audit": audit,
+            }
         instruction = (
             f"Generate and save the canonical validated handoff. Data dir: {run_dir}."
         )
@@ -286,46 +365,91 @@ def build_guarded_pipeline(
         return {}
 
     async def run_report(
-        _state: GuardedPipelineState, config: RunnableConfig
+        state: GuardedPipelineState, config: RunnableConfig
     ) -> dict[str, Any]:
         if provider == "ollama":
+            source_audit = state.get("enrichment_audit")
+            audit = {
+                **(source_audit if isinstance(source_audit, dict) else {}),
+                "units": dict(
+                    source_audit.get("units", {})
+                    if isinstance(source_audit, dict)
+                    and isinstance(source_audit.get("units"), dict)
+                    else {}
+                ),
+            }
+            audit.setdefault("schema_version", "drug_target.ollama_enrichment_audit.v1")
+            audit.setdefault("max_repair_attempts", MAX_OLLAMA_ENRICHMENT_REPAIRS)
+            candidate_texts: dict[str, str] = {}
             texts: dict[str, str] = {}
             last_result: dict[str, Any] = {"messages": []}
-            for index, label in enumerate(("primary", "secondary")):
-                result = await roles["report_writer"].ainvoke(
-                    {"messages": [{"role": "user", "content": _ollama_report_instruction(label)}]},
-                    config=config,
-                )
-                last_result = result
-                text = _ai_message_text(result)
-                candidate_payload = build_ollama_report_recommendations(
-                    run_dir,
-                    {**texts, label: text},
-                )
-                recommendations = candidate_payload.get("pipeline_recommendations", [])
-                accepted = (
-                    isinstance(recommendations, list)
-                    and index < len(recommendations)
-                    and isinstance(recommendations[index], dict)
-                    and recommendations[index].get("text") == text.strip()
-                )
-                if not accepted:
-                    result = await roles["report_writer"].ainvoke(
-                        {
-                            "messages": [
-                                {
-                                    "role": "user",
-                                    "content": _ollama_report_instruction(label, repair=True),
-                                }
-                            ]
-                        },
-                        config=config,
+            for spec in build_ollama_candidate_followup_specs(run_dir):
+                gene = spec["gene"]
+
+                def validate_followup(
+                    text: str, *, candidate_gene: str = gene
+                ) -> tuple[dict[str, str] | None, tuple[str, ...]]:
+                    followups = build_ollama_candidate_followups(
+                        run_dir, {candidate_gene: text}
                     )
-                    last_result = result
-                    text = _ai_message_text(result)
-                texts[label] = text
+                    if len(followups) == 1 and followups[0]["gene"] == candidate_gene:
+                        return followups[0], ()
+                    return None, ("CANDIDATE_FOLLOWUP_INVALID",)
+
+                followup, last_result = await _bounded_ollama_response(
+                    roles["report_writer"],
+                    initial_instruction=_ollama_candidate_instruction(spec),
+                    repair_instruction=lambda errors, candidate_spec=spec: _ollama_candidate_instruction(
+                        candidate_spec, errors
+                    ),
+                    validate=validate_followup,
+                    config=config,
+                    audit=audit,
+                    unit_id=f"candidate.{gene}",
+                    phase="candidate_followup",
+                )
+                if isinstance(followup, dict):
+                    candidate_texts[gene] = followup["text"]
+
+            for index, label in enumerate(("primary", "secondary")):
+                def validate_recommendation(
+                    text: str,
+                    *,
+                    recommendation_index: int = index,
+                    recommendation_label: str = label,
+                ) -> tuple[str | None, tuple[str, ...]]:
+                    payload = build_ollama_report_recommendations(
+                        run_dir, {**texts, recommendation_label: text}
+                    )
+                    recommendations = payload.get("pipeline_recommendations", [])
+                    if (
+                        isinstance(recommendations, list)
+                        and recommendation_index < len(recommendations)
+                        and isinstance(recommendations[recommendation_index], dict)
+                        and recommendations[recommendation_index].get("text") == text.strip()
+                    ):
+                        return text.strip(), ()
+                    return None, ("PIPELINE_RECOMMENDATION_INVALID",)
+
+                text, last_result = await _bounded_ollama_response(
+                    roles["report_writer"],
+                    initial_instruction=_ollama_report_instruction(label),
+                    repair_instruction=lambda errors, recommendation_label=label: _ollama_report_instruction(
+                        recommendation_label, errors
+                    ),
+                    validate=validate_recommendation,
+                    config=config,
+                    audit=audit,
+                    unit_id=f"recommendation.{label}",
+                    phase="pipeline_recommendation",
+                )
+                if isinstance(text, str):
+                    texts[label] = text
 
             payload = build_ollama_report_recommendations(run_dir, texts)
+            payload["candidate_followups"] = build_ollama_candidate_followups(
+                run_dir, candidate_texts
+            )
             raw_receipt = await asyncio.to_thread(
                 production_save_report_sections_tool(run_dir, disease).invoke,
                 {"payload": payload},
@@ -341,9 +465,13 @@ def build_guarded_pipeline(
                     "Drug Target report sections save failed: "
                     + _format_errors(receipt.get("errors") if isinstance(receipt, dict) else None)
                 )
+            await asyncio.to_thread(write_ollama_enrichment_audit, run_dir, audit)
             if ollama_report_guardrail is not None:
                 await ollama_report_guardrail.aafter_agent({}, None)
-            return {"messages": _last_ai_message(last_result)}
+            return {
+                "messages": _last_ai_message(last_result),
+                "enrichment_audit": audit,
+            }
         return await invoke_role(
             "report_writer",
             f"Read the validated handoff and render the guarded report. Data dir: {run_dir}.",

@@ -949,6 +949,22 @@ def test_public_guarded_run_cleanup_removes_hybrid_temporary_and_staging_outputs
     assert not staging.exists()
 
 
+def test_guarded_run_cleanup_removes_enrichment_audit_but_keeps_evidence(
+    tmp_path: Path,
+) -> None:
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    audit = evidence / "llm_enrichment_audit.json"
+    assessment = evidence / "assessment_results.json"
+    audit.write_text("{}", encoding="utf-8")
+    assessment.write_text("{}", encoding="utf-8")
+
+    clear_guarded_report_run_artifacts(tmp_path)
+
+    assert not audit.exists()
+    assert assessment.read_text(encoding="utf-8") == "{}"
+
+
 def test_top_level_cleanup_removes_stale_hybrid_artifacts_but_post_writer_guardrail_keeps_new_sections(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
