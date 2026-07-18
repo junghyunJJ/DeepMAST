@@ -10,7 +10,10 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, ValidationError
 
-from src.agents.drug_target.report_interpretations import validate_interpretation_text
+from src.agents.drug_target.report_interpretations import (
+    build_interpretation_cards,
+    validate_interpretation_text,
+)
 from src.agents.drug_target.tools.hypothesis_schema import (
     canonicalize_hypothesis_report,
     validate_canonical_hypothesis_report,
@@ -24,9 +27,19 @@ class PipelineRecommendation(BaseModel):
     supporting_sources: list[str] = Field(min_length=1, max_length=5)
 
 
+class CandidateFollowup(BaseModel):
+    gene: str = Field(min_length=1, max_length=32)
+    text: str = Field(min_length=24, max_length=360)
+    supporting_source: str = Field(min_length=1, max_length=240)
+
+
 class ReportSectionsPayload(BaseModel):
     schema_version: Literal["hybrid_report_sections/v1"]
     hypothesis_report: dict[str, Any]
+    candidate_followups: list[CandidateFollowup] = Field(
+        default_factory=list,
+        max_length=7,
+    )
     pipeline_recommendations: list[PipelineRecommendation] = Field(
         min_length=2,
         max_length=4,
@@ -35,6 +48,10 @@ class ReportSectionsPayload(BaseModel):
 
 class ReportRecommendationsPayload(BaseModel):
     schema_version: Literal["hybrid_report_sections/v1"]
+    candidate_followups: list[CandidateFollowup] = Field(
+        default_factory=list,
+        max_length=7,
+    )
     pipeline_recommendations: list[PipelineRecommendation] = Field(
         min_length=2,
         max_length=4,
@@ -154,19 +171,101 @@ def _is_safe_ollama_recommendation(
     text: object,
     card: Mapping[str, Any],
 ) -> bool:
+    return not _ollama_recommendation_errors(text, card)
+
+
+def _ollama_recommendation_errors(
+    text: object,
+    card: Mapping[str, Any],
+) -> list[str]:
     if not isinstance(text, str):
-        return False
+        return ["must be text."]
     stripped = text.strip()
-    return (
-        24 <= len(stripped) <= 360
-        and "\n" not in stripped
-        and "\r" not in stripped
-        and stripped[-1:] in {".", "!", "?"}
-        and len(re.findall(r"[.!?]", stripped)) == 1
-        and not _MARKDOWN_RECOMMENDATION_RE.search(stripped)
-        and bool(_FUTURE_ACTION_RE.search(stripped))
-        and not validate_interpretation_text(card, stripped)
+    errors: list[str] = []
+    if not 24 <= len(stripped) <= 360:
+        errors.append("must contain 24-360 characters.")
+    if "\n" in stripped or "\r" in stripped:
+        errors.append("must be a single line.")
+    if stripped[-1:] not in {".", "!", "?"} or len(
+        re.findall(r"[.!?]", stripped)
+    ) != 1:
+        errors.append("must contain exactly one sentence.")
+    if _MARKDOWN_RECOMMENDATION_RE.search(stripped):
+        errors.append("must not contain Markdown or source syntax.")
+    if not _FUTURE_ACTION_RE.search(stripped):
+        errors.append("must state a future-directed action.")
+    errors.extend(
+        issue["message"] for issue in validate_interpretation_text(card, stripped)
     )
+    return errors
+
+
+def _candidate_followup_cards(
+    specs: list[dict[str, str]],
+) -> dict[str, dict[str, Any]]:
+    cards = build_interpretation_cards(
+        {
+            "candidates": [
+                {
+                    "gene": spec["gene"],
+                    "sources": [spec["supporting_source"]],
+                    "stage3_candidate": True,
+                }
+                for spec in specs
+            ]
+        }
+    )
+    return {
+        str(card["id"]): card
+        for card in cards
+        if isinstance(card.get("id"), str)
+        and str(card["id"]).endswith(".recommendation")
+    }
+
+
+def build_ollama_candidate_followup_specs(
+    data_dir: str | Path,
+) -> list[dict[str, str]]:
+    """Return up to seven featured candidates with deterministic evidence paths."""
+    evidence_dir = Path(data_dir).expanduser().resolve() / "evidence"
+    specs: list[dict[str, str]] = []
+    for gene in _ollama_featured_genes(evidence_dir):
+        source = next(
+            (
+                f"evidence/{filename}"
+                for filename in (f"stage3_{gene}.json", f"ot_{gene}.json")
+                if (evidence_dir / filename).is_file()
+            ),
+            None,
+        )
+        if source is not None:
+            specs.append({"gene": gene, "supporting_source": source})
+        if len(specs) == 7:
+            break
+    return specs
+
+
+def build_ollama_candidate_followups(
+    data_dir: str | Path,
+    texts: Mapping[str, str],
+) -> list[dict[str, str]]:
+    """Return only locally valid Ollama candidate follow-ups."""
+    specs = build_ollama_candidate_followup_specs(data_dir)
+    cards = _candidate_followup_cards(specs)
+    followups: list[dict[str, str]] = []
+    for spec in specs:
+        text = texts.get(spec["gene"])
+        card = cards.get(f"candidate.{spec['gene']}.recommendation")
+        if card is None or _ollama_recommendation_errors(text, card):
+            continue
+        followups.append(
+            {
+                "gene": spec["gene"],
+                "text": text.strip(),
+                "supporting_source": spec["supporting_source"],
+            }
+        )
+    return followups
 
 
 def build_ollama_report_recommendations(
@@ -239,6 +338,45 @@ def canonicalize_report_sections(
         for source in source_paths
         if isinstance(source, str) and source.strip()
     }
+    candidate_cards = {
+        str(card["id"]): card
+        for card in build_interpretation_cards(report_data)
+        if isinstance(card.get("id"), str)
+        and str(card["id"]).endswith(".recommendation")
+    }
+    candidate_followups: list[dict[str, str]] = []
+    seen_followup_genes: set[str] = set()
+    for index, followup in enumerate(parsed.candidate_followups):
+        gene = followup.gene.strip().upper()
+        text = followup.text.strip()
+        source = followup.supporting_source.strip()
+        if gene in seen_followup_genes:
+            errors.append(f"candidate_followups[{index}].gene must be unique.")
+            continue
+        seen_followup_genes.add(gene)
+        card = candidate_cards.get(f"candidate.{gene}.recommendation")
+        if card is None:
+            errors.append(
+                f"candidate_followups[{index}].gene is not a featured candidate."
+            )
+            continue
+        allowed_sources = card.get("allowed_sources")
+        allowed_sources = allowed_sources if isinstance(allowed_sources, list) else []
+        if source not in allowed_sources:
+            errors.append(
+                f"candidate_followups[{index}].supporting_source is not allowed "
+                f"for {gene}."
+            )
+        for issue in _ollama_recommendation_errors(text, card):
+            errors.append(f"candidate_followups[{index}].text: {issue}")
+        candidate_followups.append(
+            {
+                "gene": gene,
+                "text": text,
+                "supporting_source": source,
+            }
+        )
+
     card = _recommendation_validation_card(report_data, known_sources)
     recommendations: list[dict[str, Any]] = []
     for index, recommendation in enumerate(parsed.pipeline_recommendations):
@@ -287,5 +425,6 @@ def canonicalize_report_sections(
     return {
         "schema_version": parsed.schema_version,
         "hypothesis_report": canonical_hypotheses,
+        "candidate_followups": candidate_followups,
         "pipeline_recommendations": recommendations,
     }, []

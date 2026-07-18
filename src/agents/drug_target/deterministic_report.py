@@ -2254,9 +2254,16 @@ def render_hybrid_report(
     if sections.get("schema_version") != "hybrid_report_sections/v1":
         raise ValueError("report_sections must use hybrid_report_sections/v1")
     hypothesis_report = sections.get("hypothesis_report")
+    candidate_followups = sections.get("candidate_followups", [])
     recommendations = sections.get("pipeline_recommendations")
-    if not isinstance(hypothesis_report, Mapping) or not isinstance(recommendations, list):
+    if (
+        not isinstance(hypothesis_report, Mapping)
+        or not isinstance(candidate_followups, list)
+        or not isinstance(recommendations, list)
+    ):
         raise ValueError("report_sections must include canonical hypotheses and recommendations")
+    if not all(isinstance(followup, Mapping) for followup in candidate_followups):
+        raise ValueError("candidate_followups must contain mappings")
     if not all(isinstance(recommendation, Mapping) for recommendation in recommendations):
         raise ValueError("pipeline_recommendations must contain mappings")
 
@@ -2285,9 +2292,17 @@ def render_hybrid_report(
         raise ValueError("hybrid report rendering requires target_assessment.json")
 
     # Hybrid reports intentionally omit broad legacy interpretation prose.
+    interpretations = {
+        "candidates": {
+            item["gene"].upper(): {
+                "recommendation": f"- {item['text']} [source: gene]"
+            }
+            for item in candidate_followups
+        }
+    }
     markdown = render_report_markdown(
         report_data,
-        interpretations=None,
+        interpretations=interpretations,
         pipeline_recommendations=recommendations,
     )
     (base / "drug.md").write_text(markdown, encoding="utf-8")

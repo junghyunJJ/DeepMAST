@@ -8,6 +8,8 @@ import pytest
 from src.agents.drug_target.hybrid_report_sections import (
     REPORT_SECTIONS_FILENAME,
     ReportRecommendationsPayload,
+    build_ollama_candidate_followup_specs,
+    build_ollama_candidate_followups,
     build_ollama_report_recommendations,
     canonicalize_report_sections,
 )
@@ -184,8 +186,16 @@ def _source_paths() -> set[str]:
 def _report_data() -> dict:
     return {
         "candidates": [
-            {"gene": "CD4", "drugs": []},
-            {"gene": "FN1", "drugs": []},
+            {
+                "gene": "CD4",
+                "drugs": [],
+                "sources": ["evidence/stage3_CD4.json"],
+            },
+            {
+                "gene": "FN1",
+                "drugs": [],
+                "sources": ["evidence/stage3_FN1.json"],
+            },
         ]
     }
 
@@ -203,6 +213,76 @@ def test_report_recommendations_payload_has_no_hypothesis_field() -> None:
         "pipeline_recommendations",
     }
     assert "hypothesis_report" not in schema["properties"]
+    assert "candidate_followups" in schema["properties"]
+
+
+def test_ollama_candidate_followups_use_featured_stage3_sources(
+    tmp_path: Path,
+) -> None:
+    _write_evidence(tmp_path)
+
+    specs = build_ollama_candidate_followup_specs(tmp_path)
+    followups = build_ollama_candidate_followups(
+        tmp_path,
+        {"FN1": "Prioritize FN1 perturbation follow-up before advancing target selection."},
+    )
+
+    assert specs == [
+        {"gene": "CD4", "supporting_source": "evidence/stage3_CD4.json"},
+        {"gene": "FN1", "supporting_source": "evidence/stage3_FN1.json"},
+    ]
+    assert followups == [
+        {
+            "gene": "FN1",
+            "text": "Prioritize FN1 perturbation follow-up before advancing target selection.",
+            "supporting_source": "evidence/stage3_FN1.json",
+        }
+    ]
+
+
+def test_canonicalize_report_sections_accepts_source_bound_candidate_followup(
+    tmp_path: Path,
+) -> None:
+    evidence_dir = _write_evidence(tmp_path)
+    payload = _payload()
+    payload["candidate_followups"] = [{
+        "gene": "FN1",
+        "text": "Prioritize FN1 perturbation follow-up before advancing target selection.",
+        "supporting_source": "evidence/stage3_FN1.json",
+    }]
+
+    canonical, errors = canonicalize_report_sections(
+        payload,
+        evidence_dir,
+        _source_paths(),
+        _report_data(),
+    )
+
+    assert errors == []
+    assert canonical is not None
+    assert canonical["candidate_followups"][0]["gene"] == "FN1"
+
+
+def test_canonicalize_report_sections_rejects_unknown_followup_gene(
+    tmp_path: Path,
+) -> None:
+    evidence_dir = _write_evidence(tmp_path)
+    payload = _payload()
+    payload["candidate_followups"] = [{
+        "gene": "TP53",
+        "text": "Prioritize TP53 perturbation follow-up before advancing target selection.",
+        "supporting_source": "evidence/stage3_FN1.json",
+    }]
+
+    canonical, errors = canonicalize_report_sections(
+        payload,
+        evidence_dir,
+        _source_paths(),
+        _report_data(),
+    )
+
+    assert canonical is None
+    assert "candidate_followups[0].gene" in "\n".join(errors)
 
 
 def test_ollama_recommendation_payload_uses_hypothesis_sources(
@@ -500,8 +580,46 @@ def test_hybrid_renderer_uses_canonical_sections_with_host_owned_provenance(
     from src.agents.drug_target.tools import validate_drug_report_finalization
 
     evidence_dir = _write_renderer_evidence(tmp_path)
+    (evidence_dir / "stage1_evidence.json").write_text(
+        json.dumps(
+            {
+                "FN1--CD4": {
+                    "ligand": "FN1",
+                    "receptor": "CD4",
+                    "string_ppi": {
+                        "interaction_found": True,
+                        "max_combined_score": 0.9,
+                    },
+                    "census_validation": {
+                        "resolved_cell_type": "pulmonary alveolar type 2 cell",
+                        "target_vs_rest": {
+                            "coexpression": {"risk_ratio": 2.0, "p_value": 0.01}
+                        },
+                    },
+                    "stage1_filter": {"passed": True},
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    (evidence_dir / "celltype_resolution.json").write_text(
+        json.dumps(
+            {
+                "primary_input_celltype": "AT2",
+                "primary_resolved_celltype": "pulmonary alveolar type 2 cell",
+                "interest_celltypes": ["AT2"],
+            }
+        ),
+        encoding="utf-8",
+    )
+    payload = _payload()
+    payload["candidate_followups"] = [{
+        "gene": "FN1",
+        "text": "Prioritize FN1 perturbation follow-up before advancing target selection.",
+        "supporting_source": "evidence/stage3_FN1.json",
+    }]
     canonical, errors = canonicalize_report_sections(
-        _payload(),
+        payload,
         evidence_dir,
         _source_paths(),
         _report_data(),
@@ -509,6 +627,12 @@ def test_hybrid_renderer_uses_canonical_sections_with_host_owned_provenance(
 
     assert errors == []
     assert canonical is not None
+    canonical["hypothesis_report"]["hypotheses"][0]["interpretation_note"] = (
+        "This follow-up does not establish a causal mechanism."
+    )
+    canonical["hypothesis_report"]["hypotheses"][0]["biological_entities"][
+        "cell_types"
+    ] = ["pulmonary alveolar type 2 cell"]
     report_data = build_report_data(
         str(tmp_path),
         "IPF",
@@ -559,6 +683,14 @@ def test_hybrid_renderer_uses_canonical_sections_with_host_owned_provenance(
     )
 
     assert rendered_markdown == (tmp_path / "drug.md").read_text(encoding="utf-8")
+    assert (
+        "Prioritize FN1 perturbation follow-up before advancing target selection."
+        in rendered_markdown
+    )
+    assert "This follow-up does not establish a causal mechanism." in rendered_markdown
+    assert "supports target-cell context, but not causal mechanism." in rendered_markdown
+    assert "**Core Claim:**" in rendered_markdown
+    assert "**Falsifiable Prediction:**" in rendered_markdown
     assert rendered_report_data["sections"]["hypotheses"]["sources"] == [
         REPORT_SECTIONS_FILENAME
     ]
@@ -659,6 +791,6 @@ def test_hybrid_renderer_explicitly_omits_legacy_interpretations(
     deterministic_report.render_hybrid_report(str(tmp_path), "IPF", canonical)
 
     assert captured == {
-        "interpretations": None,
+        "interpretations": {"candidates": {}},
         "pipeline_recommendations": canonical["pipeline_recommendations"],
     }

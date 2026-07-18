@@ -207,7 +207,7 @@ These recommendations are grounded in the available spatial, Census, OpenTargets
 
 **Actionability:** {% if h._actionability_refs is defined and h._actionability_refs %}{{ h._actionability_refs | join(', ') }}{% else %}No Stage 3 druggability evidence cited; treat as analysis or perturbation-development follow-up. [source: gene]{% endif %}
 
-**Interpretation Constraint:** {% if h._interpretation_constraint is defined and h._interpretation_constraint %}{{ h._interpretation_constraint }}{% else %}Interpret as an evidence-grounded follow-up recommendation, not a validated causal mechanism. [source: gene]{% endif %}
+**Interpretation Constraint:** {% if h._interpretation_constraint is defined and h._interpretation_constraint %}{{ h._interpretation_constraint }}{% else %}Interpret as an evidence-grounded follow-up recommendation, not a validated causal mechanism. [source: gene]{% endif %}{% if h.interpretation_note %} {{ h.interpretation_note }}{% endif %}
 
 **Evidence References:**
 {% for ref in h.evidence_references %}
