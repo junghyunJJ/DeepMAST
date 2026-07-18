@@ -1016,7 +1016,8 @@ def test_report_mvp_splits_hypotheses_by_epithelial_intrinsic_support() -> None:
     assert "**Biological Grounding:**" in markdown
     assert "**Target-Disease Support:**" in markdown
     assert "**Actionability:**" in markdown
-    assert "**Interpretation Constraint:**" in markdown
+    assert "**Evidence Rationale & Interpretation Boundary:**" in markdown
+    assert "**Interpretation Constraint:**" not in markdown
     assert "#### Secondary Stage 1 Framing Evidence" in markdown
     assert "| Pair | Census direction | Usage | Source |" in markdown
     assert "FN1-SDC2" in markdown
@@ -1194,7 +1195,7 @@ def test_report_mvp_asymmetric_primary_constraint_ignores_failed_pair() -> None:
     constraint = next(
         line
         for line in section.splitlines()
-        if line.startswith("**Interpretation Constraint:**")
+        if line.startswith("**Evidence Rationale & Interpretation Boundary:")
     )
 
     assert "Treat ICAM1 as the Stage 2/3-supported anchor" in constraint
@@ -1592,6 +1593,56 @@ def test_drug_report_html_preserves_section4_tier_split_and_framing_table() -> N
     assert "4.2. Secondary Spatial-Niche Follow-up Candidates" in html
     assert "Secondary Stage 1 Framing Evidence" in html
     assert "stage1_FN1--SDC2.json" in html
+
+
+def test_drug_report_html_parses_validation_focused_section4_markdown() -> None:
+    from src.agents.drug_target.tools.drug_report_html import parse_drug_md
+
+    context = parse_drug_md(
+        """## 4. Mechanistic Hypothesis Recommendations
+
+#### 4.1.1. EGFR follow-up in idiopathic pulmonary fibrosis
+**Validation Focus:** Mechanistic follow-up
+
+**Biological Grounding:** stage1_EGFR.json
+
+**Target-Disease Support:** ot_EGFR.json
+
+**Actionability:** stage3_EGFR.json
+
+**Evidence References:**
+- stage1_EGFR.json
+
+**Biological Entities:**
+- Genes: EGFR
+- Pathways: EGFR signaling
+- Cell Types: epithelial cells
+- Drugs: gefitinib
+
+**Evidence Rationale & Interpretation Boundary:**
+EGFR is a supported candidate. This does not establish causal mechanism. Read this as follow-up evidence.
+
+**Falsifiable Prediction & Validation Design:**
+EGFR perturbation will change a prespecified readout. Test EGFR perturbation in an appropriate fibrosis model.
+"""
+    )
+
+    hypothesis = context["hypothesis"][0]
+
+    assert hypothesis["validation_focus"] == "Mechanistic follow-up"
+    assert hypothesis["category"] == "Mechanistic follow-up"
+    assert hypothesis["core_claim"] == (
+        "EGFR is a supported candidate. This does not establish causal mechanism. "
+        "Read this as follow-up evidence."
+    )
+    assert hypothesis["falsifiable_prediction"] == (
+        "EGFR perturbation will change a prespecified readout. "
+        "Test EGFR perturbation in an appropriate fibrosis model."
+    )
+    assert hypothesis["validation_approach"] == (
+        "EGFR perturbation will change a prespecified readout. "
+        "Test EGFR perturbation in an appropriate fibrosis model."
+    )
 
 
 def test_report_mvp_ignores_malformed_optional_evidence(tmp_path: Path) -> None:

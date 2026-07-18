@@ -144,7 +144,28 @@ def _canonical_parser_compatible_section_4() -> str:
 """
 
 
-def _copy_valid_agent_markdown_fixture(name: str, tmp_path: Path) -> Path:
+def _validation_focused_parser_compatible_section_4() -> str:
+    return """## 4. Mechanistic Hypothesis Recommendations
+
+#### 4.1.1. EGFR follow-up in idiopathic pulmonary fibrosis
+**Validation Focus:** Mechanistic follow-up
+
+**Evidence Rationale & Interpretation Boundary:** EGFR is a supported candidate for a falsifiable fibrosis follow-up study. This is a follow-up interpretation boundary.
+
+- Genes: EGFR
+- Pathways: EGFR signaling
+- Cell Types: epithelial cells
+- Drugs: gefitinib
+
+**Falsifiable Prediction & Validation Design:** EGFR perturbation will change a prespecified fibrosis-associated readout. Test EGFR perturbation in an appropriate fibrosis model.
+"""
+
+
+def _copy_valid_agent_markdown_fixture(
+    name: str,
+    tmp_path: Path,
+    section_4: str | None = None,
+) -> Path:
     data_dir = _copy_fixture(name, tmp_path)
     drug_path = data_dir / "drug.md"
     lines = []
@@ -159,7 +180,7 @@ def _copy_valid_agent_markdown_fixture(name: str, tmp_path: Path) -> Path:
     drug_path.write_text(
         "\n".join(lines)
         + "\n\n"
-        + _canonical_parser_compatible_section_4()
+        + (section_4 or _canonical_parser_compatible_section_4())
         + "\n## 5. Pipeline Execution Summary & Recommendations\n",
         encoding="utf-8",
     )
@@ -965,6 +986,20 @@ def test_agent_markdown_mode_requires_parseable_section_4(tmp_path: Path) -> Non
 
     assert result["valid"] is False
     assert _has_issue(result, "AGENT_REPORT_HYPOTHESES_MISSING")
+
+
+def test_agent_markdown_mode_accepts_validation_focused_section_4(
+    tmp_path: Path,
+) -> None:
+    data_dir = _copy_valid_agent_markdown_fixture(
+        "clean",
+        tmp_path,
+        section_4=_validation_focused_parser_compatible_section_4(),
+    )
+
+    result = _invoke(data_dir, publication_mode="agent_markdown")
+
+    assert result["valid"] is True
 
 
 @pytest.mark.parametrize(

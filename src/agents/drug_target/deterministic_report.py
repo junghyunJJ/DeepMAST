@@ -23,6 +23,7 @@ from src.agents.drug_target.part4_candidate_selector import (
     part4_candidate_selector_provider_from_config,
 )
 from src.agents.drug_target.hybrid_report_sections import REPORT_SECTIONS_FILENAME
+from src.agents.drug_target.ollama_hypothesis_cards import validation_focus_for_category
 from src.agents.drug_target.therapeutic_synthesis import (
     PART4_SYNTHESIS_FILENAME,
     build_part4_therapeutic_synthesis,
@@ -1011,6 +1012,9 @@ def _annotate_hypothesis_tiers(
             rendered_hypotheses.append(hypothesis)
             continue
         rendered_hypothesis = dict(hypothesis)
+        rendered_hypothesis["_validation_focus"] = validation_focus_for_category(
+            _safe_text(rendered_hypothesis.get("category"), "")
+        )
         rank = str(rendered_hypothesis.get("rank") or "")
         snippets = hypothesis_interpretations.get(rank, {})
         snippets = snippets if isinstance(snippets, dict) else {}

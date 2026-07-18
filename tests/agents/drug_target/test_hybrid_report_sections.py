@@ -777,13 +777,16 @@ def test_hybrid_renderer_uses_canonical_sections_with_host_owned_provenance(
         for line in markdown.splitlines()
     )
     for field in (
-        "**Category:**",
-        "**Core Claim:**",
+        "**Validation Focus:** Mechanistic follow-up",
         "- Genes:",
-        "**Falsifiable Prediction:**",
-        "**Validation Approach:**",
+        "**Evidence Rationale & Interpretation Boundary:**",
+        "**Falsifiable Prediction & Validation Design:**",
     ):
         assert field in markdown
+    assert "**Category:**" not in markdown
+    assert canonical["hypothesis_report"]["hypotheses"][0]["category"] == (
+        "Mechanism of Action"
+    )
     assert "### 5.1. Pipeline Execution Summary" in markdown
     assert "| Total genes assessed |" in markdown
     assert "### 5.2. Evidence-Grounded Follow-up Recommendations" in markdown
@@ -815,8 +818,10 @@ def test_hybrid_renderer_uses_canonical_sections_with_host_owned_provenance(
     )
     assert "This follow-up does not establish a causal mechanism." in rendered_markdown
     assert "supports target-cell context, but not causal mechanism." in rendered_markdown
-    assert "**Core Claim:**" in rendered_markdown
-    assert "**Falsifiable Prediction:**" in rendered_markdown
+    assert "**Validation Focus:** Mechanistic follow-up" in rendered_markdown
+    assert "**Evidence Rationale & Interpretation Boundary:**" in rendered_markdown
+    assert "**Falsifiable Prediction & Validation Design:**" in rendered_markdown
+    assert "**Category:**" not in rendered_markdown
     assert rendered_report_data["sections"]["hypotheses"]["sources"] == [
         REPORT_SECTIONS_FILENAME
     ]

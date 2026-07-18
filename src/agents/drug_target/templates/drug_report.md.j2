@@ -193,21 +193,17 @@ These recommendations are grounded in the available spatial, Census, OpenTargets
 {% macro render_hypothesis(h, prefix) -%}
 #### {{ prefix }}.{{ h._tier_rank | default(h.rank) }}. {{ h.title }}
 
-**Category:** {{ h.category }}
+**Validation Focus:** {{ h._validation_focus | default(h.category) }}
 
 {% if h._tier_label is defined and h._tier_label %}
 **Interpretation Tier:** {{ h._tier_label }}{% if h._tier_note is defined and h._tier_note %} — {{ h._tier_note }}{% endif %}
 
 {% endif %}
-**Core Claim:** {{ h.core_claim }}
-
 **Biological Grounding:** {% if h._biological_grounding_refs is defined and h._biological_grounding_refs %}{{ h._biological_grounding_refs | join(', ') }}{% else %}No Stage 1/spatial grounding reference cited. [source: gene]{% endif %}
 
 **Target-Disease Support:** {% if h._target_disease_support_refs is defined and h._target_disease_support_refs %}{{ h._target_disease_support_refs | join(', ') }}{% else %}No Stage 2 OpenTargets evidence cited for this recommendation. [source: gene]{% endif %}
 
 **Actionability:** {% if h._actionability_refs is defined and h._actionability_refs %}{{ h._actionability_refs | join(', ') }}{% else %}No Stage 3 druggability evidence cited; treat as analysis or perturbation-development follow-up. [source: gene]{% endif %}
-
-**Interpretation Constraint:** {% if h._interpretation_constraint is defined and h._interpretation_constraint %}{{ h._interpretation_constraint }}{% else %}Interpret as an evidence-grounded follow-up recommendation, not a validated causal mechanism. [source: gene]{% endif %}{% if h.interpretation_note %} {{ h.interpretation_note }}{% endif %}
 
 **Evidence References:**
 {% for ref in h.evidence_references %}
@@ -222,9 +218,9 @@ These recommendations are grounded in the available spatial, Census, OpenTargets
 - Drugs: {{ h.biological_entities.drugs | join(', ') }}
 {% endif %}
 
-**Falsifiable Prediction:** {{ h.falsifiable_prediction }}
+**Evidence Rationale & Interpretation Boundary:** {{ h.core_claim }} {% if h._interpretation_constraint is defined and h._interpretation_constraint %}{{ h._interpretation_constraint }}{% else %}Interpret as an evidence-grounded follow-up recommendation, not a validated causal mechanism. [source: gene]{% endif %}{% if h.interpretation_note %} {{ h.interpretation_note }}{% endif %}
 
-**Validation Approach:** {{ h.validation_approach }}
+**Falsifiable Prediction & Validation Design:** {{ h.falsifiable_prediction }} {{ h.validation_approach }}
 
 {% if h._interpretation is defined and h._interpretation %}
 {{ h._interpretation }}

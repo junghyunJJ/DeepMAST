@@ -713,13 +713,17 @@ def _parse_hypothesis_section(body: str) -> list[dict[str, Any]]:
                 tier = "gene_level_actionability"
                 tier_label = "Gene-level/actionability follow-up"
 
+        focus_m = re.search(r"\*\*Validation Focus:\*\*\s*(.+)", lines)
         category_m = re.search(r"\*\*Category:\*\*\s*(.+)", lines)
         tier_label_m = re.search(r"\*\*Interpretation Tier:\*\*\s*(.+)", lines)
         if tier_label_m:
             tier_label = tier_label_m.group(1).strip()
             if not tier:
                 tier = _infer_hypothesis_tier_from_label(tier_label)
-        claim_m = re.search(
+        rationale_m = re.search(
+            r"\*\*Evidence Rationale & Interpretation Boundary:\*\*\s*(.+)",
+            lines,
+        ) or re.search(
             r"\*\*(?:Core Claim|Conservative Interpretation):\*\*\s*(.+)", lines
         )
         biological_grounding_m = re.search(r"\*\*Biological Grounding:\*\*\s*(.+)", lines)
@@ -730,11 +734,15 @@ def _parse_hypothesis_section(body: str) -> list[dict[str, Any]]:
         interpretation_constraint_m = re.search(
             r"\*\*Interpretation Constraint:\*\*\s*(.+)", lines
         )
-        prediction_m = re.search(
+        design_m = re.search(
+            r"\*\*Falsifiable Prediction & Validation Design:\*\*\s*(.+)",
+            lines,
+        )
+        prediction_m = design_m or re.search(
             r"\*\*(?:Falsifiable Prediction|Recommended Follow-up Test):\*\*\s*(.+)",
             lines,
         )
-        validation_m = re.search(
+        validation_m = design_m or re.search(
             r"\*\*(?:Validation Approach|Suggested Validation Approach):\*\*\s*(.+)",
             lines,
         )
@@ -761,13 +769,20 @@ def _parse_hypothesis_section(body: str) -> list[dict[str, Any]]:
         hypothesis = {
             "rank": i,
             "title": title,
-            "category": category_m.group(1).strip() if category_m else "",
+            "validation_focus": focus_m.group(1).strip() if focus_m else "",
+            "category": (
+                category_m.group(1).strip()
+                if category_m
+                else focus_m.group(1).strip()
+                if focus_m
+                else ""
+            ),
             "_tier": tier,
             "_tier_label": tier_label,
             "_tier_rank": (
                 int(source_heading.group("tier_rank")) if source_heading else i
             ),
-            "core_claim": claim_m.group(1).strip() if claim_m else "",
+            "core_claim": rationale_m.group(1).strip() if rationale_m else "",
             "biological_grounding": (
                 biological_grounding_m.group(1).strip()
                 if biological_grounding_m
