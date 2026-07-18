@@ -38,8 +38,21 @@ _HYPOTHESIS_FIELD_PREFIXES = {
 }
 _UNSAFE_CLAIM_RE = re.compile(
     r"\b(?:causes?|drives?|proves?|demonstrates?|establishes?|"
-    r"mediate(?:s|d)?|synerg(?:y|istic)|direct[-\s]+interaction|efficacy|"
+    r"mediate(?:s|d)?|synerg(?:y|istic)|direct(?:ly)?[-\s]+interact(?:ion|s?)|efficacy|"
     r"effective treatment)\b",
+    re.IGNORECASE,
+)
+_NAMED_DRUG_RE = re.compile(
+    r"\b(?:aspirin|[A-Za-z][A-Za-z0-9-]*(?:mab|nib|tinib|statin|cillin|cycline|"
+    r"azole|vir|xaban|parin|platin|taxel|mycin))\b",
+    re.IGNORECASE,
+)
+_SOURCE_EVIDENCE_CLAIM_RE = re.compile(
+    r"\b(?:PubMed|OpenTargets|ChEMBL|GWAS|Census|Reactome|STRING)\b|"
+    r"\b(?:evidence|sources?|citations?)\s+(?:supports?|shows?|demonstrates?|"
+    r"establishes?|indicates?)\b|"
+    r"\b(?:supported|shown|demonstrated|established|indicated)\s+by\s+"
+    r"(?:\w+\s+){0,2}(?:evidence|sources?|citations?)\b",
     re.IGNORECASE,
 )
 _NUMBER_RE = re.compile(r"\d")
@@ -79,6 +92,14 @@ def unsafe_ollama_claim_code(text: str) -> str | None:
 
 def validation_focus_for_category(category: str) -> str:
     return VALIDATION_FOCUS_BY_CATEGORY.get(category, "Evidence-bound follow-up")
+
+
+def _unsupported_card_claim_code(text: str) -> str | None:
+    if _NAMED_DRUG_RE.search(text):
+        return "UNSUPPORTED_DRUG"
+    if _SOURCE_EVIDENCE_CLAIM_RE.search(text):
+        return "UNSUPPORTED_SOURCE"
+    return None
 
 
 def parse_ollama_hypothesis_card(
@@ -190,6 +211,9 @@ def validate_ollama_hypothesis_card(
         unsafe_claim = unsafe_ollama_claim_code(text)
         if unsafe_claim is not None:
             errors.append(f"{prefix}_{unsafe_claim}")
+        unsupported_claim = _unsupported_card_claim_code(text)
+        if unsupported_claim is not None:
+            errors.append(unsupported_claim)
         if any(
             gene.upper() not in allowed_genes
             and re.search(

@@ -247,10 +247,12 @@ def test_bounded_hypothesis_card_rejects_hyphenated_direct_interaction() -> None
 @pytest.mark.parametrize(
     ("replacement", "code"),
     [
+        ("with aspirin.", "UNSUPPORTED_DRUG"),
         ("with gefitinib.", "UNSUPPORTED_ENTITY"),
         ("with SDC1.", "UNSUPPORTED_GENE"),
         ("with a 10% threshold.", "UNSUPPORTED_NUMBER"),
         ("with citation [1].", "CORE_UNSAFE_CONTENT"),
+        ("as PubMed supports this candidate.", "UNSUPPORTED_SOURCE"),
     ],
 )
 def test_bounded_hypothesis_card_rejects_unsupported_claim_inputs(
@@ -282,6 +284,7 @@ def test_bounded_hypothesis_card_rejects_unsupported_claim_inputs(
         "mediates malignant-cell outcomes",
         "shows synergy",
         "shows a direct interaction",
+        "directly interacts with a pathway",
         "has efficacy",
         "is an effective treatment",
     ],
