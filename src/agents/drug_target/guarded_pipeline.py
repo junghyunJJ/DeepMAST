@@ -287,7 +287,6 @@ def build_guarded_pipeline(
         if provider == "ollama":
             specs = build_ollama_card_specs(run_dir)
             card_texts: dict[str, OllamaHypothesisText] = {}
-            last_result: dict[str, Any] = {"messages": []}
             audit: dict[str, Any] = {
                 "schema_version": "drug_target.ollama_enrichment_audit.v1",
                 "max_repair_attempts": MAX_OLLAMA_ENRICHMENT_REPAIRS,
@@ -302,7 +301,7 @@ def build_guarded_pipeline(
                         errors.extend(validate_ollama_hypothesis_card(card, spec=card_spec))
                     return (card if not errors else None), tuple(errors)
 
-                card, last_result = await _bounded_ollama_response(
+                card, _ = await _bounded_ollama_response(
                     roles["hypothesis_writer"],
                     initial_instruction=_ollama_card_instruction(spec),
                     repair_instruction=lambda errors, card_spec=spec: _ollama_card_instruction(
@@ -334,7 +333,7 @@ def build_guarded_pipeline(
                     + _format_errors(receipt.get("errors") if isinstance(receipt, dict) else None)
                 )
             return {
-                "messages": _last_ai_message(last_result),
+                "messages": [],
                 "enrichment_audit": audit,
             }
         instruction = (
@@ -382,7 +381,6 @@ def build_guarded_pipeline(
             audit.setdefault("max_repair_attempts", MAX_OLLAMA_ENRICHMENT_REPAIRS)
             candidate_texts: dict[str, str] = {}
             texts: dict[str, str] = {}
-            last_result: dict[str, Any] = {"messages": []}
             for spec in build_ollama_candidate_followup_specs(run_dir):
                 gene = spec["gene"]
 
@@ -396,7 +394,7 @@ def build_guarded_pipeline(
                         return followups[0], ()
                     return None, ("CANDIDATE_FOLLOWUP_INVALID",)
 
-                followup, last_result = await _bounded_ollama_response(
+                followup, _ = await _bounded_ollama_response(
                     roles["report_writer"],
                     initial_instruction=_ollama_candidate_instruction(spec),
                     repair_instruction=lambda errors, candidate_spec=spec: _ollama_candidate_instruction(
@@ -431,7 +429,7 @@ def build_guarded_pipeline(
                         return text.strip(), ()
                     return None, ("PIPELINE_RECOMMENDATION_INVALID",)
 
-                text, last_result = await _bounded_ollama_response(
+                text, _ = await _bounded_ollama_response(
                     roles["report_writer"],
                     initial_instruction=_ollama_report_instruction(label),
                     repair_instruction=lambda errors, recommendation_label=label: _ollama_report_instruction(
@@ -469,7 +467,7 @@ def build_guarded_pipeline(
             if ollama_report_guardrail is not None:
                 await ollama_report_guardrail.aafter_agent({}, None)
             return {
-                "messages": _last_ai_message(last_result),
+                "messages": [],
                 "enrichment_audit": audit,
             }
         return await invoke_role(

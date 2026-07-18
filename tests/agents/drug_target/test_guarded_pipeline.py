@@ -897,3 +897,73 @@ def test_rejected_candidate_followup_repairs_three_times_then_is_omitted(
     audit = json.loads((tmp_path / "evidence" / "llm_enrichment_audit.json").read_text())
     assert audit["units"]["candidate.FN1"]["status"] == "fallback"
     assert audit["units"]["candidate.FN1"]["repair_attempt_count"] == 3
+
+
+def test_ollama_graph_state_omits_rejected_hypothesis_and_recommendation_text(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[str] = []
+    hypothesis_secret = "hypothesis-rejected-model-text"
+    recommendation_secret = "recommendation-rejected-model-text"
+
+    class _RejectedRole(_RoleAgent):
+        async def ainvoke(self, _input: dict[str, Any], config: Any = None) -> dict[str, Any]:
+            _ = config, _input
+            self.calls.append(self.name)
+            text = hypothesis_secret if self.name == "hypothesis_writer" else recommendation_secret
+            return {"messages": [AIMessage(content=text)]}
+
+    class _SaveTool:
+        @staticmethod
+        def invoke(_arguments: dict[str, object]) -> str:
+            return json.dumps({"saved": True})
+
+    _install_fakes(monkeypatch, calls)
+    monkeypatch.setattr(
+        guarded_pipeline, "create_agent", lambda *, name, **_kwargs: _RejectedRole(name, calls)
+    )
+    monkeypatch.setattr(
+        guarded_pipeline,
+        "build_ollama_card_specs",
+        lambda _data_dir: [_ollama_card_spec("mechanism", "Mechanism of Action", "EPHB4")],
+    )
+    monkeypatch.setattr(
+        guarded_pipeline, "build_ollama_hypothesis_report", lambda _data_dir, _cards: {"hypotheses": []}
+    )
+    monkeypatch.setattr(guarded_pipeline, "save_hypothesis_report", _SaveTool())
+    monkeypatch.setattr(
+        guarded_pipeline, "build_ollama_candidate_followup_specs", lambda _data_dir: []
+    )
+    monkeypatch.setattr(
+        guarded_pipeline, "build_ollama_candidate_followups", lambda _data_dir, _texts: []
+    )
+    monkeypatch.setattr(
+        guarded_pipeline,
+        "build_ollama_report_recommendations",
+        lambda _data_dir, _texts: {
+            "schema_version": "hybrid_report_sections/v1",
+            "pipeline_recommendations": [
+                {"text": "Prioritize EPHB4 validation before advancing target selection.", "supporting_sources": ["evidence/ot_EPHB4.json"]},
+                {"text": "Evaluate EPHB4 evidence before planning follow-up studies.", "supporting_sources": ["evidence/ot_EPHB4.json"]},
+            ],
+        },
+    )
+    monkeypatch.setattr(
+        guarded_pipeline, "production_save_report_sections_tool", lambda _data_dir, _disease: _SaveTool()
+    )
+
+    pipeline = guarded_pipeline.build_guarded_pipeline(
+        _specs(),
+        data_dir=str(tmp_path),
+        default_model=DEFAULT_MODEL,
+        disease="breast cancer",
+        skip_evidence_assessor=True,
+        provider="ollama",
+    )
+
+    state = asyncio.run(pipeline.ainvoke({"messages": []}))
+
+    assert calls.count("hypothesis_writer") == 4
+    assert calls.count("report_writer") == 8
+    assert hypothesis_secret not in str(state)
+    assert recommendation_secret not in str(state)
