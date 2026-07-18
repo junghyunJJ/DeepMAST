@@ -170,6 +170,29 @@ def test_bounded_hypothesis_card_rejects_unsafe_content(text: str, code: str) ->
     assert any(code in error for error in errors)
 
 
+@pytest.mark.parametrize("causal_verb", ["mediate", "mediates", "mediated"])
+def test_bounded_hypothesis_card_rejects_mediates_core_claim(causal_verb: str) -> None:
+    from src.agents.drug_target.ollama_hypothesis_cards import (
+        parse_ollama_hypothesis_card,
+        validate_ollama_hypothesis_card,
+    )
+
+    card, errors = parse_ollama_hypothesis_card(
+        _bounded_card().replace(
+            "ERBB3 and EFNB2 are evidence-supported candidates for validation in malignant cell context.",
+            "ERBB3 and EFNB2 are evidence-supported candidates for validation, but their pairing "
+            f"{causal_verb} malignant cell outcomes.",
+        )
+    )
+
+    assert errors == []
+    assert card is not None
+    assert "CORE_UNSAFE_CLAIM" in validate_ollama_hypothesis_card(
+        card,
+        spec=_mechanism_spec(),
+    )
+
+
 def test_canonicalization_revalidates_marked_ollama_enrichment(
     bc_data_dir: Path,
 ) -> None:

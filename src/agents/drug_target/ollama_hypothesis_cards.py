@@ -31,7 +31,8 @@ _HYPOTHESIS_FIELD_PREFIXES = {
 }
 _UNSAFE_CLAIM_RE = re.compile(
     r"\b(?:causes?|drives?|proves?|demonstrates?|establishes?|"
-    r"synerg(?:y|istic)|direct interaction|efficacy|effective treatment)\b",
+    r"mediate(?:s|d)?|synerg(?:y|istic)|direct interaction|efficacy|"
+    r"effective treatment)\b",
     re.IGNORECASE,
 )
 _NUMBER_RE = re.compile(r"\d")
