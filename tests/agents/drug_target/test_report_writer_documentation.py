@@ -50,9 +50,19 @@ def test_docs_describe_ollama_gene_card_contract() -> None:
 def test_docs_describe_bounded_ollama_report_sections() -> None:
     for path in (REFERENCE, STAGE_GUIDE):
         text = path.read_text(encoding="utf-8")
-        assert "two bounded recommendation sentences" in text
+        assert "Python still selects all evidence, FEATURED genes," in text
+        assert "L-R pairs, scores, and layout." in text
+        assert "four labelled hypothesis" in text
+        assert "optional one-sentence Section 3 follow-ups" in text
+        assert "two Section 5" in text
+        assert "three repairs" in text
+        assert "evidence/llm_enrichment_audit.json" in text
+        assert "DrugReportGuardrailMiddleware" in text
         assert "production_save_report_sections_tool" in text
         assert "Python selects supporting sources" in text
+        assert "Section 5 only" not in text
+        assert "card is retried once" not in text
+        assert "Invalid prose is retried once" not in text
 
 
 def test_docs_describe_guarded_reporter_and_graph_builder_entrypoints() -> None:

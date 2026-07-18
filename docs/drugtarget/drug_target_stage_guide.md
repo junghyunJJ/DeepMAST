@@ -94,23 +94,26 @@ report audit is fail-closed behavior, not a published report. The coordinator
 retries one `HYPOTHESIS_REPORT_MISSING`; rejected saves remain under the
 writer's bounded repair path.
 
-On native Ollama/Qwen runs, the hypothesis writer produces bounded prose for
-four deterministic gene-cards, not a full JSON report. Python reads FEATURED
-genes from `assessment_results.json`, selects the validator-required
-`ot_<GENE>.json` and `stage3_<GENE>.json` evidence for every FEATURED gene,
-and builds 4 final hypotheses before validating and persisting
-`evidence/hypothesis_report.json`. Only interest-cell-intrinsic Stage 1 pairs
-with strict-PASS status may accompany the malignant-cell anchor; spatial-niche-only and
-depleted-coexpression pairs do not. A rejected card is retried once and then
-replaced with conservative deterministic prose, so model-selected references
-never enter the report. Non-Ollama providers keep the existing tool-call save
-path.
+For native Ollama/Qwen, Python still selects all evidence, FEATURED genes,
+L-R pairs, scores, and layout. Qwen contributes only four labelled hypothesis
+cards, optional one-sentence Section 3 follow-ups, and two Section 5
+recommendations. Every unit is checked locally; an initial response may receive
+three repairs, then falls back to deterministic text or is omitted. The run
+writes `evidence/llm_enrichment_audit.json`; `DrugReportGuardrailMiddleware`
+remains the final whole-report audit and publication boundary.
 
-For native Ollama/Qwen publication, the report writer supplies two bounded recommendation sentences for Section 5 only.
-Python selects supporting sources from the validated handoff, builds the canonical payload, and calls
-`production_save_report_sections_tool` directly. Invalid prose is retried once
-and then replaced with a conservative deterministic sentence; the ordinary
-guardrail and Jinja2 audit remain the publication boundary.
+`hypothesis_writer` receives the selected evidence and returns four labelled
+hypothesis cards (the bounded `gene-card` units), not a full JSON report.
+Python reads FEATURED genes from `assessment_results.json`, selects the
+validator-required `ot_<GENE>.json` and `stage3_<GENE>.json` evidence, and
+builds 4 final hypotheses before persisting
+`evidence/hypothesis_report.json`. Only interest-cell-intrinsic Stage 1 pairs
+with strict-PASS status may accompany the malignant-cell anchor. The report
+writer returns optional one-sentence Section 3 follow-ups and two bounded
+recommendation sentences for Section 5. Python selects supporting sources from
+the validated handoff, validates those units, and calls
+`production_save_report_sections_tool` before saving `report_sections.json`.
+Non-Ollama providers keep the existing tool-call save path.
 
 `run_report_writer_only.py` is diagnostic-only: it tests a valid existing
 handoff's reporter phase and fails before model invocation without one.
