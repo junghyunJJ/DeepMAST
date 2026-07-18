@@ -257,15 +257,15 @@ def _ollama_card_instruction(
         sentence_rule="Keep each labelled line to one or two plain sentences.",
     )
     return (
-        "Return exactly four labelled, plain-text lines, with one or two plain sentences per line, for this bounded hypothesis card.\n"
+        "Return exactly four labelled, plain-text lines, with exactly two plain sentences on each labelled line, for this bounded hypothesis card.\n"
         f"Card ID: {spec['id']}\n"
         f"Validation Focus: {spec['validation_focus']}\n"
         f"Genes: {', '.join(spec['genes'])}\n"
         f"Cell anchor: {spec['cell_anchor']}\n"
-        f"{core_line}"
-        f"{constraint_line}\n"
-        f"{prediction_line}\n"
-        f"{validation_line}\n"
+        "CORE must identify the listed Genes as evidence-supported candidates for validation in the Cell anchor.\n"
+        "CONSTRAINT must state that the follow-up does not establish a causal mechanism.\n"
+        "PREDICTION must propose testing separate listed-gene perturbation against a prespecified Cell anchor readout.\n"
+        "VALIDATION must propose a generic future assay with matched controls or a comparator and prespecified Cell anchor readouts.\n"
         "Only PREDICTION and VALIDATION may propose a generic future assay, control, comparator, or readout. "
         "Present every method as a proposed test, not a reported result. Do not call tools. "
         "Do not return JSON, Markdown, filenames, paths, named drugs, doses, numerical thresholds, "

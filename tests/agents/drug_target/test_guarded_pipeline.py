@@ -83,9 +83,18 @@ def _ollama_card_spec(card_id: str, category: str, gene: str) -> dict[str, objec
     }
 
 
-def test_native_ollama_instructions_use_safe_templates_and_hidden_sources() -> None:
+def test_native_ollama_initial_card_instruction_requires_rich_bounded_prose() -> None:
     card_instruction = guarded_pipeline._ollama_card_instruction(
         _ollama_card_spec("mechanism", "Mechanism of Action", "ERBB3")
+    )
+    card_repair = guarded_pipeline._ollama_card_instruction(
+        _ollama_card_spec("mechanism", "Mechanism of Action", "ERBB3"),
+        (
+            "CORE_UNSAFE_CLAIM",
+            "CONSTRAINT_UNSAFE_CLAIM",
+            "PREDICTION_UNSAFE_CLAIM",
+            "VALIDATION_UNSAFE_CLAIM",
+        ),
     )
     candidate_instruction = guarded_pipeline._ollama_candidate_instruction(
         {"gene": "ERBB3", "supporting_source": "evidence/stage3_ERBB3.json"}
@@ -96,16 +105,24 @@ def test_native_ollama_instructions_use_safe_templates_and_hidden_sources() -> N
     )
 
     assert "exactly four labelled, plain-text lines" in card_instruction
-    assert "one or two plain sentences per line" in card_instruction
+    assert "exactly two plain sentences on each labelled line" in card_instruction
     assert "Validation Focus: Mechanistic follow-up" in card_instruction
     assert "Category:" not in card_instruction
+    for requirement in (
+        "CORE must identify the listed Genes as evidence-supported candidates for validation in the Cell anchor.",
+        "CONSTRAINT must state that the follow-up does not establish a causal mechanism.",
+        "PREDICTION must propose testing separate listed-gene perturbation against a prespecified Cell anchor readout.",
+        "VALIDATION must propose a generic future assay with matched controls or a comparator and prespecified Cell anchor readouts.",
+    ):
+        assert requirement in card_instruction
     for line in (
         "CORE: ERBB3 is an evidence-supported candidate for validation in malignant cell context.",
         "CONSTRAINT: This follow-up does not establish a causal mechanism.",
         "PREDICTION: Test whether separate ERBB3 perturbation shifts a prespecified malignant cell readout.",
         "VALIDATION: Evaluate separate ERBB3 perturbation with a generic primary assay, matched controls, and prespecified malignant cell readouts.",
     ):
-        assert line in card_instruction
+        assert line not in card_instruction
+        assert f"Use this safe template: {line}" in card_repair
     assert "exactly one plain sentence" not in card_instruction
 
     assert "ERBB3" in candidate_instruction
