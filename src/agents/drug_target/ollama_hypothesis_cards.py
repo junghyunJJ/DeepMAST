@@ -35,8 +35,8 @@ _UNSAFE_CLAIM_RE = re.compile(
     re.IGNORECASE,
 )
 _NUMBER_RE = re.compile(r"\d")
-_MARKDOWN_RE = re.compile(
-    r"(?:`|\*\*|__|(?:^|\s)[#>*]|(?:^|\s)[+-]\s|\[[^]]*\]\([^)]*\))"
+_PLAIN_TEXT_SYNTAX_RE = re.compile(
+    r"(?:[*`\[\]~#]|<[^>]+>|(?:^|\n)\s*(?:[-+]|>)\s)"
 )
 
 
@@ -137,10 +137,9 @@ def validate_ollama_hypothesis_card(
             or "/" in text
             or "\\" in text
             or ".json" in text.lower()
+            or _PLAIN_TEXT_SYNTAX_RE.search(text)
         ):
             errors.append(f"{prefix}_UNSAFE_CONTENT")
-        if _MARKDOWN_RE.search(text):
-            errors.append(f"{prefix}_MARKDOWN")
         if _contains_unsupported_number(text, known_genes):
             errors.append("UNSUPPORTED_NUMBER")
         if _UNSAFE_CLAIM_RE.search(text):

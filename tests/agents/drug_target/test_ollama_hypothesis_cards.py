@@ -141,6 +141,13 @@ def test_bounded_hypothesis_card_accepts_each_action_term_side(
         (_bounded_card().replace("does not establish", "proves"), "CONSTRAINT_UNSAFE_CLAIM"),
         (_bounded_card().replace("prespecified", "99% prespecified"), "UNSUPPORTED_NUMBER"),
         (_bounded_card().replace("prespecified", "a .json marker in"), "PREDICTION_UNSAFE_CONTENT"),
+        (
+            _bounded_card().replace(
+                "evidence-supported candidates",
+                "evidence-*supported* candidates",
+            ),
+            "CORE_UNSAFE_CONTENT",
+        ),
         (_bounded_card() + "\nEXTRA: text", "CARD_FORMAT"),
     ],
 )
