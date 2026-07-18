@@ -148,6 +148,13 @@ def test_bounded_hypothesis_card_accepts_each_action_term_side(
             ),
             "CORE_UNSAFE_CONTENT",
         ),
+        (
+            _bounded_card().replace(
+                "evidence-supported candidates",
+                "evidence-_supported_ candidates",
+            ),
+            "CORE_UNSAFE_CONTENT",
+        ),
         (_bounded_card() + "\nEXTRA: text", "CARD_FORMAT"),
     ],
 )

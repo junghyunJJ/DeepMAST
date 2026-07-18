@@ -36,7 +36,8 @@ _UNSAFE_CLAIM_RE = re.compile(
 )
 _NUMBER_RE = re.compile(r"\d")
 _PLAIN_TEXT_SYNTAX_RE = re.compile(
-    r"(?:[*`\[\]~#]|<[^>]+>|(?:^|\n)\s*(?:[-+]|>)\s)"
+    r"(?:[*`\[\]~#]|<[^>]+>|(?:^|\n)\s*(?:[-+]|>)\s|"
+    r"__[^_\n]+__|(?<![A-Za-z0-9])_[^_\n]+_(?![A-Za-z0-9]))"
 )
 
 
