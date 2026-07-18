@@ -24,7 +24,7 @@ def test_native_ollama_prompt_requests_bounded_plain_prose_without_changing_lega
     ollama = prompts.OLLAMA_HYPOTHESIS_WRITER_PROMPT
 
     assert "exactly four labelled, plain-text lines" in ollama
-    assert "one sentence per line" in ollama
+    assert "one or two plain sentences per line" in ollama
     assert "Do not call tools" in ollama
     assert "Do not return JSON" in ollama
     assert "save_hypothesis_report" not in ollama
@@ -37,11 +37,12 @@ def test_native_ollama_prompt_declares_the_four_field_validator_contract() -> No
     for line in (
         "CORE: <listed genes> are evidence-supported candidates for validation in the supplied cell context.",
         "CONSTRAINT: This follow-up does not establish a causal mechanism.",
-        "PREDICTION: Test whether perturbation changes prespecified cell-context readouts.",
-        "VALIDATION: Evaluate perturbation readouts in the supplied cell context.",
+        "PREDICTION: Test whether perturbation shifts a prespecified cell-context readout, with a generic future control or comparator if useful.",
+        "VALIDATION: Evaluate perturbation with a generic future assay, matched control or comparator, and prespecified cell-context readout.",
     ):
         assert line in text
     assert "exactly one plain sentence" not in text
+    assert "proposed test, not a reported result" in text
 
 
 def test_native_ollama_prompt_keeps_gene_and_evidence_selection_in_python() -> None:
@@ -50,6 +51,8 @@ def test_native_ollama_prompt_keeps_gene_and_evidence_selection_in_python() -> N
     assert "coordinator supplies" in text
     assert "Do not add genes" in text
     assert "evidence references" in text
+    assert "named drugs" in text
+    assert "numerical thresholds" in text
 
 
 def test_hypothesis_writer_default_matches_minimal_dth_required_contract() -> None:

@@ -80,6 +80,7 @@ def _repair_guidance(
     errors: tuple[str, ...],
     *,
     safe_templates: Mapping[str, str] | None = None,
+    sentence_rule: str = "Return exactly one plain sentence.",
 ) -> str:
     """Convert safe symbolic validator codes into model-safe rewrite directions."""
     directions: list[str] = []
@@ -90,7 +91,7 @@ def _repair_guidance(
         elif direction is None and code.endswith("_SINGLE_LINE"):
             direction = "Keep the response on one line."
         elif direction is None and code.endswith("_SENTENCE"):
-            direction = "Return exactly one plain sentence."
+            direction = sentence_rule
         elif direction is None and code.endswith("_UNSAFE_CONTENT"):
             direction = "Remove Markdown, paths, filenames, citations, and syntax."
         elif direction is None and code.endswith("_FUTURE_ACTION"):
@@ -239,11 +240,11 @@ def _ollama_card_instruction(
     constraint_line = "CONSTRAINT: This follow-up does not establish a causal mechanism."
     prediction_line = (
         f"PREDICTION: Test whether separate {' and '.join(spec['genes'])} perturbation "
-        f"changes prespecified {spec['cell_anchor']} readouts."
+        f"shifts a prespecified {spec['cell_anchor']} readout."
     )
     validation_line = (
-        f"VALIDATION: Evaluate separate {' and '.join(spec['genes'])} perturbation "
-        f"readouts in {spec['cell_anchor']} context."
+        f"VALIDATION: Evaluate separate {' and '.join(spec['genes'])} perturbation with a "
+        f"generic primary assay, matched controls, and prespecified {spec['cell_anchor']} readouts."
     )
     repair = _repair_guidance(
         errors,
@@ -253,22 +254,23 @@ def _ollama_card_instruction(
             "PREDICTION": prediction_line,
             "VALIDATION": validation_line,
         },
+        sentence_rule="Keep each labelled line to one or two plain sentences.",
     )
     return (
-        "Return exactly four labelled, plain-text lines, one sentence per line, for this bounded hypothesis card.\n"
+        "Return exactly four labelled, plain-text lines, with one or two plain sentences per line, for this bounded hypothesis card.\n"
         f"Card ID: {spec['id']}\n"
-        f"Category: {spec['category']}\n"
+        f"Validation Focus: {spec['validation_focus']}\n"
         f"Genes: {', '.join(spec['genes'])}\n"
-        f"Evidence references: {', '.join(spec['evidence_references'])}\n"
         f"Cell anchor: {spec['cell_anchor']}\n"
         f"{core_line}"
         f"{constraint_line}\n"
         f"{prediction_line}\n"
         f"{validation_line}\n"
-        "Do not call tools. Do not return JSON, Markdown, filenames, scores, "
-        "drug claims, combination claims, synergy claims, direct-interaction claims, "
-        "or genes outside the listed Genes. Use exactly these labels in order: "
-        "CORE, CONSTRAINT, PREDICTION, VALIDATION."
+        "Only PREDICTION and VALIDATION may propose a generic future assay, control, comparator, or readout. "
+        "Present every method as a proposed test, not a reported result. Do not call tools. "
+        "Do not return JSON, Markdown, filenames, paths, named drugs, doses, numerical thresholds, "
+        "evidence references, established-biology assertions, unsafe claims, or genes outside the listed Genes. "
+        "Use exactly these labels in order: CORE, CONSTRAINT, PREDICTION, VALIDATION."
         f"{repair}"
     )
 

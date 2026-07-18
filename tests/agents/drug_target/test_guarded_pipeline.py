@@ -58,8 +58,8 @@ def _bounded_card(gene: str, anchor: str = "malignant cell") -> str:
     return "\n".join((
         f"CORE: {gene} is an evidence-supported candidate for validation in {anchor} context.",
         "CONSTRAINT: This follow-up does not establish a causal mechanism.",
-        f"PREDICTION: Test whether separate {gene} perturbation changes prespecified {anchor} readouts.",
-        f"VALIDATION: Evaluate separate {gene} perturbation readouts in {anchor} context.",
+        f"PREDICTION: Test whether separate {gene} perturbation shifts a prespecified {anchor} readout.",
+        f"VALIDATION: Evaluate separate {gene} perturbation with a generic primary assay, matched controls, and prespecified {anchor} readouts.",
     ))
 
 
@@ -67,12 +67,13 @@ def _ollama_card_spec(card_id: str, category: str, gene: str) -> dict[str, objec
     card = {
         "core_claim": f"{gene} is an evidence-supported candidate for validation in malignant cell context.",
         "interpretation_note": "This follow-up does not establish a causal mechanism.",
-        "falsifiable_prediction": f"Test whether separate {gene} perturbation changes prespecified malignant cell readouts.",
-        "validation_approach": f"Evaluate separate {gene} perturbation readouts in malignant cell context.",
+        "falsifiable_prediction": f"Test whether separate {gene} perturbation shifts a prespecified malignant cell readout.",
+        "validation_approach": f"Evaluate separate {gene} perturbation with a generic primary assay, matched controls, and prespecified malignant cell readouts.",
     }
     return {
         "id": card_id,
         "category": category,
+        "validation_focus": "Mechanistic follow-up",
         "genes": [gene],
         "evidence_references": [f"ot_{gene}.json", f"stage3_{gene}.json"],
         "cell_anchor": "malignant cell",
@@ -95,11 +96,14 @@ def test_native_ollama_instructions_use_safe_templates_and_hidden_sources() -> N
     )
 
     assert "exactly four labelled, plain-text lines" in card_instruction
+    assert "one or two plain sentences per line" in card_instruction
+    assert "Validation Focus: Mechanistic follow-up" in card_instruction
+    assert "Category:" not in card_instruction
     for line in (
         "CORE: ERBB3 is an evidence-supported candidate for validation in malignant cell context.",
         "CONSTRAINT: This follow-up does not establish a causal mechanism.",
-        "PREDICTION: Test whether separate ERBB3 perturbation changes prespecified malignant cell readouts.",
-        "VALIDATION: Evaluate separate ERBB3 perturbation readouts in malignant cell context.",
+        "PREDICTION: Test whether separate ERBB3 perturbation shifts a prespecified malignant cell readout.",
+        "VALIDATION: Evaluate separate ERBB3 perturbation with a generic primary assay, matched controls, and prespecified malignant cell readouts.",
     ):
         assert line in card_instruction
     assert "exactly one plain sentence" not in card_instruction
@@ -108,16 +112,18 @@ def test_native_ollama_instructions_use_safe_templates_and_hidden_sources() -> N
     assert "Supporting source" not in candidate_instruction
     assert "stage3_ERBB3.json" not in candidate_instruction
     assert "Use ERBB3 verbatim" in candidate_instruction
+    assert "exactly one plain, future-action sentence" in candidate_instruction
 
     assert "Recommendation: primary" in recommendation_instruction
     assert "Allowed action anchor: Prioritize ERBB3 validation before advancing target selection." in recommendation_instruction
     assert "Use the allowed action anchor" in recommendation_instruction
+    assert "exactly one plain, future-action sentence" in recommendation_instruction
 
 
 def test_native_ollama_repair_instructions_map_detailed_codes_without_model_text() -> None:
     card_repair = guarded_pipeline._ollama_card_instruction(
         _ollama_card_spec("mechanism", "Mechanism of Action", "ERBB3"),
-        ("CORE_REQUIRED_TERMS", "UNSUPPORTED_GENE"),
+        ("CORE_REQUIRED_TERMS", "CORE_SENTENCE", "UNSUPPORTED_GENE"),
     )
     candidate_repair = guarded_pipeline._ollama_candidate_instruction(
         {"gene": "ERBB3", "supporting_source": "evidence/stage3_ERBB3.json"},
@@ -131,6 +137,7 @@ def test_native_ollama_repair_instructions_map_detailed_codes_without_model_text
 
     assert "CORE must say the listed genes are evidence-supported candidates for validation." in card_repair
     assert "Use only the listed Genes." in card_repair
+    assert "Keep each labelled line to one or two plain sentences." in card_repair
     assert "Return exactly one plain sentence." in candidate_repair
     assert "Use only the supplied gene and ordinary action words." in candidate_repair
     assert "Use a future-directed action such as prioritize, validate, evaluate, or test." in recommendation_repair
@@ -147,7 +154,7 @@ def test_native_ollama_unsafe_claim_repairs_supply_safe_field_templates() -> Non
 
     assert "Remove causal, efficacy, synergy, direct-interaction, and other unsupported claims." in repair
     assert "Use this safe template: CONSTRAINT: This follow-up does not establish a causal mechanism." in repair
-    assert "Use this safe template: PREDICTION: Test whether separate ERBB3 perturbation changes prespecified malignant cell readouts." in repair
+    assert "Use this safe template: PREDICTION: Test whether separate ERBB3 perturbation shifts a prespecified malignant cell readout." in repair
     assert "CONSTRAINT_UNSAFE_CLAIM" not in repair
     assert "PREDICTION_UNSAFE_CLAIM" not in repair
     assert "rejected model prose" not in repair

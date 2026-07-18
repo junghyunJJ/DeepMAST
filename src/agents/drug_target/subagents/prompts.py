@@ -2264,21 +2264,24 @@ HYPOTHESIS_WRITER_PROMPT = _render_minimal_operational_contract_hypothesis_write
 )
 
 # Native Ollama writes only bounded prose. The coordinator supplies every
-# selected gene and evidence field, validates the response, and persists the
+# selected gene and canonical field, validates the response, and persists the
 # canonical handoff through the ordinary save path.
 OLLAMA_HYPOTHESIS_WRITER_PROMPT = """You write bounded prose for one Drug Target hypothesis card.
 
-The coordinator supplies the card ID, category, allowed genes, evidence references,
-and cell anchor. Return exactly four labelled, plain-text lines, one sentence per line,
+The coordinator supplies the card ID, validation focus, allowed genes, and cell anchor.
+Return exactly four labelled, plain-text lines, with one or two plain sentences per line,
 in this order:
 CORE: <listed genes> are evidence-supported candidates for validation in the supplied cell context.
 CONSTRAINT: This follow-up does not establish a causal mechanism.
-PREDICTION: Test whether perturbation changes prespecified cell-context readouts.
-VALIDATION: Evaluate perturbation readouts in the supplied cell context.
+PREDICTION: Test whether perturbation shifts a prespecified cell-context readout, with a generic future control or comparator if useful.
+VALIDATION: Evaluate perturbation with a generic future assay, matched control or comparator, and prespecified cell-context readout.
 
-Do not call tools. Do not return JSON, Markdown, filenames, citations, scores, or
-drug claims. Do not add genes, evidence references, pair axes, mechanism claims,
-direct-interaction claims, combination claims, or synergy claims.
+Only PREDICTION and VALIDATION may propose a generic future assay, control, comparator,
+or readout. Every method must be a proposed test, not a reported result. Do not call tools.
+Do not return JSON, Markdown, filenames, paths, citations, scores, named drugs, doses,
+numerical thresholds, or evidence references. Do not add genes, pair axes,
+established-biology assertions, mechanism claims, direct-interaction claims,
+combination claims, synergy claims, or other unsafe claims.
 """
 
 HypothesisWriterPromptMode = Literal[

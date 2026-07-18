@@ -13,6 +13,7 @@ from src.agents.drug_target.tools.evidence_loader import (
     _load_stage1_filter_results_status,
     _stage1_pair_usage_guidance,
 )
+from src.agents.drug_target.report_interpretations import validate_interpretation_text
 
 CANONICAL_CATEGORIES = (
     "Mechanism of Action",
@@ -20,6 +21,12 @@ CANONICAL_CATEGORIES = (
     "Cross-Target Interaction",
     "Novel Pathway",
 )
+VALIDATION_FOCUS_BY_CATEGORY = {
+    "Mechanism of Action": "Mechanistic follow-up",
+    "Therapeutic Strategy": "Translational prioritization",
+    "Cross-Target Interaction": "Pairwise context test",
+    "Novel Pathway": "Orthogonal/novelty validation",
+}
 _CARD_IDS = ("mechanism", "therapy", "cross_target", "novel_pathway")
 _STAGE1_NAME_RE = re.compile(r"^stage1_([A-Za-z0-9-]+)--([A-Za-z0-9-]+)\.json$")
 _FILENAME_RE = re.compile(r"\b[A-Za-z0-9_.-]+\.json\b", re.IGNORECASE)
@@ -56,6 +63,7 @@ class OllamaCardSpec(TypedDict):
 
     id: str
     category: str
+    validation_focus: str
     genes: list[str]
     evidence_references: list[str]
     cell_anchor: str
@@ -67,6 +75,10 @@ class OllamaCardSpec(TypedDict):
 def unsafe_ollama_claim_code(text: str) -> str | None:
     """Return the stable code for globally forbidden bounded-prose claims."""
     return "UNSAFE_CLAIM" if _UNSAFE_CLAIM_RE.search(text) else None
+
+
+def validation_focus_for_category(category: str) -> str:
+    return VALIDATION_FOCUS_BY_CATEGORY.get(category, "Evidence-bound follow-up")
 
 
 def parse_ollama_hypothesis_card(
@@ -94,8 +106,11 @@ def parse_ollama_hypothesis_card(
     }, []
 
 
-def _is_single_sentence(text: str) -> bool:
-    return bool(re.fullmatch(r"[^.!?]+[.!?]", text))
+def _has_one_or_two_sentences(text: str) -> bool:
+    sentences = re.findall(r"[^.!?]+[.!?]", text)
+    return 1 <= len(sentences) <= 2 and " ".join(
+        sentence.strip() for sentence in sentences
+    ) == text
 
 
 def _contains_unsupported_number(text: str, known_genes: Iterable[str]) -> bool:
@@ -120,24 +135,47 @@ def validate_ollama_hypothesis_card(
     allowed_genes = {gene.upper() for gene in spec["genes"]}
     known_genes = tuple(spec["known_genes"])
     requirements = {
-        "core_claim": ("CORE", ((r"\bcandidates?\b",), (r"\bvalidation\b",))),
-        "interpretation_note": ("CONSTRAINT", ((r"\bnot\b",), (r"\bcausal\b",))),
+        "core_claim": (
+            "CORE",
+            48,
+            ((r"\bcandidates?\b",), (r"\bvalidation\b",)),
+        ),
+        "interpretation_note": (
+            "CONSTRAINT",
+            48,
+            ((r"\bnot\b",), (r"\bcausal\b",)),
+        ),
         "falsifiable_prediction": (
             "PREDICTION",
+            64,
             ((r"\btest\b", r"\bperturbations?\b"),),
         ),
         "validation_approach": (
             "VALIDATION",
-            ((r"\bevaluate\b", r"\bperturbations?\b"),),
+            80,
+            (
+                (r"\bevaluate\b", r"\bperturbations?\b"),
+                (r"\bcontrols?\b", r"\bcomparators?\b"),
+                (r"\breadouts?\b",),
+            ),
         ),
     }
+    interpretation_card = {
+        "id": "ollama_hypothesis_card",
+        "allowed_genes": list(spec["genes"]),
+        "allowed_drugs": [],
+        "allowed_sources": [],
+        "allowed_terms": [],
+    }
 
-    for key, (prefix, terms) in requirements.items():
+    for key, (prefix, minimum_length, terms) in requirements.items():
         text = card.get(key)
-        if not isinstance(text, str) or not 24 <= len(text) <= 360:
+        if not isinstance(text, str):
             errors.append(f"{prefix}_LENGTH")
             continue
-        if not _is_single_sentence(text):
+        if not minimum_length <= len(text) <= 360:
+            errors.append(f"{prefix}_LENGTH")
+        if not _has_one_or_two_sentences(text):
             errors.append(f"{prefix}_SENTENCE")
         if (
             "\n" in text
@@ -162,6 +200,11 @@ def validate_ollama_hypothesis_card(
             for gene in known_genes
         ):
             errors.append("UNSUPPORTED_GENE")
+        if any(
+            issue["code"] == "UNSUPPORTED_ENTITY"
+            for issue in validate_interpretation_text(interpretation_card, text)
+        ):
+            errors.append("UNSUPPORTED_ENTITY")
         if not all(
             any(re.search(pattern, text, re.IGNORECASE) for pattern in alternatives)
             for alternatives in terms
@@ -300,17 +343,19 @@ def build_ollama_card_specs(data_dir: str | Path) -> list[OllamaCardSpec]:
             "core_claim": _fallback_hypothesis(card_genes, cell_anchor),
             "interpretation_note": "This follow-up does not establish a causal mechanism.",
             "falsifiable_prediction": (
-                "Test whether separate perturbation of the listed candidates "
-                f"changes prespecified {cell_anchor} readouts."
+                f"Test whether separate {' and '.join(card_genes)} perturbation "
+                f"shifts a prespecified {cell_anchor} readout."
             ),
             "validation_approach": (
-                f"Evaluate separate perturbation readouts in {cell_anchor} context."
+                f"Evaluate separate {' and '.join(card_genes)} perturbation with a generic "
+                f"primary assay, matched controls, and prespecified {cell_anchor} readouts."
             ),
         }
         specs.append(
             {
                 "id": card_id,
                 "category": category,
+                "validation_focus": validation_focus_for_category(category),
                 "genes": card_genes,
                 "evidence_references": references,
                 "cell_anchor": cell_anchor,

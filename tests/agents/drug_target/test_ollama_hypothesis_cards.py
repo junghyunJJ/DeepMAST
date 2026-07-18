@@ -6,9 +6,11 @@ import pytest
 
 from src.agents.drug_target.ollama_hypothesis_cards import (
     OllamaCardSpec,
+    VALIDATION_FOCUS_BY_CATEGORY,
     build_ollama_card_specs,
     build_ollama_hypothesis_report,
     is_ollama_card_text_safe,
+    validation_focus_for_category,
 )
 from src.agents.drug_target.tools.hypothesis_schema import (
     canonicalize_hypothesis_report,
@@ -25,15 +27,24 @@ def _bounded_card() -> str:
     return "\n".join((
         "CORE: ERBB3 and EFNB2 are evidence-supported candidates for validation in malignant cell context.",
         "CONSTRAINT: This follow-up does not establish a causal mechanism.",
-        "PREDICTION: Test separate ERBB3 and EFNB2 perturbations with prespecified malignant cell readouts.",
-        "VALIDATION: Evaluate separate perturbation readouts in malignant cell context.",
+        "PREDICTION: Test whether separate ERBB3 and EFNB2 perturbation shifts a prespecified malignant-cell readout.",
+        "VALIDATION: Evaluate separate ERBB3 and EFNB2 perturbation with a generic primary assay, matched controls, and prespecified malignant-cell readouts.",
     ))
+
+
+RICH_CARD = "\n".join((
+    "CORE: ERBB3 is an evidence-supported validation candidate in the malignant-cell context. Its prioritization warrants validation against the supplied evidence references.",
+    "CONSTRAINT: This follow-up does not establish a causal mechanism from the current evidence. It should be interpreted as a bounded candidate-level hypothesis.",
+    "PREDICTION: Test whether separate ERBB3 perturbation shifts a prespecified malignant-cell readout. Compare the perturbation with a matched non-targeting control.",
+    "VALIDATION: Evaluate ERBB3 perturbation using a generic primary assay with matched controls and prespecified readouts. Add an orthogonal comparator only as a future design choice, not as existing evidence.",
+))
 
 
 def _mechanism_spec() -> OllamaCardSpec:
     return {
         "id": "mechanism",
         "category": "Mechanism of Action",
+        "validation_focus": "Mechanistic follow-up",
         "genes": ["ERBB3", "EFNB2"],
         "evidence_references": [],
         "cell_anchor": "malignant cell",
@@ -48,11 +59,12 @@ def _mechanism_spec() -> OllamaCardSpec:
             ),
             "interpretation_note": "This follow-up does not establish a causal mechanism.",
             "falsifiable_prediction": (
-                "Test whether separate perturbation of the listed candidates "
-                "changes prespecified malignant cell readouts."
+                "Test whether separate ERBB3 and EFNB2 perturbation shifts a "
+                "prespecified malignant-cell readout."
             ),
             "validation_approach": (
-                "Evaluate separate perturbation readouts in malignant cell context."
+                "Evaluate separate ERBB3 and EFNB2 perturbation with a generic "
+                "primary assay, matched controls, and prespecified malignant-cell readouts."
             ),
         },
         "known_genes": ["ERBB3", "EFNB2", "SDC1"],
@@ -60,13 +72,30 @@ def _mechanism_spec() -> OllamaCardSpec:
 
 
 def test_parse_bounded_hypothesis_card_returns_named_fields() -> None:
-    from src.agents.drug_target.ollama_hypothesis_cards import parse_ollama_hypothesis_card
+    from src.agents.drug_target.ollama_hypothesis_cards import (
+        parse_ollama_hypothesis_card,
+        validate_ollama_hypothesis_card,
+    )
 
     card, errors = parse_ollama_hypothesis_card(_bounded_card())
 
     assert errors == []
     assert card is not None
     assert card["interpretation_note"] == "This follow-up does not establish a causal mechanism."
+    assert validate_ollama_hypothesis_card(card, spec=_mechanism_spec()) == []
+
+
+def test_bounded_hypothesis_card_accepts_two_sentence_fields() -> None:
+    from src.agents.drug_target.ollama_hypothesis_cards import (
+        parse_ollama_hypothesis_card,
+        validate_ollama_hypothesis_card,
+    )
+
+    card, errors = parse_ollama_hypothesis_card(RICH_CARD)
+
+    assert errors == []
+    assert card is not None
+    assert validate_ollama_hypothesis_card(card, spec=_mechanism_spec()) == []
 
 
 def test_hypothesis_report_uses_all_fallback_fields(bc_data_dir: Path) -> None:
@@ -101,19 +130,19 @@ def test_hypothesis_report_keeps_valid_mapped_card(bc_data_dir: Path) -> None:
     [
         (
             "falsifiable_prediction",
-            "Test ERBB3 and EFNB2 using prespecified malignant cell readouts.",
+            "Test ERBB3 and EFNB2 with a prespecified malignant-cell readout under matched control conditions.",
         ),
         (
             "falsifiable_prediction",
-            "Use separate ERBB3 and EFNB2 perturbation readouts in malignant cells.",
+            "Use separate ERBB3 and EFNB2 perturbation with a prespecified malignant-cell readout under matched control conditions.",
         ),
         (
             "validation_approach",
-            "Evaluate ERBB3 and EFNB2 readouts in malignant cell context.",
+            "Evaluate ERBB3 and EFNB2 with matched control conditions and prespecified malignant-cell readouts for this future assay.",
         ),
         (
             "validation_approach",
-            "Use separate ERBB3 and EFNB2 perturbation readouts in malignant cell context.",
+            "Use separate ERBB3 and EFNB2 perturbation with matched control conditions and prespecified malignant-cell readouts for this future assay.",
         ),
     ],
 )
@@ -215,6 +244,102 @@ def test_bounded_hypothesis_card_rejects_hyphenated_direct_interaction() -> None
     )
 
 
+@pytest.mark.parametrize(
+    ("replacement", "code"),
+    [
+        ("with gefitinib.", "UNSUPPORTED_ENTITY"),
+        ("with SDC1.", "UNSUPPORTED_GENE"),
+        ("with a 10% threshold.", "UNSUPPORTED_NUMBER"),
+        ("with citation [1].", "CORE_UNSAFE_CONTENT"),
+    ],
+)
+def test_bounded_hypothesis_card_rejects_unsupported_claim_inputs(
+    replacement: str,
+    code: str,
+) -> None:
+    from src.agents.drug_target.ollama_hypothesis_cards import (
+        parse_ollama_hypothesis_card,
+        validate_ollama_hypothesis_card,
+    )
+
+    card, errors = parse_ollama_hypothesis_card(
+        _bounded_card().replace("in malignant cell context.", replacement, 1)
+    )
+
+    assert errors == []
+    assert card is not None
+    assert code in validate_ollama_hypothesis_card(card, spec=_mechanism_spec())
+
+
+@pytest.mark.parametrize(
+    "unsafe_claim",
+    [
+        "causes malignant-cell outcomes",
+        "drives malignant-cell outcomes",
+        "proves a mechanism",
+        "demonstrates a mechanism",
+        "establishes a mechanism",
+        "mediates malignant-cell outcomes",
+        "shows synergy",
+        "shows a direct interaction",
+        "has efficacy",
+        "is an effective treatment",
+    ],
+)
+def test_bounded_hypothesis_card_rejects_each_unsafe_claim_family(
+    unsafe_claim: str,
+) -> None:
+    from src.agents.drug_target.ollama_hypothesis_cards import (
+        parse_ollama_hypothesis_card,
+        validate_ollama_hypothesis_card,
+    )
+
+    card, errors = parse_ollama_hypothesis_card(
+        _bounded_card().replace(
+            "in malignant cell context.",
+            f"in malignant cell context and {unsafe_claim}.",
+            1,
+        )
+    )
+
+    assert errors == []
+    assert card is not None
+    assert "CORE_UNSAFE_CLAIM" in validate_ollama_hypothesis_card(
+        card,
+        spec=_mechanism_spec(),
+    )
+
+
+@pytest.mark.parametrize(
+    "validation",
+    [
+        "Evaluate ERBB3 and EFNB2 perturbation with a generic primary assay and prespecified malignant-cell readouts.",
+        "Evaluate ERBB3 and EFNB2 perturbation with a generic primary assay and matched controls.",
+    ],
+)
+def test_bounded_hypothesis_card_requires_control_or_comparator_and_readout(
+    validation: str,
+) -> None:
+    from src.agents.drug_target.ollama_hypothesis_cards import (
+        parse_ollama_hypothesis_card,
+        validate_ollama_hypothesis_card,
+    )
+
+    card, errors = parse_ollama_hypothesis_card(
+        _bounded_card().replace(
+            "Evaluate separate ERBB3 and EFNB2 perturbation with a generic primary assay, matched controls, and prespecified malignant-cell readouts.",
+            validation,
+        )
+    )
+
+    assert errors == []
+    assert card is not None
+    assert "VALIDATION_REQUIRED_TERMS" in validate_ollama_hypothesis_card(
+        card,
+        spec=_mechanism_spec(),
+    )
+
+
 def test_canonicalization_revalidates_marked_ollama_enrichment(
     bc_data_dir: Path,
 ) -> None:
@@ -255,6 +380,16 @@ def test_card_specs_cover_all_featured_genes_with_four_categories(
     }
     assert all(spec["evidence_references"] for spec in specs)
     assert "SDC1" in specs[0]["known_genes"]
+    assert VALIDATION_FOCUS_BY_CATEGORY == {
+        "Mechanism of Action": "Mechanistic follow-up",
+        "Therapeutic Strategy": "Translational prioritization",
+        "Cross-Target Interaction": "Pairwise context test",
+        "Novel Pathway": "Orthogonal/novelty validation",
+    }
+    assert [spec["validation_focus"] for spec in specs] == list(
+        VALIDATION_FOCUS_BY_CATEGORY.values()
+    )
+    assert validation_focus_for_category("unknown") == "Evidence-bound follow-up"
 
 
 def test_skeleton_is_schema_valid_without_model_selected_references(
