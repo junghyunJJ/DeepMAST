@@ -131,10 +131,18 @@ diagnostic entrypoints retain their separately documented boundaries.
 The guarded coordinator enforces `prepare -> validate_evidence ->
 hypothesis_writer -> validate_hypothesis -> report_writer -> final
 audit/publication`; evidence runs insert `evidence_assessor` before
-`validate_evidence`. For native Ollama/Qwen, Python owns the canonical Section
-4 hypotheses and `report_sections.json`; Qwen supplies only bounded gene-card
-prose and two Section 5 recommendation sentences. It never writes Markdown,
-report data, or target assessment artifacts directly.
+`validate_evidence`.
+
+Python owns the canonical Section 4 hypothesis and report-section boundaries;
+Qwen can contribute only validated bounded prose within them.
+
+For native Ollama/Qwen, Python still selects all evidence, FEATURED genes,
+L-R pairs, scores, and layout. Qwen contributes only four labelled hypothesis
+cards, optional one-sentence Section 3 follow-ups, and two Section 5
+recommendations. Every unit is checked locally; an initial response may receive
+three repairs, then falls back to deterministic text or is omitted. The run
+writes `evidence/llm_enrichment_audit.json`; `DrugReportGuardrailMiddleware`
+remains the final whole-report audit and publication boundary.
 
 | Output | Owner | When written |
 |---|---|---|
@@ -642,23 +650,27 @@ The deployed `:6000` Ollama 0.20.6 OpenAI-compatible API ignores output and
 thinking controls, while the native provider honors `think=false` and
 `num_predict`.
 
-For the native Ollama/Qwen path, `hypothesis_writer` produces bounded prose
-for four deterministic gene-cards, not a full JSON report. Python reads
-FEATURED genes from `assessment_results.json`, selects the validator-required
-`ot_<GENE>.json` and `stage3_<GENE>.json` evidence for every FEATURED gene,
-and builds 4 final hypotheses before validating and persisting
-`evidence/hypothesis_report.json`. Only interest-cell-intrinsic Stage 1 pairs
-with strict-PASS status may accompany the malignant-cell anchor; spatial-niche-only and
-depleted-coexpression pairs do not. A rejected card is retried once and then
-replaced with conservative deterministic prose, so model-selected references
-never enter the report. Non-Ollama providers retain the existing tool-call
-save contract.
+For native Ollama/Qwen, Python still selects all evidence, FEATURED genes,
+L-R pairs, scores, and layout. Qwen contributes only four labelled hypothesis
+cards, optional one-sentence Section 3 follow-ups, and two Section 5
+recommendations. Every unit is checked locally; an initial response may receive
+three repairs, then falls back to deterministic text or is omitted. The run
+writes `evidence/llm_enrichment_audit.json`; `DrugReportGuardrailMiddleware`
+remains the final whole-report audit and publication boundary.
 
-For native Ollama/Qwen publication, the report writer supplies two bounded recommendation sentences for Section 5 only.
-Python selects supporting sources from the validated handoff, builds the canonical payload, and calls
-`production_save_report_sections_tool` directly. Invalid prose is retried once
-and then replaced with a conservative deterministic sentence; the ordinary
-guardrail and Jinja2 audit remain the publication boundary.
+`hypothesis_writer` receives the selected evidence and returns four labelled
+hypothesis cards (the bounded `gene-card` units), not a full JSON report.
+Python reads FEATURED genes from `assessment_results.json`, selects the
+validator-required `ot_<GENE>.json` and `stage3_<GENE>.json` evidence, and
+builds 4 final hypotheses before persisting
+`evidence/hypothesis_report.json`. Only interest-cell-intrinsic Stage 1 pairs
+with strict-PASS status may accompany the malignant-cell anchor. The report
+writer returns only bounded Section 3 follow-ups plus two bounded recommendation sentences
+for Section 5;
+Python selects supporting sources from the validated handoff, validates those
+units, and calls `production_save_report_sections_tool` before saving
+`report_sections.json`. Non-Ollama providers retain the existing tool-call
+save contract.
 
 A successful publication run requires a fresh valid
 `evidence/hypothesis_report.json`, `report_sections.json`, `drug.md`, and
