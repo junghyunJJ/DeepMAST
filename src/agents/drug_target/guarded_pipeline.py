@@ -76,7 +76,11 @@ _REPAIR_GUIDANCE = {
 }
 
 
-def _repair_guidance(errors: tuple[str, ...]) -> str:
+def _repair_guidance(
+    errors: tuple[str, ...],
+    *,
+    safe_templates: Mapping[str, str] | None = None,
+) -> str:
     """Convert safe symbolic validator codes into model-safe rewrite directions."""
     directions: list[str] = []
     for code in errors:
@@ -95,6 +99,17 @@ def _repair_guidance(errors: tuple[str, ...]) -> str:
             direction = "Remove template placeholder syntax."
         elif direction is None and code.endswith("_UNSUPPORTED_SOURCE"):
             direction = "Remove source references."
+        elif direction is None and code.endswith("_UNSAFE_CLAIM"):
+            field = code.removesuffix("_UNSAFE_CLAIM")
+            template = (safe_templates or {}).get(field)
+            direction = (
+                "Remove causal, efficacy, synergy, direct-interaction, and other unsupported claims."
+                + (
+                    f" Use this safe template: {template}"
+                    if template
+                    else " Return the supplied valid safe template for that field."
+                )
+            )
         elif direction is None:
             direction = "Return only the required bounded format."
         if direction not in directions:
@@ -219,6 +234,24 @@ def _ollama_card_instruction(
         else f"CORE: {genes} are evidence-supported candidates for validation "
         f"in {spec['cell_anchor']} context.\n"
     )
+    constraint_line = "CONSTRAINT: This follow-up does not establish a causal mechanism."
+    prediction_line = (
+        f"PREDICTION: Test whether separate {' and '.join(spec['genes'])} perturbation "
+        f"changes prespecified {spec['cell_anchor']} readouts."
+    )
+    validation_line = (
+        f"VALIDATION: Evaluate separate {' and '.join(spec['genes'])} perturbation "
+        f"readouts in {spec['cell_anchor']} context."
+    )
+    repair = _repair_guidance(
+        errors,
+        safe_templates={
+            "CORE": core_line.rstrip(),
+            "CONSTRAINT": constraint_line,
+            "PREDICTION": prediction_line,
+            "VALIDATION": validation_line,
+        },
+    )
     return (
         "Return exactly four labelled, plain-text lines, one sentence per line, for this bounded hypothesis card.\n"
         f"Card ID: {spec['id']}\n"
@@ -227,14 +260,14 @@ def _ollama_card_instruction(
         f"Evidence references: {', '.join(spec['evidence_references'])}\n"
         f"Cell anchor: {spec['cell_anchor']}\n"
         f"{core_line}"
-        "CONSTRAINT: This follow-up does not establish a causal mechanism.\n"
-        f"PREDICTION: Test whether separate {' and '.join(spec['genes'])} perturbation changes prespecified {spec['cell_anchor']} readouts.\n"
-        f"VALIDATION: Evaluate separate {' and '.join(spec['genes'])} perturbation readouts in {spec['cell_anchor']} context.\n"
+        f"{constraint_line}\n"
+        f"{prediction_line}\n"
+        f"{validation_line}\n"
         "Do not call tools. Do not return JSON, Markdown, filenames, scores, "
         "drug claims, combination claims, synergy claims, direct-interaction claims, "
         "or genes outside the listed Genes. Use exactly these labels in order: "
         "CORE, CONSTRAINT, PREDICTION, VALIDATION."
-        f"{_repair_guidance(errors)}"
+        f"{repair}"
     )
 
 

@@ -139,6 +139,20 @@ def test_native_ollama_repair_instructions_map_detailed_codes_without_model_text
     assert "PIPELINE_RECOMMENDATION_FUTURE_ACTION" not in recommendation_repair
 
 
+def test_native_ollama_unsafe_claim_repairs_supply_safe_field_templates() -> None:
+    repair = guarded_pipeline._ollama_card_instruction(
+        _ollama_card_spec("mechanism", "Mechanism of Action", "ERBB3"),
+        ("CONSTRAINT_UNSAFE_CLAIM", "PREDICTION_UNSAFE_CLAIM"),
+    )
+
+    assert "Remove causal, efficacy, synergy, direct-interaction, and other unsupported claims." in repair
+    assert "Use this safe template: CONSTRAINT: This follow-up does not establish a causal mechanism." in repair
+    assert "Use this safe template: PREDICTION: Test whether separate ERBB3 perturbation changes prespecified malignant cell readouts." in repair
+    assert "CONSTRAINT_UNSAFE_CLAIM" not in repair
+    assert "PREDICTION_UNSAFE_CLAIM" not in repair
+    assert "rejected model prose" not in repair
+
+
 def _install_fakes(
     monkeypatch: pytest.MonkeyPatch,
     calls: list[str],
