@@ -240,6 +240,23 @@ def test_ollama_candidate_followups_use_featured_stage3_sources(
     ]
 
 
+def test_ollama_candidate_followups_reject_unsafe_causal_claims(
+    tmp_path: Path,
+) -> None:
+    _write_evidence(tmp_path)
+
+    followups = build_ollama_candidate_followups(
+        tmp_path,
+        {
+            "FN1": (
+                "Prioritize FN1 validation because it drives disease progression."
+            ),
+        },
+    )
+
+    assert followups == []
+
+
 def test_canonicalize_report_sections_accepts_source_bound_candidate_followup(
     tmp_path: Path,
 ) -> None:
@@ -342,6 +359,25 @@ def test_ollama_recommendation_payload_replaces_unsafe_text(tmp_path: Path) -> N
     )
 
     assert payload["pipeline_recommendations"][0]["text"].startswith("Prioritize")
+
+
+def test_ollama_recommendation_payload_replaces_unsafe_causal_claim(
+    tmp_path: Path,
+) -> None:
+    _write_valid_hypothesis_report(tmp_path)
+
+    payload = build_ollama_report_recommendations(
+        tmp_path,
+        {
+            "primary": (
+                "Prioritize FN1 validation because it drives disease progression."
+            ),
+        },
+    )
+
+    assert payload["pipeline_recommendations"][0]["text"] == (
+        "Prioritize CD4 validation before advancing target selection."
+    )
 
 
 def test_bound_hypothesis_reader_requires_valid_handoff(tmp_path: Path) -> None:

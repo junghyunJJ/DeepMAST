@@ -14,6 +14,7 @@ from src.agents.drug_target.report_interpretations import (
     build_interpretation_cards,
     validate_interpretation_text,
 )
+from src.agents.drug_target.ollama_hypothesis_cards import unsafe_ollama_claim_code
 from src.agents.drug_target.tools.hypothesis_schema import (
     canonicalize_hypothesis_report,
     validate_canonical_hypothesis_report,
@@ -195,6 +196,9 @@ def _ollama_recommendation_errors(
         errors.append("must not contain Markdown or source syntax.")
     if not _FUTURE_ACTION_RE.search(stripped):
         errors.append("must state a future-directed action.")
+    unsafe_claim = unsafe_ollama_claim_code(stripped)
+    if unsafe_claim is not None:
+        errors.append(unsafe_claim)
     errors.extend(
         issue["message"] for issue in validate_interpretation_text(card, stripped)
     )

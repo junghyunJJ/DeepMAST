@@ -152,6 +152,24 @@ def test_native_ollama_unsafe_claim_repairs_supply_safe_field_templates() -> Non
     assert "PREDICTION_UNSAFE_CLAIM" not in repair
     assert "rejected model prose" not in repair
 
+    candidate_repair = guarded_pipeline._ollama_candidate_instruction(
+        {"gene": "ERBB3", "supporting_source": "evidence/stage3_ERBB3.json"},
+        ("CANDIDATE_FOLLOWUP_UNSAFE_CLAIM",),
+    )
+    recommendation_repair = guarded_pipeline._ollama_report_instruction(
+        "primary",
+        action_anchor="Prioritize ERBB3 validation before advancing target selection.",
+        errors=("PIPELINE_RECOMMENDATION_UNSAFE_CLAIM",),
+    )
+
+    for prompt, code in (
+        (candidate_repair, "CANDIDATE_FOLLOWUP_UNSAFE_CLAIM"),
+        (recommendation_repair, "PIPELINE_RECOMMENDATION_UNSAFE_CLAIM"),
+    ):
+        assert "Remove causal, efficacy, synergy, direct-interaction, and other unsupported claims." in prompt
+        assert code not in prompt
+        assert "drives disease progression" not in prompt
+
 
 def _install_fakes(
     monkeypatch: pytest.MonkeyPatch,
@@ -759,16 +777,16 @@ def test_ollama_report_route_saves_bounded_payload(
     assert saved_payloads == [payload]
 
 
-def test_ollama_report_sentence_retries_once(
+def test_unsafe_ollama_report_sentence_repairs_then_uses_fallback(
     tmp_path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     calls: list[str] = []
     responses = iter(
         [
-            "# invalid",
-            "Prioritize ERBB2 validation before advancing target selection.",
-            "Evaluate ERBB3 evidence before planning follow-up studies.",
+            "Prioritize ERBB2 validation because it drives disease progression.",
         ]
+        * 4
+        + ["Evaluate ERBB3 evidence before planning follow-up studies."]
     )
     saved_payloads: list[dict[str, object]] = []
 
@@ -790,7 +808,7 @@ def test_ollama_report_sentence_retries_once(
         primary = texts.get("primary", "")
         primary_text = (
             primary.strip()
-            if primary.startswith("Prioritize")
+            if primary == "Prioritize ERBB2 validation before advancing target selection."
             else "Prioritize ERBB2 validation before advancing target selection."
         )
         return {
@@ -849,10 +867,14 @@ def test_ollama_report_sentence_retries_once(
 
     asyncio.run(pipeline.ainvoke({"messages": []}))
 
-    assert calls == ["prepare", "report_writer", "report_writer", "report_writer"]
+    assert calls == ["prepare", "report_writer", "report_writer", "report_writer", "report_writer", "report_writer"]
     assert len(saved_payloads) == 1
     audit = json.loads((tmp_path / "evidence" / "llm_enrichment_audit.json").read_text())
-    assert "PIPELINE_RECOMMENDATION_UNSAFE_CONTENT" in audit["units"]["recommendation.primary"]["attempts"][0]["codes"]
+    assert saved_payloads[0]["pipeline_recommendations"][0]["text"] == (
+        "Prioritize ERBB2 validation before advancing target selection."
+    )
+    assert audit["units"]["recommendation.primary"]["status"] == "fallback"
+    assert "PIPELINE_RECOMMENDATION_UNSAFE_CLAIM" in audit["units"]["recommendation.primary"]["attempts"][0]["codes"]
     assert "PIPELINE_RECOMMENDATION_INVALID" not in audit["units"]["recommendation.primary"]["attempts"][0]["codes"]
 
 
@@ -901,7 +923,7 @@ def test_rejected_candidate_followup_repairs_three_times_then_is_omitted(
     calls: list[str] = []
     saved_payloads: list[dict[str, object]] = []
     responses = iter(
-        ["bad"] * 4
+        ["Prioritize FN1 validation because it drives disease progression."] * 4
         + [
             "Prioritize FN1 validation before advancing target selection.",
             "Evaluate FN1 evidence before planning follow-up studies.",
@@ -971,7 +993,7 @@ def test_rejected_candidate_followup_repairs_three_times_then_is_omitted(
     audit = json.loads((tmp_path / "evidence" / "llm_enrichment_audit.json").read_text())
     assert audit["units"]["candidate.FN1"]["status"] == "fallback"
     assert audit["units"]["candidate.FN1"]["repair_attempt_count"] == 3
-    assert "CANDIDATE_FOLLOWUP_LENGTH" in audit["units"]["candidate.FN1"]["attempts"][0]["codes"]
+    assert "CANDIDATE_FOLLOWUP_UNSAFE_CLAIM" in audit["units"]["candidate.FN1"]["attempts"][0]["codes"]
     assert "CANDIDATE_FOLLOWUP_INVALID" not in audit["units"]["candidate.FN1"]["attempts"][0]["codes"]
 
 

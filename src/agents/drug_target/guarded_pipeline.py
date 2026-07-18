@@ -137,6 +137,8 @@ def _recommendation_error_codes(
             suffix = "UNSAFE_CONTENT"
         elif error == "must state a future-directed action.":
             suffix = "FUTURE_ACTION"
+        elif error == "UNSAFE_CLAIM":
+            suffix = error
         elif error == "Interpretation text is empty.":
             suffix = "EMPTY"
         elif error == "Interpretation text contains template placeholder syntax.":

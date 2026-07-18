@@ -31,7 +31,7 @@ _HYPOTHESIS_FIELD_PREFIXES = {
 }
 _UNSAFE_CLAIM_RE = re.compile(
     r"\b(?:causes?|drives?|proves?|demonstrates?|establishes?|"
-    r"mediate(?:s|d)?|synerg(?:y|istic)|direct interaction|efficacy|"
+    r"mediate(?:s|d)?|synerg(?:y|istic)|direct[-\s]+interaction|efficacy|"
     r"effective treatment)\b",
     re.IGNORECASE,
 )
@@ -62,6 +62,11 @@ class OllamaCardSpec(TypedDict):
     fallback_hypothesis: str
     fallback_card: OllamaHypothesisText
     known_genes: list[str]
+
+
+def unsafe_ollama_claim_code(text: str) -> str | None:
+    """Return the stable code for globally forbidden bounded-prose claims."""
+    return "UNSAFE_CLAIM" if _UNSAFE_CLAIM_RE.search(text) else None
 
 
 def parse_ollama_hypothesis_card(
@@ -144,8 +149,9 @@ def validate_ollama_hypothesis_card(
             errors.append(f"{prefix}_UNSAFE_CONTENT")
         if _contains_unsupported_number(text, known_genes):
             errors.append("UNSUPPORTED_NUMBER")
-        if _UNSAFE_CLAIM_RE.search(text):
-            errors.append(f"{prefix}_UNSAFE_CLAIM")
+        unsafe_claim = unsafe_ollama_claim_code(text)
+        if unsafe_claim is not None:
+            errors.append(f"{prefix}_{unsafe_claim}")
         if any(
             gene.upper() not in allowed_genes
             and re.search(

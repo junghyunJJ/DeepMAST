@@ -193,6 +193,28 @@ def test_bounded_hypothesis_card_rejects_mediates_core_claim(causal_verb: str) -
     )
 
 
+def test_bounded_hypothesis_card_rejects_hyphenated_direct_interaction() -> None:
+    from src.agents.drug_target.ollama_hypothesis_cards import (
+        parse_ollama_hypothesis_card,
+        validate_ollama_hypothesis_card,
+    )
+
+    card, errors = parse_ollama_hypothesis_card(
+        _bounded_card().replace(
+            "in malignant cell context.",
+            "in malignant cell context despite a direct-interaction claim.",
+            1,
+        )
+    )
+
+    assert errors == []
+    assert card is not None
+    assert "CORE_UNSAFE_CLAIM" in validate_ollama_hypothesis_card(
+        card,
+        spec=_mechanism_spec(),
+    )
+
+
 def test_canonicalization_revalidates_marked_ollama_enrichment(
     bc_data_dir: Path,
 ) -> None:
