@@ -29,6 +29,8 @@ def test_docs_define_native_qwen_publication_success_profile() -> None:
         assert "drug_report_validation_final.json" in text
         assert 'publication.status: "passed"' in text
         assert "HYPOTHESIS_REPORT_MISSING" in text
+        assert "non-Ollama coordinator paths only" in text
+        assert "native Ollama/Qwen instead uses its separate per-unit initial response" in text
         assert "writer's bounded repair path" in text
 
 

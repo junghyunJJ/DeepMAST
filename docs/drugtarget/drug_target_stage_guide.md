@@ -91,8 +91,9 @@ A successful publication run requires a fresh valid
 `drug_report_validation_final.json` with `valid: true` and
 `publication.status: "passed"`. A durable hypothesis rejection without a
 report audit is fail-closed behavior, not a published report. The coordinator
-retries one `HYPOTHESIS_REPORT_MISSING`; rejected saves remain under the
-writer's bounded repair path.
+retries one `HYPOTHESIS_REPORT_MISSING` on non-Ollama coordinator paths only;
+native Ollama/Qwen instead uses its separate per-unit initial response plus up
+to three local repairs; rejected saves remain under the writer's bounded repair path.
 
 For native Ollama/Qwen, Python still selects all evidence, FEATURED genes,
 L-R pairs, scores, and layout. Qwen contributes only four labelled hypothesis
