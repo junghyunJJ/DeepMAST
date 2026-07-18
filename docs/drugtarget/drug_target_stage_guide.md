@@ -96,12 +96,24 @@ native Ollama/Qwen instead uses its separate per-unit initial response plus up
 to three local repairs; rejected saves remain under the writer's bounded repair path.
 
 For native Ollama/Qwen, Python still selects all evidence, FEATURED genes,
-L-R pairs, scores, and layout. Qwen contributes only four labelled hypothesis
-cards, optional one-sentence Section 3 follow-ups, and two Section 5
-recommendations. Every unit is checked locally; an initial response may receive
-three repairs, then falls back to deterministic text or is omitted. The run
-writes `evidence/llm_enrichment_audit.json`; `DrugReportGuardrailMiddleware`
-remains the final whole-report audit and publication boundary.
+L-R pairs, scores, and layout. Source, candidate, and category selection remains
+deterministic. Qwen contributes only four labelled hypothesis cards. Within each
+card, it produces four internal, independently validated card fields with one or
+two sentences each. Deterministic report rendering combines them into the two
+Section 4 reader-facing blocks under deterministic `Validation Focus`.
+
+Generic prospective design details—assay modalities, controls, comparators, and
+readouts—are permitted only for proposed prediction and validation designs; they
+are proposals, not evidence or established biological claims. Named-drug
+rejection is deliberately bounded, not comprehensive medication NER: prompt
+constraints, existing entity checks, and deterministic common-name/stem matching;
+there is no medication dictionary, network lookup, dependency, or assay-modality
+allowlist. Section 3 and Section 5 remain short, bounded sentence units:
+optional one-sentence Section 3 follow-ups and two Section 5 recommendations.
+Every unit is checked locally; an initial response may receive at most three safe
+repairs, then falls back to deterministic text or is omitted. The run writes
+`evidence/llm_enrichment_audit.json`; `DrugReportGuardrailMiddleware` remains
+the final whole-report audit and publication boundary.
 
 `hypothesis_writer` receives the selected evidence and returns four labelled
 hypothesis cards (the bounded `gene-card` units), not a full JSON report.

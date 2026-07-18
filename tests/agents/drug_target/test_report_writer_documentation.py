@@ -57,7 +57,7 @@ def test_docs_describe_bounded_ollama_report_sections() -> None:
         assert "four labelled hypothesis" in text
         assert "optional one-sentence Section 3 follow-ups" in text
         assert "two Section 5" in text
-        assert "three repairs" in text
+        assert "at most three safe repairs" in " ".join(text.split())
         assert "evidence/llm_enrichment_audit.json" in text
         assert "DrugReportGuardrailMiddleware" in text
         assert "production_save_report_sections_tool" in text
@@ -65,6 +65,24 @@ def test_docs_describe_bounded_ollama_report_sections() -> None:
         assert "Section 5 only" not in text
         assert "card is retried once" not in text
         assert "Invalid prose is retried once" not in text
+
+
+def test_docs_describe_rich_section4_validation_contract() -> None:
+    for path in (REFERENCE, STAGE_GUIDE):
+        text = path.read_text(encoding="utf-8")
+        contract_text = " ".join(text.split())
+        assert "four internal, independently validated card fields" in contract_text
+        assert "one or two sentences each" in contract_text
+        assert (
+            "two Section 4 reader-facing blocks under deterministic `Validation Focus`"
+            in contract_text
+        )
+        assert "assay modalities, controls, comparators, and readouts" in contract_text
+        assert "proposals, not evidence or established biological claims" in contract_text
+        assert "Source, candidate, and category selection remains deterministic" in contract_text
+        assert "at most three safe repairs" in contract_text
+        assert "Section 3 and Section 5 remain short, bounded sentence units" in contract_text
+        assert "not comprehensive medication NER" in contract_text
 
 
 def test_docs_describe_guarded_reporter_and_graph_builder_entrypoints() -> None:
