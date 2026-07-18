@@ -38,13 +38,16 @@ _HYPOTHESIS_FIELD_PREFIXES = {
 }
 _UNSAFE_CLAIM_RE = re.compile(
     r"\b(?:causes?|drives?|proves?|demonstrates?|establishes?|"
-    r"mediate(?:s|d)?|synerg(?:y|istic)|direct(?:ly)?[-\s]+interact(?:ion|s?)|efficacy|"
+    r"mediate(?:s|d)?|synerg(?:y|istic)|"
+    r"(?:direct(?:ly)?[-\s]+interact(?:ion|s?)|interacts?[-\s]+directly)|efficacy|"
     r"effective treatment)\b",
     re.IGNORECASE,
 )
+# ponytail: no evidence-backed drug list is available to this card validator;
+# replace this suffix heuristic if OllamaCardSpec gains allowed-drug context.
 _NAMED_DRUG_RE = re.compile(
     r"\b(?:aspirin|[A-Za-z][A-Za-z0-9-]*(?:mab|nib|tinib|statin|cillin|cycline|"
-    r"azole|vir|xaban|parin|platin|taxel|mycin))\b",
+    r"azole|vir|xaban|parin|platin|taxel|mycin|xifen|farin|formin))\b",
     re.IGNORECASE,
 )
 _SOURCE_EVIDENCE_CLAIM_RE = re.compile(

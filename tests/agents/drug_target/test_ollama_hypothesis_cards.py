@@ -248,6 +248,9 @@ def test_bounded_hypothesis_card_rejects_hyphenated_direct_interaction() -> None
     ("replacement", "code"),
     [
         ("with aspirin.", "UNSUPPORTED_DRUG"),
+        ("with tamoxifen.", "UNSUPPORTED_DRUG"),
+        ("with warfarin.", "UNSUPPORTED_DRUG"),
+        ("with metformin.", "UNSUPPORTED_DRUG"),
         ("with gefitinib.", "UNSUPPORTED_ENTITY"),
         ("with SDC1.", "UNSUPPORTED_GENE"),
         ("with a 10% threshold.", "UNSUPPORTED_NUMBER"),
@@ -285,6 +288,7 @@ def test_bounded_hypothesis_card_rejects_unsupported_claim_inputs(
         "shows synergy",
         "shows a direct interaction",
         "directly interacts with a pathway",
+        "interacts directly with a pathway",
         "has efficacy",
         "is an effective treatment",
     ],
