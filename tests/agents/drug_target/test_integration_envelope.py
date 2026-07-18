@@ -108,7 +108,12 @@ def test_guarded_ollama_writer_is_a_tool_free_prose_card_agent(tmp_path: Path) -
     )
 
     assert writer["tools"] == []
-    assert "exactly one plain sentence" in writer["system_prompt"]
+    assert "exactly four labelled, plain-text lines" in writer["system_prompt"]
+    assert "one sentence per line" in writer["system_prompt"]
+    assert "CORE:" in writer["system_prompt"]
+    assert "CONSTRAINT:" in writer["system_prompt"]
+    assert "PREDICTION:" in writer["system_prompt"]
+    assert "VALIDATION:" in writer["system_prompt"]
     assert not any(
         isinstance(
             middleware,

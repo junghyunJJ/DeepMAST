@@ -82,6 +82,63 @@ def _ollama_card_spec(card_id: str, category: str, gene: str) -> dict[str, objec
     }
 
 
+def test_native_ollama_instructions_use_safe_templates_and_hidden_sources() -> None:
+    card_instruction = guarded_pipeline._ollama_card_instruction(
+        _ollama_card_spec("mechanism", "Mechanism of Action", "ERBB3")
+    )
+    candidate_instruction = guarded_pipeline._ollama_candidate_instruction(
+        {"gene": "ERBB3", "supporting_source": "evidence/stage3_ERBB3.json"}
+    )
+    recommendation_instruction = guarded_pipeline._ollama_report_instruction(
+        "primary",
+        action_anchor="Prioritize ERBB3 validation before advancing target selection.",
+    )
+
+    assert "exactly four labelled, plain-text lines" in card_instruction
+    for line in (
+        "CORE: ERBB3 is an evidence-supported candidate for validation in malignant cell context.",
+        "CONSTRAINT: This follow-up does not establish a causal mechanism.",
+        "PREDICTION: Test whether separate ERBB3 perturbation changes prespecified malignant cell readouts.",
+        "VALIDATION: Evaluate separate ERBB3 perturbation readouts in malignant cell context.",
+    ):
+        assert line in card_instruction
+    assert "exactly one plain sentence" not in card_instruction
+
+    assert "ERBB3" in candidate_instruction
+    assert "Supporting source" not in candidate_instruction
+    assert "stage3_ERBB3.json" not in candidate_instruction
+    assert "Use ERBB3 verbatim" in candidate_instruction
+
+    assert "Recommendation: primary" in recommendation_instruction
+    assert "Allowed action anchor: Prioritize ERBB3 validation before advancing target selection." in recommendation_instruction
+    assert "Use the allowed action anchor" in recommendation_instruction
+
+
+def test_native_ollama_repair_instructions_map_detailed_codes_without_model_text() -> None:
+    card_repair = guarded_pipeline._ollama_card_instruction(
+        _ollama_card_spec("mechanism", "Mechanism of Action", "ERBB3"),
+        ("CORE_REQUIRED_TERMS", "UNSUPPORTED_GENE"),
+    )
+    candidate_repair = guarded_pipeline._ollama_candidate_instruction(
+        {"gene": "ERBB3", "supporting_source": "evidence/stage3_ERBB3.json"},
+        ("CANDIDATE_FOLLOWUP_SENTENCE", "CANDIDATE_FOLLOWUP_UNSUPPORTED_ENTITY"),
+    )
+    recommendation_repair = guarded_pipeline._ollama_report_instruction(
+        "primary",
+        action_anchor="Prioritize ERBB3 validation before advancing target selection.",
+        errors=("PIPELINE_RECOMMENDATION_FUTURE_ACTION",),
+    )
+
+    assert "CORE must say the listed genes are evidence-supported candidates for validation." in card_repair
+    assert "Use only the listed Genes." in card_repair
+    assert "Return exactly one plain sentence." in candidate_repair
+    assert "Use only the supplied gene and ordinary action words." in candidate_repair
+    assert "Use a future-directed action such as prioritize, validate, evaluate, or test." in recommendation_repair
+    assert "CORE_REQUIRED_TERMS" not in card_repair
+    assert "CANDIDATE_FOLLOWUP_SENTENCE" not in candidate_repair
+    assert "PIPELINE_RECOMMENDATION_FUTURE_ACTION" not in recommendation_repair
+
+
 def _install_fakes(
     monkeypatch: pytest.MonkeyPatch,
     calls: list[str],
@@ -780,6 +837,9 @@ def test_ollama_report_sentence_retries_once(
 
     assert calls == ["prepare", "report_writer", "report_writer", "report_writer"]
     assert len(saved_payloads) == 1
+    audit = json.loads((tmp_path / "evidence" / "llm_enrichment_audit.json").read_text())
+    assert "PIPELINE_RECOMMENDATION_UNSAFE_CONTENT" in audit["units"]["recommendation.primary"]["attempts"][0]["codes"]
+    assert "PIPELINE_RECOMMENDATION_INVALID" not in audit["units"]["recommendation.primary"]["attempts"][0]["codes"]
 
 
 def test_bounded_ollama_response_repairs_three_times_before_fallback() -> None:
@@ -897,6 +957,8 @@ def test_rejected_candidate_followup_repairs_three_times_then_is_omitted(
     audit = json.loads((tmp_path / "evidence" / "llm_enrichment_audit.json").read_text())
     assert audit["units"]["candidate.FN1"]["status"] == "fallback"
     assert audit["units"]["candidate.FN1"]["repair_attempt_count"] == 3
+    assert "CANDIDATE_FOLLOWUP_LENGTH" in audit["units"]["candidate.FN1"]["attempts"][0]["codes"]
+    assert "CANDIDATE_FOLLOWUP_INVALID" not in audit["units"]["candidate.FN1"]["attempts"][0]["codes"]
 
 
 def test_ollama_graph_state_omits_rejected_hypothesis_and_recommendation_text(

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import time
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
@@ -16,6 +17,7 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
 
 from src.agents.drug_target.hybrid_report_sections import (
+    _ollama_recommendation_errors,
     build_ollama_candidate_followup_specs,
     build_ollama_candidate_followups,
     build_ollama_report_recommendations,
@@ -59,6 +61,105 @@ T = TypeVar("T")
 
 MAX_OLLAMA_ENRICHMENT_REPAIRS = 3
 LLM_ENRICHMENT_AUDIT_FILENAME = "llm_enrichment_audit.json"
+
+_GENE_TOKEN_RE = re.compile(r"\b[A-Z][A-Z0-9-]{1,}\b")
+_REPAIR_GUIDANCE = {
+    "CARD_FORMAT": "Return exactly four labelled lines in the required order.",
+    "CORE_REQUIRED_TERMS": "CORE must say the listed genes are evidence-supported candidates for validation.",
+    "CONSTRAINT_REQUIRED_TERMS": "CONSTRAINT must say this does not establish a causal mechanism.",
+    "PREDICTION_REQUIRED_TERMS": "PREDICTION must use Test and perturbation.",
+    "VALIDATION_REQUIRED_TERMS": "VALIDATION must use Evaluate and perturbation.",
+    "UNSUPPORTED_GENE": "Use only the listed Genes.",
+    "UNSUPPORTED_NUMBER": "Remove unsupported numbers.",
+    "CANDIDATE_FOLLOWUP_UNSUPPORTED_ENTITY": "Use only the supplied gene and ordinary action words.",
+    "PIPELINE_RECOMMENDATION_UNSUPPORTED_ENTITY": "Use only the allowed action anchor and ordinary action words.",
+}
+
+
+def _repair_guidance(errors: tuple[str, ...]) -> str:
+    """Convert safe symbolic validator codes into model-safe rewrite directions."""
+    directions: list[str] = []
+    for code in errors:
+        direction = _REPAIR_GUIDANCE.get(code)
+        if direction is None and code.endswith("_LENGTH"):
+            direction = "Keep the response between 24 and 360 characters."
+        elif direction is None and code.endswith("_SINGLE_LINE"):
+            direction = "Keep the response on one line."
+        elif direction is None and code.endswith("_SENTENCE"):
+            direction = "Return exactly one plain sentence."
+        elif direction is None and code.endswith("_UNSAFE_CONTENT"):
+            direction = "Remove Markdown, paths, filenames, citations, and syntax."
+        elif direction is None and code.endswith("_FUTURE_ACTION"):
+            direction = "Use a future-directed action such as prioritize, validate, evaluate, or test."
+        elif direction is None and code.endswith("_PLACEHOLDER"):
+            direction = "Remove template placeholder syntax."
+        elif direction is None and code.endswith("_UNSUPPORTED_SOURCE"):
+            direction = "Remove source references."
+        elif direction is None:
+            direction = "Return only the required bounded format."
+        if direction not in directions:
+            directions.append(direction)
+    return "" if not directions else "\nRepair requirements:\n- " + "\n- ".join(directions)
+
+
+def _recommendation_error_codes(
+    errors: list[str],
+    *,
+    prefix: str,
+) -> tuple[str, ...]:
+    """Keep audit and repair inputs granular without retaining model prose."""
+    codes: list[str] = []
+    for error in errors:
+        if error == "must be text.":
+            suffix = "TYPE"
+        elif error == "must contain 24-360 characters.":
+            suffix = "LENGTH"
+        elif error == "must be a single line.":
+            suffix = "SINGLE_LINE"
+        elif error == "must contain exactly one sentence.":
+            suffix = "SENTENCE"
+        elif error == "must not contain Markdown or source syntax.":
+            suffix = "UNSAFE_CONTENT"
+        elif error == "must state a future-directed action.":
+            suffix = "FUTURE_ACTION"
+        elif error == "Interpretation text is empty.":
+            suffix = "EMPTY"
+        elif error == "Interpretation text contains template placeholder syntax.":
+            suffix = "PLACEHOLDER"
+        elif error.startswith("Unsupported entity token"):
+            suffix = "UNSUPPORTED_ENTITY"
+        elif error.startswith("Unsupported source reference"):
+            suffix = "UNSUPPORTED_SOURCE"
+        elif error.startswith("Unsupported numeric claim"):
+            suffix = "UNSUPPORTED_NUMBER"
+        else:
+            suffix = "INVALID_FORMAT"
+        code = f"{prefix}_{suffix}"
+        if code not in codes:
+            codes.append(code)
+    return tuple(codes)
+
+
+def _bounded_recommendation_codes(
+    text: str,
+    *,
+    prefix: str,
+    allowed_genes: tuple[str, ...],
+) -> tuple[str, ...]:
+    """Classify a rejected bounded response without keeping its text."""
+    return _recommendation_error_codes(
+        _ollama_recommendation_errors(
+            text,
+            {
+                "allowed_genes": list(allowed_genes),
+                "allowed_drugs": [],
+                "allowed_sources": [],
+                "allowed_terms": [],
+                "allowed_numbers": [],
+            },
+        ),
+        prefix=prefix,
+    )
 
 
 def _compile_role(spec: dict[str, Any], *, default_model: Any) -> Runnable:
@@ -110,49 +211,61 @@ def _ollama_card_instruction(
     errors: tuple[str, ...] = (),
 ) -> str:
     """Request only bounded prose; the coordinator owns every report field."""
-    correction = (
-        " The prior card was rejected for: " + ", ".join(errors) + "."
-        if errors
-        else ""
+    genes = " and ".join(spec["genes"])
+    core_line = (
+        f"CORE: {spec['genes'][0]} is an evidence-supported candidate for validation "
+        f"in {spec['cell_anchor']} context.\n"
+        if len(spec["genes"]) == 1
+        else f"CORE: {genes} are evidence-supported candidates for validation "
+        f"in {spec['cell_anchor']} context.\n"
     )
     return (
-        "Return exactly four labelled, plain-text sentences for this bounded hypothesis card.\n"
+        "Return exactly four labelled, plain-text lines, one sentence per line, for this bounded hypothesis card.\n"
         f"Card ID: {spec['id']}\n"
         f"Category: {spec['category']}\n"
         f"Genes: {', '.join(spec['genes'])}\n"
         f"Evidence references: {', '.join(spec['evidence_references'])}\n"
         f"Cell anchor: {spec['cell_anchor']}\n"
+        f"{core_line}"
+        "CONSTRAINT: This follow-up does not establish a causal mechanism.\n"
+        f"PREDICTION: Test whether separate {' and '.join(spec['genes'])} perturbation changes prespecified {spec['cell_anchor']} readouts.\n"
+        f"VALIDATION: Evaluate separate {' and '.join(spec['genes'])} perturbation readouts in {spec['cell_anchor']} context.\n"
         "Do not call tools. Do not return JSON, Markdown, filenames, scores, "
         "drug claims, combination claims, synergy claims, direct-interaction claims, "
         "or genes outside the listed Genes. Use exactly these labels in order: "
         "CORE, CONSTRAINT, PREDICTION, VALIDATION."
-        f"{correction}"
+        f"{_repair_guidance(errors)}"
     )
 
 
-def _ollama_report_instruction(label: str, errors: tuple[str, ...] = ()) -> str:
+def _ollama_report_instruction(
+    label: str,
+    *,
+    action_anchor: str,
+    errors: tuple[str, ...] = (),
+) -> str:
     """Keep native Ollama reporting to one bounded recommendation sentence."""
-    correction = f" Previous rejection codes: {', '.join(errors)}." if errors else ""
     return (
         "Return exactly one plain, future-action sentence for a pipeline recommendation.\n"
         f"Recommendation: {label}\n"
+        f"Allowed action anchor: {action_anchor}\n"
+        "Use the allowed action anchor as the factual boundary and write one conservative future action.\n"
         "Do not call tools. Do not return JSON, Markdown, filenames, paths, citations, "
         "headings, or additional sentences."
-        f"{correction}"
+        f"{_repair_guidance(errors)}"
     )
 
 
 def _ollama_candidate_instruction(
     spec: Mapping[str, str], errors: tuple[str, ...] = ()
 ) -> str:
-    correction = f" Previous rejection codes: {', '.join(errors)}." if errors else ""
     return (
         "Return exactly one plain, future-action sentence for the named candidate follow-up.\n"
         f"Candidate: {spec['gene']}\n"
-        f"Supporting source: {spec['supporting_source']}\n"
+        f"Use {spec['gene']} verbatim and state one conservative future action.\n"
         "Do not call tools. Do not return JSON, Markdown, filenames, paths, citations, "
         "headings, or additional sentences."
-        f"{correction}"
+        f"{_repair_guidance(errors)}"
     )
 
 
@@ -390,7 +503,8 @@ def build_guarded_pipeline(
             audit.setdefault("max_repair_attempts", MAX_OLLAMA_ENRICHMENT_REPAIRS)
             candidate_texts: dict[str, str] = {}
             texts: dict[str, str] = {}
-            for spec in build_ollama_candidate_followup_specs(run_dir):
+            candidate_specs = build_ollama_candidate_followup_specs(run_dir)
+            for spec in candidate_specs:
                 gene = spec["gene"]
 
                 def validate_followup(
@@ -401,7 +515,11 @@ def build_guarded_pipeline(
                     )
                     if len(followups) == 1 and followups[0]["gene"] == candidate_gene:
                         return followups[0], ()
-                    return None, ("CANDIDATE_FOLLOWUP_INVALID",)
+                    return None, _bounded_recommendation_codes(
+                        text,
+                        prefix="CANDIDATE_FOLLOWUP",
+                        allowed_genes=(candidate_gene,),
+                    )
 
                 followup, _ = await _bounded_ollama_response(
                     roles["report_writer"],
@@ -418,12 +536,23 @@ def build_guarded_pipeline(
                 if followup is not None:
                     candidate_texts[gene] = followup["text"]
 
+            fallback_payload = build_ollama_report_recommendations(run_dir, {})
+            fallback_recommendations = fallback_payload.get("pipeline_recommendations", [])
+            if not isinstance(fallback_recommendations, list) or len(fallback_recommendations) != 2:
+                raise RuntimeError("Drug Target report recommendations require two deterministic fallbacks")
             for index, label in enumerate(("primary", "secondary")):
+                fallback = fallback_recommendations[index]
+                if not isinstance(fallback, Mapping) or not isinstance(fallback.get("text"), str):
+                    raise RuntimeError("Drug Target report recommendation fallback is invalid")
+                action_anchor = fallback["text"].strip()
+                allowed_genes = tuple(_GENE_TOKEN_RE.findall(action_anchor))
+
                 def validate_recommendation(
                     text: str,
                     *,
                     recommendation_index: int = index,
                     recommendation_label: str = label,
+                    recommendation_genes: tuple[str, ...] = allowed_genes,
                 ) -> tuple[str | None, tuple[str, ...]]:
                     payload = build_ollama_report_recommendations(
                         run_dir, {**texts, recommendation_label: text}
@@ -436,13 +565,21 @@ def build_guarded_pipeline(
                         and recommendations[recommendation_index].get("text") == text.strip()
                     ):
                         return text.strip(), ()
-                    return None, ("PIPELINE_RECOMMENDATION_INVALID",)
+                    return None, _bounded_recommendation_codes(
+                        text,
+                        prefix="PIPELINE_RECOMMENDATION",
+                        allowed_genes=recommendation_genes,
+                    )
 
                 text, _ = await _bounded_ollama_response(
                     roles["report_writer"],
-                    initial_instruction=_ollama_report_instruction(label),
-                    repair_instruction=lambda errors, recommendation_label=label: _ollama_report_instruction(
-                        recommendation_label, errors
+                    initial_instruction=_ollama_report_instruction(
+                        label, action_anchor=action_anchor
+                    ),
+                    repair_instruction=lambda errors, recommendation_label=label, recommendation_anchor=action_anchor: _ollama_report_instruction(
+                        recommendation_label,
+                        action_anchor=recommendation_anchor,
+                        errors=errors,
                     ),
                     validate=validate_recommendation,
                     config=config,

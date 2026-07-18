@@ -23,11 +23,25 @@ def test_native_ollama_prompt_requests_bounded_plain_prose_without_changing_lega
     legacy = prompts.HYPOTHESIS_WRITER_PROMPT
     ollama = prompts.OLLAMA_HYPOTHESIS_WRITER_PROMPT
 
-    assert "exactly one plain sentence" in ollama
+    assert "exactly four labelled, plain-text lines" in ollama
+    assert "one sentence per line" in ollama
     assert "Do not call tools" in ollama
     assert "Do not return JSON" in ollama
     assert "save_hypothesis_report" not in ollama
     assert "exactly one plain sentence" not in legacy
+
+
+def test_native_ollama_prompt_declares_the_four_field_validator_contract() -> None:
+    text = prompts.OLLAMA_HYPOTHESIS_WRITER_PROMPT
+
+    for line in (
+        "CORE: <listed genes> are evidence-supported candidates for validation in the supplied cell context.",
+        "CONSTRAINT: This follow-up does not establish a causal mechanism.",
+        "PREDICTION: Test whether perturbation changes prespecified cell-context readouts.",
+        "VALIDATION: Evaluate perturbation readouts in the supplied cell context.",
+    ):
+        assert line in text
+    assert "exactly one plain sentence" not in text
 
 
 def test_native_ollama_prompt_keeps_gene_and_evidence_selection_in_python() -> None:
