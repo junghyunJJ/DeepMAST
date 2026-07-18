@@ -521,6 +521,7 @@ def canonicalize_hypothesis_report(
     if not isinstance(hypotheses, list):
         return None, ["hypotheses must be a list"], diagnostics
 
+    ollama_specs: list[dict[str, Any]] | None = None
     for idx, hyp in enumerate(hypotheses):
         if not isinstance(hyp, dict):
             errors.append(f"hypotheses[{idx}] must be an object")
@@ -587,6 +588,44 @@ def canonicalize_hypothesis_report(
             if d["usage"] == "contrast" and d["display_reference"] not in existing_contrast
         ]
         hyp["contrast_references"] = existing_contrast + contrast
+
+        if "interpretation_note" in hyp:
+            if ollama_specs is None:
+                from src.agents.drug_target.ollama_hypothesis_cards import (
+                    build_ollama_card_specs,
+                )
+
+                try:
+                    ollama_specs = build_ollama_card_specs(evidence_dir.parent)
+                except ValueError:
+                    ollama_specs = []
+            rank = hyp.get("rank")
+            spec = (
+                ollama_specs[rank - 1]
+                if isinstance(rank, int) and not isinstance(rank, bool)
+                and 1 <= rank <= len(ollama_specs)
+                else None
+            )
+            if spec is None:
+                errors.append(f"hypotheses[{idx}].ollama_enrichment:CARD_SPEC")
+                continue
+            from src.agents.drug_target.ollama_hypothesis_cards import (
+                validate_ollama_hypothesis_card,
+            )
+
+            card = {
+                field: hyp.get(field) if isinstance(hyp.get(field), str) else ""
+                for field in (
+                    "core_claim",
+                    "interpretation_note",
+                    "falsifiable_prediction",
+                    "validation_approach",
+                )
+            }
+            errors.extend(
+                f"hypotheses[{idx}].ollama_enrichment:{error}"
+                for error in validate_ollama_hypothesis_card(card, spec=spec)
+            )
 
     gap_analysis = canonical.get("gap_analysis")
     if not isinstance(gap_analysis, dict):

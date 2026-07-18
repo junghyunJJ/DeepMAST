@@ -23,6 +23,30 @@ CANONICAL_CATEGORIES = (
 _CARD_IDS = ("mechanism", "therapy", "cross_target", "novel_pathway")
 _STAGE1_NAME_RE = re.compile(r"^stage1_([A-Za-z0-9-]+)--([A-Za-z0-9-]+)\.json$")
 _FILENAME_RE = re.compile(r"\b[A-Za-z0-9_.-]+\.json\b", re.IGNORECASE)
+_HYPOTHESIS_FIELD_PREFIXES = {
+    "CORE": "core_claim",
+    "CONSTRAINT": "interpretation_note",
+    "PREDICTION": "falsifiable_prediction",
+    "VALIDATION": "validation_approach",
+}
+_UNSAFE_CLAIM_RE = re.compile(
+    r"\b(?:causes?|drives?|proves?|demonstrates?|establishes?|"
+    r"synerg(?:y|istic)|direct interaction|efficacy|effective treatment)\b",
+    re.IGNORECASE,
+)
+_NUMBER_RE = re.compile(r"\d")
+_MARKDOWN_RE = re.compile(
+    r"(?:`|\*\*|__|(?:^|\s)[#>*]|(?:^|\s)[+-]\s|\[[^]]*\]\([^)]*\))"
+)
+
+
+class OllamaHypothesisText(TypedDict):
+    """The four bounded fields Ollama may enrich for one hypothesis card."""
+
+    core_claim: str
+    interpretation_note: str
+    falsifiable_prediction: str
+    validation_approach: str
 
 
 class OllamaCardSpec(TypedDict):
@@ -34,7 +58,95 @@ class OllamaCardSpec(TypedDict):
     evidence_references: list[str]
     cell_anchor: str
     fallback_hypothesis: str
+    fallback_card: OllamaHypothesisText
     known_genes: list[str]
+
+
+def parse_ollama_hypothesis_card(
+    text: str,
+) -> tuple[OllamaHypothesisText | None, list[str]]:
+    """Parse exactly the labelled four-line Ollama card contract."""
+    lines = text.splitlines()
+    if len(lines) != len(_HYPOTHESIS_FIELD_PREFIXES):
+        return None, ["CARD_FORMAT"]
+
+    fields: dict[str, str] = {}
+    for line, (prefix, key) in zip(lines, _HYPOTHESIS_FIELD_PREFIXES.items()):
+        if line.count(": ") != 1:
+            return None, ["CARD_FORMAT"]
+        actual_prefix, value = line.split(": ", maxsplit=1)
+        if actual_prefix != prefix:
+            return None, ["CARD_FORMAT"]
+        fields[key] = value.strip()
+
+    return {
+        "core_claim": fields["core_claim"],
+        "interpretation_note": fields["interpretation_note"],
+        "falsifiable_prediction": fields["falsifiable_prediction"],
+        "validation_approach": fields["validation_approach"],
+    }, []
+
+
+def _is_single_sentence(text: str) -> bool:
+    return bool(re.fullmatch(r"[^.!?]+[.!?]", text))
+
+
+def _contains_unsupported_number(text: str, known_genes: Iterable[str]) -> bool:
+    without_gene_symbols = text
+    for gene in known_genes:
+        without_gene_symbols = re.sub(
+            rf"(?<![A-Za-z0-9]){re.escape(gene)}(?![A-Za-z0-9])",
+            "",
+            without_gene_symbols,
+            flags=re.IGNORECASE,
+        )
+    return bool(_NUMBER_RE.search(without_gene_symbols))
+
+
+def validate_ollama_hypothesis_card(
+    card: OllamaHypothesisText,
+    *,
+    spec: OllamaCardSpec,
+) -> list[str]:
+    """Return symbolic errors for the bounded model-owned fields."""
+    errors: list[str] = []
+    allowed_genes = {gene.upper() for gene in spec["genes"]}
+    known_genes = tuple(spec["known_genes"])
+    requirements = {
+        "core_claim": ("CORE", (r"\bcandidates?\b", r"\bvalidation\b")),
+        "interpretation_note": ("CONSTRAINT", (r"\bnot\b", r"\bcausal\b")),
+        "falsifiable_prediction": ("PREDICTION", (r"\btest\b", r"\bperturbation\b")),
+        "validation_approach": ("VALIDATION", (r"\bevaluate\b", r"\bperturbation\b")),
+    }
+
+    for key, (prefix, terms) in requirements.items():
+        text = card.get(key)
+        if not isinstance(text, str) or not 24 <= len(text) <= 360:
+            errors.append(f"{prefix}_LENGTH")
+            continue
+        if not _is_single_sentence(text):
+            errors.append(f"{prefix}_SENTENCE")
+        if "\n" in text or "/" in text or "\\" in text or _FILENAME_RE.search(text):
+            errors.append(f"{prefix}_UNSAFE_CONTENT")
+        if _MARKDOWN_RE.search(text):
+            errors.append(f"{prefix}_MARKDOWN")
+        if _contains_unsupported_number(text, known_genes):
+            errors.append("UNSUPPORTED_NUMBER")
+        if _UNSAFE_CLAIM_RE.search(text):
+            errors.append(f"{prefix}_UNSAFE_CLAIM")
+        if any(
+            gene.upper() not in allowed_genes
+            and re.search(
+                rf"(?<![A-Za-z0-9]){re.escape(gene)}(?![A-Za-z0-9])",
+                text,
+                re.IGNORECASE,
+            )
+            for gene in known_genes
+        ):
+            errors.append("UNSUPPORTED_GENE")
+        if not all(re.search(pattern, text, re.IGNORECASE) for pattern in terms):
+            errors.append(f"{prefix}_REQUIRED_TERMS")
+    return errors
 
 
 def _read_assessment(evidence_dir: Path) -> dict[str, Any]:
@@ -163,6 +275,17 @@ def build_ollama_card_specs(data_dir: str | Path) -> list[OllamaCardSpec]:
             if _stage1_contains_gene(filename, card_genes)
         )
         references = list(dict.fromkeys(references))
+        fallback_card: OllamaHypothesisText = {
+            "core_claim": _fallback_hypothesis(card_genes, cell_anchor),
+            "interpretation_note": "This follow-up does not establish a causal mechanism.",
+            "falsifiable_prediction": (
+                "Test whether separate perturbation of the listed candidates "
+                f"changes prespecified {cell_anchor} readouts."
+            ),
+            "validation_approach": (
+                f"Evaluate separate perturbation readouts in {cell_anchor} context."
+            ),
+        }
         specs.append(
             {
                 "id": card_id,
@@ -170,7 +293,8 @@ def build_ollama_card_specs(data_dir: str | Path) -> list[OllamaCardSpec]:
                 "genes": card_genes,
                 "evidence_references": references,
                 "cell_anchor": cell_anchor,
-                "fallback_hypothesis": _fallback_hypothesis(card_genes, cell_anchor),
+                "fallback_hypothesis": fallback_card["core_claim"],
+                "fallback_card": fallback_card,
                 "known_genes": known_genes,
             }
         )
@@ -179,28 +303,33 @@ def build_ollama_card_specs(data_dir: str | Path) -> list[OllamaCardSpec]:
 
 def build_ollama_hypothesis_report(
     data_dir: str | Path,
-    card_texts: Mapping[str, str],
+    card_texts: Mapping[str, OllamaHypothesisText],
 ) -> dict[str, object]:
     """Assemble a canonical report without admitting model-selected evidence."""
     base = Path(data_dir).expanduser().resolve()
-    evidence_dir = base / "evidence"
     specs = build_ollama_card_specs(base)
-    known_genes = _known_gene_symbols(evidence_dir)
     hypotheses: list[dict[str, object]] = []
 
     for rank, spec in enumerate(specs, start=1):
         genes = spec["genes"]
         card_id = spec["id"]
         candidate = card_texts.get(card_id, "")
-        core_claim = (
-            candidate
-            if isinstance(candidate, str)
-            and is_ollama_card_text_safe(
-                candidate,
-                allowed_genes=genes,
-                known_genes=known_genes,
-            )
-            else spec["fallback_hypothesis"]
+        enriched_card: OllamaHypothesisText | None = None
+        if isinstance(candidate, Mapping) and all(
+            isinstance(candidate.get(key), str)
+            for key in _HYPOTHESIS_FIELD_PREFIXES.values()
+        ):
+            enriched_card = {
+                "core_claim": candidate["core_claim"],
+                "interpretation_note": candidate["interpretation_note"],
+                "falsifiable_prediction": candidate["falsifiable_prediction"],
+                "validation_approach": candidate["validation_approach"],
+            }
+        card = (
+            enriched_card
+            if enriched_card is not None
+            and not validate_ollama_hypothesis_card(enriched_card, spec=spec)
+            else spec["fallback_card"]
         )
         cell_anchor = spec["cell_anchor"]
         hypotheses.append(
@@ -212,7 +341,8 @@ def build_ollama_hypothesis_report(
                 ),
                 "category": spec["category"],
                 "gap_type": "none",
-                "core_claim": core_claim,
+                "core_claim": card["core_claim"],
+                "interpretation_note": card["interpretation_note"],
                 "evidence_references": spec["evidence_references"],
                 "evidence_reference_details": [
                     {"filename": filename, "usage": "primary"}
@@ -225,14 +355,8 @@ def build_ollama_hypothesis_report(
                     "cell_types": [cell_anchor],
                     "drugs": [],
                 },
-                "falsifiable_prediction": (
-                    "Test whether separate perturbation of the listed candidates "
-                    f"changes prespecified {cell_anchor} readouts."
-                ),
-                "validation_approach": (
-                    "Evaluate separate perturbation readouts in "
-                    f"{cell_anchor} context."
-                ),
+                "falsifiable_prediction": card["falsifiable_prediction"],
+                "validation_approach": card["validation_approach"],
                 "scores": {
                     "evidence_coverage": 0.5,
                     "specificity": 0.5,
