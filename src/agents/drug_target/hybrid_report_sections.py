@@ -257,7 +257,11 @@ def build_ollama_candidate_followups(
     for spec in specs:
         text = texts.get(spec["gene"])
         card = cards.get(f"candidate.{spec['gene']}.recommendation")
-        if card is None or _ollama_recommendation_errors(text, card):
+        if (
+            not isinstance(text, str)
+            or card is None
+            or _ollama_recommendation_errors(text, card)
+        ):
             continue
         followups.append(
             {

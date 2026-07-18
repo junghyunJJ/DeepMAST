@@ -7,7 +7,7 @@ import json
 import time
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
-from typing import Annotated, Any, NotRequired, TypedDict
+from typing import Annotated, Any, Literal, NotRequired, TypedDict, TypeVar
 
 from langchain.agents import create_agent
 from langchain_core.messages import AIMessage, BaseMessage
@@ -46,6 +46,15 @@ class GuardedPipelineState(TypedDict):
     messages: Annotated[list[BaseMessage], add_messages]
     run_started_at: NotRequired[float]
     enrichment_audit: NotRequired[dict[str, Any]]
+
+
+class OllamaEnrichmentAttempt(TypedDict):
+    attempt: int
+    status: Literal["accepted", "rejected"]
+    codes: list[str]
+
+
+T = TypeVar("T")
 
 
 MAX_OLLAMA_ENRICHMENT_REPAIRS = 3
@@ -152,14 +161,14 @@ async def _bounded_ollama_response(
     *,
     initial_instruction: str,
     repair_instruction: Callable[[tuple[str, ...]], str],
-    validate: Callable[[str], tuple[object | None, tuple[str, ...]]],
+    validate: Callable[[str], tuple[T | None, tuple[str, ...]]],
     config: RunnableConfig,
     audit: dict[str, Any],
     unit_id: str,
     phase: str,
-) -> tuple[object | None, dict[str, Any]]:
+) -> tuple[T | None, dict[str, Any]]:
     """Try one bounded prompt and at most three local repairs."""
-    history: list[dict[str, object]] = []
+    history: list[OllamaEnrichmentAttempt] = []
     last_result: dict[str, Any] = {"messages": []}
     for attempt in range(MAX_OLLAMA_ENRICHMENT_REPAIRS + 1):
         instruction = (
@@ -314,7 +323,7 @@ def build_guarded_pipeline(
                     phase="hypothesis",
                 )
                 card_texts[spec["id"]] = (
-                    card if isinstance(card, dict) else spec["fallback_card"]
+                    card if card is not None else spec["fallback_card"]
                 )
             report = build_ollama_hypothesis_report(run_dir, card_texts)
             raw_receipt = await asyncio.to_thread(
@@ -406,7 +415,7 @@ def build_guarded_pipeline(
                     unit_id=f"candidate.{gene}",
                     phase="candidate_followup",
                 )
-                if isinstance(followup, dict):
+                if followup is not None:
                     candidate_texts[gene] = followup["text"]
 
             for index, label in enumerate(("primary", "secondary")):
@@ -441,7 +450,7 @@ def build_guarded_pipeline(
                     unit_id=f"recommendation.{label}",
                     phase="pipeline_recommendation",
                 )
-                if isinstance(text, str):
+                if text is not None:
                     texts[label] = text
 
             payload = build_ollama_report_recommendations(run_dir, texts)
