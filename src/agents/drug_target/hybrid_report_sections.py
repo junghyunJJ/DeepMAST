@@ -421,6 +421,9 @@ def canonicalize_report_sections(
                 f"pipeline_recommendations[{index}].text must state a future-directed "
                 "action."
             )
+        unsafe_claim = unsafe_ollama_claim_code(text)
+        if unsafe_claim is not None:
+            errors.append(f"pipeline_recommendations[{index}].text: {unsafe_claim}")
         for issue in validate_interpretation_text(card, text):
             errors.append(
                 f"pipeline_recommendations[{index}].text: {issue['message']}"

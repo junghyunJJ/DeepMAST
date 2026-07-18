@@ -417,6 +417,38 @@ def test_sections_save_host_injects_saved_handoff(tmp_path: Path) -> None:
     assert saved["hypothesis_report"]["hypotheses"] == handoff["hypotheses"]
 
 
+def test_sections_save_rejects_causal_recommendation_at_canonical_boundary(
+    tmp_path: Path,
+) -> None:
+    from src.agents.drug_target.production_report_tools import (
+        production_save_report_sections_tool,
+    )
+
+    _write_renderer_evidence(tmp_path)
+    persist_hypothesis_report(tmp_path, _hypothesis_report())
+    recommendations = _payload()["pipeline_recommendations"]
+    recommendations[0]["text"] = (
+        "Prioritize FN1 validation because it drives disease progression."
+    )
+
+    receipt = json.loads(
+        production_save_report_sections_tool(tmp_path, "IPF").invoke(
+            {
+                "payload": {
+                    "schema_version": "hybrid_report_sections/v1",
+                    "pipeline_recommendations": recommendations,
+                },
+            }
+        )
+    )
+
+    assert receipt["saved"] is False
+    assert receipt["errors"] == [
+        "pipeline_recommendations[0].text: UNSAFE_CLAIM",
+    ]
+    assert not (tmp_path / "drug.md").exists()
+
+
 def test_validate_canonical_hypothesis_report_accepts_current_contract_without_write(
     tmp_path: Path,
 ) -> None:
