@@ -159,11 +159,12 @@ def _write_ollama_enrichment_evidence(tmp_path: Path) -> Path:
                 {"gene": "ERBB2"},
                 {"gene": "TP53"},
                 {"gene": "KRAS"},
+                {"gene": "BRAF"},
             ]
         }),
         encoding="utf-8",
     )
-    for gene in ("TP53", "KRAS"):
+    for gene in ("TP53", "KRAS", "BRAF"):
         (evidence_dir / f"stage3_{gene}.json").write_text(
             json.dumps({"gene_symbol": gene}),
             encoding="utf-8",
