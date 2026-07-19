@@ -276,7 +276,11 @@ def production_save_report_sections_tool(
 
     def save_report_sections_for_run(payload: ReportRecommendationsPayload) -> str:
         try:
-            hypothesis_report = _read_validated_hypothesis_report(run_dir)
+            hypothesis_report = (
+                {"hypotheses": []}
+                if payload.no_featured_candidates
+                else _read_validated_hypothesis_report(run_dir)
+            )
             full_payload = {
                 **payload.model_dump(),
                 "hypothesis_report": hypothesis_report,
@@ -284,7 +288,10 @@ def production_save_report_sections_tool(
             report_data = build_report_data(
                 str(run_dir),
                 disease,
-                hypothesis_data={"hypotheses": []},
+                hypothesis_data={
+                    "hypotheses": [],
+                    "no_featured_candidates": payload.no_featured_candidates,
+                },
                 hypothesis_source=REPORT_SECTIONS_FILENAME,
             )
             if not report_data.get("valid"):

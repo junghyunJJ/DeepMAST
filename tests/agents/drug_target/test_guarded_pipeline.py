@@ -329,6 +329,63 @@ def test_resume_pipeline_skips_only_evidence_assessor(
     assert calls == ["prepare", "hypothesis_writer", "report_writer"]
 
 
+def test_zero_featured_candidates_skip_llm_roles_and_publish_sections(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[str] = []
+    saved_payloads: list[dict[str, Any]] = []
+    publications: list[dict[str, Any]] = []
+    _install_fakes(monkeypatch, calls)
+
+    class _StageGate:
+        @staticmethod
+        def invoke(_args: dict[str, str]) -> str:
+            return json.dumps(
+                {"stage1_complete": True, "stage3_candidates_count": 0}
+            )
+
+    class _SaveTool:
+        @staticmethod
+        def invoke(args: dict[str, Any]) -> str:
+            saved_payloads.append(args["payload"])
+            return json.dumps({"saved": True})
+
+    monkeypatch.setattr(guarded_pipeline, "check_stage1_completion", _StageGate())
+    monkeypatch.setattr(
+        guarded_pipeline,
+        "production_save_report_sections_tool",
+        lambda *_args: _SaveTool(),
+    )
+    monkeypatch.setattr(
+        guarded_pipeline,
+        "run_drug_report_guardrail",
+        lambda *_args, **_kwargs: publications.append(_kwargs)
+        or {"status": "passed", "publication_status": "passed"},
+        raising=False,
+    )
+    pipeline = guarded_pipeline.build_guarded_pipeline(
+        _specs(),
+        data_dir=str(tmp_path),
+        default_model=DEFAULT_MODEL,
+        disease="breast cancer",
+        skip_evidence_assessor=True,
+        provider="ollama",
+    )
+
+    asyncio.run(pipeline.ainvoke({"messages": []}))
+
+    assert calls == ["prepare"]
+    assert saved_payloads == [
+        {
+            "schema_version": "hybrid_report_sections/v1",
+            "no_featured_candidates": True,
+            "candidate_followups": [],
+            "pipeline_recommendations": [],
+        }
+    ]
+    assert publications == [{"disease": "breast cancer", "require_report_sections": True}]
+
+
 def test_invalid_evidence_stops_before_hypothesis_and_report(
     tmp_path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -80,6 +80,21 @@ def _write_renderer_evidence(tmp_path: Path) -> Path:
     return evidence_dir
 
 
+def _write_zero_featured_renderer_evidence(tmp_path: Path) -> Path:
+    evidence_dir = _write_renderer_evidence(tmp_path)
+    (evidence_dir / "assessment_results.json").write_text(
+        json.dumps(
+            {
+                "disease": "IPF",
+                "rubric_assessment": [],
+                "stage3_candidates": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    return evidence_dir
+
+
 def _hypothesis(
     rank: int,
     category: str,
@@ -415,6 +430,72 @@ def test_sections_save_host_injects_saved_handoff(tmp_path: Path) -> None:
     saved = json.loads((tmp_path / REPORT_SECTIONS_FILENAME).read_text())
     handoff = json.loads((tmp_path / "evidence" / "hypothesis_report.json").read_text())
     assert saved["hypothesis_report"]["hypotheses"] == handoff["hypotheses"]
+
+
+def test_zero_featured_sections_publish_without_hypothesis_handoff(
+    tmp_path: Path,
+) -> None:
+    from src.agents.drug_target.production_report_tools import (
+        production_save_report_sections_tool,
+    )
+    from src.agents.drug_target.report_guardrails import run_drug_report_guardrail
+
+    _write_zero_featured_renderer_evidence(tmp_path)
+    receipt = json.loads(
+        production_save_report_sections_tool(tmp_path, "IPF").invoke(
+            {
+                "payload": {
+                    "schema_version": "hybrid_report_sections/v1",
+                    "no_featured_candidates": True,
+                    "candidate_followups": [],
+                    "pipeline_recommendations": [],
+                },
+            }
+        )
+    )
+
+    assert receipt["saved"] is True, receipt
+    assert not (tmp_path / "evidence" / "hypothesis_report.json").exists()
+    saved = json.loads((tmp_path / REPORT_SECTIONS_FILENAME).read_text(encoding="utf-8"))
+    assert saved["no_featured_candidates"] is True
+    assert saved["hypothesis_report"]["hypotheses"] == []
+    markdown = (tmp_path / "drug.md").read_text(encoding="utf-8")
+    assert (
+        "No FEATURED candidates met the Stage 3 criteria; no hypothesis-driven "
+        "follow-up recommendations were generated."
+    ) in markdown
+
+    result = run_drug_report_guardrail(
+        tmp_path,
+        disease="IPF",
+        require_report_sections=True,
+    )
+
+    assert result["status"] == "passed", result
+    assert (tmp_path / "drug_report.html").is_file()
+    assert (tmp_path / "part4_candidate_selection.json").is_file()
+    assert (tmp_path / "part4_therapeutic_synthesis.md").is_file()
+
+
+def test_no_featured_marker_rejects_nonempty_stage3_candidates(
+    tmp_path: Path,
+) -> None:
+    evidence_dir = _write_evidence(tmp_path)
+    canonical, errors = canonicalize_report_sections(
+        {
+            "schema_version": "hybrid_report_sections/v1",
+            "no_featured_candidates": True,
+            "hypothesis_report": {"hypotheses": []},
+            "candidate_followups": [],
+            "pipeline_recommendations": [],
+        },
+        evidence_dir,
+        _source_paths(),
+        _report_data(),
+    )
+
+    assert canonical is None
+    assert "stage3_candidates must be an empty list" in "\n".join(errors)
 
 
 def test_sections_save_rejects_causal_recommendation_at_canonical_boundary(

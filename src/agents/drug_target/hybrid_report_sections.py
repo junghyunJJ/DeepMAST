@@ -21,6 +21,10 @@ from src.agents.drug_target.tools.hypothesis_schema import (
 )
 
 REPORT_SECTIONS_FILENAME = "report_sections.json"
+NO_FEATURED_CANDIDATES_SECTION_4_SENTENCE = (
+    "No FEATURED candidates met the Stage 3 criteria; no hypothesis-driven "
+    "follow-up recommendations were generated."
+)
 
 
 class PipelineRecommendation(BaseModel):
@@ -37,24 +41,24 @@ class CandidateFollowup(BaseModel):
 class ReportSectionsPayload(BaseModel):
     schema_version: Literal["hybrid_report_sections/v1"]
     hypothesis_report: dict[str, Any]
+    no_featured_candidates: bool = False
     candidate_followups: list[CandidateFollowup] = Field(
         default_factory=list,
         max_length=7,
     )
     pipeline_recommendations: list[PipelineRecommendation] = Field(
-        min_length=2,
         max_length=4,
     )
 
 
 class ReportRecommendationsPayload(BaseModel):
     schema_version: Literal["hybrid_report_sections/v1"]
+    no_featured_candidates: bool = False
     candidate_followups: list[CandidateFollowup] = Field(
         default_factory=list,
         max_length=7,
     )
     pipeline_recommendations: list[PipelineRecommendation] = Field(
-        min_length=2,
         max_length=4,
     )
 
@@ -316,6 +320,42 @@ def build_ollama_report_recommendations(
     }
 
 
+def validate_no_featured_candidates_contract(
+    payload: Mapping[str, Any],
+    evidence_dir: Path,
+) -> list[str]:
+    """Validate the only allowed empty-hypothesis report-sections contract."""
+    errors: list[str] = []
+    try:
+        assessment = json.loads(
+            (evidence_dir / "assessment_results.json").read_text(encoding="utf-8")
+        )
+    except (OSError, json.JSONDecodeError) as exc:
+        return [f"could not read assessment_results.json: {exc}"]
+    stage3_candidates = (
+        assessment.get("stage3_candidates") if isinstance(assessment, Mapping) else None
+    )
+    if not isinstance(stage3_candidates, list) or stage3_candidates:
+        errors.append(
+            "no_featured_candidates requires assessment_results.json "
+            "stage3_candidates must be an empty list."
+        )
+
+    hypothesis_report = payload.get("hypothesis_report")
+    hypotheses = (
+        hypothesis_report.get("hypotheses")
+        if isinstance(hypothesis_report, Mapping)
+        else None
+    )
+    if not isinstance(hypotheses, list) or hypotheses:
+        errors.append("no_featured_candidates requires an empty hypotheses list.")
+    for field in ("candidate_followups", "pipeline_recommendations"):
+        value = payload.get(field)
+        if not isinstance(value, list) or value:
+            errors.append(f"no_featured_candidates requires empty {field}.")
+    return errors
+
+
 def canonicalize_report_sections(
     payload: Any,
     evidence_dir: Path,
@@ -327,6 +367,23 @@ def canonicalize_report_sections(
         parsed = ReportSectionsPayload.model_validate(payload)
     except ValidationError as exc:
         return None, [f"report_sections payload is invalid: {exc}"]
+
+    if parsed.no_featured_candidates:
+        errors = validate_no_featured_candidates_contract(
+            parsed.model_dump(), evidence_dir
+        )
+        if errors:
+            return None, errors
+        return {
+            "schema_version": parsed.schema_version,
+            "no_featured_candidates": True,
+            "hypothesis_report": {"hypotheses": []},
+            "candidate_followups": [],
+            "pipeline_recommendations": [],
+        }, []
+
+    if not 2 <= len(parsed.pipeline_recommendations) <= 4:
+        return None, ["pipeline_recommendations must contain 2-4 items."]
 
     canonical_hypotheses, errors, _ = canonicalize_hypothesis_report(
         parsed.hypothesis_report,

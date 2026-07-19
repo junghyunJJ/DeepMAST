@@ -182,7 +182,10 @@ Each gene is scored on two independent tracks reflecting different types of ther
 {{ disease_scope.proxy_note }}
 
 {% endif %}
-{% if hypothesis_data and hypothesis_data.hypotheses %}
+{% if hypothesis_data and hypothesis_data.no_featured_candidates %}
+No FEATURED candidates met the Stage 3 criteria; no hypothesis-driven follow-up recommendations were generated. [source: rubric_assessment]
+
+{% elif hypothesis_data and hypothesis_data.hypotheses %}
 Evidence coverage: {{ hypothesis_data.evidence_coverage_pct }}% ({{ hypothesis_data.hypotheses_retained }} follow-up recommendations retained from {{ hypothesis_data.hypotheses_generated }} generated). [source: rubric_assessment]
 
 {% if interpretations.hypotheses_overview %}

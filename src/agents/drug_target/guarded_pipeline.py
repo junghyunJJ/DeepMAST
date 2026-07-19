@@ -43,12 +43,14 @@ from src.agents.drug_target.tools.hypothesis_schema import (
 from src.agents.drug_target.production_report_tools import (
     production_save_report_sections_tool,
 )
+from src.agents.drug_target.report_guardrails import run_drug_report_guardrail
 
 
 class GuardedPipelineState(TypedDict):
     messages: Annotated[list[BaseMessage], add_messages]
     run_started_at: NotRequired[float]
     enrichment_audit: NotRequired[dict[str, Any]]
+    no_featured_candidates: NotRequired[bool]
 
 
 class OllamaEnrichmentAttempt(TypedDict):
@@ -447,7 +449,54 @@ def build_guarded_pipeline(
                 "Drug Target evidence gate failed: "
                 + str(result.get("recommendation") or "Stage 1 is incomplete")
             )
-        return {}
+        stage3_candidates_count = result.get("stage3_candidates_count")
+        return {
+            "no_featured_candidates": (
+                isinstance(stage3_candidates_count, int)
+                and not isinstance(stage3_candidates_count, bool)
+                and stage3_candidates_count == 0
+            )
+        }
+
+    async def run_no_featured_report(
+        _state: GuardedPipelineState,
+    ) -> dict[str, Any]:
+        raw_receipt = await asyncio.to_thread(
+            production_save_report_sections_tool(run_dir, disease).invoke,
+            {
+                "payload": {
+                    "schema_version": "hybrid_report_sections/v1",
+                    "no_featured_candidates": True,
+                    "candidate_followups": [],
+                    "pipeline_recommendations": [],
+                }
+            },
+        )
+        try:
+            receipt = json.loads(raw_receipt)
+        except (TypeError, json.JSONDecodeError) as exc:
+            raise RuntimeError(
+                "Drug Target no-featured report save returned an invalid receipt"
+            ) from exc
+        if not isinstance(receipt, dict) or receipt.get("saved") is not True:
+            raise RuntimeError(
+                "Drug Target no-featured report save failed: "
+                + _format_errors(receipt.get("errors") if isinstance(receipt, dict) else None)
+            )
+        publication = await asyncio.to_thread(
+            run_drug_report_guardrail,
+            run_dir,
+            disease=disease,
+            require_report_sections=True,
+        )
+        if not isinstance(publication, dict) or publication.get("status") != "passed":
+            raise RuntimeError(
+                "Drug Target no-featured report publication failed: "
+                + _format_errors(
+                    publication.get("issues") if isinstance(publication, dict) else None
+                )
+            )
+        return {"messages": []}
 
     async def run_hypothesis(
         _state: GuardedPipelineState, config: RunnableConfig
@@ -684,6 +733,7 @@ def build_guarded_pipeline(
     graph = StateGraph(GuardedPipelineState)
     graph.add_node("prepare", prepare)
     graph.add_node("validate_evidence", validate_evidence)
+    graph.add_node("no_featured_report", run_no_featured_report)
     graph.add_node("hypothesis_writer", run_hypothesis)
     graph.add_node("validate_hypothesis", validate_hypothesis)
     graph.add_node("report_writer", run_report)
@@ -694,7 +744,15 @@ def build_guarded_pipeline(
         graph.add_node("evidence_assessor", run_evidence)
         graph.add_edge("prepare", "evidence_assessor")
         graph.add_edge("evidence_assessor", "validate_evidence")
-    graph.add_edge("validate_evidence", "hypothesis_writer")
+    graph.add_conditional_edges(
+        "validate_evidence",
+        lambda state: (
+            "no_featured_report"
+            if state.get("no_featured_candidates")
+            else "hypothesis_writer"
+        ),
+    )
+    graph.add_edge("no_featured_report", END)
     graph.add_edge("hypothesis_writer", "validate_hypothesis")
     graph.add_edge("validate_hypothesis", "report_writer")
     graph.add_edge("report_writer", END)

@@ -1890,6 +1890,12 @@ def build_report_data(
     hypotheses = hypothesis.get("hypotheses")
     if not isinstance(hypotheses, list):
         hypotheses = []
+    no_featured_candidates = (
+        isinstance(hypothesis_data, dict)
+        and hypothesis_data.get("no_featured_candidates") is True
+    ) or hypothesis.get("no_featured_candidates") is True
+    if no_featured_candidates:
+        hypothesis = {**hypothesis, "no_featured_candidates": True}
 
     sections = {
         "executive_summary": {
@@ -1953,6 +1959,7 @@ def build_report_data(
         "sections": sections,
         "candidates": candidates,
         "hypotheses": hypotheses,
+        "no_featured_candidates": no_featured_candidates,
         "sources": {
             source: {"sha256": _sha256_path(base / source)}
             for source in sorted(cited_sources)
@@ -1979,7 +1986,7 @@ def validate_report_data(report_data: dict[str, Any]) -> list[dict[str, Any]]:
                 "message": "report_data schema_version must be drug_target.report_data.v1",
             }
         )
-    if not report_data.get("candidates"):
+    if not report_data.get("candidates") and not report_data.get("no_featured_candidates"):
         issues.append(
             {
                 "code": "NO_CANDIDATES",

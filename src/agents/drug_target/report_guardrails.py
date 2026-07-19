@@ -17,7 +17,10 @@ from src.agents.drug_target.deterministic_report import (
     build_report_data,
     validate_report_data,
 )
-from src.agents.drug_target.hybrid_report_sections import REPORT_SECTIONS_FILENAME
+from src.agents.drug_target.hybrid_report_sections import (
+    REPORT_SECTIONS_FILENAME,
+    validate_no_featured_candidates_contract,
+)
 from src.agents.drug_target.part4_candidate_selector import (
     ENABLE_PART4_CANDIDATE_SELECTOR_CONFIG_KEY,
     PART4_CANDIDATE_SELECTION_SCHEMA_VERSION,
@@ -376,6 +379,14 @@ def _hypothesis_payload_from_report_sections(data_dir: Path) -> dict[str, Any]:
     sections = json.loads(sections_path.read_text(encoding="utf-8"))
     if not isinstance(sections, Mapping):
         raise ValueError("report_sections.json must be a JSON object")
+    if sections.get("no_featured_candidates") is True:
+        errors = validate_no_featured_candidates_contract(
+            sections,
+            data_dir / "evidence",
+        )
+        if errors:
+            raise ValueError("report_sections.json no-featured contract is invalid")
+        return {"hypotheses": [], "no_featured_candidates": True}
     hypothesis_report = sections.get("hypothesis_report")
     canonical, errors, _ = canonicalize_hypothesis_report(
         hypothesis_report,

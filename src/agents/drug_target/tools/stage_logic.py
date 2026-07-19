@@ -5379,6 +5379,59 @@ def _check_agent_markdown_hypotheses(
     return issues
 
 
+def _check_no_featured_agent_markdown(
+    data_dir_path: Path,
+    drug_text: str,
+    drug_md_path: Path,
+) -> tuple[bool, list[dict]]:
+    """Validate the persisted empty Section 4 exception before allowing it."""
+    from src.agents.drug_target.hybrid_report_sections import (
+        NO_FEATURED_CANDIDATES_SECTION_4_SENTENCE,
+        validate_no_featured_candidates_contract,
+    )
+    from src.agents.drug_target.tools.drug_report_html import parse_drug_md
+
+    sections_path = data_dir_path / "report_sections.json"
+    if not sections_path.exists():
+        return False, []
+    try:
+        sections = json.loads(sections_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return True, [{
+            "code": "NO_FEATURED_CANDIDATES_CONTRACT_INVALID",
+            "severity": "high",
+            "message": f"Could not read no-featured report sections: {exc}",
+            "location": str(sections_path),
+            "evidence": {},
+        }]
+    if not isinstance(sections, dict) or sections.get("no_featured_candidates") is not True:
+        return False, []
+
+    errors = validate_no_featured_candidates_contract(
+        sections,
+        data_dir_path / "evidence",
+    )
+    section_four = drug_text.split("## 4. Evidence-Grounded Follow-up Recommendations", 1)
+    section_body = section_four[1].split("## 5.", 1)[0] if len(section_four) == 2 else ""
+    hypotheses = parse_drug_md(drug_text).get("hypothesis")
+    if (
+        NO_FEATURED_CANDIDATES_SECTION_4_SENTENCE not in section_body
+        or not isinstance(hypotheses, list)
+        or hypotheses
+        or re.search(r"^####\s+4\.", section_body, flags=re.MULTILINE)
+    ):
+        errors.append("no_featured_candidates requires an intentionally empty Section 4.")
+    if not errors:
+        return True, []
+    return True, [{
+        "code": "NO_FEATURED_CANDIDATES_CONTRACT_INVALID",
+        "severity": "high",
+        "message": "No-featured report sections or Section 4 are invalid.",
+        "location": str(drug_md_path),
+        "evidence": {"errors": errors},
+    }]
+
+
 def _critic_finalization_issues(data_dir_path: Path) -> tuple[dict, list[dict]]:
     """Return critic check details and blocking issues for require_critic=True."""
     critic_path = data_dir_path / "evidence" / "critic_report.json"
@@ -5755,12 +5808,19 @@ def validate_drug_report_finalization(
             drug_text = ""
 
         if publication_mode == "agent_markdown":
-            finalization_issues.extend(
-                _check_agent_markdown_hypotheses(
-                    drug_text,
-                    data_dir_path / "drug.md",
-                )
+            no_featured_report, no_featured_issues = _check_no_featured_agent_markdown(
+                data_dir_path,
+                drug_text,
+                data_dir_path / "drug.md",
             )
+            finalization_issues.extend(no_featured_issues)
+            if not no_featured_report:
+                finalization_issues.extend(
+                    _check_agent_markdown_hypotheses(
+                        drug_text,
+                        data_dir_path / "drug.md",
+                    )
+                )
 
         if drug_text:
             finalization_issues.extend(_check_markdown_table_pipe_drift(drug_text))
