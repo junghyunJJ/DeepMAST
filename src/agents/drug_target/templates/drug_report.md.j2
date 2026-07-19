@@ -221,7 +221,7 @@ These recommendations are grounded in the available spatial, Census, OpenTargets
 **Evidence Rationale & Interpretation Boundary:**
 
 - **Rationale:** {{ h.core_claim }}
-- **Interpretation boundary:** {% if h._interpretation_constraint is defined and h._interpretation_constraint %}{{ h._interpretation_constraint }}{% else %}Interpret as an evidence-grounded follow-up recommendation, not a validated causal mechanism. [source: gene]{% endif %}{% if h.interpretation_note %} {{ h.interpretation_note }}{% endif %}
+- **Interpretation boundary:** {% if h._interpretation_constraint is defined and h._interpretation_constraint %}{{ h._interpretation_constraint }}{% else %}Interpret as an evidence-grounded follow-up recommendation, not a validated causal mechanism. [source: gene]{% endif %}{% if h.interpretation_note %} {{ h.interpretation_note }}{% endif %}{{ "\n" }}
 
 **Falsifiable Prediction & Validation Design:**
 

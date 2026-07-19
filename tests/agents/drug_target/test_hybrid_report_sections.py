@@ -792,6 +792,10 @@ def test_hybrid_renderer_uses_canonical_sections_with_host_owned_provenance(
         "**Falsifiable Prediction & Validation Design:**\n\n- **Prediction:**"
         in markdown
     )
+    section4_card = markdown.split(
+        "**Evidence Rationale & Interpretation Boundary:**", 1
+    )[1].split("---", 1)[0]
+    assert "\n\n**Falsifiable Prediction & Validation Design:**" in section4_card
     assert "- **Design:**" in markdown
     for legacy_label in (
         "**Core Claim:**",
