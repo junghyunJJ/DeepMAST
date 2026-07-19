@@ -79,7 +79,9 @@ def _ollama_card_spec(card_id: str, category: str, gene: str) -> dict[str, objec
         "cell_anchor": "malignant cell",
         "fallback_hypothesis": card["core_claim"],
         "fallback_card": card,
-        "known_genes": ("EFNB2", "EPHB4", "ERBB2", "ERBB3", "SDC1"),
+        "known_genes": (
+            "EFNB2", "EPHB4", "ERBB2", "ERBB3", "INSR", "LAMA5", "SDC1"
+        ),
     }
 
 
@@ -457,10 +459,12 @@ def test_ollama_generates_one_bounded_card_per_spec(
     specs = [
         _ollama_card_spec(card_id, category, gene)
         for card_id, category, gene in (
-            ("mechanism", "Mechanism of Action", "EFNB2"),
-            ("therapy", "Therapeutic Strategy", "EPHB4"),
-            ("cross_target", "Cross-Target Interaction", "ERBB2"),
-            ("novel_pathway", "Novel Pathway", "ERBB3"),
+            ("primary_pair_1", "Mechanism of Action", "EFNB2"),
+            ("primary_pair_2", "Therapeutic Strategy", "EPHB4"),
+            ("primary_pair_3", "Cross-Target Interaction", "ERBB2"),
+            ("gene_level_1", "Novel Pathway", "ERBB3"),
+            ("gene_level_2", "Mechanism of Action", "INSR"),
+            ("gene_level_3", "Therapeutic Strategy", "LAMA5"),
         )
     ]
     report = {"hypotheses": []}
@@ -573,6 +577,8 @@ def test_ollama_generates_one_bounded_card_per_spec(
         "hypothesis_writer",
         "hypothesis_writer",
         "hypothesis_writer",
+        "hypothesis_writer",
+        "hypothesis_writer",
         "report_writer",
         "report_writer",
     ]
@@ -581,6 +587,14 @@ def test_ollama_generates_one_bounded_card_per_spec(
         for instruction in instructions
         if "Card ID: " in instruction
     ] == [spec["id"] for spec in specs]
+    audit = json.loads(
+        (tmp_path / "evidence" / "llm_enrichment_audit.json").read_text()
+    )
+    assert set(audit["units"]) >= {f"hypothesis.{spec['id']}" for spec in specs}
+    assert all(
+        audit["units"][f"hypothesis.{spec['id']}"]["repair_attempt_count"] <= 3
+        for spec in specs
+    )
     assert saved_reports == [report]
 
 
