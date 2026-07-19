@@ -27,7 +27,8 @@ VALIDATION_FOCUS_BY_CATEGORY = {
     "Cross-Target Interaction": "Pairwise context test",
     "Novel Pathway": "Orthogonal/novelty validation",
 }
-_CARD_IDS = ("mechanism", "therapy", "cross_target", "novel_pathway")
+_PRIMARY_PAIR_LIMIT = 3
+_GENE_LEVEL_CARD_LIMIT = 3
 _STAGE1_NAME_RE = re.compile(r"^stage1_([A-Za-z0-9-]+)--([A-Za-z0-9-]+)\.json$")
 _FILENAME_RE = re.compile(r"\b[A-Za-z0-9_.-]+\.json\b", re.IGNORECASE)
 _HYPOTHESIS_FIELD_PREFIXES = {
@@ -88,6 +89,8 @@ class OllamaCardSpec(TypedDict):
     """The deterministic inputs and fallback for one bounded Ollama card."""
 
     id: str
+    selection_kind: Literal["primary_pair", "gene_level"]
+    title: str
     category: str
     validation_focus: str
     genes: list[str]
@@ -298,6 +301,64 @@ def _featured_genes(evidence_dir: Path) -> list[str]:
     return genes
 
 
+def _featured_gene_scores(evidence_dir: Path, genes: Iterable[str]) -> dict[str, float]:
+    candidates = _read_assessment(evidence_dir).get("stage3_candidates")
+    raw_scores: dict[str, float] = {}
+    if isinstance(candidates, list):
+        for candidate in candidates:
+            if not isinstance(candidate, dict):
+                continue
+            gene = str(candidate.get("gene") or candidate.get("gene_symbol") or "").strip().upper()
+            score = candidate.get("combined_rank_score")
+            if gene and isinstance(score, (int, float)) and not isinstance(score, bool):
+                raw_scores[gene] = float(score)
+    return {gene.upper(): raw_scores.get(gene.upper(), 0.0) for gene in genes}
+
+
+def _stage1_pair_genes(filename: str) -> list[str] | None:
+    match = _STAGE1_NAME_RE.match(filename)
+    if match is None:
+        return None
+    return [match.group(1).upper(), match.group(2).upper()]
+
+
+def _ranked_intrinsic_pairs(
+    filenames: Iterable[str],
+    scores: Mapping[str, float],
+) -> list[tuple[str, list[str]]]:
+    candidates: list[tuple[float, str, list[str]]] = []
+    for filename in filenames:
+        genes = _stage1_pair_genes(filename)
+        if genes is not None:
+            candidates.append((sum(scores.get(gene, 0.0) for gene in genes), filename, genes))
+    candidates.sort(key=lambda item: (-item[0], item[1]))
+    return [(filename, genes) for _score, filename, genes in candidates[:_PRIMARY_PAIR_LIMIT]]
+
+
+def _gene_level_groups(genes: Iterable[str], scores: Mapping[str, float]) -> list[list[str]]:
+    ordered = sorted(dict.fromkeys(genes), key=lambda gene: (-scores.get(gene, 0.0), gene))
+    if not ordered:
+        return []
+    chunk_size = (len(ordered) + _GENE_LEVEL_CARD_LIMIT - 1) // _GENE_LEVEL_CARD_LIMIT
+    return [ordered[index:index + chunk_size] for index in range(0, len(ordered), chunk_size)]
+
+
+def _gene_references(evidence_dir: Path, genes: Iterable[str]) -> list[str]:
+    return [
+        filename
+        for gene in genes
+        for filename in (f"ot_{gene}.json", f"stage3_{gene}.json")
+        if (evidence_dir / filename).is_file()
+    ]
+
+
+def _fallback_hypothesis(genes: list[str], cell_anchor: str) -> str:
+    subject = " and ".join(genes)
+    verb = "is" if len(genes) == 1 else "are"
+    noun = "candidate" if len(genes) == 1 else "candidates"
+    return f"{subject} {verb} evidence-supported {noun} for validation in {cell_anchor} context."
+
+
 def _intrinsic_stage1_files(evidence_dir: Path) -> list[str]:
     statuses, _ = _load_stage1_filter_results_status(evidence_dir)
     passed_files = [
@@ -307,14 +368,6 @@ def _intrinsic_stage1_files(evidence_dir: Path) -> list[str]:
     ]
     guidance = _stage1_pair_usage_guidance(evidence_dir, sorted(passed_files))
     return list(guidance["interest_cell_intrinsic_stage1_pair_files"])
-
-
-def _stage1_contains_gene(filename: str, genes: Iterable[str]) -> bool:
-    match = _STAGE1_NAME_RE.match(filename)
-    if not match:
-        return False
-    pair = {match.group(1).upper(), match.group(2).upper()}
-    return bool(pair.intersection(genes))
 
 
 def _known_gene_symbols(evidence_dir: Path) -> set[str]:
@@ -361,42 +414,52 @@ def is_ollama_card_text_safe(
     )
 
 
-def _fallback_hypothesis(genes: list[str], cell_anchor: str) -> str:
-    return (
-        f"{' and '.join(genes)} are evidence-supported candidates for validation "
-        f"in {cell_anchor} context."
-    )
-
-
 def build_ollama_card_specs(data_dir: str | Path) -> list[OllamaCardSpec]:
-    """Build four deterministic, evidence-grounded input cards for Ollama."""
+    """Build deterministic, evidence-grounded input cards for Ollama."""
     evidence_dir = Path(data_dir).expanduser().resolve() / "evidence"
     genes = _featured_genes(evidence_dir)
     labels = _celltype_contract_labels(evidence_dir)
     cell_anchor = labels["required_cell_context_anchor"]
     if not cell_anchor:
         raise ValueError("celltype_resolution.json has no resolved cell-type anchor")
-    intrinsic_stage1 = _intrinsic_stage1_files(evidence_dir)
     known_genes = sorted(_known_gene_symbols(evidence_dir))
+    scores = _featured_gene_scores(evidence_dir, genes)
+    primary_pairs = _ranked_intrinsic_pairs(_intrinsic_stage1_files(evidence_dir), scores)
+    primary_genes = {gene for _filename, pair_genes in primary_pairs for gene in pair_genes}
+    gene_groups = _gene_level_groups(
+        (gene for gene in genes if gene not in primary_genes),
+        scores,
+    )
 
-    grouped = [[] for _ in CANONICAL_CATEGORIES]
-    for index, gene in enumerate(genes):
-        grouped[index % len(grouped)].append(gene)
+    selected: list[tuple[Literal["primary_pair", "gene_level"], list[str], list[str], str]] = []
+    for filename, pair_genes in primary_pairs:
+        selected.append(
+            (
+                "primary_pair",
+                pair_genes,
+                [*_gene_references(evidence_dir, pair_genes), filename],
+                f"{'-'.join(pair_genes)} interest-cell intrinsic validation candidate in {cell_anchor} context",
+            )
+        )
+    for group in gene_groups:
+        selected.append(
+            (
+                "gene_level",
+                group,
+                _gene_references(evidence_dir, group),
+                f"{' and '.join(group)} gene-level/actionability follow-up candidate in {cell_anchor} context",
+            )
+        )
+
+    if len(selected) < len(CANONICAL_CATEGORIES):
+        raise ValueError("pair-first Ollama selection requires at least four evidence-backed cards")
 
     specs: list[OllamaCardSpec] = []
-    for card_id, category, card_genes in zip(_CARD_IDS, CANONICAL_CATEGORIES, grouped):
-        references = [
-            filename
-            for gene in card_genes
-            for filename in (f"ot_{gene}.json", f"stage3_{gene}.json")
-            if (evidence_dir / filename).is_file()
-        ]
-        references.extend(
-            filename
-            for filename in intrinsic_stage1
-            if _stage1_contains_gene(filename, card_genes)
-        )
-        references = list(dict.fromkeys(references))
+    kind_counts = {"primary_pair": 0, "gene_level": 0}
+    for index, (selection_kind, card_genes, references, title) in enumerate(selected):
+        kind_counts[selection_kind] += 1
+        category = CANONICAL_CATEGORIES[index % len(CANONICAL_CATEGORIES)]
+        card_id = f"{selection_kind}_{kind_counts[selection_kind]}"
         fallback_card: OllamaHypothesisText = {
             "core_claim": _fallback_hypothesis(card_genes, cell_anchor),
             "interpretation_note": "This follow-up does not establish a causal mechanism.",
@@ -412,10 +475,12 @@ def build_ollama_card_specs(data_dir: str | Path) -> list[OllamaCardSpec]:
         specs.append(
             {
                 "id": card_id,
+                "selection_kind": selection_kind,
+                "title": title,
                 "category": category,
                 "validation_focus": validation_focus_for_category(category),
                 "genes": card_genes,
-                "evidence_references": references,
+                "evidence_references": list(dict.fromkeys(references)),
                 "cell_anchor": cell_anchor,
                 "fallback_hypothesis": fallback_card["core_claim"],
                 "fallback_card": fallback_card,
@@ -463,10 +528,7 @@ def build_ollama_hypothesis_report(
         hypotheses.append(
             {
                 "rank": rank,
-                "title": (
-                    f"{' and '.join(genes)} evidence-supported validation candidates "
-                    f"in {cell_anchor} context"
-                ),
+                "title": spec["title"],
                 "category": spec["category"],
                 "gap_type": "none",
                 "core_claim": card["core_claim"],

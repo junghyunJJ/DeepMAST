@@ -5,12 +5,11 @@ from pathlib import Path
 import pytest
 
 from src.agents.drug_target.ollama_hypothesis_cards import (
+    CANONICAL_CATEGORIES,
     OllamaCardSpec,
-    VALIDATION_FOCUS_BY_CATEGORY,
     build_ollama_card_specs,
     build_ollama_hypothesis_report,
     is_ollama_card_text_safe,
-    validation_focus_for_category,
 )
 from src.agents.drug_target.tools.hypothesis_schema import (
     canonicalize_hypothesis_report,
@@ -43,6 +42,8 @@ RICH_CARD = "\n".join((
 def _mechanism_spec() -> OllamaCardSpec:
     return {
         "id": "mechanism",
+        "selection_kind": "primary_pair",
+        "title": "ERBB3-EFNB2 interest-cell intrinsic validation candidate in malignant cell context",
         "category": "Mechanism of Action",
         "validation_focus": "Mechanistic follow-up",
         "genes": ["ERBB3", "EFNB2"],
@@ -145,16 +146,16 @@ def test_card_validator_accepts_deterministic_numeric_cell_anchor(
 
 
 def test_hypothesis_report_keeps_valid_mapped_card(bc_data_dir: Path) -> None:
-    from src.agents.drug_target.ollama_hypothesis_cards import parse_ollama_hypothesis_card
+    spec = build_ollama_card_specs(bc_data_dir)[0]
+    card = dict(spec["fallback_card"])
+    card["core_claim"] = (
+        f"{' and '.join(spec['genes'])} are evidence-supported candidates for validation "
+        f"in {spec['cell_anchor']} context. This remains a bounded candidate-level hypothesis."
+    )
 
-    card, errors = parse_ollama_hypothesis_card(_bounded_card())
-    assert errors == []
-    assert card is not None
-
-    hypothesis = build_ollama_hypothesis_report(
-        bc_data_dir,
-        {"mechanism": card},
-    )["hypotheses"][0]
+    hypothesis = build_ollama_hypothesis_report(bc_data_dir, {spec["id"]: card})[
+        "hypotheses"
+    ][0]
 
     assert hypothesis["core_claim"] == card["core_claim"]
     assert hypothesis["interpretation_note"] == card["interpretation_note"]
@@ -508,38 +509,84 @@ def test_canonicalization_revalidates_marked_ollama_enrichment(
     assert "hypotheses[0].ollama_enrichment:CONSTRAINT_UNSAFE_CLAIM" in errors
 
 
-def test_card_specs_cover_all_featured_genes_with_four_categories(
+def test_ipf_specs_select_intrinsic_pairs_then_score_ordered_gene_cards(
+    ipf_data_dir: Path,
+) -> None:
+    specs = build_ollama_card_specs(ipf_data_dir)
+
+    assert [spec["id"] for spec in specs] == [
+        "primary_pair_1",
+        "primary_pair_2",
+        "primary_pair_3",
+        "gene_level_1",
+        "gene_level_2",
+        "gene_level_3",
+    ]
+    assert [spec["selection_kind"] for spec in specs] == [
+        "primary_pair",
+        "primary_pair",
+        "primary_pair",
+        "gene_level",
+        "gene_level",
+        "gene_level",
+    ]
+    assert [spec["genes"] for spec in specs] == [
+        ["ICAM1", "MUC1"],
+        ["MIF", "CD74"],
+        ["ICAM1", "EZR"],
+        ["FN1"],
+        ["APP"],
+        ["AGER"],
+    ]
+    assert [
+        [ref for ref in spec["evidence_references"] if ref.startswith("stage1_")]
+        for spec in specs[:3]
+    ] == [
+        ["stage1_ICAM1--MUC1.json"],
+        ["stage1_MIF--CD74.json"],
+        ["stage1_ICAM1--EZR.json"],
+    ]
+    assert all(
+        not ref.startswith("stage1_")
+        for spec in specs[3:]
+        for ref in spec["evidence_references"]
+    )
+    assert set(spec["category"] for spec in specs) == set(CANONICAL_CATEGORIES)
+
+
+def test_bc_specs_cover_every_featured_gene_within_six_cards(
     bc_data_dir: Path,
 ) -> None:
     specs = build_ollama_card_specs(bc_data_dir)
 
-    assert [spec["category"] for spec in specs] == [
-        "Mechanism of Action",
-        "Therapeutic Strategy",
-        "Cross-Target Interaction",
-        "Novel Pathway",
-    ]
-    assert {gene for spec in specs for gene in spec["genes"]} == {
-        "EFNB2",
-        "EPHB4",
-        "ERBB2",
-        "ERBB3",
-        "INSR",
-        "LAMA5",
-        "NECTIN4",
-    }
-    assert all(spec["evidence_references"] for spec in specs)
-    assert "SDC1" in specs[0]["known_genes"]
-    assert VALIDATION_FOCUS_BY_CATEGORY == {
-        "Mechanism of Action": "Mechanistic follow-up",
-        "Therapeutic Strategy": "Translational prioritization",
-        "Cross-Target Interaction": "Pairwise context test",
-        "Novel Pathway": "Orthogonal/novelty validation",
-    }
-    assert [spec["validation_focus"] for spec in specs] == list(
-        VALIDATION_FOCUS_BY_CATEGORY.values()
+    featured = {"EFNB2", "EPHB4", "ERBB2", "ERBB3", "INSR", "LAMA5", "NECTIN4"}
+
+    assert 4 <= len(specs) <= 6
+    assert sum(spec["selection_kind"] == "primary_pair" for spec in specs) <= 3
+    assert sum(spec["selection_kind"] == "gene_level" for spec in specs) <= 3
+    assert featured.issubset({gene for spec in specs for gene in spec["genes"]})
+    assert set(spec["category"] for spec in specs) == set(CANONICAL_CATEGORIES)
+
+
+def test_ipf_pair_first_skeleton_is_schema_valid(ipf_data_dir: Path) -> None:
+    report = build_ollama_hypothesis_report(ipf_data_dir, {})
+    canonical, errors, _ = canonicalize_hypothesis_report(
+        report,
+        ipf_data_dir / "evidence",
+        legacy_compat=False,
     )
-    assert validation_focus_for_category("unknown") == "Evidence-bound follow-up"
+
+    assert canonical is not None, errors
+    assert errors == []
+    assert [hypothesis["biological_entities"]["genes"] for hypothesis in canonical["hypotheses"]] == [
+        ["ICAM1", "MUC1"],
+        ["MIF", "CD74"],
+        ["ICAM1", "EZR"],
+        ["FN1"],
+        ["APP"],
+        ["AGER"],
+    ]
+    assert validate_canonical_hypothesis_report(canonical, ipf_data_dir / "evidence") == []
 
 
 def test_skeleton_is_schema_valid_without_model_selected_references(
@@ -563,15 +610,13 @@ def test_skeleton_is_schema_valid_without_model_selected_references(
 def test_skeleton_replaces_unsafe_card_text_with_its_fallback(
     bc_data_dir: Path,
 ) -> None:
+    spec = build_ollama_card_specs(bc_data_dir)[0]
     report = build_ollama_hypothesis_report(
         bc_data_dir,
-        {"mechanism": "ERBB3 has synergistic effects with EPHB4."},
+        {spec["id"]: "ERBB3 has synergistic effects with EPHB4."},
     )
 
-    assert report["hypotheses"][0]["core_claim"] == (
-        "ERBB3 and EFNB2 are evidence-supported candidates for validation "
-        "in malignant cell context."
-    )
+    assert report["hypotheses"][0]["core_claim"] == spec["fallback_card"]["core_claim"]
 
 
 def test_skeleton_replaces_causal_card_text_with_its_fallback(
@@ -584,15 +629,10 @@ def test_skeleton_replaces_causal_card_text_with_its_fallback(
         allowed_genes=["ERBB3", "EFNB2"],
         known_genes=["ERBB3", "EFNB2", "EPHB4"],
     )
-    report = build_ollama_hypothesis_report(
-        bc_data_dir,
-        {"mechanism": causal_claim},
-    )
+    spec = build_ollama_card_specs(bc_data_dir)[0]
+    report = build_ollama_hypothesis_report(bc_data_dir, {spec["id"]: causal_claim})
 
-    assert report["hypotheses"][0]["core_claim"] == (
-        "ERBB3 and EFNB2 are evidence-supported candidates for validation "
-        "in malignant cell context."
-    )
+    assert report["hypotheses"][0]["core_claim"] == spec["fallback_card"]["core_claim"]
 
 
 def test_card_text_accepts_only_conservative_candidate_form() -> None:
@@ -607,12 +647,10 @@ def test_card_text_accepts_only_conservative_candidate_form() -> None:
 def test_skeleton_replaces_card_text_that_repeats_a_filename(
     bc_data_dir: Path,
 ) -> None:
+    spec = build_ollama_card_specs(bc_data_dir)[0]
     report = build_ollama_hypothesis_report(
         bc_data_dir,
-        {"mechanism": "ERBB3 is supported by ot_ERBB3.json."},
+        {spec["id"]: "ERBB3 is supported by ot_ERBB3.json."},
     )
 
-    assert report["hypotheses"][0]["core_claim"] == (
-        "ERBB3 and EFNB2 are evidence-supported candidates for validation "
-        "in malignant cell context."
-    )
+    assert report["hypotheses"][0]["core_claim"] == spec["fallback_card"]["core_claim"]
