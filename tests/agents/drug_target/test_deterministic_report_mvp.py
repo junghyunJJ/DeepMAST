@@ -1195,7 +1195,7 @@ def test_report_mvp_asymmetric_primary_constraint_ignores_failed_pair() -> None:
     constraint = next(
         line
         for line in section.splitlines()
-        if line.startswith("**Evidence Rationale & Interpretation Boundary:")
+        if line.startswith("- **Interpretation boundary:")
     )
 
     assert "Treat ICAM1 as the Stage 2/3-supported anchor" in constraint

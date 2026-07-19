@@ -783,6 +783,23 @@ def test_hybrid_renderer_uses_canonical_sections_with_host_owned_provenance(
         "**Falsifiable Prediction & Validation Design:**",
     ):
         assert field in markdown
+    assert (
+        "**Evidence Rationale & Interpretation Boundary:**\n\n- **Rationale:**"
+        in markdown
+    )
+    assert "- **Interpretation boundary:**" in markdown
+    assert (
+        "**Falsifiable Prediction & Validation Design:**\n\n- **Prediction:**"
+        in markdown
+    )
+    assert "- **Design:**" in markdown
+    for legacy_label in (
+        "**Core Claim:**",
+        "**Interpretation Constraint:**",
+        "**Falsifiable Prediction:**",
+        "**Validation Approach:**",
+    ):
+        assert legacy_label not in markdown
     assert "**Category:**" not in markdown
     assert canonical["hypothesis_report"]["hypotheses"][0]["category"] == (
         "Mechanism of Action"
@@ -821,6 +838,10 @@ def test_hybrid_renderer_uses_canonical_sections_with_host_owned_provenance(
     assert "**Validation Focus:** Mechanistic follow-up" in rendered_markdown
     assert "**Evidence Rationale & Interpretation Boundary:**" in rendered_markdown
     assert "**Falsifiable Prediction & Validation Design:**" in rendered_markdown
+    assert "- **Rationale:**" in rendered_markdown
+    assert "- **Interpretation boundary:**" in rendered_markdown
+    assert "- **Prediction:**" in rendered_markdown
+    assert "- **Design:**" in rendered_markdown
     assert "**Category:**" not in rendered_markdown
     assert rendered_report_data["sections"]["hypotheses"]["sources"] == [
         REPORT_SECTIONS_FILENAME

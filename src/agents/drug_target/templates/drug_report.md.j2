@@ -218,9 +218,15 @@ These recommendations are grounded in the available spatial, Census, OpenTargets
 - Drugs: {{ h.biological_entities.drugs | join(', ') }}
 {% endif %}
 
-**Evidence Rationale & Interpretation Boundary:** {{ h.core_claim }} {% if h._interpretation_constraint is defined and h._interpretation_constraint %}{{ h._interpretation_constraint }}{% else %}Interpret as an evidence-grounded follow-up recommendation, not a validated causal mechanism. [source: gene]{% endif %}{% if h.interpretation_note %} {{ h.interpretation_note }}{% endif %}
+**Evidence Rationale & Interpretation Boundary:**
 
-**Falsifiable Prediction & Validation Design:** {{ h.falsifiable_prediction }} {{ h.validation_approach }}
+- **Rationale:** {{ h.core_claim }}
+- **Interpretation boundary:** {% if h._interpretation_constraint is defined and h._interpretation_constraint %}{{ h._interpretation_constraint }}{% else %}Interpret as an evidence-grounded follow-up recommendation, not a validated causal mechanism. [source: gene]{% endif %}{% if h.interpretation_note %} {{ h.interpretation_note }}{% endif %}
+
+**Falsifiable Prediction & Validation Design:**
+
+- **Prediction:** {{ h.falsifiable_prediction }}
+- **Design:** {{ h.validation_approach }}
 
 {% if h._interpretation is defined and h._interpretation %}
 {{ h._interpretation }}
