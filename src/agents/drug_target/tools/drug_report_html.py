@@ -670,6 +670,22 @@ def _first_markdown_paragraph(markdown: str) -> str:
     return " ".join(lines)
 
 
+def _grouped_section4_block(text: str, heading: str) -> str:
+    match = re.search(
+        rf"^\*\*{re.escape(heading)}:\*\*\s*\n(?P<body>.*?)(?=^\*\*|^####|^---|\Z)",
+        text,
+        flags=re.MULTILINE | re.DOTALL,
+    )
+    if not match:
+        return ""
+    values: list[str] = []
+    for line in match.group("body").splitlines():
+        bullet = re.match(r"^-\s+\*\*[^:]+:\*\*\s*(.+)$", line.strip())
+        if bullet:
+            values.append(bullet.group(1).strip())
+    return " ".join(values)
+
+
 def _parse_hypothesis_section(body: str) -> list[dict[str, Any]]:
     """Parse section 4 follow-up recommendation entries into a structured list."""
     hypotheses: list[dict[str, Any]] = []
@@ -720,6 +736,12 @@ def _parse_hypothesis_section(body: str) -> list[dict[str, Any]]:
             tier_label = tier_label_m.group(1).strip()
             if not tier:
                 tier = _infer_hypothesis_tier_from_label(tier_label)
+        rationale = _grouped_section4_block(
+            lines, "Evidence Rationale & Interpretation Boundary"
+        )
+        design = _grouped_section4_block(
+            lines, "Falsifiable Prediction & Validation Design"
+        )
         rationale_m = re.search(
             r"\*\*Evidence Rationale & Interpretation Boundary:\*\*\s*(.+)",
             lines,
@@ -745,6 +767,15 @@ def _parse_hypothesis_section(body: str) -> list[dict[str, Any]]:
         validation_m = design_m or re.search(
             r"\*\*(?:Validation Approach|Suggested Validation Approach):\*\*\s*(.+)",
             lines,
+        )
+        core_claim = rationale or (
+            rationale_m.group(1).strip() if rationale_m else ""
+        )
+        falsifiable_prediction = design or (
+            prediction_m.group(1).strip() if prediction_m else ""
+        )
+        validation_approach = design or (
+            validation_m.group(1).strip() if validation_m else ""
         )
 
         # Parse biological entities
@@ -782,7 +813,7 @@ def _parse_hypothesis_section(body: str) -> list[dict[str, Any]]:
             "_tier_rank": (
                 int(source_heading.group("tier_rank")) if source_heading else i
             ),
-            "core_claim": rationale_m.group(1).strip() if rationale_m else "",
+            "core_claim": core_claim,
             "biological_grounding": (
                 biological_grounding_m.group(1).strip()
                 if biological_grounding_m
@@ -799,8 +830,8 @@ def _parse_hypothesis_section(body: str) -> list[dict[str, Any]]:
                 if interpretation_constraint_m
                 else ""
             ),
-            "falsifiable_prediction": prediction_m.group(1).strip() if prediction_m else "",
-            "validation_approach": validation_m.group(1).strip() if validation_m else "",
+            "falsifiable_prediction": falsifiable_prediction,
+            "validation_approach": validation_approach,
             "genes": genes,
             "pathways": pathways,
             "cell_types": cell_types,

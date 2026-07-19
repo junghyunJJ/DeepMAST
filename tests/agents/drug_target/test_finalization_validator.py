@@ -150,14 +150,20 @@ def _validation_focused_parser_compatible_section_4() -> str:
 #### 4.1.1. EGFR follow-up in idiopathic pulmonary fibrosis
 **Validation Focus:** Mechanistic follow-up
 
-**Evidence Rationale & Interpretation Boundary:** EGFR is a supported candidate for a falsifiable fibrosis follow-up study. This is a follow-up interpretation boundary.
+**Evidence Rationale & Interpretation Boundary:**
+
+- **Rationale:** EGFR is a supported candidate for a falsifiable fibrosis follow-up study.
+- **Interpretation boundary:** This does not establish a causal mechanism.
 
 - Genes: EGFR
 - Pathways: EGFR signaling
 - Cell Types: epithelial cells
 - Drugs: gefitinib
 
-**Falsifiable Prediction & Validation Design:** EGFR perturbation will change a prespecified fibrosis-associated readout. Test EGFR perturbation in an appropriate fibrosis model.
+**Falsifiable Prediction & Validation Design:**
+
+- **Prediction:** Test whether EGFR perturbation changes a prespecified fibrosis readout.
+- **Design:** Evaluate EGFR perturbation in an appropriate fibrosis model with matched controls.
 """
 
 
@@ -988,13 +994,21 @@ def test_agent_markdown_mode_requires_parseable_section_4(tmp_path: Path) -> Non
     assert _has_issue(result, "AGENT_REPORT_HYPOTHESES_MISSING")
 
 
-def test_agent_markdown_mode_accepts_validation_focused_section_4(
+@pytest.mark.parametrize(
+    "section_4",
+    [
+        _canonical_parser_compatible_section_4(),
+        _validation_focused_parser_compatible_section_4(),
+    ],
+)
+def test_agent_markdown_mode_accepts_parser_compatible_section_4(
     tmp_path: Path,
+    section_4: str,
 ) -> None:
     data_dir = _copy_valid_agent_markdown_fixture(
         "clean",
         tmp_path,
-        section_4=_validation_focused_parser_compatible_section_4(),
+        section_4=section_4,
     )
 
     result = _invoke(data_dir, publication_mode="agent_markdown")

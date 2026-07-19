@@ -1620,10 +1620,14 @@ def test_drug_report_html_parses_validation_focused_section4_markdown() -> None:
 - Drugs: gefitinib
 
 **Evidence Rationale & Interpretation Boundary:**
-EGFR is a supported candidate. This does not establish causal mechanism. Read this as follow-up evidence.
+
+- **Rationale:** EGFR is a supported candidate for a falsifiable fibrosis follow-up study.
+- **Interpretation boundary:** This does not establish a causal mechanism.
 
 **Falsifiable Prediction & Validation Design:**
-EGFR perturbation will change a prespecified readout. Test EGFR perturbation in an appropriate fibrosis model.
+
+- **Prediction:** Test whether EGFR perturbation changes a prespecified fibrosis readout.
+- **Design:** Evaluate EGFR perturbation in an appropriate fibrosis model with matched controls.
 """
     )
 
@@ -1632,17 +1636,38 @@ EGFR perturbation will change a prespecified readout. Test EGFR perturbation in 
     assert hypothesis["validation_focus"] == "Mechanistic follow-up"
     assert hypothesis["category"] == "Mechanistic follow-up"
     assert hypothesis["core_claim"] == (
-        "EGFR is a supported candidate. This does not establish causal mechanism. "
-        "Read this as follow-up evidence."
+        "EGFR is a supported candidate for a falsifiable fibrosis follow-up study. "
+        "This does not establish a causal mechanism."
     )
     assert hypothesis["falsifiable_prediction"] == (
-        "EGFR perturbation will change a prespecified readout. "
+        "Test whether EGFR perturbation changes a prespecified fibrosis readout. "
+        "Evaluate EGFR perturbation in an appropriate fibrosis model with matched controls."
+    )
+    assert hypothesis["validation_approach"] == hypothesis["falsifiable_prediction"]
+    assert "- **" not in hypothesis["core_claim"]
+    assert "- **" not in hypothesis["falsifiable_prediction"]
+
+
+def test_drug_report_html_retains_inline_grouped_section4_markdown() -> None:
+    from src.agents.drug_target.tools.drug_report_html import parse_drug_md
+
+    context = parse_drug_md(
+        """## 4. Mechanistic Hypothesis Recommendations
+
+#### 4.1.1. EGFR follow-up in idiopathic pulmonary fibrosis
+**Validation Focus:** Mechanistic follow-up
+**Evidence Rationale & Interpretation Boundary:** EGFR is a supported candidate.
+**Falsifiable Prediction & Validation Design:** Test EGFR perturbation in an appropriate fibrosis model.
+"""
+    )
+
+    hypothesis = context["hypothesis"][0]
+
+    assert hypothesis["core_claim"] == "EGFR is a supported candidate."
+    assert hypothesis["falsifiable_prediction"] == (
         "Test EGFR perturbation in an appropriate fibrosis model."
     )
-    assert hypothesis["validation_approach"] == (
-        "EGFR perturbation will change a prespecified readout. "
-        "Test EGFR perturbation in an appropriate fibrosis model."
-    )
+    assert hypothesis["validation_approach"] == hypothesis["falsifiable_prediction"]
 
 
 def test_report_mvp_ignores_malformed_optional_evidence(tmp_path: Path) -> None:
