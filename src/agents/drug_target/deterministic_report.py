@@ -30,6 +30,7 @@ from src.agents.drug_target.therapeutic_synthesis import (
     render_part4_therapeutic_synthesis_markdown,
 )
 from src.agents.drug_target.tools.scoring_metadata import NOVELTY_OPPORTUNITY_LEGEND
+from src.agents.drug_target.tools.stage_logic import _agent_markdown_disease_scope
 
 
 _SCORE_FIELDS = (
@@ -1372,6 +1373,8 @@ def _markdown_template_context(
     filter_lookup = _stage1_filter_lookup(stage1_rows)
     stage1_pair_lookup = _stage1_pair_file_lookup(stage1_pairs, filter_lookup)
     celltype_context = _celltype_context_from_template_context(template_context)
+    disease_scope = template_context.get("disease_scope", {})
+    disease_scope = disease_scope if isinstance(disease_scope, dict) else {}
 
     featured_cards: list[dict[str, Any]] = []
     for candidate in selected:
@@ -1472,7 +1475,7 @@ def _markdown_template_context(
         "stage1_filter_results": _format_stage1_filter_results(stage1_rows),
         "hypothesis_data": hypothesis_data,
         "celltype_context": celltype_context,
-        "disease_scope": {"requires_proxy_note": False},
+        "disease_scope": disease_scope,
         "data_limitations": [],
         "novelty_opportunity_legend": NOVELTY_OPPORTUNITY_LEGEND,
         "interpretations": interpretations,
@@ -1821,6 +1824,7 @@ def build_report_data(
     )
     if not isinstance(celltype_resolution, dict):
         celltype_resolution = {}
+    disease_scope = _agent_markdown_disease_scope(assessment, base / "evidence")
 
     candidates: list[dict[str, Any]] = []
     for row in sorted(
@@ -1958,6 +1962,7 @@ def build_report_data(
             "stage1_filter_results": stage1_filter_results,
             "stage1_pairs": stage1_pairs,
             "celltype_resolution": celltype_resolution,
+            "disease_scope": disease_scope,
             "hypothesis_data": hypothesis,
         },
         "issues": [],

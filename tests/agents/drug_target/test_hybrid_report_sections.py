@@ -706,6 +706,14 @@ def test_hybrid_renderer_uses_canonical_sections_with_host_owned_provenance(
     from src.agents.drug_target.tools import validate_drug_report_finalization
 
     evidence_dir = _write_renderer_evidence(tmp_path)
+    assessment_path = evidence_dir / "assessment_results.json"
+    assessment = json.loads(assessment_path.read_text(encoding="utf-8"))
+    assessment["disease"] = "idiopathic pulmonary fibrosis"
+    assessment_path.write_text(json.dumps(assessment), encoding="utf-8")
+    (evidence_dir / "stage1_FN1--CD4.json").write_text(
+        json.dumps({"census_validation": {"disease": "pulmonary fibrosis"}}),
+        encoding="utf-8",
+    )
     (evidence_dir / "stage1_evidence.json").write_text(
         json.dumps(
             {
@@ -761,7 +769,7 @@ def test_hybrid_renderer_uses_canonical_sections_with_host_owned_provenance(
     ] = ["pulmonary alveolar type 2 cell"]
     report_data = build_report_data(
         str(tmp_path),
-        "IPF",
+        "idiopathic pulmonary fibrosis",
         hypothesis_data=canonical,
         hypothesis_source=REPORT_SECTIONS_FILENAME,
     )
@@ -828,7 +836,7 @@ def test_hybrid_renderer_uses_canonical_sections_with_host_owned_provenance(
 
     rendered_markdown, rendered_report_data = render_hybrid_report(
         str(tmp_path),
-        "IPF",
+        "idiopathic pulmonary fibrosis",
         canonical,
     )
 
@@ -861,7 +869,18 @@ def test_hybrid_renderer_uses_canonical_sections_with_host_owned_provenance(
             {"data_dir": str(tmp_path), "publication_mode": "agent_markdown"}
         )
     )
+    assert not any(
+        "MISSING_DISEASE_SCOPE_NOTE" in issue
+        for issue in validation["checks"]["report_finalization"]["issues"]
+    )
     assert validation["valid"] is True
+    assert (
+        "Scope note: Stage 1 Census evidence for these hypotheses is labeled "
+        "pulmonary fibrosis and is used here as a proxy for idiopathic pulmonary "
+        "fibrosis; Section 4 statements should be read as IPF-oriented hypotheses "
+        "rather than direct disease-specific proof. [source: disease_scope]"
+        in rendered_markdown
+    )
     finding_types = {
         finding["type"]
         for finding in validation["checks"]["validate_drug_md"]["raw"]["findings"]

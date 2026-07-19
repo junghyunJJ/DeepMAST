@@ -3565,7 +3565,7 @@ _EXPAND_SENTENCE_END_RE = re.compile(r"[.!?]")
 _BASE_EVIDENCE_FIELDS: frozenset[str] = frozenset({
     "name", "max_phase", "indications", "mechanism_of_action", "molecule_type",
     "first_approval", "chembl_id", "gene", "matched_drugs",
-    "preclinical_compounds", "interpretation",
+    "preclinical_compounds", "interpretation", "disease_scope",
 })
 
 
