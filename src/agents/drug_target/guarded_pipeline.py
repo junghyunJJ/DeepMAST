@@ -487,6 +487,7 @@ def build_guarded_pipeline(
             run_drug_report_guardrail,
             run_dir,
             disease=disease,
+            provider=provider,
             require_report_sections=True,
         )
         if not isinstance(publication, dict) or publication.get("status") != "passed":

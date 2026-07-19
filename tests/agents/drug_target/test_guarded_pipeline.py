@@ -383,7 +383,13 @@ def test_zero_featured_candidates_skip_llm_roles_and_publish_sections(
             "pipeline_recommendations": [],
         }
     ]
-    assert publications == [{"disease": "breast cancer", "require_report_sections": True}]
+    assert publications == [
+        {
+            "disease": "breast cancer",
+            "provider": "ollama",
+            "require_report_sections": True,
+        }
+    ]
 
 
 def test_invalid_evidence_stops_before_hypothesis_and_report(
