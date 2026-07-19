@@ -234,7 +234,10 @@ def validate_ollama_hypothesis_card(
         if _contains_unsupported_number(
             text,
             known_genes,
-            allowed_literals=(spec["cell_anchor"],),
+            allowed_literals=(
+                spec["cell_anchor"],
+                f"{spec['cell_anchor']}s",
+            ),
         ):
             errors.append("UNSUPPORTED_NUMBER")
         unsafe_claim = unsafe_ollama_claim_code(text)

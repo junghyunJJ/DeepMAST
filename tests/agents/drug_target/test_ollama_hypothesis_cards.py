@@ -145,6 +145,38 @@ def test_card_validator_accepts_deterministic_numeric_cell_anchor(
         ) == []
 
 
+def test_card_validator_accepts_plural_numeric_cell_anchor_but_rejects_new_numbers(
+    ipf_data_dir: Path,
+) -> None:
+    from src.agents.drug_target.ollama_hypothesis_cards import (
+        validate_ollama_hypothesis_card,
+    )
+
+    spec = build_ollama_card_specs(ipf_data_dir)[0]
+    plural_anchor = f"{spec['cell_anchor']}s"
+    plural_card = {
+        field: text.replace(spec["cell_anchor"], plural_anchor)
+        for field, text in spec["fallback_card"].items()
+    }
+
+    assert validate_ollama_hypothesis_card(
+        plural_card,
+        spec=spec,
+        attempt_context="repair",
+    ) == []
+
+    unsupported_number_card = dict(plural_card)
+    unsupported_number_card["core_claim"] = (
+        f"{plural_card['core_claim']} Phase 3 remains outside this bounded evidence."
+    )
+
+    assert "UNSUPPORTED_NUMBER" in validate_ollama_hypothesis_card(
+        unsupported_number_card,
+        spec=spec,
+        attempt_context="repair",
+    )
+
+
 def test_hypothesis_report_keeps_valid_mapped_card(bc_data_dir: Path) -> None:
     spec = build_ollama_card_specs(bc_data_dir)[0]
     card = dict(spec["fallback_card"])
