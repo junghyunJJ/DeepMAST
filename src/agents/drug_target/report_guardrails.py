@@ -19,6 +19,7 @@ from src.agents.drug_target.deterministic_report import (
 )
 from src.agents.drug_target.hybrid_report_sections import REPORT_SECTIONS_FILENAME
 from src.agents.drug_target.part4_candidate_selector import (
+    ENABLE_PART4_CANDIDATE_SELECTOR_CONFIG_KEY,
     PART4_CANDIDATE_SELECTION_SCHEMA_VERSION,
     generate_part4_candidate_selection,
     part4_candidate_selector_provider_from_config,
@@ -443,6 +444,8 @@ async def _publish_report_outputs(
             configurable["llm_model"] = model
         if request_timeout_seconds is not None:
             configurable["llm_request_timeout_seconds"] = request_timeout_seconds
+        if provider == "ollama":
+            configurable[ENABLE_PART4_CANDIDATE_SELECTOR_CONFIG_KEY] = False
         selector_config: dict[str, Any] = {"configurable": configurable} if configurable else {}
         selector_provider = part4_candidate_selector_provider_from_config(selector_config)
         selection = await generate_part4_candidate_selection(

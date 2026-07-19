@@ -1529,6 +1529,58 @@ def test_publication_passes_selected_llm_configuration_to_part4_selector(
     }
 
 
+def test_publication_disables_part4_selector_for_ollama(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / "drug.md").write_text(DRUG_MD_WITH_HYPOTHESIS, encoding="utf-8")
+    captured: dict[str, Any] = {}
+    selector_provider_from_config = (
+        report_guardrails.part4_candidate_selector_provider_from_config
+    )
+    _patch_publisher_happy_path(monkeypatch, captured)
+    monkeypatch.setattr(
+        report_guardrails,
+        "part4_candidate_selector_provider_from_config",
+        selector_provider_from_config,
+    )
+    live_llm_configs: list[dict[str, Any]] = []
+
+    def create_live_llm(config: dict[str, Any]) -> object:
+        live_llm_configs.append(config)
+        return object()
+
+    monkeypatch.setattr("src.agents.model.create_llm_from_config", create_live_llm)
+
+    async def selection(*_args: Any, **kwargs: Any) -> dict[str, Any]:
+        captured["deterministic_selected_genes"] = kwargs["deterministic_selected_genes"]
+        captured["selector_config"] = kwargs["config"]
+        captured["selector_provider"] = kwargs["provider"]
+        return {
+            "schema_version": report_guardrails.PART4_CANDIDATE_SELECTION_SCHEMA_VERSION,
+            "selected_genes": kwargs["deterministic_selected_genes"],
+        }
+
+    monkeypatch.setattr(report_guardrails, "generate_part4_candidate_selection", selection)
+
+    asyncio.run(
+        report_guardrails._publish_report_outputs(
+            tmp_path,
+            disease="IPF",
+            provider="ollama",
+        )
+    )
+
+    assert captured["deterministic_selected_genes"] == ["GENE1"]
+    assert captured["selector_config"] == {
+        "configurable": {
+            "llm_provider": "ollama",
+            "enable_part4_candidate_selector": False,
+        }
+    }
+    assert captured["selector_provider"] is None
+    assert live_llm_configs == []
+
+
 def test_publication_omits_unset_llm_configuration_from_part4_selector(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
