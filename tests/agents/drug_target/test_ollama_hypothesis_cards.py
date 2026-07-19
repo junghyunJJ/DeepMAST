@@ -120,6 +120,30 @@ def test_hypothesis_report_uses_all_fallback_fields(bc_data_dir: Path) -> None:
     assert hypothesis["validation_approach"].startswith("Evaluate")
 
 
+@pytest.fixture
+def ipf_data_dir() -> Path:
+    return Path(__file__).resolve().parents[3].parent.parent / "final_ipf"
+
+
+def test_card_validator_accepts_deterministic_numeric_cell_anchor(
+    ipf_data_dir: Path,
+) -> None:
+    from src.agents.drug_target.ollama_hypothesis_cards import (
+        validate_ollama_hypothesis_card,
+    )
+
+    specs = build_ollama_card_specs(ipf_data_dir)
+
+    assert specs
+    for spec in specs:
+        assert spec["cell_anchor"] == "pulmonary alveolar type 2 cell"
+        assert validate_ollama_hypothesis_card(
+            spec["fallback_card"],
+            spec=spec,
+            attempt_context="repair",
+        ) == []
+
+
 def test_hypothesis_report_keeps_valid_mapped_card(bc_data_dir: Path) -> None:
     from src.agents.drug_target.ollama_hypothesis_cards import parse_ollama_hypothesis_card
 

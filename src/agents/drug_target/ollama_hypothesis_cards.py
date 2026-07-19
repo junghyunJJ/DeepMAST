@@ -147,16 +147,21 @@ def _has_sentence_count(text: str, *, minimum: int, maximum: int) -> bool:
     ) == text
 
 
-def _contains_unsupported_number(text: str, known_genes: Iterable[str]) -> bool:
-    without_gene_symbols = text
-    for gene in known_genes:
-        without_gene_symbols = re.sub(
-            rf"(?<![A-Za-z0-9]){re.escape(gene)}(?![A-Za-z0-9])",
+def _contains_unsupported_number(
+    text: str,
+    known_genes: Iterable[str],
+    *,
+    allowed_literals: Iterable[str] = (),
+) -> bool:
+    without_allowed_literals = text
+    for literal in (*known_genes, *allowed_literals):
+        without_allowed_literals = re.sub(
+            rf"(?<![A-Za-z0-9]){re.escape(literal)}(?![A-Za-z0-9])",
             "",
-            without_gene_symbols,
+            without_allowed_literals,
             flags=re.IGNORECASE,
         )
-    return bool(_NUMBER_RE.search(without_gene_symbols))
+    return bool(_NUMBER_RE.search(without_allowed_literals))
 
 
 def validate_ollama_hypothesis_card(
@@ -223,7 +228,11 @@ def validate_ollama_hypothesis_card(
             or _PLAIN_TEXT_SYNTAX_RE.search(text)
         ):
             errors.append(f"{prefix}_UNSAFE_CONTENT")
-        if _contains_unsupported_number(text, known_genes):
+        if _contains_unsupported_number(
+            text,
+            known_genes,
+            allowed_literals=(spec["cell_anchor"],),
+        ):
             errors.append("UNSUPPORTED_NUMBER")
         unsafe_claim = unsafe_ollama_claim_code(text)
         if unsafe_claim is not None:
