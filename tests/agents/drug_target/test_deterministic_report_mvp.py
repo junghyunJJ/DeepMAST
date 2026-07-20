@@ -893,6 +893,7 @@ def test_report_mvp_renders_stage1_biological_context_table_with_spatial_note() 
         "| **FN1-PLAUR** | FAIL; STRING=0.697; confirmed | RR=0.1557, p=0.0; depleted | FN1 depleted; PLAUR depleted |"
         in fn1_section
     )
+    assert "\n- Census:" not in fn1_section
     assert "Negative/contrast only" in fn1_section
     assert (
         "**Spatial context:** All ligand-receptor pairs listed above originated from significant LIANA+ spatial co-localization results"
@@ -1640,10 +1641,11 @@ def test_drug_report_html_parses_validation_focused_section4_markdown() -> None:
         "This does not establish a causal mechanism."
     )
     assert hypothesis["falsifiable_prediction"] == (
-        "Test whether EGFR perturbation changes a prespecified fibrosis readout. "
+        "Test whether EGFR perturbation changes a prespecified fibrosis readout."
+    )
+    assert hypothesis["validation_approach"] == (
         "Evaluate EGFR perturbation in an appropriate fibrosis model with matched controls."
     )
-    assert hypothesis["validation_approach"] == hypothesis["falsifiable_prediction"]
     assert "- **" not in hypothesis["core_claim"]
     assert "- **" not in hypothesis["falsifiable_prediction"]
 

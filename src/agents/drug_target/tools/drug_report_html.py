@@ -739,9 +739,6 @@ def _parse_hypothesis_section(body: str) -> list[dict[str, Any]]:
         rationale = _grouped_section4_block(
             lines, "Evidence Rationale & Interpretation Boundary"
         )
-        design = _grouped_section4_block(
-            lines, "Falsifiable Prediction & Validation Design"
-        )
         rationale_m = re.search(
             r"\*\*Evidence Rationale & Interpretation Boundary:\*\*\s*(.+)",
             lines,
@@ -760,23 +757,19 @@ def _parse_hypothesis_section(body: str) -> list[dict[str, Any]]:
             r"\*\*Falsifiable Prediction & Validation Design:\*\*\s*(.+)",
             lines,
         )
-        prediction_m = design_m or re.search(
-            r"\*\*(?:Falsifiable Prediction|Recommended Follow-up Test):\*\*\s*(.+)",
+        prediction_m = re.search(
+            r"\*\*(?:Prediction|Falsifiable Prediction|Recommended Follow-up Test):\*\*\s*(.+)",
             lines,
-        )
-        validation_m = design_m or re.search(
-            r"\*\*(?:Validation Approach|Suggested Validation Approach):\*\*\s*(.+)",
+        ) or design_m
+        validation_m = re.search(
+            r"\*\*(?:Design|Validation Approach|Suggested Validation Approach):\*\*\s*(.+)",
             lines,
-        )
+        ) or design_m
         core_claim = rationale or (
             rationale_m.group(1).strip() if rationale_m else ""
         )
-        falsifiable_prediction = design or (
-            prediction_m.group(1).strip() if prediction_m else ""
-        )
-        validation_approach = design or (
-            validation_m.group(1).strip() if validation_m else ""
-        )
+        falsifiable_prediction = prediction_m.group(1).strip() if prediction_m else ""
+        validation_approach = validation_m.group(1).strip() if validation_m else ""
 
         # Parse biological entities
         genes: list[str] = []

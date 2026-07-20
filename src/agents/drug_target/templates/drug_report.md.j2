@@ -142,9 +142,6 @@ Each gene is scored on two independent tracks reflecting different types of ther
 |---|---|---|---|---|---|---|
 {% for p in card._pairs -%}
 | **{{ p.ligand }}-{{ p.receptor }}** | {{ p.stage1_string }} | {{ p.census_coexpression }} | {{ p.gene_direction }} | {{ p.interpretation }} | {{ p.hypothesis_use }} | `{{ p.pair_file }}` |
-{% if p.census_rr is not none %}
-- Census: risk_ratio={{ p.census_rr }}, p_value={{ p.census_p }} [from {{ p.pair_file }}]
-{% endif %}
 {% endfor %}
 
 **Spatial context:** All ligand-receptor pairs listed above originated from significant LIANA+ spatial co-localization results in the interest region/cell-type program. Stage 1 PASS/FAIL and Census direction are used here to decide whether each pair can support a hypothesis, and what kind of hypothesis is allowed.
