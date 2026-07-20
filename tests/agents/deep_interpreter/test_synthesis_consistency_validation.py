@@ -60,6 +60,31 @@ def test_validator_reports_repairable_canonical_fact_mismatches(
     }
 
 
+def test_candidate_heading_allows_descriptors_and_keeps_score_offsets(
+    tmp_path: Path,
+) -> None:
+    _write_base_sources(tmp_path)
+    synthesis = (
+        "### 1. ERBB3 (Combined Score: 15, Validated Target, High Priority)\n"
+    )
+    (tmp_path / "synthesis.md").write_text(
+        synthesis,
+        encoding="utf-8",
+    )
+
+    [issue] = [
+        issue
+        for issue in validate_synthesis_consistency(tmp_path)["issues"]
+        if issue["severity"] == "error"
+    ]
+
+    assert issue["code"] == "synthesis_consistency_score_mismatch"
+    assert issue["value"] == "15"
+    assert issue["repairable"] is True
+    assert issue["start_offset"] == synthesis.index("15")
+    assert issue["end_offset"] == synthesis.index("15") + len("15")
+
+
 def test_repair_replaces_only_literal_source_derived_values(tmp_path: Path) -> None:
     _write_base_sources(tmp_path)
     (tmp_path / "synthesis.md").write_text(
@@ -77,6 +102,29 @@ def test_repair_replaces_only_literal_source_derived_values(tmp_path: Path) -> N
         "### 1. ERBB3 (Combined Score: 16)\n"
         "CDH1-ERBB3 combinedscore = 0.8141.\n"
         "Factor3 estrogen enrichment estimate = -5.480.\n"
+    )
+
+
+def test_repair_uses_offsets_when_numeric_value_repeats(tmp_path: Path) -> None:
+    _write_base_sources(tmp_path)
+    (tmp_path / "synthesis.md").write_text(
+        "Background threshold 15 remains unchanged.\n"
+        "### 1. ERBB3 (Combined Score: 15, Validated Target, High Priority)\n",
+        encoding="utf-8",
+    )
+    [issue] = [
+        issue
+        for issue in validate_synthesis_consistency(tmp_path)["issues"]
+        if issue["severity"] == "error"
+    ]
+
+    changed = repair_synthesis_consistency(tmp_path, [issue])
+
+    assert issue["repairable"] is True
+    assert changed == 1
+    assert (tmp_path / "synthesis.md").read_text(encoding="utf-8") == (
+        "Background threshold 15 remains unchanged.\n"
+        "### 1. ERBB3 (Combined Score: 16, Validated Target, High Priority)\n"
     )
 
 

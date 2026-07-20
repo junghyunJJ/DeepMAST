@@ -8,7 +8,7 @@ from typing import Any
 
 _SYNTHESIS_CANDIDATE_RE = re.compile(
     r"^###\s+(?P<rank>\d+)\.\s+(?P<gene>[A-Za-z0-9_-]+)\s+"
-    r"\(Combined Score:\s*(?P<score>-?\d+(?:\.\d+)?)\)",
+    r"\(Combined Score:\s*(?P<score>-?\d+(?:\.\d+)?)(?:,[^)]*)?\)",
     re.MULTILINE,
 )
 _SOURCE_CANDIDATE_RE = re.compile(
@@ -127,7 +127,9 @@ def validate_synthesis_consistency(data_dir: str | Path) -> dict[str, list[dict[
                 code="synthesis_consistency_candidate_mismatch",
                 value=rank,
                 replacement=score_fact["rank"],
-                repairable=_can_repair(synthesis, rank),
+                repairable=_can_repair(
+                    synthesis, rank, match.start("rank"), match.end("rank")
+                ),
                 start=match.start("rank"),
                 end=match.end("rank"),
             )
@@ -137,7 +139,9 @@ def validate_synthesis_consistency(data_dir: str | Path) -> dict[str, list[dict[
                 code="synthesis_consistency_score_mismatch",
                 value=score,
                 replacement=score_fact["canonical_value"],
-                repairable=_can_repair(synthesis, score),
+                repairable=_can_repair(
+                    synthesis, score, match.start("score"), match.end("score")
+                ),
                 start=match.start("score"),
                 end=match.end("score"),
             )
@@ -172,7 +176,9 @@ def validate_synthesis_consistency(data_dir: str | Path) -> dict[str, list[dict[
                 code="synthesis_consistency_lr_mismatch",
                 value=value,
                 replacement=replacement,
-                repairable=_can_repair(synthesis, value),
+                repairable=_can_repair(
+                    synthesis, value, match.start("value"), match.end("value")
+                ),
                 start=match.start("value"),
                 end=match.end("value"),
             )
@@ -198,7 +204,9 @@ def validate_synthesis_consistency(data_dir: str | Path) -> dict[str, list[dict[
                 code="synthesis_consistency_quantitative_mismatch",
                 value=value,
                 replacement=replacement,
-                repairable=_can_repair(synthesis, value),
+                repairable=_can_repair(
+                    synthesis, value, match.start("value"), match.end("value")
+                ),
                 start=match.start("value"),
                 end=match.end("value"),
             )
@@ -394,8 +402,14 @@ def _normalize_label(value: str) -> str:
     return " ".join(value.lower().split())
 
 
-def _can_repair(text: str, value: str) -> bool:
-    return bool(value) and text.count(value) == 1
+def _can_repair(
+    text: str, value: str, start: int | None = None, end: int | None = None
+) -> bool:
+    if not value:
+        return False
+    if start is not None and end is not None and text[start:end] == value:
+        return True
+    return text.count(value) == 1
 
 
 def _format_json_number(value: Any) -> str:
