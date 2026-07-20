@@ -46,6 +46,30 @@ def _write_synthesis_required_files(data_dir: Path) -> None:
     )
 
 
+def _write_consistency_guardrail_fixture(data_dir: Path, synthesis: str) -> None:
+    (data_dir / "papers.json").write_text('{"papers": []}', encoding="utf-8")
+    (data_dir / "part1_final.md").write_text("## Part 1\n", encoding="utf-8")
+    (data_dir / "part2_final.md").write_text("## Part 2\n", encoding="utf-8")
+    (data_dir / "part3_final.md").write_text("## Part 3\n", encoding="utf-8")
+    (data_dir / "part4_candidate_selection.json").write_text(
+        json.dumps(
+            {
+                "selected_genes": ["ERBB3"],
+                "selected_lr_pairs": [
+                    {"interaction": "CDH1^ERBB3", "combinedscore": 0.8141}
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (data_dir / "part4_therapeutic_synthesis.md").write_text(
+        "### 1. Candidate: ERBB3\n"
+        "- Score profile: combined 16 = validated 10 + exploratory 6.\n",
+        encoding="utf-8",
+    )
+    (data_dir / "synthesis.md").write_text(synthesis, encoding="utf-8")
+
+
 def test_run_report_guardrail_skips_when_parts_are_incomplete(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -200,6 +224,50 @@ def test_run_synthesis_guardrail_softens_claim_rag_error_and_records_results(
     assert result["claims_by_status"]["overclaimed"] == 1
     assert final["claim_validation"][0]["hedged"] is True
     assert "hypothesis requiring validation" in synthesis.lower()
+
+
+def test_run_synthesis_guardrail_repairs_consistency_mismatch(
+    tmp_path: Path,
+) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    _write_consistency_guardrail_fixture(
+        tmp_path,
+        "### 1. ERBB3 (Combined Score: 15)\n",
+    )
+
+    result = report_guardrails.run_synthesis_guardrail(tmp_path)
+
+    assert result["status"] == "passed"
+    assert result["repair_attempt_count"] == 1
+    assert result["consistency_issue_count"] == 1
+    assert "Combined Score: 16" in (tmp_path / "synthesis.md").read_text(
+        encoding="utf-8"
+    )
+    final = json.loads(
+        (tmp_path / "synthesis_guardrail_final.json").read_text(encoding="utf-8")
+    )
+    assert final["consistency_validation"]
+    assert not [issue for issue in final["issues"] if issue["severity"] == "error"]
+
+
+def test_run_synthesis_guardrail_fails_unresolved_consistency_issue(
+    tmp_path: Path,
+) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    synthesis = "### 1. EGFR (Combined Score: 15)\n"
+    _write_consistency_guardrail_fixture(tmp_path, synthesis)
+
+    result = report_guardrails.run_synthesis_guardrail(tmp_path)
+
+    final = json.loads(
+        (tmp_path / "synthesis_guardrail_final.json").read_text(encoding="utf-8")
+    )
+    assert (tmp_path / "synthesis.md").read_text(encoding="utf-8") == synthesis
+    assert result["status"] == "failed"
+    assert result["repair_attempt_count"] == 1
+    assert final["issues"][-1]["code"] == "synthesis_consistency_unresolved"
 
 
 def test_run_synthesis_guardrail_rejects_html_fragment_synthesis(

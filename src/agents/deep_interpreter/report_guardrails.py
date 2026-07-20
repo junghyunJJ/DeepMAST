@@ -8,6 +8,7 @@ from typing import Any
 from scripts import repair_report as repair_report_script
 from scripts import validate_report as validate_report_script
 from src.agents.deep_interpreter import claim_rag_validation
+from src.agents.deep_interpreter import synthesis_consistency_validation
 
 
 REQUIRED_PART_FILES = (
@@ -46,10 +47,13 @@ PAPERS_JSON_LOAD_ERROR_CODES = {
 def _issue_payload(
     issues: list[dict[str, str]],
     claim_validation: list[dict[str, Any]] | None = None,
+    consistency_validation: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     payload: dict[str, Any] = {"issue_count": len(issues), "issues": issues}
     if claim_validation is not None:
         payload["claim_validation"] = claim_validation
+    if consistency_validation is not None:
+        payload["consistency_validation"] = consistency_validation
     return payload
 
 
@@ -57,10 +61,11 @@ def _write_issues(
     path: Path,
     issues: list[dict[str, str]],
     claim_validation: list[dict[str, Any]] | None = None,
+    consistency_validation: list[dict[str, Any]] | None = None,
 ) -> None:
     path.write_text(
         json.dumps(
-            _issue_payload(issues, claim_validation),
+            _issue_payload(issues, claim_validation, consistency_validation),
             indent=2,
             ensure_ascii=False,
         )
@@ -236,6 +241,9 @@ def repair_synthesis_report(data_dir: str | Path, issues: list[dict[str, str]]) 
             continue
         if repair_report_script._repair_pmid_issue(data_dir, issue):
             changed_claims += 1
+    changed_claims += synthesis_consistency_validation.repair_synthesis_consistency(
+        data_dir, issues
+    )
     return changed_claims
 
 
@@ -252,17 +260,18 @@ def _validate_synthesis_with_claims(
     *,
     provider: str | None,
     claim_cache: dict[str, list[dict[str, Any]]],
-) -> tuple[list[dict[str, str]], list[dict[str, Any]]]:
+) -> tuple[list[dict[str, str]], list[dict[str, Any]], dict[str, list[dict[str, Any]]]]:
     deterministic = validate_synthesis_report(data_dir)
     if any(issue.get("code") in PAPERS_JSON_LOAD_ERROR_CODES for issue in deterministic):
-        return deterministic, []
+        return deterministic, [], {"issues": [], "results": []}
     semantic = claim_rag_validation.validate_claims(
         data_dir,
         ("synthesis.md",),
         provider=provider,
         cache=claim_cache,
     )
-    return deterministic + semantic["issues"], semantic["claims"]
+    consistency = synthesis_consistency_validation.validate_synthesis_consistency(data_dir)
+    return deterministic + semantic["issues"] + consistency["issues"], semantic["claims"], consistency
 
 
 def run_report_guardrail(data_dir: str | Path, *, provider: str | None = None) -> dict[str, Any]:
@@ -335,16 +344,22 @@ def run_synthesis_guardrail(data_dir: str | Path, *, provider: str | None = None
     final_path = data_dir / "synthesis_guardrail_final.json"
 
     claim_cache: dict[str, list[dict[str, Any]]] = {}
-    initial_issues, initial_claims = _validate_synthesis_with_claims(
+    initial_issues, initial_claims, initial_consistency = _validate_synthesis_with_claims(
         data_dir,
         provider=provider,
         claim_cache=claim_cache,
     )
-    _write_issues(initial_path, initial_issues, initial_claims)
+    _write_issues(
+        initial_path,
+        initial_issues,
+        initial_claims,
+        initial_consistency["results"],
+    )
     initial_error_count = _error_count(initial_issues)
 
     current_issues = initial_issues
     current_claims = initial_claims
+    current_consistency = initial_consistency
     changed_claims = 0
     repair_attempt_count = 0
 
@@ -355,7 +370,7 @@ def run_synthesis_guardrail(data_dir: str | Path, *, provider: str | None = None
         changed = repair_synthesis_report(data_dir, current_issues)
         repair_attempt_count += 1
         changed_claims += changed
-        current_issues, current_claims = _validate_synthesis_with_claims(
+        current_issues, current_claims, current_consistency = _validate_synthesis_with_claims(
             data_dir,
             provider=provider,
             claim_cache=claim_cache,
@@ -364,7 +379,12 @@ def run_synthesis_guardrail(data_dir: str | Path, *, provider: str | None = None
             break
 
     final_issues = current_issues
-    _write_issues(final_path, final_issues, current_claims)
+    _write_issues(
+        final_path,
+        final_issues,
+        current_claims,
+        current_consistency["results"],
+    )
     final_error_count = _error_count(final_issues)
 
     return {
@@ -379,4 +399,7 @@ def run_synthesis_guardrail(data_dir: str | Path, *, provider: str | None = None
         "claims_validated": len(current_claims),
         "claims_by_status": _claim_status_counts(current_claims),
         "validation_results": current_claims,
+        "consistency_checked": True,
+        "consistency_issue_count": len(initial_consistency["issues"]),
+        "consistency_validation": current_consistency["results"],
     }
