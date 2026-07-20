@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import hashlib
 import json
+import os
 import re
 from collections.abc import Sequence
 from pathlib import Path
@@ -34,6 +36,10 @@ HIGH_RISK_CLAIM_RE = re.compile(
     re.IGNORECASE,
 )
 MAX_CLAIMS_PER_JUDGMENT = 5
+CLAIM_RAG_CHECKPOINT_FILENAME = "claim_rag_checkpoint.json"
+DEFAULT_JUDGE_NUM_PREDICT = 3000
+DEFAULT_JUDGE_TIMEOUT_SECONDS = 300.0
+DEFAULT_SINGLE_CLAIM_TIMEOUT_SECONDS = 120.0
 
 
 class ClaimJudgment(BaseModel):
@@ -54,6 +60,41 @@ class _SearchLiteratureFulltext:
 
 
 search_literature_fulltext = _SearchLiteratureFulltext()
+
+
+def _positive_int_env(name: str, default: int) -> int:
+    value = int(os.getenv(name, str(default)))
+    if value <= 0:
+        raise ValueError(f"{name} must be positive")
+    return value
+
+
+def _positive_float_env(name: str, default: float) -> float:
+    value = float(os.getenv(name, str(default)))
+    if value <= 0:
+        raise ValueError(f"{name} must be positive")
+    return value
+
+
+def _create_judge_llm(provider: str | None, *, single_claim: bool = False) -> Any:
+    timeout_name = (
+        "CLAIM_RAG_SINGLE_CLAIM_TIMEOUT_SECONDS"
+        if single_claim
+        else "CLAIM_RAG_JUDGE_TIMEOUT_SECONDS"
+    )
+    timeout_default = (
+        DEFAULT_SINGLE_CLAIM_TIMEOUT_SECONDS
+        if single_claim
+        else DEFAULT_JUDGE_TIMEOUT_SECONDS
+    )
+    return create_llm(
+        provider,
+        reasoning=True,
+        num_predict=_positive_int_env(
+            "CLAIM_RAG_JUDGE_NUM_PREDICT", DEFAULT_JUDGE_NUM_PREDICT
+        ),
+        request_timeout=_positive_float_env(timeout_name, timeout_default),
+    )
 
 
 def _is_high_risk_claim(claim: str) -> bool:
@@ -256,38 +297,112 @@ def _unverifiable(item: dict[str, Any], reason: str) -> dict[str, Any]:
     }
 
 
-def _judge_group(group: dict[str, Any], model: Any) -> list[dict[str, Any]]:
-    evidence_items = [item for item in group["claims"] if item["evidence"]]
+def _checkpoint_key(group: dict[str, Any], claims: list[dict[str, Any]]) -> str:
+    payload = {
+        "file": group["file"],
+        "section": group["section"],
+        "claims": [
+            {
+                "index": item["index"],
+                "claim": item["claim"],
+                "candidate_pmids": item["candidate_pmids"],
+                "hedged": item["hedged"],
+            }
+            for item in claims
+        ],
+    }
+    return hashlib.sha256(
+        json.dumps(payload, sort_keys=True, ensure_ascii=False).encode("utf-8")
+    ).hexdigest()
+
+
+def _load_checkpoint(path: Path) -> dict[str, Any]:
+    try:
+        checkpoint = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {"version": 1, "batches": {}}
+    if (
+        not isinstance(checkpoint, dict)
+        or checkpoint.get("version") != 1
+        or not isinstance(checkpoint.get("batches"), dict)
+    ):
+        return {"version": 1, "batches": {}}
+    return checkpoint
+
+
+def _write_checkpoint(path: Path, checkpoint: dict[str, Any]) -> None:
+    path.write_text(
+        json.dumps(checkpoint, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+
+
+def _has_failed_judge_result(results: list[dict[str, Any]]) -> bool:
+    return any(
+        str(item.get("reason", "")).startswith("Claim judge failed:")
+        for item in results
+    )
+
+
+def _invoke_judgment(model: Any, group: dict[str, Any]) -> list[ClaimJudgment]:
+    structured_model = model.with_structured_output(ClaimJudgmentBatch)
+    response = structured_model.invoke(
+        [HumanMessage(content=_judgment_prompt(group))]
+    )
+    return response.judgments
+
+
+def _judge_source_batch(
+    group: dict[str, Any],
+    batch: list[dict[str, Any]],
+    model: Any,
+    get_model: Any | None,
+    fallback_model: Any | None,
+    get_fallback_model: Any | None,
+    stats: dict[str, int],
+) -> list[dict[str, Any]]:
+    evidence_items = [item for item in batch if item["evidence"]]
     missing = {
         item["index"]: _unverifiable(item, "No allowed PMID evidence was retrieved.")
-        for item in group["claims"]
+        for item in batch
         if not item["evidence"]
     }
-    if not evidence_items:
-        return [missing[item["index"]] for item in group["claims"]]
-
     judgments: dict[int, ClaimJudgment] = {}
     failed: dict[int, dict[str, Any]] = {}
-    structured_model = model.with_structured_output(ClaimJudgmentBatch)
-    for start in range(0, len(evidence_items), MAX_CLAIMS_PER_JUDGMENT):
-        batch = evidence_items[start : start + MAX_CLAIMS_PER_JUDGMENT]
+    if evidence_items:
         try:
-            response = structured_model.invoke(
-                [HumanMessage(content=_judgment_prompt({**group, "claims": batch}))]
-            )
-            judgments.update({item.claim_index: item for item in response.judgments})
-        except Exception as exc:
-            failed.update(
+            if model is None and get_model is not None:
+                model = get_model()
+            stats["judgment_batch_count"] += 1
+            judgments.update(
                 {
-                    item["index"]: _unverifiable(
-                        item, f"Claim judge failed: {type(exc).__name__}."
-                    )
-                    for item in batch
+                    item.claim_index: item
+                    for item in _invoke_judgment(model, {**group, "claims": evidence_items})
                 }
             )
+        except Exception as primary_exc:
+            for item in evidence_items:
+                try:
+                    if fallback_model is None and get_fallback_model is not None:
+                        fallback_model = get_fallback_model()
+                    if fallback_model is None:
+                        raise primary_exc
+                    stats["single_claim_fallback_count"] += 1
+                    judgments.update(
+                        {
+                            judgment.claim_index: judgment
+                            for judgment in _invoke_judgment(
+                                fallback_model, {**group, "claims": [item]}
+                            )
+                        }
+                    )
+                except Exception as fallback_exc:
+                    failed[item["index"]] = _unverifiable(
+                        item, f"Claim judge failed: {type(fallback_exc).__name__}."
+                    )
 
     results: list[dict[str, Any]] = []
-    for item in group["claims"]:
+    for item in batch:
         if item["index"] in missing:
             results.append(missing[item["index"]])
             continue
@@ -307,6 +422,64 @@ def _judge_group(group: dict[str, Any], model: Any) -> list[dict[str, Any]]:
                 "evidence_quote": judgment.evidence_quote,
             }
         )
+    return results
+
+
+def _judge_group(
+    group: dict[str, Any],
+    model: Any,
+    fallback_model: Any | None = None,
+    checkpoint: dict[str, Any] | None = None,
+    flush_checkpoint: Any | None = None,
+    *,
+    data_dir: Path | None = None,
+    stats: dict[str, int] | None = None,
+    get_model: Any | None = None,
+    get_fallback_model: Any | None = None,
+) -> list[dict[str, Any]]:
+    checkpoint = checkpoint if checkpoint is not None else {"version": 1, "batches": {}}
+    batches = checkpoint.setdefault("batches", {})
+    if flush_checkpoint is None:
+        flush_checkpoint = lambda: None
+    stats = stats if stats is not None else {
+        "checkpoint_hits": 0,
+        "judgment_batch_count": 0,
+        "single_claim_fallback_count": 0,
+    }
+    results: list[dict[str, Any]] = []
+    for start in range(0, len(group["claims"]), MAX_CLAIMS_PER_JUDGMENT):
+        batch = group["claims"][start : start + MAX_CLAIMS_PER_JUDGMENT]
+        key = _checkpoint_key(group, batch)
+        saved = batches.get(key)
+        if isinstance(saved, dict) and isinstance(saved.get("results"), list):
+            stats["checkpoint_hits"] += 1
+            results.extend(saved["results"])
+            continue
+
+        enriched = [
+            {
+                **item,
+                "file": group["file"],
+                "section": group["section"],
+                "evidence": item.get("evidence")
+                if "evidence" in item or data_dir is None
+                else _retrieve_evidence(item["claim"], item["candidate_pmids"], data_dir),
+            }
+            for item in batch
+        ]
+        judged = _judge_source_batch(
+            group,
+            enriched,
+            model,
+            get_model,
+            fallback_model,
+            get_fallback_model,
+            stats,
+        )
+        if not _has_failed_judge_result(judged):
+            batches[key] = {"results": judged}
+            flush_checkpoint()
+        results.extend(judged)
     return results
 
 
@@ -351,11 +524,22 @@ def validate_claims(
     data_dir = Path(data_dir).expanduser().resolve()
     cache = cache if cache is not None else {}
     model = llm
+    fallback_model: Any | None = None
+    checkpoint_path = data_dir / CLAIM_RAG_CHECKPOINT_FILENAME
+    checkpoint = _load_checkpoint(checkpoint_path)
+    stats = {
+        "checkpoint_hits": 0,
+        "judgment_batch_count": 0,
+        "single_claim_fallback_count": 0,
+    }
     results: list[dict[str, Any]] = []
     selection: dict[str, Any] = {
         "extracted_claim_count": 0,
         "selected_claim_count": 0,
         "skipped_claims": [],
+        "checkpoint_hits": 0,
+        "judgment_batch_count": 0,
+        "single_claim_fallback_count": 0,
     }
     selected_groups: list[dict[str, Any]] = []
 
@@ -385,25 +569,33 @@ def validate_claims(
         if cached is not None:
             results.extend(cached)
             continue
-        enriched = {
-            **group,
-            "claims": [
-                {
-                    **item,
-                    "file": group["file"],
-                    "section": group["section"],
-                    "evidence": _retrieve_evidence(
-                        item["claim"], item["candidate_pmids"], data_dir
-                    ),
-                }
-                for item in group["claims"]
-            ],
-        }
-        if model is None and any(item["evidence"] for item in enriched["claims"]):
-            model = create_llm(provider)
-        judged = _judge_group(enriched, model)
+
+        def get_fallback_model() -> Any:
+            nonlocal fallback_model
+            if fallback_model is None:
+                fallback_model = _create_judge_llm(provider, single_claim=True)
+            return fallback_model
+
+        def get_model() -> Any:
+            nonlocal model
+            if model is None:
+                model = _create_judge_llm(provider)
+            return model
+
+        judged = _judge_group(
+            group,
+            model,
+            fallback_model,
+            checkpoint,
+            lambda: _write_checkpoint(checkpoint_path, checkpoint),
+            data_dir=data_dir,
+            stats=stats,
+            get_model=get_model,
+            get_fallback_model=get_fallback_model,
+        )
         cache[cache_key] = judged
         results.extend(judged)
 
+    selection.update(stats)
     issues = [issue for result in results if (issue := _issue_for(result)) is not None]
     return {"claims": results, "issues": issues, "selection": selection}

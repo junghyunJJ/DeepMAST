@@ -268,6 +268,132 @@ class BatchLimitedStructuredModel:
         )
 
 
+def test_create_judge_llm_uses_bounded_reasoning_configuration(monkeypatch) -> None:
+    captured: dict[str, object] = {}
+    monkeypatch.setattr(
+        claim_rag_validation,
+        "create_llm",
+        lambda provider, **kwargs: captured.update(provider=provider, **kwargs)
+        or object(),
+    )
+    monkeypatch.setenv("OLLAMA_NUM_PREDICT", "12000")
+
+    claim_rag_validation._create_judge_llm("ollama")
+
+    assert captured == {
+        "provider": "ollama",
+        "reasoning": True,
+        "num_predict": 3000,
+        "request_timeout": 300.0,
+    }
+
+
+class TimeoutPrimaryModel(BatchLimitedStructuredModel):
+    def invoke(self, messages):
+        payload = json.loads(
+            messages[0].content.split("Claims and evidence:\n", maxsplit=1)[1]
+        )
+        self.batch_sizes.append(len(payload))
+        raise TimeoutError("primary timed out")
+
+
+class SingleClaimFallbackModel(BatchLimitedStructuredModel):
+    def invoke(self, messages):
+        payload = json.loads(
+            messages[0].content.split("Claims and evidence:\n", maxsplit=1)[1]
+        )
+        if len(payload) != 1:
+            raise AssertionError("fallback must receive one claim")
+        return super().invoke(messages)
+
+
+class FailingFallbackModel(SingleClaimFallbackModel):
+    def invoke(self, messages):
+        payload = json.loads(
+            messages[0].content.split("Claims and evidence:\n", maxsplit=1)[1]
+        )
+        self.batch_sizes.append(len(payload))
+        raise RuntimeError("fallback failed")
+
+
+def test_judge_group_falls_back_to_single_claim_batches_after_primary_timeout() -> None:
+    primary = TimeoutPrimaryModel()
+    fallback = SingleClaimFallbackModel()
+    checkpoint = {"version": 1, "batches": {}}
+    flushes = 0
+    group = {
+        "file": "synthesis.md",
+        "section": "## Therapeutic Implications",
+        "claims": [
+            {
+                "index": index,
+                "claim": f"Claim {index} is supported.",
+                "candidate_pmids": ["11111111"],
+                "hedged": False,
+                "file": "synthesis.md",
+                "section": "## Therapeutic Implications",
+                "evidence": [
+                    {
+                        "pmid": "11111111",
+                        "source": "abstract",
+                        "text": "Evidence supports the claim.",
+                    }
+                ],
+            }
+            for index in range(2)
+        ],
+    }
+
+    def flush() -> None:
+        nonlocal flushes
+        flushes += 1
+
+    results = claim_rag_validation._judge_group(group, primary, fallback, checkpoint, flush)
+
+    assert primary.batch_sizes == [2]
+    assert fallback.batch_sizes == [1, 1]
+    assert [item["status"] for item in results] == ["supported", "supported"]
+    assert flushes == 1
+
+
+def test_judge_group_does_not_persist_failed_judge_results() -> None:
+    primary = TimeoutPrimaryModel()
+    fallback = FailingFallbackModel()
+    checkpoint = {"version": 1, "batches": {}}
+    flushes = 0
+    group = {
+        "file": "synthesis.md",
+        "section": "## Therapeutic Implications",
+        "claims": [
+            {
+                "index": 0,
+                "claim": "Claim 0 is supported.",
+                "candidate_pmids": ["11111111"],
+                "hedged": False,
+                "file": "synthesis.md",
+                "section": "## Therapeutic Implications",
+                "evidence": [
+                    {
+                        "pmid": "11111111",
+                        "source": "abstract",
+                        "text": "Evidence supports the claim.",
+                    }
+                ],
+            }
+        ],
+    }
+
+    def flush() -> None:
+        nonlocal flushes
+        flushes += 1
+
+    results = claim_rag_validation._judge_group(group, primary, fallback, checkpoint, flush)
+
+    assert results[0]["reason"] == "Claim judge failed: RuntimeError."
+    assert checkpoint["batches"] == {}
+    assert flushes == 0
+
+
 def test_judge_group_splits_large_sections_into_bounded_batches() -> None:
     model = BatchLimitedStructuredModel()
     group = {
@@ -297,6 +423,76 @@ def test_judge_group_splits_large_sections_into_bounded_batches() -> None:
 
     assert model.batch_sizes == [5, 5, 5, 5, 5]
     assert [result["status"] for result in results] == ["supported"] * 25
+
+
+class InterruptOnSecondBatchModel(BatchLimitedStructuredModel):
+    def __init__(self) -> None:
+        super().__init__()
+        self.calls = 0
+
+    def invoke(self, messages):
+        self.calls += 1
+        if self.calls == 2:
+            raise KeyboardInterrupt
+        return super().invoke(messages)
+
+
+def test_validate_claims_persists_completed_batches_before_keyboard_interrupt(
+    tmp_path: Path, monkeypatch
+) -> None:
+    _write_papers(tmp_path / "papers.json")
+    (tmp_path / "part1_final.md").write_text(
+        "## Analysis 1-1\n"
+        "### Biological Interpretation\n"
+        "TGFB drives fibrosis (PMID: 11111111).\n"
+        "### References\n"
+        "- PMID: 11111111\n"
+        "## Analysis 1-2\n"
+        "### Biological Interpretation\n"
+        "CXCL12 regulates immune migration (PMID: 22222222).\n"
+        "### References\n"
+        "- PMID: 22222222\n",
+        encoding="utf-8",
+    )
+    searched: list[str] = []
+
+    def fake_search(args):
+        searched.append(args["query"])
+        pmid = "22222222" if "CXCL12" in args["query"] else "11111111"
+        return [
+            {
+                "page_content": "Evidence supports the claim.",
+                "metadata": {"filename": f"pmid_{pmid}.txt"},
+            }
+        ]
+
+    monkeypatch.setattr(
+        claim_rag_validation.search_literature_fulltext, "invoke", fake_search
+    )
+
+    try:
+        claim_rag_validation.validate_claims(
+            tmp_path, ("part1_final.md",), llm=InterruptOnSecondBatchModel()
+        )
+    except KeyboardInterrupt:
+        pass
+    else:
+        raise AssertionError("KeyboardInterrupt must propagate")
+
+    checkpoint_path = tmp_path / claim_rag_validation.CLAIM_RAG_CHECKPOINT_FILENAME
+    checkpoint = json.loads(checkpoint_path.read_text(encoding="utf-8"))
+    assert len(checkpoint["batches"]) == 1
+
+    searched.clear()
+    successful = BatchLimitedStructuredModel()
+    result = claim_rag_validation.validate_claims(
+        tmp_path, ("part1_final.md",), llm=successful
+    )
+
+    assert searched == ["CXCL12 regulates immune migration (PMID: 22222222)."]
+    assert successful.batch_sizes == [1]
+    assert [item["status"] for item in result["claims"]] == ["supported", "supported"]
+    assert result["selection"]["checkpoint_hits"] == 1
 
 
 def test_validate_claims_maps_overclaim_to_repairable_issue(
@@ -414,5 +610,6 @@ def test_section_cache_skips_unchanged_retrieval_and_judgment(
         tmp_path, ("part1_final.md",), llm=FakeStructuredModel(), cache=cache
     )
 
-    assert first == second
+    assert first["claims"] == second["claims"]
+    assert first["issues"] == second["issues"]
     assert search_calls == 1
