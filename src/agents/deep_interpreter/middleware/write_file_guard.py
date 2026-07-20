@@ -39,13 +39,14 @@ def _redact_path(path: str) -> str:
 
 
 # Output artifacts that MUST NOT be written via write_file.
-_BLOCKED_ARTIFACT_NAMES = ("target_assessment.json", "drug.md")
+_BLOCKED_ARTIFACT_NAMES = ("target_assessment.json", "drug.md", "report_data.json")
 
 _BLOCKED_ARTIFACT_ERROR = (
     "ERROR: Do not use write_file for output artifacts. "
     "Use save_target_assessment for target_assessment.json, "
     "save_drug_md for drug.md, and "
-    "save_hypothesis_report(data_dir, report) for hypothesis_report.json."
+    "save_hypothesis_report(data_dir, report) for hypothesis_report.json. "
+    "report_data.json is internal and may not be agent-authored."
 )
 
 
@@ -126,9 +127,9 @@ class WriteFileArgGuardMiddleware(AgentMiddleware):
 
     @classmethod
     def _is_blocked_artifact(cls, request: ToolCallRequest) -> bool:
-        """Return True if write_file targets a protected output artifact."""
+        """Return True if a generic mutation targets a protected artifact."""
         tool_call = request.tool_call
-        if tool_call.get("name") != "write_file":
+        if tool_call.get("name") not in {"write_file", "edit_file"}:
             return False
         args = tool_call.get("args")
         if not isinstance(args, dict):
@@ -246,7 +247,7 @@ class WriteFileArgGuardMiddleware(AgentMiddleware):
                 normalized = self._normalize_path(
                     args,
                     self._backend_root,
-                    patched.tool_call.get("id", ""),
+                    patched.tool_call.get("id") or "",
                 )
                 if isinstance(normalized, ToolMessage):
                     return normalized
@@ -268,7 +269,7 @@ class WriteFileArgGuardMiddleware(AgentMiddleware):
                 normalized = self._normalize_path(
                     args,
                     self._backend_root,
-                    patched.tool_call.get("id", ""),
+                    patched.tool_call.get("id") or "",
                 )
                 if isinstance(normalized, ToolMessage):
                     return normalized

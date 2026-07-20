@@ -1,155 +1,327 @@
 #!/usr/bin/env python3
-"""Run ONLY the report_writer subagent on existing evidence files.
+"""Render the guarded hybrid report from existing evidence."""
 
-Skips evidence_assessor entirely — uses pre-collected evidence.
-Generates target_assessment.json and drug.md.
-
-Usage:
-    python scripts/run_report_writer_only.py --data-dir res_ipf --disease "idiopathic pulmonary fibrosis"
-    python scripts/run_report_writer_only.py --data-dir res_ipf --disease "IPF" --provider openrouter
-    python scripts/run_report_writer_only.py --data-dir res_ipf --disease "IPF" --provider ollama --model qwen3.5:122b
-"""
+from __future__ import annotations
 
 import argparse
 import asyncio
+import json
+import multiprocessing
+import os
 import sys
 import time
-import uuid
+from queue import Empty
 from pathlib import Path
+from typing import Any, NoReturn, cast
+
+from langchain_core.callbacks import BaseCallbackHandler
+from langchain_core.runnables import RunnableConfig
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from dotenv import load_dotenv
-load_dotenv(PROJECT_ROOT / ".env")
-
-from deepagents import create_deep_agent
-from langgraph.checkpoint.memory import MemorySaver
-
-from src.agents.model import create_llm
-from src.agents.drug_target.subagents.prompts import SUBAGENT_PROMPTS
-from src.agents.drug_target.tools import (
-    load_lr_candidates,
-    load_evidence_files,
-    validate_evidence_completeness,
-    save_target_assessment,
-    save_drug_md,
-    sequential_thinking,
-    think_tool,
-    validate_quality,
+from src.agents.drug_target.agent import (
+    DrugTargetConfig,
+    Provider,
+    create_guarded_report_writer,
 )
+from src.agents.drug_target.middleware import clear_guarded_report_run_artifacts
+from src.agents.drug_target.tools.hypothesis_schema import validate_hypothesis_report_quality
+
+REQUIRED_GUARDED_ARTIFACTS = (
+    "drug.md",
+    "target_assessment.json",
+    "report_sections.json",
+    "drug_report_validation_initial.json",
+    "drug_report_validation_final.json",
+    "part4_candidate_selection.json",
+    "part4_therapeutic_synthesis.md",
+    "drug_report.html",
+)
+_PROCESS_STOP_SECONDS = 0.1
+
+
+class ReportWriterTraceCallback(BaseCallbackHandler):
+    def __init__(self, trace_file: str) -> None:
+        self._file = Path(trace_file).open("a", encoding="utf-8")
+
+    def _write(self, event: str, **fields: object) -> None:
+        self._file.write(json.dumps({"event": event, "at": time.time(), **fields}) + "\n")
+        self._file.flush()
+
+    def on_chat_model_start(self, serialized: dict[str, Any], messages: list[list[Any]], **_kwargs: Any) -> None:
+        self._write("llm_start")
+
+    def on_llm_end(self, response: Any, **_kwargs: Any) -> None:
+        self._write("llm_end")
+
+    def on_llm_error(self, error: BaseException, **_kwargs: Any) -> None:
+        self._write("llm_error", error=type(error).__name__)
+
+    def on_tool_start(self, serialized: dict[str, Any], input_str: str, **_kwargs: Any) -> None:
+        tool = serialized.get("name")
+        self._write("tool_start", tool=tool if isinstance(tool, str) else "unknown")
+
+    def on_tool_end(self, output: Any, *, name: str | None = None, **_kwargs: Any) -> None:
+        fields: dict[str, object] = {}
+        if name == "save_report_sections":
+            fields["tool"] = name
+            try:
+                receipt = json.loads(str(getattr(output, "content", output)))
+            except json.JSONDecodeError:
+                receipt = None
+            if isinstance(receipt, dict) and isinstance(receipt.get("saved"), bool):
+                fields["saved"] = receipt["saved"]
+                if receipt["saved"] is False and isinstance(receipt.get("errors"), list):
+                    fields["errors"] = receipt["errors"]
+        self._write("tool_end", **fields)
+
+    def on_tool_error(self, error: BaseException, **_kwargs: Any) -> None:
+        self._write("tool_error", error=type(error).__name__)
+
+    def close(self) -> None:
+        if not self._file.closed:
+            self._file.close()
 
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Run report_writer subagent only")
-    p.add_argument("--data-dir", required=True, help="Data directory with evidence/")
-    p.add_argument("--disease", required=True, help="Disease context")
-    p.add_argument("--provider", default="ollama", help="LLM provider (default: ollama)")
-    p.add_argument("--model", default=None, help="Model override (e.g. qwen3.5:122b)")
-    return p.parse_args()
+    parser = argparse.ArgumentParser(description="Render guarded hybrid report from existing evidence")
+    parser.add_argument("--data-dir", required=True)
+    parser.add_argument("--disease", required=True)
+    parser.add_argument("--provider", default="ollama")
+    parser.add_argument("--model")
+    parser.add_argument("--request-timeout-seconds", type=float, default=600)
+    parser.add_argument("--run-timeout-seconds", type=float, default=1800)
+    parser.add_argument("--trace-file", type=Path)
+    return parser.parse_args()
 
 
-async def main():
-    args = parse_args()
-    data_dir = str(Path(args.data_dir).expanduser().resolve())
-
-    print("=" * 70)
-    print("Report Writer Only")
-    print("=" * 70)
-    print(f"  Provider: {args.provider}")
-    print(f"  Model:    {args.model or 'default'}")
-    print(f"  Data dir: {data_dir}")
-    print(f"  Disease:  {args.disease}")
-    print()
-
-    # Verify evidence files exist
-    evidence_dir = Path(data_dir) / "evidence"
-    n_files = len(list(evidence_dir.glob("*.json")))
-    print(f"  Evidence files: {n_files}")
-    if n_files < 5:
-        print("ERROR: Not enough evidence files. Run full pipeline first.")
-        sys.exit(1)
-
-    # Create LLM
-    llm_kwargs = {}
-    if args.model:
-        llm_kwargs["model"] = args.model
-    llm = create_llm(provider=args.provider, **llm_kwargs)
-
-    tools = [
-        load_lr_candidates,
-        load_evidence_files,
-        validate_evidence_completeness,
-        save_target_assessment,
-        save_drug_md,
-        sequential_thinking,
-        think_tool,
-        validate_quality,
-    ]
-
-    data_dir_note = (
-        f"\n\n## Data Directory\n"
-        f"The data directory for this session is: `{data_dir}`\n"
-        f"Pass this exact path as `data_dir` to all tool calls "
-        f"(load_lr_candidates, load_evidence_files, save_target_assessment, save_drug_md).\n"
-        f"- **Disease context**: `{args.disease}`\n"
+def guarded_run_succeeded(data_dir: Path) -> bool:
+    audit_path = data_dir / "drug_report_validation_final.json"
+    try:
+        audit = json.loads(audit_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    publication = audit.get("publication") if isinstance(audit, dict) else {}
+    return (
+        audit.get("valid") is True
+        and isinstance(publication, dict)
+        and publication.get("status") == "passed"
+        and all((data_dir / name).is_file() and (data_dir / name).stat().st_size > 0 for name in REQUIRED_GUARDED_ARTIFACTS)
     )
 
-    system_prompt = SUBAGENT_PROMPTS["report_writer"] + data_dir_note
 
-    agent = create_deep_agent(
-        model=llm,
-        tools=tools,
-        subagents=[],
-        checkpointer=MemorySaver(),
-        system_prompt=system_prompt,
-    )
+def _validated_handoff_exists(data_dir: Path) -> bool:
+    return bool(validate_hypothesis_report_quality(data_dir).get("valid"))
 
-    t0 = time.time()
-    print("\nInvoking report_writer agent...")
-    print("-" * 70)
 
-    initial_message = (
-        f"Generate the drug target assessment report for {args.disease}.\n\n"
-        f"Data directory: {data_dir}\n"
-        f"All evidence files are already collected (Stage 1, 2, 3 complete).\n\n"
-        f"Steps:\n"
-        f"1. Call load_lr_candidates(data_dir='{data_dir}', disease='{args.disease}') to get input pairs\n"
-        f"2. Call load_evidence_files(data_dir='{data_dir}') to load all evidence\n"
-        f"3. Call validate_evidence_completeness(data_dir='{data_dir}') to check readiness\n"
-        f"4. Plan the document structure using sequential_thinking\n"
-        f"5. Call save_target_assessment to create target_assessment.json\n"
-        f"6. Call save_drug_md(data_dir='{data_dir}', content=...) to write drug.md to disk\n"
-        f"7. Validate quality >= 0.7\n"
-    )
+def _validate_timeouts(args: argparse.Namespace) -> None:
+    if args.request_timeout_seconds <= 0 or args.run_timeout_seconds <= 0:
+        raise ValueError("request and run timeouts must be positive")
+    if args.request_timeout_seconds >= args.run_timeout_seconds:
+        raise ValueError("request timeout must be shorter than run timeout")
 
-    result = await agent.ainvoke(
-        {"messages": [{"role": "user", "content": initial_message}]},
-        config={"configurable": {"thread_id": str(uuid.uuid4())}},
-    )
 
-    elapsed = time.time() - t0
-    print("-" * 70)
-    print(f"\nCompleted in {elapsed / 60:.1f} minutes")
+def _resolve_trace_file(data_dir: Path, trace_file: Path | None) -> str | None:
+    if trace_file is None:
+        return None
+    resolved = trace_file.expanduser().resolve()
+    if resolved.is_relative_to(data_dir):
+        raise ValueError("trace file must be outside data directory")
+    resolved.parent.mkdir(parents=True, exist_ok=True)
+    return str(resolved)
 
-    # Check outputs
-    drug_md = Path(data_dir) / "drug.md"
-    target_json = Path(data_dir) / "target_assessment.json"
 
-    if drug_md.exists():
-        content = drug_md.read_text()
-        print(f"\ndrug.md generated ({len(content)} chars, {content.count(chr(10))} lines)")
-        print(f"  Path: {drug_md}")
+def _infer_timeout_phase(data_dir: Path) -> str:
+    if (data_dir / "drug_report_validation_final.json").is_file():
+        return "publication"
+    if (data_dir / "report_sections.json").is_file():
+        return "guardrail_or_publication"
+    return "report_writer"
+
+
+def _writer_input(data_dir: str, disease: str) -> dict[str, list[dict[str, str]]]:
+    return {
+        "messages": [
+            {
+                "role": "user",
+                "content": (
+                    "Render guarded hybrid report from existing evidence. "
+                    f"Data dir: {data_dir}. Disease: {disease}."
+                ),
+            }
+        ]
+    }
+
+
+def _process_context() -> Any:
+    return multiprocessing.get_context()
+
+
+def _force_exit() -> NoReturn:
+    os._exit(1)
+
+
+async def _stop_child_process(process: Any) -> bool:
+    try:
+        if not process.is_alive():
+            return True
+        process.terminate()
+        await asyncio.to_thread(process.join, _PROCESS_STOP_SECONDS)
+        if process.is_alive():
+            process.kill()
+            await asyncio.to_thread(process.join, _PROCESS_STOP_SECONDS)
+        return not process.is_alive()
+    except Exception:
+        return False
+
+
+async def _require_child_stop(process: Any, data_dir: Path) -> None:
+    if not await _stop_child_process(process):
+        try:
+            await asyncio.to_thread(clear_guarded_report_run_artifacts, data_dir)
+        finally:
+            _force_exit()
+
+
+def _run_guarded_writer_child(
+    results: Any,
+    data_dir: str,
+    disease: str,
+    provider: str,
+    model: str | None,
+    request_timeout_seconds: float,
+    trace_file: str | None,
+) -> None:
+    """Construct and invoke the diagnostic writer outside the parent deadline."""
+    try:
+        report_writer = create_guarded_report_writer(
+            DrugTargetConfig(
+                provider=cast(Provider, provider),
+                model=model,
+                request_timeout_seconds=request_timeout_seconds,
+                data_dir=data_dir,
+                disease=disease,
+                workflow_mode="guarded_report",
+                subagent_models={},
+            )
+        )
+        callback = ReportWriterTraceCallback(trace_file) if trace_file else None
+        try:
+            if callback is None:
+                asyncio.run(report_writer.ainvoke(_writer_input(data_dir, disease)))
+            else:
+                invoke_config: RunnableConfig = {"callbacks": [callback]}
+                asyncio.run(report_writer.ainvoke(_writer_input(data_dir, disease), config=invoke_config))
+        finally:
+            if callback:
+                callback.close()
+    except Exception as exc:
+        results.put(("error", f"{type(exc).__name__}: {exc}"))
     else:
-        print("\nWARNING: drug.md was not generated")
+        results.put(("success", ""))
 
-    if target_json.exists():
-        print(f"target_assessment.json generated")
-        print(f"  Path: {target_json}")
 
-    print(f"\n{'=' * 70}")
-    print("DONE!")
+async def _run_guarded_writer_with_deadline(
+    *,
+    data_dir: Path,
+    args: argparse.Namespace,
+    trace_file: str | None,
+) -> tuple[str, str]:
+    context = _process_context()
+    results = context.Queue()
+    process = context.Process(
+        target=_run_guarded_writer_child,
+        args=(
+            results,
+            str(data_dir),
+            args.disease,
+            args.provider,
+            args.model,
+            args.request_timeout_seconds,
+            trace_file,
+        ),
+    )
+    stop_attempted = False
+    try:
+        try:
+            process.start()
+        except Exception as exc:
+            return "error", f"{type(exc).__name__}: {exc}"
+        try:
+            await asyncio.wait_for(
+                asyncio.to_thread(process.join, args.run_timeout_seconds),
+                timeout=args.run_timeout_seconds,
+            )
+        except TimeoutError:
+            stop_attempted = True
+            await _require_child_stop(process, data_dir)
+            return "timeout", ""
+        if process.is_alive():
+            stop_attempted = True
+            await _require_child_stop(process, data_dir)
+            return "timeout", ""
+
+        try:
+            return await asyncio.to_thread(results.get, True, 0.1)
+        except Empty:
+            return "error", "child exited without a result"
+    finally:
+        if not stop_attempted:
+            await _require_child_stop(process, data_dir)
+        results.close()
+        results.join_thread()
+
+
+async def main() -> int:
+    args = parse_args()
+    try:
+        _validate_timeouts(args)
+    except ValueError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+    data_dir = Path(args.data_dir).expanduser().resolve()
+    if not _validated_handoff_exists(data_dir):
+        print(
+            "ERROR: valid hypothesis_report.json is required for reporter-only diagnostic",
+            file=sys.stderr,
+        )
+        return 1
+    if len(list((data_dir / "evidence").glob("*.json"))) < 5:
+        print("ERROR: Not enough evidence files. Run evidence assessment first.")
+        return 1
+    try:
+        trace_file = _resolve_trace_file(data_dir, args.trace_file)
+    except ValueError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+    await asyncio.to_thread(clear_guarded_report_run_artifacts, data_dir)
+    status, detail = await _run_guarded_writer_with_deadline(
+        data_dir=data_dir,
+        args=args,
+        trace_file=trace_file,
+    )
+    if status == "timeout":
+        phase = _infer_timeout_phase(data_dir)
+        await asyncio.to_thread(clear_guarded_report_run_artifacts, data_dir)
+        model_label = args.model or "default"
+        print(
+            "ERROR: guarded report timed out after "
+            f"{args.run_timeout_seconds}s in phase={phase} "
+            f"provider={args.provider} model={model_label}",
+            file=sys.stderr,
+        )
+        return 1
+    if status == "error":
+        await asyncio.to_thread(clear_guarded_report_run_artifacts, data_dir)
+        print(f"ERROR: guarded report writer failed: {detail}", file=sys.stderr)
+        return 1
+    if guarded_run_succeeded(data_dir):
+        print("DONE")
+        return 0
+    print("ERROR: guarded report audit or required artifacts failed")
+    return 1
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    raise SystemExit(asyncio.run(main()))

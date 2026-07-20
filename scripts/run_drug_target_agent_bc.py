@@ -1,117 +1,108 @@
 #!/usr/bin/env python3
-"""Run Drug Target Assessment Agent on res_bc_ollama/ data.
+"""Convenience runner for the canonical guarded fixed-dataset workflow."""
 
-Executes the full 2-subagent pipeline (evidence_assessor → report_writer)
-to generate drug.md from lr_candidates.json.
-"""
+from __future__ import annotations
 
 import asyncio
-import json
+import argparse
+import contextlib
+import math
+import os
 import sys
 import time
 import uuid
 from pathlib import Path
 
-# Add project root to path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from dotenv import load_dotenv
-load_dotenv(PROJECT_ROOT / ".env")
-
-from src.agents.drug_target.agent import create_drug_target_agent, DrugTargetConfig
-
-# ── Configuration ──────────────────────────────────────────────────────
-DATA_DIR = str(PROJECT_ROOT / "res_bc_ollama")
-DISEASE = "breast cancer"
-PROVIDER = "openrouter"
+from src.agents.drug_target.agent import DrugTargetConfig, create_drug_target_agent
+from src.agents.drug_target.report_guardrails import clear_derived_report_artifacts
+from scripts.run_report_writer_only import guarded_run_succeeded
 
 
-async def main():
-    print("=" * 70)
-    print("Drug Target Assessment Agent — Breast Cancer")
-    print("=" * 70)
-    print(f"  Provider: {PROVIDER}")
-    print(f"  Data dir: {DATA_DIR}")
-    print(f"  Disease:  {DISEASE}")
-    print()
+def _positive_seconds(value: str) -> float:
+    seconds = float(value)
+    if not math.isfinite(seconds) or seconds <= 0:
+        raise argparse.ArgumentTypeError("heartbeat seconds must be positive")
+    return seconds
 
-    # Verify lr_candidates.json exists
-    lr_path = Path(DATA_DIR) / "lr_candidates.json"
-    if not lr_path.exists():
-        print(f"ERROR: lr_candidates.json not found at {lr_path}")
-        sys.exit(1)
 
-    lr_data = json.loads(lr_path.read_text())
-    n_pairs = len(lr_data.get("pairs", []))
-    print(f"  L-R pairs: {n_pairs}")
-    print()
+async def _emit_heartbeat(interval_seconds: float, started_at: float) -> None:
+    while True:
+        await asyncio.sleep(interval_seconds)
+        elapsed = int(time.monotonic() - started_at)
+        print(f"RUNNING elapsed_seconds={elapsed}", flush=True)
 
-    # Create agent
-    config = DrugTargetConfig(
-        provider=PROVIDER,
-        data_dir=DATA_DIR,
-        disease=DISEASE,
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Run the guarded drug target pipeline for breast cancer")
+    parser.add_argument("--data-dir", type=Path, default=PROJECT_ROOT / "res_bc_ollama")
+    parser.add_argument("--disease", default="breast cancer")
+    parser.add_argument("--provider", default="openrouter")
+    parser.add_argument("--model")
+    parser.add_argument("--skip-evidence-assessor", action="store_true")
+    parser.add_argument(
+        "--heartbeat-seconds",
+        type=_positive_seconds,
+        default=15.0,
+        help="Print liveness while the guarded agent awaits model or tool work.",
     )
+    return parser.parse_args()
 
-    print("Creating Drug Target Agent...")
-    t0 = time.time()
-    agent, backend = create_drug_target_agent(config)
-    print(f"  Agent created in {time.time() - t0:.1f}s")
 
+async def main() -> int:
+    args = parse_args()
+    data_dir = args.data_dir.expanduser().resolve()
+    if not (data_dir / "lr_candidates.json").exists():
+        print(f"ERROR: lr_candidates.json not found at {data_dir / 'lr_candidates.json'}")
+        return 1
+    clear_derived_report_artifacts(data_dir, include_audits=True, include_sources=True)
+    backend = None
+    heartbeat_task: asyncio.Task[None] | None = None
+    previous_skip_evidence_assessor = os.environ.get("DRUG_TARGET_SKIP_EVIDENCE_ASSESSOR")
     try:
-        # Natural language message — data_dir and disease are already
-        # injected into the system prompt via DrugTargetConfig.
-        initial_message = (
-            "Run the full drug target assessment pipeline for breast cancer."
+        if args.skip_evidence_assessor:
+            os.environ["DRUG_TARGET_SKIP_EVIDENCE_ASSESSOR"] = "1"
+        agent, backend = create_drug_target_agent(
+            DrugTargetConfig(
+                provider=args.provider,
+                model=args.model,
+                data_dir=str(data_dir),
+                disease=args.disease,
+                workflow_mode="guarded_report",
+            )
         )
-
-        print("\nInvoking agent...")
-        print("-" * 70)
-
-        result = await agent.ainvoke(
-            {
-                "messages": [{
-                    "role": "user",
-                    "content": initial_message,
-                }]
-            },
+        print("STARTED guarded BC pipeline", flush=True)
+        started_at = time.monotonic()
+        heartbeat_task = asyncio.create_task(
+            _emit_heartbeat(args.heartbeat_seconds, started_at)
+        )
+        await agent.ainvoke(
+            {"messages": [{"role": "user", "content": "Run the guarded drug target pipeline."}]},
             config={"configurable": {"thread_id": str(uuid.uuid4())}},
         )
-
-        elapsed = time.time() - t0
-        print("-" * 70)
-        print(f"\nAgent completed in {elapsed / 60:.1f} minutes")
-
-        # Check outputs
-        drug_md = Path(DATA_DIR) / "drug.md"
-        target_json = Path(DATA_DIR) / "target_assessment.json"
-
-        if drug_md.exists():
-            content = drug_md.read_text()
-            print(f"\ndrug.md generated ({len(content)} chars)")
-            print(f"  Path: {drug_md}")
-        else:
-            print("\nWARNING: drug.md was not generated")
-
-        if target_json.exists():
-            print(f"target_assessment.json generated")
-            print(f"  Path: {target_json}")
-
-        # Print evidence file count
-        evidence_dir = Path(DATA_DIR) / "evidence"
-        if evidence_dir.exists():
-            n_files = len(list(evidence_dir.glob("*.json")))
-            print(f"\nEvidence files: {n_files}")
-
+        if guarded_run_succeeded(data_dir):
+            print("DONE")
+            return 0
+        print("ERROR: guarded report audit or required artifacts failed")
+        return 1
+    except Exception as exc:
+        print(f"ERROR: {exc}")
+        return 1
     finally:
-        if backend:
-            backend.cleanup()
-
-    print(f"\n{'=' * 70}")
-    print("DONE!")
-    print(f"{'=' * 70}")
+        if heartbeat_task is not None:
+            heartbeat_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await heartbeat_task
+        if previous_skip_evidence_assessor is None:
+            os.environ.pop("DRUG_TARGET_SKIP_EVIDENCE_ASSESSOR", None)
+        else:
+            os.environ["DRUG_TARGET_SKIP_EVIDENCE_ASSESSOR"] = previous_skip_evidence_assessor
+        cleanup = getattr(backend, "cleanup", None)
+        if callable(cleanup):
+            cleanup()
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    raise SystemExit(asyncio.run(main()))

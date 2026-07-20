@@ -216,7 +216,7 @@ def test_operational_contract_prompt_modes_isolate_dth_skill_read() -> None:
     shared_minimal_phrases = (
         'load_evidence_files(data_dir=data_dir, scope="hypothesis")',
         "No drug-target interpretation rubric is provided by this base prompt",
-        "Generate 4-6 retained recommendations.",
+        "Prefer exactly four retained recommendations; expand to five or six only when needed to cover every FEATURED gene.",
         "`Mechanism of Action`, `Therapeutic Strategy`, `Cross-Target Interaction`,",
         "and `Novel Pathway`;",
         "Build a JSON-compatible object:",
@@ -455,9 +455,9 @@ def test_drug_target_hypothesis_skill_uses_structured_packet_for_quality_signatu
 
 
 def test_get_subagents_can_render_progressive_disclosure_prompt_mode() -> None:
-    from src.agents.drug_target.subagents.configs import get_subagents
+    from src.agents.drug_target.subagents.configs import get_legacy_subagents
 
-    subagents = get_subagents(
+    subagents = get_legacy_subagents(
         hypothesis_writer_prompt_mode="progressive_disclosure_only"
     )
     hypothesis_writer = next(
@@ -472,9 +472,9 @@ def test_get_subagents_can_render_progressive_disclosure_prompt_mode() -> None:
 
 def test_get_subagents_enforces_native_retry_only_for_thin_prompt_modes() -> None:
     from src.agents.drug_target.middleware import HypothesisRetryLoopMiddleware
-    from src.agents.drug_target.subagents.configs import get_subagents
+    from src.agents.drug_target.subagents.configs import get_legacy_subagents
 
-    subagents = get_subagents(hypothesis_writer_prompt_mode="thin_basic")
+    subagents = get_legacy_subagents(hypothesis_writer_prompt_mode="thin_basic")
     hypothesis_writer = next(
         subagent for subagent in subagents if subagent["name"] == "hypothesis_writer"
     )
@@ -486,7 +486,7 @@ def test_get_subagents_enforces_native_retry_only_for_thin_prompt_modes() -> Non
     )
     assert retry_middleware._stop_after_first_save is True
 
-    subagents = get_subagents(hypothesis_writer_prompt_mode="dth_contrast_no_skill")
+    subagents = get_legacy_subagents(hypothesis_writer_prompt_mode="dth_contrast_no_skill")
     hypothesis_writer = next(
         subagent for subagent in subagents if subagent["name"] == "hypothesis_writer"
     )
@@ -498,7 +498,7 @@ def test_get_subagents_enforces_native_retry_only_for_thin_prompt_modes() -> Non
     assert retry_middleware._stop_after_first_save is False
     assert retry_middleware._max_hypothesis_save_attempts == 3
 
-    subagents = get_subagents(hypothesis_writer_prompt_mode="operational_contract_only")
+    subagents = get_legacy_subagents(hypothesis_writer_prompt_mode="operational_contract_only")
     hypothesis_writer = next(
         subagent for subagent in subagents if subagent["name"] == "hypothesis_writer"
     )
@@ -511,7 +511,7 @@ def test_get_subagents_enforces_native_retry_only_for_thin_prompt_modes() -> Non
     assert retry_middleware._max_hypothesis_save_attempts == 3
     assert retry_middleware._single_read_skill_paths == ()
 
-    subagents = get_subagents(
+    subagents = get_legacy_subagents(
         hypothesis_writer_prompt_mode="operational_contract_plus_dth"
     )
     hypothesis_writer = next(
@@ -526,7 +526,7 @@ def test_get_subagents_enforces_native_retry_only_for_thin_prompt_modes() -> Non
         "skills/drug-target-hypothesis/SKILL.md",
     )
 
-    subagents = get_subagents(
+    subagents = get_legacy_subagents(
         hypothesis_writer_prompt_mode="operational_contract_minimal"
     )
     hypothesis_writer = next(
@@ -540,7 +540,7 @@ def test_get_subagents_enforces_native_retry_only_for_thin_prompt_modes() -> Non
     assert retry_middleware._stop_after_first_save is False
     assert retry_middleware._max_hypothesis_save_attempts == 3
 
-    subagents = get_subagents(
+    subagents = get_legacy_subagents(
         hypothesis_writer_prompt_mode="operational_contract_minimal_plus_dth"
     )
     hypothesis_writer = next(
@@ -577,9 +577,9 @@ def test_progressive_disclosure_with_modality_map_keeps_soft_routing() -> None:
 
 
 def test_get_subagents_can_render_progressive_disclosure_with_modality_map() -> None:
-    from src.agents.drug_target.subagents.configs import get_subagents
+    from src.agents.drug_target.subagents.configs import get_legacy_subagents
 
-    subagents = get_subagents(
+    subagents = get_legacy_subagents(
         hypothesis_writer_prompt_mode="progressive_disclosure_with_modality_map"
     )
     hypothesis_writer = next(
@@ -594,7 +594,7 @@ def test_get_subagents_can_render_progressive_disclosure_with_modality_map() -> 
 
 
 def test_progressive_disclosure_governor_does_not_hard_require_drug_target_skill() -> None:
-    from src.agents.drug_target.subagents.configs import get_subagents
+    from src.agents.drug_target.subagents.configs import get_legacy_subagents
     from src.agents.shared.skill_activation_governor import SkillActivationGovernor
 
     allowed_names = (
@@ -606,7 +606,7 @@ def test_progressive_disclosure_governor_does_not_hard_require_drug_target_skill
         name: f"skills/{name}"
         for name in allowed_names
     }
-    subagents = get_subagents(
+    subagents = get_legacy_subagents(
         skills_dir="skills",
         subagent_skill_names={"hypothesis_writer": allowed_names},
         subagent_skill_registries={"hypothesis_writer": registry},
@@ -628,7 +628,7 @@ def test_progressive_disclosure_governor_does_not_hard_require_drug_target_skill
 
 
 def test_progressive_disclosure_with_modality_map_governor_keeps_drug_target_candidate() -> None:
-    from src.agents.drug_target.subagents.configs import get_subagents
+    from src.agents.drug_target.subagents.configs import get_legacy_subagents
     from src.agents.shared.skill_activation_governor import SkillActivationGovernor
 
     allowed_names = (
@@ -640,7 +640,7 @@ def test_progressive_disclosure_with_modality_map_governor_keeps_drug_target_can
         name: f"skills/{name}"
         for name in allowed_names
     }
-    subagents = get_subagents(
+    subagents = get_legacy_subagents(
         skills_dir="skills",
         subagent_skill_names={"hypothesis_writer": allowed_names},
         subagent_skill_registries={"hypothesis_writer": registry},

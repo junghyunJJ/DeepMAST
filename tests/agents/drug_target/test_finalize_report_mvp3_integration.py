@@ -56,6 +56,36 @@ def _write_lr_candidates(workspace: Path) -> None:
     )
 
 
+def test_legacy_finalize_report_explicitly_includes_hypothesis_summary(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import src.agents.drug_target.finalize_report as finalize_report_module
+
+    workspace = _copy_baseline_workspace(tmp_path)
+    sentinel = object()
+    captured: dict[str, object] = {}
+    monkeypatch.setattr(
+        finalize_report_module,
+        "_build_evidence_summary_st",
+        sentinel,
+    )
+
+    def fake_call_tool(tool, **kwargs):
+        if tool is sentinel:
+            captured.update(kwargs)
+        return "{}"
+
+    monkeypatch.setattr(finalize_report_module, "_call_tool", fake_call_tool)
+
+    finalize_report_module._load_expansion_inputs(
+        str(workspace),
+        "idiopathic pulmonary fibrosis",
+    )
+
+    assert captured["include_legacy_hypothesis"] is True
+
+
 @pytest.mark.asyncio
 async def test_finalize_report_uses_deterministic_mvp_without_llm(
     tmp_path: Path,

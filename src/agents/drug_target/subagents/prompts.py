@@ -1,11 +1,12 @@
 """Subagent prompts for Drug Target Assessment Agent.
 
-Three subagents with staged funnel architecture (happy path):
+Production has two subagents with staged funnel architecture:
 1. EVIDENCE_ASSESSOR: 3-stage funnel (Stage 2: validation & scoring -> Stage 1:
    biological context -> Stage 3: ChEMBL drug profiles inline) with inline
    rubric assessment.
-2. HYPOTHESIS_WRITER: Evidence-grounded follow-up recommendation generation.
-3. REPORT_WRITER: Generate drug.md aligned with report_template.md.
+2. REPORT_WRITER: Guarded author of validated report sections for deterministic rendering.
+
+HYPOTHESIS_WRITER prompts remain only for explicit legacy compatibility callers.
 """
 
 from typing import Literal
@@ -131,7 +132,7 @@ Call `query_stage2_gene_panel(gene_symbols, disease, selected_top3_genes, data_d
 After the batch call:
 `query_stage2_gene_panel` automatically saves all evidence files to disk:
 stage2_evidence.json, known_drugs.json, gene_manifest.json, and ot_{GENE}.json per gene.
-Verify by calling `load_evidence_files(data_dir)` afterward.
+Verify by calling `load_evidence_files(data_dir=data_dir, scope="assessment")` afterward.
 Do NOT call save_evidence to overwrite these files — they contain the real database results.
 
 a) **Ensembl VEP** runs automatically during `query_stage2_gene_panel`.
@@ -258,7 +259,7 @@ with `total=0` when `stage3_candidates` is empty. Treat that as complete.
 Your work is complete once `run_stage3_batch.success=true`.
 
 The updated `assessment_results.json` plus the `stage3_*.json` files are the
-handoff signal to `hypothesis_writer`.
+handoff signal to report_writer.
 
 ## Important Rules
 - Stage 2 batching: `query_stage2_gene_panel(...)` — auto-saves all Stage 2 files
@@ -283,14 +284,14 @@ handoff signal to `hypothesis_writer`.
 - If ALL tools for a stage fail: explicitly state "No evidence collected for Stage N
   due to tool failures" and score all criteria at 0
 
-GUIDANCE: If `ls` or `glob` returns an empty list for a path you expect to contain evidence files (for example `/evidence/`), do NOT conclude the directory is empty. The data is guaranteed present per the user prompt. Instead, call `load_evidence_files(data_dir)` — the project's canonical evidence loader — to retrieve evidence files. Do NOT call `read_file` directly under `/evidence/` (this is forbidden by the existing HARD rules in this prompt module). Always use virtual paths starting with `/evidence/...`. NEVER prepend the disk path of `data_dir` (such as `/private/tmp/...`) to filesystem operations.
+GUIDANCE: If `ls` or `glob` returns an empty list for a path you expect to contain evidence files (for example `/evidence/`), do NOT conclude the directory is empty. The data is guaranteed present per the user prompt. Instead, call `load_evidence_files(data_dir, scope="assessment")` — the project's canonical evidence loader — to retrieve evidence files. Do NOT call `read_file` directly under `/evidence/` (this is forbidden by the existing HARD rules in this prompt module). Always use virtual paths starting with `/evidence/...`. NEVER prepend the disk path of `data_dir` (such as `/private/tmp/...`) to filesystem operations.
 """
 
 # =============================================================================
-# Hypothesis Writer
+# Legacy Compatibility Hypothesis Writer
 # =============================================================================
 
-HYPOTHESIS_WRITER_PROMPT = """You are the Hypothesis Writer for the Drug Target Assessment Agent.
+HYPOTHESIS_WRITER_PROMPT = """You are the legacy compatibility Hypothesis Writer for the Drug Target Assessment Agent.
 
 Your role is to generate evidence-grounded downstream follow-up recommendations
 from the multi-stage drug target assessment evidence. The internal artifact is
@@ -1037,7 +1038,8 @@ GUIDANCE: If `ls` or `glob` returns an empty list for a path you expect to conta
 # Report Writer
 # =============================================================================
 
-# RETENTION DECISION: Retained pending reader migration
+# Legacy compatibility prompt retained for old readers; production uses the
+# canonical REPORT_WRITER_PROMPT declared beside the registry below.
 #
 # REPORT_WRITER_PROMPT is NOT dead code. Five live readers import it directly:
 #   - tests/agents/drug_target/test_prompts_gap_analysis_rule.py
@@ -1056,7 +1058,7 @@ GUIDANCE: If `ls` or `glob` returns an empty list for a path you expect to conta
 #
 # Do NOT add new readers. The migration plan is to delete this constant once
 # existing readers are updated.
-REPORT_WRITER_PROMPT = """You are the Report Writer for the Drug Target Assessment Agent.
+LEGACY_REPORT_WRITER_PROMPT = """You are the Report Writer for the Drug Target Assessment Agent.
 
 Your role is to generate a publication-quality drug.md document that integrates
 all assessment findings into a structured therapeutic target report, and to
@@ -1424,7 +1426,7 @@ GUIDANCE: If `ls` or `glob` returns an empty list for a path you expect to conta
 # =============================================================================
 # Summarizer / Audit Loop — REMOVED (Phase 3b-A, 2026-05-19)
 # The summarizer prompt and critic-review fragment were deleted here.
-# Report finalization is now handled by the deterministic finalize_report
+# Historical compatibility: report finalization is handled by the deterministic finalize_report
 # LangGraph node (src/agents/drug_target/finalize_report.py).
 # =============================================================================
 
@@ -1514,10 +1516,10 @@ GUIDANCE: If `ls` or `glob` returns an empty list for a path you expect to conta
 
 _BENCHMARK_HYPOTHESIS_WRITER_PROMPT_BASE = HYPOTHESIS_WRITER_PROMPT
 
-HYPOTHESIS_WRITER_PROMPT = """You are the hypothesis_writer subagent for the Drug Target Assessment Agent.
+HYPOTHESIS_WRITER_PROMPT = """You are the legacy compatibility hypothesis_writer subagent for the Drug Target Assessment Agent.
 
 Goal: create a valid `evidence/hypothesis_report.json` from evidence that
-already exists on disk. This is the production DTH-required operational contract:
+already exists on disk. This is the legacy DTH-required operational contract:
 it defines tool use, citation validity, schema shape, save-gate recovery, and
 bounded retry behavior. It intentionally keeps drug-target interpretation
 knowledge in the loaded DTH skill guide rather than duplicating that rubric in
@@ -1867,6 +1869,7 @@ condition explicitly requires them.
   or accepted by `validate_evidence_references`.
 - Before saving, call `validate_evidence_references(data_dir, all_cited_filenames)`.
 - Save only with `save_hypothesis_report(data_dir=data_dir, report=report)`.
+- Do not finish with a prose answer before calling `save_hypothesis_report`.
 
 ## Forced Skill Reads
 {forced_skill_read_block}
@@ -1900,7 +1903,7 @@ labels, genes, drugs, pathways, or mechanisms from skill text or filename
 patterns.
 
 ## Valid Output Contract
-Generate 4-6 retained recommendations. The final retained set must:
+Prefer exactly four retained recommendations; expand to five or six only when needed to cover every FEATURED gene. The final retained set must:
 - include every FEATURED gene at least once in `biological_entities.genes`;
 - include at least one recommendation in each category:
   `Mechanism of Action`, `Therapeutic Strategy`, `Cross-Target Interaction`,
@@ -1957,6 +1960,16 @@ If `save_hypothesis_report` returns `saved: false`:
   filename named by validation, or remove the direct pair wording;
 - for invalid references, remove or replace the invalid filename and validate
   again;
+- `PRIMARY_EPITHELIAL_INTRINSIC_COVERAGE_MISSING`: call
+  `validate_evidence_references` for the revised combined citation list and
+  read `interest_cell_intrinsic_stage1_pair_files` plus
+  `hypothesis_writer_contract.required_cell_context_anchor`. Revise one
+  retained hypothesis so `evidence_references` includes one exact file from
+  that intrinsic list, `biological_entities.cell_types` includes the exact
+  required anchor, and `validation_approach` explicitly tests that same
+  anchor. Do not use a spatial-niche-only Stage 1 file to satisfy this
+  requirement. If the intrinsic list is empty, do not invent a file; stop
+  and report the evidence blocker.
 - Stop after 3 save attempts in this subagent turn so graph-native retry can
   apply the bounded retry policy.
 
@@ -2250,6 +2263,28 @@ HYPOTHESIS_WRITER_PROMPT = _render_minimal_operational_contract_hypothesis_write
     _THIN_BASIC_DTH_SKILL_PATHS
 )
 
+# Native Ollama writes only bounded prose. The coordinator supplies every
+# selected gene and canonical field, validates the response, and persists the
+# canonical handoff through the ordinary save path.
+OLLAMA_HYPOTHESIS_WRITER_PROMPT = """You write bounded prose for one Drug Target hypothesis card.
+
+The coordinator supplies the card ID, validation focus, allowed genes, and cell anchor.
+Return exactly four labelled, plain-text lines. The initial card must have exactly two plain sentences per line;
+repair requests may use one or two plain sentences per line,
+in this order:
+CORE: <listed genes> are evidence-supported candidates for validation in the supplied cell context.
+CONSTRAINT: This follow-up does not establish a causal mechanism.
+PREDICTION: Test whether perturbation shifts a prespecified cell-context readout, with a generic future control or comparator if useful.
+VALIDATION: Evaluate perturbation with a generic future assay, matched control or comparator, and prespecified cell-context readout.
+
+Only PREDICTION and VALIDATION may propose a generic future assay, control, comparator,
+or readout. Every method must be a proposed test, not a reported result. Do not call tools.
+Do not return JSON, Markdown, filenames, paths, citations, scores, named drugs, doses,
+numerical thresholds, or evidence references. Do not add genes, pair axes,
+established-biology assertions, mechanism claims, direct-interaction claims,
+combination claims, synergy claims, or other unsafe claims.
+"""
+
 HypothesisWriterPromptMode = Literal[
     "default",
     "dth_contrast_no_skill",
@@ -2298,7 +2333,7 @@ _HYPOTHESIS_WRITER_PROGRESSIVE_DISCLOSURE_WITH_MODALITY_MAP_NOTE = """Use progre
 def render_hypothesis_writer_prompt(
     mode: HypothesisWriterPromptMode = "default",
 ) -> str:
-    """Return the hypothesis_writer prompt variant for production or benchmarks."""
+    """Return a legacy compatibility hypothesis_writer prompt variant for benchmarks."""
     if mode == "default":
         return HYPOTHESIS_WRITER_PROMPT
     if mode == "dth_contrast_no_skill":
@@ -2373,19 +2408,73 @@ def render_hypothesis_writer_prompt(
 
 
 # =============================================================================
+# Canonical production report writer
+# =============================================================================
+
+REPORT_WRITER_PROMPT = """You are the GUARDED REPORT SYNTHESIZER.
+
+The interpreter already created and validated the canonical hypothesis handoff.
+You author only 2-4 Section 5 pipeline recommendations. The host injects the
+handoff into report_sections.json, then Jinja renders every factual field.
+Never author Markdown or a hypothesis JSON object.
+
+Never use read_file, write_file, grep, execute, or an external database tool.
+
+## MODE SELECTION
+If the user message starts with ## REPAIR MODE, follow only REPAIR MODE.
+Otherwise follow INITIAL WRITE.
+
+## INITIAL WRITE
+1. Read `skills/drug-target-reporting/SKILL.md` with read_skill_file.
+2. Call load_validated_hypothesis_report. Stop if valid is false.
+3. Create one payload with exactly `schema_version` and `pipeline_recommendations`.
+   Each recommendation has one future-directed sentence and 1-5 exact `evidence/<filename>.json` paths from the handoff.
+4. Call `save_report_sections` once. If its receipt has `saved:true`, stop. If
+   its receipt has `saved:false`, repair only returned recommendation violations
+   and call `save_report_sections` once more, then stop.
+
+## REPAIR MODE
+1. Use the supplied recommendation payload.
+2. Repair only the cited recommendation violations in that payload.
+3. Call `save_report_sections` exactly once with the corrected recommendation payload, then stop.
+"""
+
+
+OLLAMA_REPORT_WRITER_PROMPT = """You are the BOUNDED OLLAMA REPORT WRITER.
+
+Return exactly one plain, future-action sentence when asked for a pipeline
+recommendation. Do not call tools. Do not return JSON, Markdown, filenames,
+paths, citations, headings, or additional sentences. Python owns every report
+field, evidence source, and save operation.
+"""
+
+
+DIRECT_MARKDOWN_REPAIR_PROMPT = """You are the LEGACY DIRECT MARKDOWN REPAIR AGENT.
+
+The user provides the complete current `drug.md` and cited validation findings.
+Fix only those findings while preserving supported content. If evidence is needed,
+use `load_evidence_files` with scope="hypothesis"; never read a legacy
+hypothesis report. Your one terminal write is `save_drug_md`: call it exactly
+once with the corrected complete Markdown, then stop.
+"""
+
+# =============================================================================
 # Prompt Registry
 # =============================================================================
 
 SUBAGENT_PROMPTS = {
     "evidence_assessor": EVIDENCE_ASSESSOR_PROMPT,
+    "report_writer": REPORT_WRITER_PROMPT,
     "hypothesis_writer": HYPOTHESIS_WRITER_PROMPT,
 }
 
 __all__ = [
     "EVIDENCE_ASSESSOR_PROMPT",
+    "DIRECT_MARKDOWN_REPAIR_PROMPT",
     "HYPOTHESIS_WRITER_PROMPT",
     "HypothesisWriterPromptMode",
-    "REPORT_WRITER_PROMPT",  # Retained pending reader migration — see canonical comment above the constant.
+    "OLLAMA_REPORT_WRITER_PROMPT",
+    "REPORT_WRITER_PROMPT",
     "LEGACY_CRITIC_PROMPT_PERSISTED_REPORT",
     "SUBAGENT_PROMPTS",
     "render_hypothesis_writer_prompt",

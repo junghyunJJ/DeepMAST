@@ -93,10 +93,10 @@ def create_openai_llm(**kwargs) -> ChatOpenAI:
     # model = kwargs.get("model", os.getenv("OPENAI_MODEL", "gpt-4.1"))
     temperature = kwargs.get("temperature", 0)
 
-    return ChatOpenAI(
-        model=model,
-        temperature=temperature,
-    )
+    init_kwargs: dict[str, Any] = {"model": model, "temperature": temperature}
+    if kwargs.get("request_timeout") is not None:
+        init_kwargs["request_timeout"] = kwargs["request_timeout"]
+    return ChatOpenAI(**init_kwargs)
 
 
 def create_claude_llm(**kwargs) -> ChatAnthropic:
@@ -112,12 +112,14 @@ def create_claude_llm(**kwargs) -> ChatAnthropic:
 
     temperature = kwargs.get("temperature", 0)
 
-    return ChatAnthropic(
-        model_name=model,
-        temperature=temperature,
-        timeout=None,
-        stop=None,
-    )
+    init_kwargs: dict[str, Any] = {
+        "model_name": model,
+        "temperature": temperature,
+        "stop": None,
+    }
+    if kwargs.get("request_timeout") is not None:
+        init_kwargs["timeout"] = kwargs["request_timeout"]
+    return ChatAnthropic(**init_kwargs)
 
 
 def create_google_llm(**kwargs) -> ChatGoogleGenerativeAI:
@@ -346,6 +348,8 @@ def create_openrouter_llm(**kwargs) -> ChatOpenAI:
     )
     if max_tokens is not None:
         init_kwargs["max_tokens"] = max_tokens
+    if kwargs.get("request_timeout") is not None:
+        init_kwargs["request_timeout"] = kwargs["request_timeout"]
 
     return ChatOpenAI(**init_kwargs)
 
@@ -437,4 +441,7 @@ def create_llm_from_config(
     provider = (configurable.get("llm_provider") or "").strip() or fallback_provider
     model_name = (configurable.get("llm_model") or "").strip() or None
     kwargs = {"model": model_name} if model_name else {}
+    request_timeout = configurable.get("llm_request_timeout_seconds")
+    if request_timeout is not None:
+        kwargs["request_timeout"] = request_timeout
     return create_llm(provider=provider, **kwargs)

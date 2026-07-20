@@ -670,6 +670,22 @@ def _first_markdown_paragraph(markdown: str) -> str:
     return " ".join(lines)
 
 
+def _grouped_section4_block(text: str, heading: str) -> str:
+    match = re.search(
+        rf"^\*\*{re.escape(heading)}:\*\*\s*\n(?P<body>.*?)(?=^\*\*|^####|^---|\Z)",
+        text,
+        flags=re.MULTILINE | re.DOTALL,
+    )
+    if not match:
+        return ""
+    values: list[str] = []
+    for line in match.group("body").splitlines():
+        bullet = re.match(r"^-\s+\*\*[^:]+:\*\*\s*(.+)$", line.strip())
+        if bullet:
+            values.append(bullet.group(1).strip())
+    return " ".join(values)
+
+
 def _parse_hypothesis_section(body: str) -> list[dict[str, Any]]:
     """Parse section 4 follow-up recommendation entries into a structured list."""
     hypotheses: list[dict[str, Any]] = []
@@ -713,13 +729,20 @@ def _parse_hypothesis_section(body: str) -> list[dict[str, Any]]:
                 tier = "gene_level_actionability"
                 tier_label = "Gene-level/actionability follow-up"
 
+        focus_m = re.search(r"\*\*Validation Focus:\*\*\s*(.+)", lines)
         category_m = re.search(r"\*\*Category:\*\*\s*(.+)", lines)
         tier_label_m = re.search(r"\*\*Interpretation Tier:\*\*\s*(.+)", lines)
         if tier_label_m:
             tier_label = tier_label_m.group(1).strip()
             if not tier:
                 tier = _infer_hypothesis_tier_from_label(tier_label)
-        claim_m = re.search(
+        rationale = _grouped_section4_block(
+            lines, "Evidence Rationale & Interpretation Boundary"
+        )
+        rationale_m = re.search(
+            r"\*\*Evidence Rationale & Interpretation Boundary:\*\*\s*(.+)",
+            lines,
+        ) or re.search(
             r"\*\*(?:Core Claim|Conservative Interpretation):\*\*\s*(.+)", lines
         )
         biological_grounding_m = re.search(r"\*\*Biological Grounding:\*\*\s*(.+)", lines)
@@ -730,14 +753,23 @@ def _parse_hypothesis_section(body: str) -> list[dict[str, Any]]:
         interpretation_constraint_m = re.search(
             r"\*\*Interpretation Constraint:\*\*\s*(.+)", lines
         )
+        design_m = re.search(
+            r"\*\*Falsifiable Prediction & Validation Design:\*\*\s*(.+)",
+            lines,
+        )
         prediction_m = re.search(
-            r"\*\*(?:Falsifiable Prediction|Recommended Follow-up Test):\*\*\s*(.+)",
+            r"\*\*(?:Prediction|Falsifiable Prediction|Recommended Follow-up Test):\*\*\s*(.+)",
             lines,
-        )
+        ) or design_m
         validation_m = re.search(
-            r"\*\*(?:Validation Approach|Suggested Validation Approach):\*\*\s*(.+)",
+            r"\*\*(?:Design|Validation Approach|Suggested Validation Approach):\*\*\s*(.+)",
             lines,
+        ) or design_m
+        core_claim = rationale or (
+            rationale_m.group(1).strip() if rationale_m else ""
         )
+        falsifiable_prediction = prediction_m.group(1).strip() if prediction_m else ""
+        validation_approach = validation_m.group(1).strip() if validation_m else ""
 
         # Parse biological entities
         genes: list[str] = []
@@ -761,13 +793,20 @@ def _parse_hypothesis_section(body: str) -> list[dict[str, Any]]:
         hypothesis = {
             "rank": i,
             "title": title,
-            "category": category_m.group(1).strip() if category_m else "",
+            "validation_focus": focus_m.group(1).strip() if focus_m else "",
+            "category": (
+                category_m.group(1).strip()
+                if category_m
+                else focus_m.group(1).strip()
+                if focus_m
+                else ""
+            ),
             "_tier": tier,
             "_tier_label": tier_label,
             "_tier_rank": (
                 int(source_heading.group("tier_rank")) if source_heading else i
             ),
-            "core_claim": claim_m.group(1).strip() if claim_m else "",
+            "core_claim": core_claim,
             "biological_grounding": (
                 biological_grounding_m.group(1).strip()
                 if biological_grounding_m
@@ -784,8 +823,8 @@ def _parse_hypothesis_section(body: str) -> list[dict[str, Any]]:
                 if interpretation_constraint_m
                 else ""
             ),
-            "falsifiable_prediction": prediction_m.group(1).strip() if prediction_m else "",
-            "validation_approach": validation_m.group(1).strip() if validation_m else "",
+            "falsifiable_prediction": falsifiable_prediction,
+            "validation_approach": validation_approach,
             "genes": genes,
             "pathways": pathways,
             "cell_types": cell_types,
@@ -1483,7 +1522,11 @@ def _format_filter_results(results: list[dict]) -> list[dict]:
     return formatted
 
 
-def build_drug_html_context(data_dir: str) -> dict[str, Any]:
+def build_drug_html_context(
+    data_dir: str,
+    *,
+    allow_legacy_hypothesis_fallback: bool = True,
+) -> dict[str, Any]:
     """Build complete Jinja2 context for drug target HTML report."""
     base = _resolve_data_dir(data_dir)
     drug_md_path = base / "drug.md"
@@ -1497,7 +1540,7 @@ def build_drug_html_context(data_dir: str) -> dict[str, Any]:
         _enrich_from_target_assessment(context, ta_path)
 
     # Fallback: load hypothesis from evidence/hypothesis_report.json if parser missed it
-    if not context.get("hypothesis"):
+    if allow_legacy_hypothesis_fallback and not context.get("hypothesis"):
         hyp_path = base / "evidence" / "hypothesis_report.json"
         if hyp_path.exists():
             try:

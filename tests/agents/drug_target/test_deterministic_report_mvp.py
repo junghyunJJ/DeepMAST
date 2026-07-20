@@ -270,6 +270,95 @@ def test_report_mvp_keeps_section_sources_deterministic(tmp_path: Path) -> None:
         assert "evidence/assessment_results.json" in candidate["sources"]
 
 
+def test_build_report_data_accepts_hypotheses_without_legacy_file(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.agents.drug_target import deterministic_report
+
+    data_dir = _copy_baseline_workspace(tmp_path)
+    (data_dir / "evidence" / "hypothesis_report.json").write_text(
+        "stale legacy payload that must not be parsed",
+        encoding="utf-8",
+    )
+    hypothesis_data = {
+        "hypotheses": [
+            {
+                "rank": 1,
+                "title": "Markdown-derived hypothesis",
+                "category": "mechanistic",
+                "core_claim": "A testable association.",
+                "biological_entities": {
+                    "genes": ["GENE1"],
+                    "pathways": [],
+                    "cell_types": [],
+                    "drugs": [],
+                },
+                "falsifiable_prediction": "GENE1 changes in the disease context.",
+                "validation_approach": "Perturb GENE1 and measure the endpoint.",
+                "evidence_references": ["drug.md"],
+            }
+        ]
+    }
+    original_sha256_path = deterministic_report._sha256_path
+
+    def guarded_sha256_path(path: Path) -> str:
+        if path.name == "hypothesis_report.json":
+            raise AssertionError("injected mode must not hash the legacy hypothesis file")
+        return original_sha256_path(path)
+
+    monkeypatch.setattr(deterministic_report, "_sha256_path", guarded_sha256_path)
+
+    report_data = deterministic_report.build_report_data(
+        str(data_dir),
+        "IPF",
+        hypothesis_data=hypothesis_data,
+    )
+
+    assert report_data["valid"] is True
+    assert report_data["hypotheses"][0]["title"] == "Markdown-derived hypothesis"
+    assert report_data["sections"]["hypotheses"]["sources"] == ["drug.md"]
+    assert "evidence/hypothesis_report.json" not in report_data["sources"]
+
+
+def test_build_report_data_records_explicit_injected_hypothesis_source(
+    tmp_path: Path,
+) -> None:
+    from src.agents.drug_target.deterministic_report import build_report_data
+
+    workspace = _copy_baseline_workspace(tmp_path)
+    hypothesis_data = {
+        "hypotheses": [
+            {
+                "rank": 1,
+                "title": "Injected report section hypothesis",
+                "category": "Mechanism of Action",
+                "core_claim": "FN1 is a testable follow-up candidate.",
+                "biological_entities": {
+                    "genes": ["FN1"],
+                    "pathways": [],
+                    "cell_types": [],
+                    "drugs": [],
+                },
+                "falsifiable_prediction": "Measure FN1 after perturbation.",
+                "validation_approach": "Use a matched FN1 perturbation assay.",
+                "evidence_references": ["stage3_FN1.json"],
+            }
+        ]
+    }
+
+    report_data = build_report_data(
+        str(workspace),
+        "idiopathic pulmonary fibrosis",
+        hypothesis_data=hypothesis_data,
+        hypothesis_source="report_sections.json",
+    )
+
+    assert report_data["sections"]["hypotheses"]["sources"] == [
+        "report_sections.json"
+    ]
+
+
 def test_report_mvp_defaults_absent_gwas_audit_fields(tmp_path: Path) -> None:
     from src.agents.drug_target.deterministic_report import build_report_data
 
@@ -804,6 +893,7 @@ def test_report_mvp_renders_stage1_biological_context_table_with_spatial_note() 
         "| **FN1-PLAUR** | FAIL; STRING=0.697; confirmed | RR=0.1557, p=0.0; depleted | FN1 depleted; PLAUR depleted |"
         in fn1_section
     )
+    assert "\n- Census:" not in fn1_section
     assert "Negative/contrast only" in fn1_section
     assert (
         "**Spatial context:** All ligand-receptor pairs listed above originated from significant LIANA+ spatial co-localization results"
@@ -927,7 +1017,8 @@ def test_report_mvp_splits_hypotheses_by_epithelial_intrinsic_support() -> None:
     assert "**Biological Grounding:**" in markdown
     assert "**Target-Disease Support:**" in markdown
     assert "**Actionability:**" in markdown
-    assert "**Interpretation Constraint:**" in markdown
+    assert "**Evidence Rationale & Interpretation Boundary:**" in markdown
+    assert "**Interpretation Constraint:**" not in markdown
     assert "#### Secondary Stage 1 Framing Evidence" in markdown
     assert "| Pair | Census direction | Usage | Source |" in markdown
     assert "FN1-SDC2" in markdown
@@ -1105,7 +1196,7 @@ def test_report_mvp_asymmetric_primary_constraint_ignores_failed_pair() -> None:
     constraint = next(
         line
         for line in section.splitlines()
-        if line.startswith("**Interpretation Constraint:**")
+        if line.startswith("- **Interpretation boundary:")
     )
 
     assert "Treat ICAM1 as the Stage 2/3-supported anchor" in constraint
@@ -1503,6 +1594,82 @@ def test_drug_report_html_preserves_section4_tier_split_and_framing_table() -> N
     assert "4.2. Secondary Spatial-Niche Follow-up Candidates" in html
     assert "Secondary Stage 1 Framing Evidence" in html
     assert "stage1_FN1--SDC2.json" in html
+
+
+def test_drug_report_html_parses_validation_focused_section4_markdown() -> None:
+    from src.agents.drug_target.tools.drug_report_html import parse_drug_md
+
+    context = parse_drug_md(
+        """## 4. Mechanistic Hypothesis Recommendations
+
+#### 4.1.1. EGFR follow-up in idiopathic pulmonary fibrosis
+**Validation Focus:** Mechanistic follow-up
+
+**Biological Grounding:** stage1_EGFR.json
+
+**Target-Disease Support:** ot_EGFR.json
+
+**Actionability:** stage3_EGFR.json
+
+**Evidence References:**
+- stage1_EGFR.json
+
+**Biological Entities:**
+- Genes: EGFR
+- Pathways: EGFR signaling
+- Cell Types: epithelial cells
+- Drugs: gefitinib
+
+**Evidence Rationale & Interpretation Boundary:**
+
+- **Rationale:** EGFR is a supported candidate for a falsifiable fibrosis follow-up study.
+- **Interpretation boundary:** This does not establish a causal mechanism.
+
+**Falsifiable Prediction & Validation Design:**
+
+- **Prediction:** Test whether EGFR perturbation changes a prespecified fibrosis readout.
+- **Design:** Evaluate EGFR perturbation in an appropriate fibrosis model with matched controls.
+"""
+    )
+
+    hypothesis = context["hypothesis"][0]
+
+    assert hypothesis["validation_focus"] == "Mechanistic follow-up"
+    assert hypothesis["category"] == "Mechanistic follow-up"
+    assert hypothesis["core_claim"] == (
+        "EGFR is a supported candidate for a falsifiable fibrosis follow-up study. "
+        "This does not establish a causal mechanism."
+    )
+    assert hypothesis["falsifiable_prediction"] == (
+        "Test whether EGFR perturbation changes a prespecified fibrosis readout."
+    )
+    assert hypothesis["validation_approach"] == (
+        "Evaluate EGFR perturbation in an appropriate fibrosis model with matched controls."
+    )
+    assert "- **" not in hypothesis["core_claim"]
+    assert "- **" not in hypothesis["falsifiable_prediction"]
+
+
+def test_drug_report_html_retains_inline_grouped_section4_markdown() -> None:
+    from src.agents.drug_target.tools.drug_report_html import parse_drug_md
+
+    context = parse_drug_md(
+        """## 4. Mechanistic Hypothesis Recommendations
+
+#### 4.1.1. EGFR follow-up in idiopathic pulmonary fibrosis
+**Validation Focus:** Mechanistic follow-up
+**Evidence Rationale & Interpretation Boundary:** EGFR is a supported candidate.
+**Falsifiable Prediction & Validation Design:** Test EGFR perturbation in an appropriate fibrosis model.
+"""
+    )
+
+    hypothesis = context["hypothesis"][0]
+
+    assert hypothesis["core_claim"] == "EGFR is a supported candidate."
+    assert hypothesis["falsifiable_prediction"] == (
+        "Test EGFR perturbation in an appropriate fibrosis model."
+    )
+    assert hypothesis["validation_approach"] == hypothesis["falsifiable_prediction"]
 
 
 def test_report_mvp_ignores_malformed_optional_evidence(tmp_path: Path) -> None:

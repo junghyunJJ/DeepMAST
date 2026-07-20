@@ -16,6 +16,44 @@ def test_hypothesis_writer_prompt_names_primary_runtime_tools() -> None:
     assert "save_evidence(data_dir" not in text
     assert "save_hypothesis_report(data_dir, hypothesis_data)" not in text
     assert "Do not use `read_file`, `write_file`, `ls`, grep" in text
+    assert "Do not finish with a prose answer before calling `save_hypothesis_report`." in text
+
+
+def test_native_ollama_prompt_requests_bounded_plain_prose_without_changing_legacy_prompt() -> None:
+    legacy = prompts.HYPOTHESIS_WRITER_PROMPT
+    ollama = prompts.OLLAMA_HYPOTHESIS_WRITER_PROMPT
+
+    assert "exactly four labelled, plain-text lines" in ollama
+    assert "initial card must have exactly two plain sentences per line" in ollama
+    assert "repair requests may use one or two plain sentences per line" in ollama
+    assert "Do not call tools" in ollama
+    assert "Do not return JSON" in ollama
+    assert "save_hypothesis_report" not in ollama
+    assert "exactly one plain sentence" not in legacy
+
+
+def test_native_ollama_prompt_declares_the_four_field_validator_contract() -> None:
+    text = prompts.OLLAMA_HYPOTHESIS_WRITER_PROMPT
+
+    for line in (
+        "CORE: <listed genes> are evidence-supported candidates for validation in the supplied cell context.",
+        "CONSTRAINT: This follow-up does not establish a causal mechanism.",
+        "PREDICTION: Test whether perturbation shifts a prespecified cell-context readout, with a generic future control or comparator if useful.",
+        "VALIDATION: Evaluate perturbation with a generic future assay, matched control or comparator, and prespecified cell-context readout.",
+    ):
+        assert line in text
+    assert "exactly one plain sentence" not in text
+    assert "proposed test, not a reported result" in text
+
+
+def test_native_ollama_prompt_keeps_gene_and_evidence_selection_in_python() -> None:
+    text = prompts.OLLAMA_HYPOTHESIS_WRITER_PROMPT
+
+    assert "coordinator supplies" in text
+    assert "Do not add genes" in text
+    assert "evidence references" in text
+    assert "named drugs" in text
+    assert "numerical thresholds" in text
 
 
 def test_hypothesis_writer_default_matches_minimal_dth_required_contract() -> None:
@@ -46,7 +84,8 @@ def test_hypothesis_writer_prompt_keeps_dth_as_only_required_skill() -> None:
 def test_hypothesis_writer_prompt_preserves_artifact_shape_and_coverage_contract() -> None:
     text = prompts.HYPOTHESIS_WRITER_PROMPT
 
-    assert "Generate 4-6 retained recommendations" in text
+    assert "Prefer exactly four retained recommendations" in text
+    assert "expand to five or six only when needed to cover every FEATURED gene" in text
     assert "include every FEATURED gene at least once" in text
     for category in (
         "Mechanism of Action",
@@ -105,6 +144,15 @@ def test_hypothesis_writer_prompt_preserves_bounded_repair_contract() -> None:
     )
     for phrase in required_phrases:
         assert phrase in text
+
+
+def test_hypothesis_writer_prompt_repairs_primary_intrinsic_coverage() -> None:
+    from src.agents.drug_target.subagents.prompts import HYPOTHESIS_WRITER_PROMPT
+
+    assert "PRIMARY_EPITHELIAL_INTRINSIC_COVERAGE_MISSING" in HYPOTHESIS_WRITER_PROMPT
+    assert "interest_cell_intrinsic_stage1_pair_files" in HYPOTHESIS_WRITER_PROMPT
+    assert "required_cell_context_anchor" in HYPOTHESIS_WRITER_PROMPT
+    assert "Do not use a spatial-niche-only Stage 1 file" in HYPOTHESIS_WRITER_PROMPT
 
 
 def test_hypothesis_writer_prompt_does_not_embed_dth_interpretation_rubric() -> None:

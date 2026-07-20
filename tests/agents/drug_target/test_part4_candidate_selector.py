@@ -703,6 +703,17 @@ def test_part4_candidate_selection_fallback_records_deterministic_selection() ->
     )
 
 
+def test_production_evidence_references_exclude_legacy_intermediates() -> None:
+    from src.agents.drug_target.part4_candidate_selector import (
+        PART4_CANDIDATE_SELECTION_EVIDENCE_REFERENCES,
+    )
+
+    assert PART4_CANDIDATE_SELECTION_EVIDENCE_REFERENCES == [
+        "drug.md",
+        "target_assessment.json",
+    ]
+
+
 @pytest.mark.asyncio
 async def test_generate_candidate_selection_accepts_fake_provider(
     tmp_path: Path,
@@ -729,7 +740,7 @@ async def test_generate_candidate_selection_accepts_fake_provider(
                 "excluded_high_score_candidates": {
                     "FN1": "Lower target actionability in the bounded context."
                 },
-                "evidence_references": ["drug.md", "report_data.json"],
+                "evidence_references": ["drug.md", "target_assessment.json"],
             }
         )
 
@@ -751,7 +762,7 @@ async def test_generate_candidate_selection_accepts_fake_provider(
     assert payload["attempt_history"] == [
         {"attempt": 1, "status": "accepted", "issues": []}
     ]
-    assert payload["evidence_references"] == ["drug.md", "report_data.json"]
+    assert payload["evidence_references"] == ["drug.md", "target_assessment.json"]
 
 
 @pytest.mark.asyncio

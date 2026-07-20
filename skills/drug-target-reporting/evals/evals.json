@@ -1,35 +1,17 @@
 {
   "skill_name": "drug-target-reporting",
-  "description": "Realistic test prompts for the drug-target-reporting skill. Runs via claude-with-access-to-the-skill or a mock-LLM harness; assertions to be added after first live run observes actual outputs.",
+  "description": "No-live-model guarded report-writer fixtures.",
   "evals": [
     {
-      "id": 1,
-      "prompt": "I've completed hypothesis_writer for the IPF drug target run at /tmp/deep_interpreter_workspace/ipf_2026. CD4 came back with combined_total=16 and classification='validated_target'. Please finalize drug.md with all EXPAND markers expanded, keeping every pre-filled score, drug name, and classification verbatim. Render the HTML report after validation passes.",
-      "expected_output": "Happy path — reads SKILL.md, calls build_evidence_summary, reads draft, expands all EXPAND markers with 2-4 hedged sentences each, copies CD4 scores verbatim (16, not 9), lists only drugs present in Reference Card (ibalizumab, tregalizumab for CD4), calls save_drug_md, calls validate_drug_md (passes), calls generate_drug_html_report. Final drug.md has no unexpanded markers, no hallucinated drugs, classification label preserved.",
+      "id": "initial_handoff_synthesis",
+      "prompt": "Produce the guarded Section 5 synthesis from the validated handoff.",
+      "expected_output": "Read the reporting skill, load_validated_hypothesis_report, then save one recommendation-only sections payload; if saved:true stop; if saved:false repair only reported recommendation violations and save once more.",
       "files": []
     },
     {
-      "id": 2,
-      "prompt": "The drug_target pipeline at /tmp/deep_interpreter_workspace/rare_disease_2026 has finished but the evidence_assessor funnel yielded zero FEATURED genes (all combined_total scores <5). Write drug.md.",
-      "expected_output": "Zero-candidate short-circuit — skill detects empty funnel, writes a minimal drug.md that states 'Insufficient evidence for current prioritization' and lists per-gene gaps, does NOT fabricate priorities, does NOT invent drug candidates, does NOT recommend advancement. HTML report generation either skipped or produces a gap-analysis layout.",
-      "files": []
-    },
-    {
-      "id": 3,
-      "prompt": "For the breast cancer run at /tmp/deep_interpreter_workspace/brca_2026, ESR1 has combined_total=7 and classification='novel_candidate'. Generate the deep-dive narrative for ESR1 in the final drug.md.",
-      "expected_output": "Novel candidate disambiguation — confirms Phase B2 calibration table usage. LLM must pick the row keyed on classification=='novel_candidate' (NOT exploratory_target) despite both rows sharing combined_total=5-9. Narrative uses novel-target tone ('biological plausibility supports further validation'), priority template for low-novel ('Early-stage novel target; monitor for emerging evidence'), no extrapolation from ESR1's approved breast-cancer indication to the study disease if they differ.",
-      "files": []
-    },
-    {
-      "id": 4,
-      "prompt": "My previous report_writer run saved drug.md with 'tamoxifen was cited in PMID 99999999' but validate_drug_md reports FABRICATED_PMID / WRONG_SCORE. Please fix the drug.md at /tmp/deep_interpreter_workspace/test_run/drug.md.",
-      "expected_output": "Validation-failure recovery — skill re-reads Reference Card, identifies the fabricated PMID and wrong score, removes/replaces them (or writes 'No citation available.' if Reference Card has no PMID for that claim), re-saves, re-validates. Does NOT loop indefinitely: after 3 consecutive failed save attempts the skill stops and reports unresolved issues per Troubleshooting > validation-loop-escape rule. After Phase F purge this prompt becomes a FABRICATED_DRUG/WRONG_SCORE test; keep both framings until Phase F lands.",
-      "files": []
-    },
-    {
-      "id": 5,
-      "prompt": "The IPF run has EGFR with max_phase=4 for non-small cell lung cancer but Phase 0 for pulmonary fibrosis. Render the EGFR deep dive.",
-      "expected_output": "Cross-disease phase isolation (stretch) — confirms Domain-Specific Accuracy Guards row 'Phase across indications'. Drug profile must report EGFR phase as per-indication: 'approved (Phase 4) for NSCLC; no pulmonary fibrosis trials identified'. Must NOT extrapolate NSCLC approval to IPF applicability. Hedged language on fibrosis relevance.",
+      "id": "repair_only",
+      "prompt": "## REPAIR MODE\nFix only the listed validation issue in this sections payload.",
+      "expected_output": "Change only the listed recommendation issue and save the corrected recommendation payload once; do not read skills or reload the validated handoff.",
       "files": []
     }
   ]

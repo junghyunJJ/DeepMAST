@@ -7,6 +7,7 @@ No test depends on any live workspace (res_ipf_qwen* or similar).
 
 import json
 import os
+import re
 import shutil
 from pathlib import Path
 
@@ -17,6 +18,10 @@ from src.agents.drug_target.tools import (
     validate_drug_md,
 )
 import src.agents.drug_target.tools.stage_logic as stage_logic
+from src.agents.drug_target.tools.stage_logic import (
+    _EXPAND_SENTENCE_END_RE,
+    _is_expand_prose,
+)
 from src.agents.drug_target.tools.report_expansion_schema import (
     canonical_json_hash,
     persist_drug_report_reference_card,
@@ -29,7 +34,12 @@ FIXTURE_ROOT = Path(__file__).parent / "fixtures"
 # ---------------------------------------------------------------------------
 
 
-def _invoke(data_dir, *, allow_legacy: bool = True):
+def _invoke(
+    data_dir: Path | str,
+    *,
+    allow_legacy: bool = True,
+    publication_mode: str = "renderer",
+) -> dict:
     """Invoke the @tool wrapper with data_dir as a string."""
     previous = os.environ.get("DEEPMAST_ALLOW_LEGACY_DRUG_MD")
     if allow_legacy:
@@ -37,7 +47,14 @@ def _invoke(data_dir, *, allow_legacy: bool = True):
     else:
         os.environ.pop("DEEPMAST_ALLOW_LEGACY_DRUG_MD", None)
     try:
-        return json.loads(validate_drug_report_finalization.invoke({"data_dir": str(data_dir)}))
+        return json.loads(
+            validate_drug_report_finalization.invoke(
+                {
+                    "data_dir": str(data_dir),
+                    "publication_mode": publication_mode,
+                }
+            )
+        )
     finally:
         if previous is None:
             os.environ.pop("DEEPMAST_ALLOW_LEGACY_DRUG_MD", None)
@@ -108,6 +125,108 @@ def _write_renderer_sidecars(data_dir: Path, *, bad_source_hash: bool = False, b
     }
     (data_dir / "drug_report_render.json").write_text(
         json.dumps(metadata, indent=2),
+        encoding="utf-8",
+    )
+
+
+def _canonical_parser_compatible_section_4() -> str:
+    return """## 4. Mechanistic Hypothesis Recommendations
+
+#### 4.1.1. EGFR follow-up in idiopathic pulmonary fibrosis
+**Category:** Mechanistic follow-up
+**Core Claim:** EGFR is a supported candidate for a falsifiable fibrosis follow-up study.
+- Genes: EGFR
+- Pathways: EGFR signaling
+- Cell Types: epithelial cells
+- Drugs: gefitinib
+**Falsifiable Prediction:** EGFR perturbation will change a prespecified fibrosis-associated readout.
+**Validation Approach:** Test EGFR perturbation in an appropriate fibrosis model.
+"""
+
+
+def _validation_focused_parser_compatible_section_4() -> str:
+    return """## 4. Mechanistic Hypothesis Recommendations
+
+#### 4.1.1. EGFR follow-up in idiopathic pulmonary fibrosis
+**Validation Focus:** Mechanistic follow-up
+
+**Evidence Rationale & Interpretation Boundary:**
+
+- **Rationale:** EGFR is a supported candidate for a falsifiable fibrosis follow-up study.
+- **Interpretation boundary:** This does not establish a causal mechanism.
+
+- Genes: EGFR
+- Pathways: EGFR signaling
+- Cell Types: epithelial cells
+- Drugs: gefitinib
+
+**Falsifiable Prediction & Validation Design:**
+
+- **Prediction:** Test whether EGFR perturbation changes a prespecified fibrosis readout.
+- **Design:** Evaluate EGFR perturbation in an appropriate fibrosis model with matched controls.
+"""
+
+
+def _copy_valid_agent_markdown_fixture(
+    name: str,
+    tmp_path: Path,
+    section_4: str | None = None,
+) -> Path:
+    data_dir = _copy_fixture(name, tmp_path)
+    drug_path = data_dir / "drug.md"
+    lines = []
+    for line in drug_path.read_text(encoding="utf-8").splitlines():
+        if (
+            _is_expand_prose(line)
+            and _EXPAND_SENTENCE_END_RE.search(line.strip())
+            and "[source:" not in line.casefold()
+        ):
+            line = f"{line} [source: interpretation]"
+        lines.append(line)
+    drug_path.write_text(
+        "\n".join(lines)
+        + "\n\n"
+        + (section_4 or _canonical_parser_compatible_section_4())
+        + "\n## 5. Pipeline Execution Summary & Recommendations\n",
+        encoding="utf-8",
+    )
+    return data_dir
+
+
+def _replace_section_4_with_parser_fixture(data_dir: Path, *, missing: str) -> None:
+    section = _canonical_parser_compatible_section_4()
+    replacements = {
+        "title": (
+            "#### 4.1.1. EGFR follow-up in idiopathic pulmonary fibrosis",
+            "#### 4.1.1. <!-- missing -->",
+        ),
+        "category": (
+            "**Category:** Mechanistic follow-up",
+            "**Category:** <!-- missing -->",
+        ),
+        "core_claim": (
+            "**Core Claim:** EGFR is a supported candidate for a falsifiable fibrosis follow-up study.",
+            "**Core Claim:** <!-- missing -->",
+        ),
+        "genes": ("- Genes: EGFR", "- Genes: <!-- missing -->"),
+        "falsifiable_prediction": (
+            "**Falsifiable Prediction:** EGFR perturbation will change a prespecified fibrosis-associated readout.",
+            "**Falsifiable Prediction:** <!-- missing -->",
+        ),
+        "validation_approach": (
+            "**Validation Approach:** Test EGFR perturbation in an appropriate fibrosis model.",
+            "**Validation Approach:** <!-- missing -->",
+        ),
+    }
+    old, new = replacements[missing]
+    section = section.replace(old, new)
+    drug_path = data_dir / "drug.md"
+    drug_path.write_text(
+        re.sub(
+            r"(?ms)^## 4\. Mechanistic Hypothesis Recommendations.*?(?=^## 5\.)",
+            section,
+            drug_path.read_text(encoding="utf-8"),
+        ),
         encoding="utf-8",
     )
 
@@ -593,7 +712,7 @@ def test_finalization_fails_when_failed_suffix_leaks_to_drug_md(tmp_path):
 def test_finalization_reports_unverified_numeric_prediction_by_default(tmp_path):
     d = _copy_fixture("clean", tmp_path)
     hyp_path = d / "evidence" / "hypothesis_report.json"
-    payload = {"hypotheses": []}
+    payload: dict[str, object] = {"hypotheses": []}
     payload["prediction_grounding_summary"] = {
         "unverified": 1,
         "unverified_indices": [0],
@@ -616,7 +735,7 @@ def test_finalization_strict_mode_fails_unverified_numeric_prediction(
 ):
     d = _copy_fixture("clean", tmp_path)
     hyp_path = d / "evidence" / "hypothesis_report.json"
-    payload = {"hypotheses": []}
+    payload: dict[str, object] = {"hypotheses": []}
     payload["prediction_grounding_summary"] = {
         "unverified": 1,
         "unverified_indices": [0],
@@ -657,7 +776,298 @@ def test_finalization_fails_legacy_mode_unless_compat_flag_set(
 
 
 # ---------------------------------------------------------------------------
-# 13. validate_drug_md signature dispatch
+# 13. Agent-authored Markdown mode
+# ---------------------------------------------------------------------------
+
+
+def test_agent_markdown_mode_ignores_renderer_sidecars(tmp_path: Path) -> None:
+    data_dir = _copy_valid_agent_markdown_fixture("clean", tmp_path)
+    _write_renderer_sidecars(data_dir, bad_source_hash=True, bad_drug_hash=True)
+
+    result = _invoke(
+        data_dir,
+        allow_legacy=False,
+        publication_mode="agent_markdown",
+    )
+
+    assert result["valid"] is True
+    assert not _has_issue(result, "VALIDATE_DRUG_MD_BLOCKING_FINDING")
+    assert not _has_issue(result, "RENDER_SOURCE_HASH_MISMATCH")
+    assert not _has_issue(result, "RENDERED_DRUG_MD_HASH_MISMATCH")
+
+
+def test_agent_markdown_mode_ignores_newer_legacy_hypothesis_file(
+    tmp_path: Path,
+) -> None:
+    data_dir = _copy_valid_agent_markdown_fixture("clean", tmp_path)
+    hypothesis_path = data_dir / "evidence" / "hypothesis_report.json"
+    hypothesis_path.touch()
+
+    result = _invoke(data_dir, publication_mode="agent_markdown")
+
+    assert not _has_issue(result, "STALE_HYPOTHESIS_REPORT")
+
+
+@pytest.mark.parametrize(
+    "relative_path",
+    [
+        "evidence/hypothesis_report.json",
+        "evidence/hypothesis_report.summarizer_sanitized.json",
+        "evidence/hypothesis_report_last_rejection.json",
+        "evidence/hypothesis_report_draft.json",
+        "evidence/report_data.json",
+        "report_expansions.json",
+        "drug_report_reference_card.json",
+    ],
+)
+def test_agent_markdown_mode_never_reads_legacy_or_renderer_sidecars(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    relative_path: str,
+) -> None:
+    data_dir = _copy_valid_agent_markdown_fixture("clean", tmp_path)
+    path = data_dir / relative_path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("{not-json", encoding="utf-8")
+    forbidden_reads: list[Path] = []
+    original_read_text = Path.read_text
+
+    def guarded_read_text(path: Path, *args, **kwargs) -> str:
+        if path == data_dir / relative_path:
+            forbidden_reads.append(path)
+        return original_read_text(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", guarded_read_text)
+
+    result = _invoke(data_dir, publication_mode="agent_markdown")
+
+    assert result["valid"] is True
+    assert forbidden_reads == []
+
+
+@pytest.mark.parametrize(
+    "relative_path",
+    [
+        "evidence/assessment_results.json",
+        "evidence/stage1_filter_results.json",
+    ],
+)
+def test_agent_markdown_mode_rejects_malformed_required_json(
+    tmp_path: Path,
+    relative_path: str,
+) -> None:
+    data_dir = _copy_valid_agent_markdown_fixture("clean", tmp_path)
+    if relative_path.endswith("stage1_filter_results.json"):
+        _move_stage1_filter_results_to_evidence(data_dir)
+    (data_dir / relative_path).write_text("{not-json", encoding="utf-8")
+
+    result = _invoke(data_dir, publication_mode="agent_markdown")
+
+    assert result["valid"] is False
+    assert result["checks"]["required_artifacts"]["status"] == "fail"
+    assert relative_path in result["checks"]["required_artifacts"]["invalid"]
+    assert _has_issue(result, "INVALID_REQUIRED_ARTIFACT")
+
+
+def test_validator_rejects_git_worktree_root(tmp_path: Path) -> None:
+    (tmp_path / ".git").write_text("gitdir: /tmp/example", encoding="utf-8")
+
+    result = _invoke(tmp_path, publication_mode="agent_markdown")
+
+    assert result["valid"] is False
+    assert _has_issue(result, "INVALID_DATA_DIR")
+
+
+def test_save_drug_md_quality_flags_do_not_read_legacy_or_renderer_sidecars(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.agents.drug_target.tools.assessment_output import save_drug_md
+
+    data_dir = _copy_fixture("clean", tmp_path)
+    content = (data_dir / "drug.md").read_text(encoding="utf-8")
+    forbidden_paths = {
+        data_dir / "evidence" / "hypothesis_report.json",
+        data_dir / "evidence" / "hypothesis_report.summarizer_sanitized.json",
+        data_dir / "evidence" / "hypothesis_report_last_rejection.json",
+        data_dir / "evidence" / "hypothesis_report_draft.json",
+        data_dir / "evidence" / "report_data.json",
+        data_dir / "report_expansions.json",
+        data_dir / "drug_report_reference_card.json",
+    }
+    for path in forbidden_paths:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("{not-json", encoding="utf-8")
+    forbidden_reads: list[Path] = []
+    original_read_text = Path.read_text
+
+    def tracking_read_text(path: Path, *args, **kwargs) -> str:
+        if path in forbidden_paths:
+            forbidden_reads.append(path)
+        return original_read_text(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", tracking_read_text)
+
+    save_drug_md.invoke({"data_dir": str(data_dir), "content": content})
+
+    assert forbidden_reads == []
+
+
+def test_agent_markdown_mode_still_blocks_report_findings(tmp_path: Path) -> None:
+    data_dir = _copy_valid_agent_markdown_fixture(
+        "validate_drug_md_failed",
+        tmp_path,
+    )
+
+    result = _invoke(
+        data_dir,
+        allow_legacy=False,
+        publication_mode="agent_markdown",
+    )
+
+    assert result["valid"] is False
+    assert _has_issue(result, "VALIDATE_DRUG_MD_FAILED")
+
+
+def test_agent_markdown_mode_preserves_disease_scope_check(tmp_path: Path) -> None:
+    data_dir = _copy_valid_agent_markdown_fixture("clean", tmp_path)
+    assessment_path = data_dir / "evidence" / "assessment_results.json"
+    assessment = json.loads(assessment_path.read_text(encoding="utf-8"))
+    assessment["disease"] = "idiopathic pulmonary fibrosis"
+    assessment_path.write_text(json.dumps(assessment), encoding="utf-8")
+    (data_dir / "evidence" / "stage1_EGFR--TGFB1.json").write_text(
+        json.dumps(
+            {"census_cross_validation": {"disease": "pulmonary fibrosis"}}
+        ),
+        encoding="utf-8",
+    )
+
+    result = _invoke(data_dir, publication_mode="agent_markdown")
+
+    assert result["valid"] is False
+    assert _has_issue(result, "MISSING_DISEASE_SCOPE_NOTE")
+
+
+@pytest.mark.parametrize("content", ["", " \n\t "])
+def test_agent_markdown_mode_requires_section_4_for_blank_reports(
+    tmp_path: Path,
+    content: str,
+) -> None:
+    data_dir = _copy_valid_agent_markdown_fixture("clean", tmp_path)
+    (data_dir / "drug.md").write_text(content, encoding="utf-8")
+
+    result = _invoke(data_dir, publication_mode="agent_markdown")
+
+    assert result["valid"] is False
+    assert _has_issue(result, "AGENT_REPORT_HYPOTHESES_MISSING")
+
+
+def test_agent_markdown_mode_rejects_list_assessment_results(tmp_path: Path) -> None:
+    data_dir = _copy_valid_agent_markdown_fixture("clean", tmp_path)
+    assessment_path = data_dir / "evidence" / "assessment_results.json"
+    assessment_path.write_text("[]", encoding="utf-8")
+
+    result = _invoke(data_dir, publication_mode="agent_markdown")
+
+    assert result["valid"] is False
+    assert result["checks"]["required_artifacts"]["status"] == "fail"
+    assert "evidence/assessment_results.json" in result["checks"]["required_artifacts"]["invalid"]
+    assert _has_issue(result, "INVALID_REQUIRED_ARTIFACT")
+
+
+def test_agent_markdown_mode_requires_parseable_section_4(tmp_path: Path) -> None:
+    data_dir = _copy_valid_agent_markdown_fixture("clean", tmp_path)
+    drug_path = data_dir / "drug.md"
+    drug_path.write_text(
+        re.sub(
+            r"(?ms)^## 4\..*?(?=^## 5\.)",
+            "## 4. Mechanistic Hypothesis Recommendations\n\n"
+            "No recommendation was authored.\n\n",
+            drug_path.read_text(encoding="utf-8"),
+        ),
+        encoding="utf-8",
+    )
+
+    result = _invoke(data_dir, publication_mode="agent_markdown")
+
+    assert result["valid"] is False
+    assert _has_issue(result, "AGENT_REPORT_HYPOTHESES_MISSING")
+
+
+@pytest.mark.parametrize(
+    "section_4",
+    [
+        _canonical_parser_compatible_section_4(),
+        _validation_focused_parser_compatible_section_4(),
+    ],
+)
+def test_agent_markdown_mode_accepts_parser_compatible_section_4(
+    tmp_path: Path,
+    section_4: str,
+) -> None:
+    data_dir = _copy_valid_agent_markdown_fixture(
+        "clean",
+        tmp_path,
+        section_4=section_4,
+    )
+
+    result = _invoke(data_dir, publication_mode="agent_markdown")
+
+    assert result["valid"] is True
+
+
+@pytest.mark.parametrize(
+    "missing_label",
+    [
+        "title",
+        "category",
+        "core_claim",
+        "genes",
+        "falsifiable_prediction",
+        "validation_approach",
+    ],
+)
+def test_agent_markdown_mode_rejects_incomplete_section_4_entry(
+    tmp_path: Path,
+    missing_label: str,
+) -> None:
+    data_dir = _copy_valid_agent_markdown_fixture("clean", tmp_path)
+    _replace_section_4_with_parser_fixture(data_dir, missing=missing_label)
+
+    result = _invoke(data_dir, publication_mode="agent_markdown")
+
+    assert result["valid"] is False
+    assert _has_issue(result, "AGENT_REPORT_HYPOTHESIS_INCOMPLETE")
+
+
+def test_save_drug_md_preserves_expand_markers_by_default(tmp_path: Path) -> None:
+    from src.agents.drug_target.tools.assessment_output import save_drug_md
+
+    content = "# Report\n\n<!-- EXPAND: write the summary -->\n"
+
+    save_drug_md.invoke({"data_dir": str(tmp_path), "content": content})
+
+    assert "<!-- EXPAND:" in (tmp_path / "drug.md").read_text(encoding="utf-8")
+
+
+def test_save_drug_md_legacy_marker_stripping_requires_opt_in(tmp_path: Path) -> None:
+    from src.agents.drug_target.tools.assessment_output import save_drug_md
+
+    content = "# Report\n\n<!-- EXPAND: write the summary -->\n"
+
+    save_drug_md.invoke(
+        {
+            "data_dir": str(tmp_path),
+            "content": content,
+            "strip_unexpanded_markers": True,
+        }
+    )
+
+    assert "<!-- EXPAND:" not in (tmp_path / "drug.md").read_text(encoding="utf-8")
+
+
+# ---------------------------------------------------------------------------
+# 14. validate_drug_md signature dispatch
 # ---------------------------------------------------------------------------
 
 
@@ -678,9 +1088,11 @@ def test_validate_drug_md_str_uses_resolve_data_dir(tmp_path, monkeypatch):
     monkeypatch.setattr(_el, "_resolve_data_dir", _fake_resolve)
 
     # validate_drug_md is a @tool; unwrap to call the underlying function.
-    impl = getattr(validate_drug_md, "func", None) or validate_drug_md
+    impl = getattr(validate_drug_md, "func", None)
+    assert callable(impl)
     raw_json = impl(nonexistent_str)
     raw = json.loads(raw_json) if isinstance(raw_json, str) else raw_json
+    assert isinstance(raw, dict)
     # The redirect must have succeeded — valid=True (clean fixture passes).
     assert raw.get("valid") is True, (
         f"Expected valid=True after _resolve_data_dir redirect; got: {raw}"
@@ -704,10 +1116,12 @@ def test_validate_drug_md_path_skips_resolve_data_dir(tmp_path, monkeypatch):
     import src.agents.drug_target.tools.evidence_loader as _el
     monkeypatch.setattr(_el, "_resolve_data_dir", _must_not_be_called)
 
-    impl = getattr(validate_drug_md, "func", None) or validate_drug_md
+    impl = getattr(validate_drug_md, "func", None)
+    assert callable(impl)
     # Pass a Path — must NOT raise AssertionError.
     raw_json = impl(clean_copy)  # clean_copy is already a Path
     raw = json.loads(raw_json) if isinstance(raw_json, str) else raw_json
+    assert isinstance(raw, dict)
     assert raw.get("valid") is True, (
         f"Expected valid=True when called with Path; got: {raw}"
     )

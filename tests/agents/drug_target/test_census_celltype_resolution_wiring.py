@@ -25,8 +25,8 @@ def test_search_census_celltype_options_is_reexported_tool() -> None:
     assert getattr(search_census_celltype_options, "name", "") == "search_census_celltype_options"
 
 
-def test_evidence_assessor_exposes_resolver_tool() -> None:
-    subagents = configs.get_subagents(data_dir="/tmp/nonexistent", disease="pulmonary fibrosis")
+def test_evidence_assessor_exposes_resolver_tool(tmp_path) -> None:
+    subagents = configs.get_subagents(data_dir=str(tmp_path), disease="pulmonary fibrosis")
     evidence = next(item for item in subagents if item["name"] == "evidence_assessor")
 
     assert "resolve_census_celltypes" in _tool_names(evidence)
@@ -34,9 +34,9 @@ def test_evidence_assessor_exposes_resolver_tool() -> None:
     assert "search_census_celltype_options" in _tool_names(evidence)
 
 
-def test_census_disable_strips_census_and_cellxgene_tools() -> None:
+def test_census_disable_strips_census_and_cellxgene_tools(tmp_path) -> None:
     subagents = configs.get_subagents(
-        data_dir="/tmp/nonexistent",
+        data_dir=str(tmp_path),
         disease="pulmonary fibrosis",
         enable_census=False,
     )
@@ -54,14 +54,14 @@ def test_census_disable_strips_census_and_cellxgene_tools() -> None:
     }.isdisjoint(_tool_names(evidence))
 
 
-def test_census_disabled_stage1_tool_forces_enable_census_false(monkeypatch) -> None:
+def test_census_disabled_stage1_tool_forces_enable_census_false(monkeypatch, tmp_path) -> None:
     def capture_stage1_payload(**kwargs):
         return kwargs
 
     monkeypatch.setattr(run_stage1_batch, "func", capture_stage1_payload)
 
     subagents = configs.get_subagents(
-        data_dir="/tmp/nonexistent",
+        data_dir=str(tmp_path),
         disease="pulmonary fibrosis",
         enable_census=False,
     )
@@ -74,14 +74,14 @@ def test_census_disabled_stage1_tool_forces_enable_census_false(monkeypatch) -> 
 
     omitted_payload = disabled_stage1.invoke(
         {
-            "data_dir": "/tmp/nonexistent",
+            "data_dir": str(tmp_path),
             "disease": "pulmonary fibrosis",
             "target_cell_type": "pulmonary alveolar type 2 cell",
         }
     )
     explicit_true_payload = disabled_stage1.invoke(
         {
-            "data_dir": "/tmp/nonexistent",
+            "data_dir": str(tmp_path),
             "disease": "pulmonary fibrosis",
             "target_cell_type": "pulmonary alveolar type 2 cell",
             "enable_census": True,

@@ -42,11 +42,19 @@ Acceptance criteria from the issue body:
 from __future__ import annotations
 
 from collections import Counter
+from pathlib import Path
 
 import pytest
 
 from src.agents.drug_target.tools.report_expansion_schema import (
     build_expansion_slots,
+)
+
+
+_REPO_ROOT = Path(__file__).parents[3]
+_MIRRORED_TEMPLATE_PATHS = (
+    _REPO_ROOT / "src/agents/drug_target/templates/drug_report.md.j2",
+    _REPO_ROOT / "skills/drug-target-reporting/templates/drug_report.md.j2",
 )
 
 
@@ -192,3 +200,13 @@ def test_build_expansion_slots_returns_explicit_expansion_slots_unchanged() -> N
         "expansion_slots": pre_built,
     }
     assert build_expansion_slots(card) is pre_built
+
+
+def test_mirrored_hybrid_templates_produce_unique_reference_card_slot_ids() -> None:
+    templates = [path.read_text(encoding="utf-8") for path in _MIRRORED_TEMPLATE_PATHS]
+    assert templates[0] == templates[1]
+
+    for template in templates:
+        slots = build_expansion_slots({"markdown_template": template})
+        slot_ids = [slot["slot_id"] for slot in slots]
+        assert len(slot_ids) == len(set(slot_ids))

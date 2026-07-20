@@ -14,7 +14,41 @@ from unittest.mock import MagicMock, patch
 import pytest
 from langchain_openai import ChatOpenAI
 
-from src.agents.model import create_llm, create_ollama_openai_llm
+from src.agents.model import (
+    create_claude_llm,
+    create_llm,
+    create_llm_from_config,
+    create_openai_llm,
+    create_openrouter_llm,
+    create_ollama_openai_llm,
+)
+
+
+def test_openai_timeout_is_forwarded_only_when_explicit() -> None:
+    with patch("src.agents.model.ChatOpenAI", autospec=True) as mock_chatopenai:
+        mock_chatopenai.return_value = MagicMock(spec=ChatOpenAI)
+        create_openai_llm(request_timeout=45.0)
+        assert mock_chatopenai.call_args.kwargs["request_timeout"] == 45.0
+        create_openai_llm()
+        assert "request_timeout" not in mock_chatopenai.call_args.kwargs
+
+
+def test_claude_timeout_is_forwarded_only_when_explicit() -> None:
+    with patch("src.agents.model.ChatAnthropic", autospec=True) as mock_chatanthropic:
+        mock_chatanthropic.return_value = MagicMock()
+        create_claude_llm(request_timeout=45.0)
+        assert mock_chatanthropic.call_args.kwargs["timeout"] == 45.0
+        create_claude_llm()
+        assert "timeout" not in mock_chatanthropic.call_args.kwargs
+
+
+def test_openrouter_timeout_is_forwarded_only_when_explicit() -> None:
+    with patch("src.agents.model.ChatOpenAI", autospec=True) as mock_chatopenai:
+        mock_chatopenai.return_value = MagicMock(spec=ChatOpenAI)
+        create_openrouter_llm(request_timeout=45.0)
+        assert mock_chatopenai.call_args.kwargs["request_timeout"] == 45.0
+        create_openrouter_llm()
+        assert "request_timeout" not in mock_chatopenai.call_args.kwargs
 
 
 # ---------------------------------------------------------------------------
@@ -410,6 +444,21 @@ def test_create_ollama_llm_reads_ollama_reasoning_false_env(monkeypatch):
     assert kwargs["think"] is False
 
 
+def test_native_ollama_profile_honors_reasoning_and_generation_caps(monkeypatch):
+    """Native Ollama must forward the bounded benchmark profile unchanged."""
+    monkeypatch.setenv("OLLAMA_BASE_URL", "http://localhost:6000")
+    monkeypatch.setenv("OLLAMA_REASONING", "false")
+    monkeypatch.setenv("OLLAMA_NUM_PREDICT", "2048")
+    with patch("src.agents.model._ChatOllamaWithThink", autospec=True) as model:
+        model.return_value = MagicMock()
+        create_llm(provider="ollama", model="qwen3.5:122b")
+
+    kwargs = model.call_args.kwargs
+    assert kwargs["base_url"] == "http://localhost:6000"
+    assert kwargs["num_predict"] == 2048
+    assert kwargs["think"] is False
+
+
 def test_chat_ollama_with_think_injects_native_payload_flag():
     """The compatibility wrapper must put `think` at Ollama /api/chat top level."""
     from langchain_core.messages import HumanMessage
@@ -423,3 +472,38 @@ def test_chat_ollama_with_think_injects_native_payload_flag():
     params = llm._chat_params([HumanMessage(content="Return OK")])
 
     assert params["think"] is False
+
+
+def test_create_llm_from_config_passes_explicit_model_and_request_timeout():
+    """Configured Part 4 calls keep the caller-selected client settings."""
+    with patch("src.agents.model.create_llm", autospec=True) as mock_create_llm:
+        create_llm_from_config(
+            {
+                "configurable": {
+                    "llm_provider": "ollama-openai",
+                    "llm_model": "qwen3.5:122b",
+                    "llm_request_timeout_seconds": 45.0,
+                }
+            }
+        )
+
+    assert mock_create_llm.call_args.kwargs == {
+        "provider": "ollama-openai",
+        "model": "qwen3.5:122b",
+        "request_timeout": 45.0,
+    }
+
+
+def test_create_llm_from_config_omits_unset_request_timeout():
+    """An absent timeout leaves the provider factory's existing default intact."""
+    with patch("src.agents.model.create_llm", autospec=True) as mock_create_llm:
+        create_llm_from_config(
+            {
+                "configurable": {
+                    "llm_provider": "ollama-openai",
+                    "llm_request_timeout_seconds": None,
+                }
+            }
+        )
+
+    assert mock_create_llm.call_args.kwargs == {"provider": "ollama-openai"}

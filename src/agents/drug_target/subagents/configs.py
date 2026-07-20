@@ -1,23 +1,19 @@
 """Subagent configurations for Drug Target Assessment Agent.
 
-Two-subagent staged funnel (happy path):
-- evidence_assessor: 3-stage funnel (Stage 2: validation & scoring ->
-  Stage 1: biological context -> Stage 3: ChEMBL drug profiles inline)
-  with inline rubric assessment.
-- hypothesis_writer: Hypothesis generation with UCB scoring from all evidence.
+Production workflow: ``evidence_assessor -> hypothesis_writer -> report_writer``.
+The hypothesis writer saves the validated canonical handoff; the report writer
+renders guarded report sections from it before deterministic validation,
+repair, publication, and audit.
 
-Report finalization is handled by the deterministic ``finalize_report`` node in
-the LangGraph super-graph (``src/agents/drug_target/finalize_report.py``).
-That node renders drug.md + HTML + target_assessment.json with cited-only
-provenance and a token-budget fail-closed gate — no LLM summarizer subagent.
-
-Workflow order: evidence_assessor -> hypothesis_writer
+The deterministic ``finalize_report`` super-graph remains only in
+:func:`get_legacy_subagents` for explicit ``legacy_hypothesis`` compatibility
+callers.
 """
 
 import json
 import re
 from pathlib import Path
-from typing import Callable, Literal, Sequence
+from typing import Any, Callable, Literal, Sequence
 
 from langchain_core.language_models import BaseChatModel
 from langchain_core.tools import BaseTool
@@ -29,10 +25,27 @@ from src.agents.deep_interpreter.middleware.write_file_guard import (
 )
 from src.agents.drug_target.subagents.prompts import (
     HypothesisWriterPromptMode,
+    OLLAMA_HYPOTHESIS_WRITER_PROMPT,
+    OLLAMA_REPORT_WRITER_PROMPT,
+    REPORT_WRITER_PROMPT,
     SUBAGENT_PROMPTS,
     render_hypothesis_writer_prompt,
 )
-from src.agents.drug_target.middleware import HypothesisRetryLoopMiddleware
+from src.agents.drug_target.middleware import (
+    DrugReportGuardrailMiddleware,
+    DrugTargetManagedFilesystemGuardMiddleware,
+    HypothesisReportGuardrailMiddleware,
+    HypothesisRetryLoopMiddleware,
+)
+from src.agents.drug_target.production_report_tools import (
+    production_assessment_evidence_tool,
+    production_assessment_save_evidence_tool,
+    production_hypothesis_evidence_tool,
+    production_load_validated_hypothesis_report_tool,
+    production_save_hypothesis_report_tool,
+    production_save_report_sections_tool,
+    production_skill_reader_tool,
+)
 from src.agents.drug_target.tools import (
     apply_semantic_celltype_proxy,
     compute_rubric_scores,
@@ -54,7 +67,9 @@ from src.agents.drug_target.tools import (
     run_compare_census_lr_pair,
     run_stage1_batch,
     save_evidence,
+    save_drug_md,
     save_hypothesis_report,
+    save_target_assessment,
     sequential_thinking,
     think_tool,
     validate_evidence_references,
@@ -66,8 +81,10 @@ from src.agents.drug_target.tools import (
 __all__ = [
     "SUBAGENT_CONFIGS",
     "WORKFLOW_ORDER",
+    "LEGACY_WORKFLOW_ORDER",
     "filter_hypothesis_evidence_files",
     "get_subagents",
+    "get_legacy_subagents",
 ]
 
 SkillActivationMode = Literal[
@@ -294,7 +311,8 @@ SUBAGENT_CONFIGS = {
     "hypothesis_writer": {
         "name": "hypothesis_writer",
         "description": (
-            "Hypothesis generation from Stage 1-3 evidence. Reads all evidence files, "
+            "Guarded canonical hypothesis interpretation from Stage 1-3 evidence. "
+            "Reads all evidence files, "
             "generates 4-6 mechanistic hypotheses across 4 thematic categories, "
             "applies gap detection and UCB scoring, outputs hypothesis_report.json."
         ),
@@ -312,6 +330,20 @@ SUBAGENT_CONFIGS = {
             ReadFileBlockMiddleware(),
         ],  # Block read_file, force load_evidence_files
     },
+    "report_writer": {
+        "name": "report_writer",
+        "description": "Guarded author of validated report sections.",
+        "system_prompt": REPORT_WRITER_PROMPT,
+        "tools": [
+            load_lr_candidates,
+            load_evidence_files,
+            read_skill_file,
+            production_save_report_sections_tool,
+            sequential_thinking,
+            think_tool,
+            validate_quality,
+        ],
+    },
 }
 
 
@@ -319,9 +351,12 @@ SUBAGENT_CONFIGS = {
 # Workflow Order
 # =============================================================================
 
-WORKFLOW_ORDER = ["evidence_assessor", "hypothesis_writer"]
+WORKFLOW_ORDER = ["evidence_assessor", "hypothesis_writer", "report_writer"]
+_TOP_LEVEL_SUBAGENTS = ("evidence_assessor", "hypothesis_writer", "report_writer")
 
-_TOP_LEVEL_SUBAGENTS = ("evidence_assessor", "hypothesis_writer")
+# Deprecated compatibility ordering for the outer super-graph and benchmarks.
+LEGACY_WORKFLOW_ORDER = ["evidence_assessor", "hypothesis_writer"]
+_LEGACY_TOP_LEVEL_SUBAGENTS = ("evidence_assessor", "hypothesis_writer")
 
 _DTH_SINGLE_READ_PROMPT_MODES = frozenset(
     {
@@ -332,7 +367,7 @@ _DTH_SINGLE_READ_PROMPT_MODES = frozenset(
 _DTH_SKILL_PATH = "skills/drug-target-hypothesis/SKILL.md"
 
 WORKFLOW_DESCRIPTION = """
-Drug Target Assessment 2-Agent Workflow (Staged Funnel):
+Drug Target Assessment Production 2-Agent Workflow (Staged Funnel):
 
 1. EVIDENCE_ASSESSOR (Plan->Execute->Reflect per stage)
    Stage 2 FIRST (ALL unique genes): batch OpenTargets + batch GWAS + VEP (conditional)
@@ -348,6 +383,14 @@ Drug Target Assessment 2-Agent Workflow (Staged Funnel):
             assessment_results.json, rubric_scores.csv, stage3_{GENE}.json
    Gate: assessment_results.json must exist with stage3_candidates
 
+2. REPORT_WRITER (guarded direct author)
+   Reads bounded hypothesis-scope evidence and the reporting skill.
+   Writes target_assessment.json exactly once, then drug.md exactly once.
+   DrugReportGuardrailMiddleware validates, repairs, publishes, and writes
+   initial/final audit artifacts.
+
+Legacy compatibility topology only (explicit ``legacy_hypothesis`` callers):
+
 2. HYPOTHESIS_WRITER (Plan->Execute->Reflect)
    Reads all Stage 1-3 evidence files
    Generates 4-6 mechanistic hypotheses across 4 thematic categories
@@ -355,7 +398,7 @@ Drug Target Assessment 2-Agent Workflow (Staged Funnel):
    Outputs: hypothesis_report.json
    Gate: hypothesis_report.json must exist
 
-3. FINALIZE_REPORT NODE (deterministic post-agent): super-graph node renders
+3. LEGACY FINALIZE_REPORT NODE (deterministic post-agent): super-graph node renders
    drug.md + HTML + target_assessment.json with cited-only provenance +
    token-budget fail-closed gate. See src/agents/drug_target/finalize_report.py.
 """
@@ -365,7 +408,7 @@ Drug Target Assessment 2-Agent Workflow (Staged Funnel):
 # Public API
 # =============================================================================
 
-def get_subagents(
+def get_legacy_subagents(
     custom_tools: Sequence[BaseTool | Callable] | None = None,
     data_dir: str | None = None,
     disease: str | None = None,
@@ -382,14 +425,14 @@ def get_subagents(
     skill_activation_mode: SkillActivationMode | None = None,
     hypothesis_writer_prompt_mode: HypothesisWriterPromptMode = "default",
 ) -> list[dict]:
-    """Build the two drug-target subagents in workflow order.
+    """Build the explicit legacy hypothesis workflow without production guards.
 
     Returns a list of two flat dict subagents:
       1. evidence_assessor — 3-stage funnel with inline rubric assessment.
       2. hypothesis_writer — hypothesis generation with UCB scoring.
 
-    Report finalization is handled by the deterministic ``finalize_report``
-    LangGraph node after the DeepAgents harness completes.
+    Legacy report finalization is handled by the deterministic
+    ``finalize_report`` LangGraph node after the DeepAgents harness completes.
 
     Args:
         custom_tools: Additional tools to inject into each subagent.
@@ -412,8 +455,8 @@ def get_subagents(
             benchmarks.
         skill_activation_mode: Optional explicit activation strategy. When
             omitted, derives from enable_skill_activator for compatibility.
-        hypothesis_writer_prompt_mode: Prompt variant for hypothesis_writer.
-            ``default`` preserves production prompt-level skill reads;
+        hypothesis_writer_prompt_mode: Prompt variant for legacy hypothesis_writer.
+            ``default`` preserves legacy prompt-level skill reads;
             ``progressive_disclosure_only`` removes those benchmark-confounding
             direct reads so SkillsMiddleware/activator/governor owns selection.
 
@@ -422,7 +465,7 @@ def get_subagents(
     """
     subagents = [
         {**SUBAGENT_CONFIGS[name], "tools": list(SUBAGENT_CONFIGS[name]["tools"])}
-        for name in _TOP_LEVEL_SUBAGENTS
+        for name in _LEGACY_TOP_LEVEL_SUBAGENTS
     ]
 
     for subagent in subagents:
@@ -610,4 +653,262 @@ def get_subagents(
                     ))
                     subagent["middleware"] = mw
 
+    return subagents
+
+
+def _tool_data_dir_names(tools: Sequence[BaseTool | Callable]) -> set[str]:
+    """Return public tools whose declared schema accepts ``data_dir``."""
+
+    names: set[str] = set()
+    for tool in tools:
+        name = getattr(tool, "name", getattr(tool, "__name__", ""))
+        args = getattr(tool, "args", None)
+        if isinstance(args, dict) and "data_dir" in args:
+            names.add(str(name))
+            continue
+        target = getattr(tool, "func", tool)
+        try:
+            import inspect
+
+            if callable(target) and "data_dir" in inspect.signature(target).parameters:
+                names.add(str(name))
+        except (TypeError, ValueError):
+            pass
+    return names
+
+
+def _production_skills_dir(skills_dir: str | None) -> Path:
+    if skills_dir:
+        return Path(skills_dir).expanduser().resolve()
+    from src.agents.shared.utils import find_project_root
+
+    return find_project_root() / "skills"
+
+
+def get_subagents(
+    custom_tools: Sequence[BaseTool | Callable] | None = None,
+    data_dir: str | None = None,
+    disease: str | None = None,
+    provider: str | None = None,
+    report_writer_model: str | None = None,
+    report_writer_request_timeout_seconds: float | None = None,
+    model_overrides: dict[str, BaseChatModel | str] | None = None,
+    default_model: BaseChatModel | str | None = None,
+    backend: object | None = None,
+    enable_census: bool = True,
+    skills_sources: list[str] | None = None,
+    skill_registry: dict[str, str] | None = None,
+    skills_dir: str | None = None,
+    subagent_skill_names: dict[str, tuple[str, ...]] | None = None,
+    subagent_skill_registries: dict[str, dict[str, str]] | None = None,
+    enable_skill_activator: bool = True,
+    skill_activation_mode: SkillActivationMode | None = None,
+    hypothesis_writer_prompt_mode: HypothesisWriterPromptMode = "default",
+) -> list[dict]:
+    """Build the guarded production evidence-interpreter-reporter surface."""
+
+    _ = custom_tools, default_model, backend, skills_sources, skill_registry
+    if custom_tools:
+        raise ValueError("custom_tools are not allowed in guarded_report mode")
+    raw_data_dir = _sanitize_prompt_value(data_dir)
+    if not raw_data_dir:
+        raise ValueError("guarded production get_subagents requires a non-empty data_dir")
+
+    run_dir = Path(raw_data_dir).expanduser().resolve()
+    if not run_dir.exists() or not run_dir.is_dir():
+        raise ValueError("guarded production get_subagents requires an existing data_dir")
+    safe_data_dir = str(run_dir)
+    safe_disease = _sanitize_prompt_value(disease)
+    root = _production_skills_dir(skills_dir)
+    skill_names = subagent_skill_names or {
+        "evidence_assessor": (),
+        "hypothesis_writer": ("drug-target-hypothesis",),
+        "report_writer": ("drug-target-reporting",),
+    }
+    registries = subagent_skill_registries or {
+        name: {skill: str(root / skill) for skill in names}
+        for name, names in skill_names.items()
+    }
+    activation_mode: SkillActivationMode = (
+        skill_activation_mode
+        if skill_activation_mode is not None
+        else ("middleware_plus_activator" if enable_skill_activator else "middleware_only")
+    )
+    if activation_mode not in {
+        "middleware_only",
+        "middleware_plus_activator",
+        "middleware_plus_governor",
+    }:
+        raise ValueError(f"unknown skill_activation_mode: {activation_mode!r}")
+
+    subagents = [
+        {**SUBAGENT_CONFIGS[name], "tools": list(SUBAGENT_CONFIGS[name]["tools"])}
+        for name in _TOP_LEVEL_SUBAGENTS
+    ]
+    for subagent in subagents:
+        name = subagent["name"]
+        allowed_names = (
+            ()
+            if name in {"hypothesis_writer", "report_writer"} and provider == "ollama"
+            else tuple(skill_names.get(name, ()))
+        )
+        tools = [tool for tool in subagent["tools"] if tool is not None]
+        if name == "evidence_assessor":
+            tools = [
+                production_assessment_evidence_tool(safe_data_dir)
+                if getattr(tool, "name", None) == "load_evidence_files"
+                else production_assessment_save_evidence_tool(safe_data_dir)
+                if getattr(tool, "name", None) == "save_evidence"
+                else tool
+                for tool in tools
+                if getattr(tool, "name", None) != "read_skill_file" or allowed_names
+            ]
+            if allowed_names:
+                tools.append(production_skill_reader_tool(root, allowed_names))
+        elif name == "hypothesis_writer":
+            if provider == "ollama":
+                tools = []
+            else:
+                replacements = {
+                    "load_evidence_files": production_hypothesis_evidence_tool(safe_data_dir),
+                    "save_hypothesis_report": production_save_hypothesis_report_tool(
+                        safe_data_dir
+                    ),
+                    "read_skill_file": production_skill_reader_tool(root, allowed_names),
+                }
+                tools = [
+                    replacements.get(getattr(tool, "name", ""), tool)
+                    for tool in tools
+                    if getattr(tool, "name", None) != "read_skill_file" or allowed_names
+                ]
+        else:
+            if provider == "ollama":
+                tools = []
+            else:
+                tools = [
+                    production_load_validated_hypothesis_report_tool(safe_data_dir),
+                    production_save_report_sections_tool(safe_data_dir, safe_disease),
+                ]
+                if allowed_names:
+                    tools.append(production_skill_reader_tool(root, allowed_names))
+
+        if not enable_census and name == "evidence_assessor":
+            census_names = {
+                "query_cellxgene_lr_context", "list_census_diseases", "list_census_cell_types",
+                "resolve_census_celltypes", "search_census_celltype_options",
+                "apply_semantic_celltype_proxy", "run_compare_census_lr_pair",
+                "run_batch_census_lr_pairs",
+            }
+            tools = [
+                _disabled_census_stage1_batch_tool()
+                if getattr(tool, "name", None) == "run_stage1_batch"
+                else tool
+                for tool in tools
+                if getattr(tool, "name", None) not in census_names
+            ]
+        subagent["tools"] = tools
+        prompt = subagent["system_prompt"]
+        if name == "hypothesis_writer":
+            prompt = (
+                OLLAMA_HYPOTHESIS_WRITER_PROMPT
+                if provider == "ollama"
+                else render_hypothesis_writer_prompt(hypothesis_writer_prompt_mode)
+            )
+        elif name == "report_writer":
+            prompt = (
+                OLLAMA_REPORT_WRITER_PROMPT
+                if provider == "ollama"
+                else REPORT_WRITER_PROMPT
+            )
+        available = ", ".join(
+            getattr(tool, "name", getattr(tool, "__name__", "tool")) for tool in tools
+        ) or "no tools"
+        subagent["system_prompt"] = (
+            f"{prompt}\n\n## Data Directory\n"
+            f"The configured data directory is: `{safe_data_dir}`.\n"
+            f"Use only these tools: {available}.\n"
+            + (f"- **Disease context**: `{safe_disease}`\n" if safe_disease else "")
+        )
+        middleware = [
+            DrugTargetManagedFilesystemGuardMiddleware(
+                safe_data_dir,
+                data_dir_tool_names=_tool_data_dir_names(
+                    [tool for tool in tools if isinstance(tool, BaseTool) or callable(tool)]
+                ),
+            ),
+            WriteFileArgGuardMiddleware(backend_root=safe_data_dir),
+        ]
+        if name == "hypothesis_writer":
+            if provider != "ollama":
+                middleware.extend(
+                    [
+                        ReadFileBlockMiddleware(),
+                        HypothesisRetryLoopMiddleware(max_hypothesis_save_attempts=3),
+                    ]
+                )
+                middleware.append(HypothesisReportGuardrailMiddleware(safe_data_dir))
+        elif name == "report_writer":
+            if provider != "ollama":
+                middleware.append(
+                    HypothesisRetryLoopMiddleware(
+                        stop_after_first_save=True,
+                        stop_after_first_successful_save=True,
+                        terminal_save_tool_names=("save_report_sections",),
+                        max_hypothesis_save_attempts=2,
+                    )
+                )
+            guardrail_kwargs: dict[str, Any] = {
+                "data_dir": safe_data_dir,
+                "provider": provider,
+                "disease": safe_disease,
+            }
+            if report_writer_model:
+                guardrail_kwargs["model"] = report_writer_model
+            if report_writer_request_timeout_seconds is not None:
+                guardrail_kwargs["request_timeout_seconds"] = (
+                    report_writer_request_timeout_seconds
+                )
+            middleware.append(
+                DrugReportGuardrailMiddleware(**guardrail_kwargs)
+            )
+        if allowed_names:
+            from src.agents.shared.skills_middleware import SkillsMiddleware
+
+            middleware.append(
+                SkillsMiddleware(skills_dir=root, allowed_skill_names=allowed_names)
+            )
+            if activation_mode == "middleware_plus_activator":
+                from src.agents.shared.skill_activator import SkillActivator
+
+                middleware.append(
+                    SkillActivator(skill_registry=registries.get(name, {}))
+                )
+            elif activation_mode == "middleware_plus_governor":
+                from src.agents.shared.skill_activation_governor import SkillActivationGovernor
+
+                hard_required = (
+                    ("drug-target-hypothesis",)
+                    if name == "hypothesis_writer"
+                    and "drug-target-hypothesis" in allowed_names
+                    else ("drug-target-reporting",)
+                    if name == "report_writer" and "drug-target-reporting" in allowed_names
+                    else ()
+                )
+                middleware.append(
+                    SkillActivationGovernor(
+                        skill_registry=registries.get(name, {}),
+                        hard_required_skill_names=hard_required,
+                        candidate_skill_names=tuple(s for s in allowed_names if s not in hard_required),
+                        artifact_gate=(
+                            "save_hypothesis_report"
+                            if name == "hypothesis_writer"
+                            else "save_report_sections"
+                            if name == "report_writer"
+                            else "final artifact"
+                        ),
+                    )
+                )
+        subagent["middleware"] = middleware
+        if model_overrides and name in model_overrides:
+            subagent["model"] = model_overrides[name]
     return subagents

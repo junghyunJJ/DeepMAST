@@ -282,33 +282,39 @@ def save_target_assessment(
     schema_file = _schema_path()
     schema_loaded = schema_file.exists()
     schema_errors: list[str] = []
-    schema_dict: dict | None = None
+    schema_dict: dict[str, Any] | None = None
     if schema_loaded:
         try:
-            schema_dict = json.loads(schema_file.read_text(encoding="utf-8"))
+            schema = json.loads(schema_file.read_text(encoding="utf-8"))
+            if not isinstance(schema, dict):
+                raise TypeError("output schema must be a JSON object")
+            schema_dict = schema
         except Exception as exc:
             schema_errors.append(f"Failed to parse output schema: {exc}")
         else:
+            assert schema_dict is not None
             try:
                 import jsonschema  # local import keeps cold path light
-                jsonschema.validate(instance=payload, schema=schema_dict)
             except ImportError:
                 schema_errors.append(
                     "jsonschema package not installed — falling back to "
                     "_validate_contract domain checks only."
                 )
-            except jsonschema.ValidationError as exc:
-                # Surface the specific path in the payload that failed validation
-                # so operators can map the error back to the contract violation.
-                where = "/".join(str(p) for p in exc.absolute_path) or "<root>"
-                schema_errors.append(
-                    f"output_schema.json validation failed at {where}: {exc.message}"
-                )
-            except Exception as exc:
-                # Schema-level error (malformed schema file, etc.)
-                schema_errors.append(
-                    f"jsonschema.validate raised unexpected error: {exc}"
-                )
+            else:
+                try:
+                    jsonschema.validate(instance=payload, schema=schema_dict)
+                except jsonschema.ValidationError as exc:
+                    # Surface the specific path in the payload that failed validation
+                    # so operators can map the error back to the contract violation.
+                    where = "/".join(str(p) for p in exc.absolute_path) or "<root>"
+                    schema_errors.append(
+                        f"output_schema.json validation failed at {where}: {exc.message}"
+                    )
+                except Exception as exc:
+                    # Schema-level error (malformed schema file, etc.)
+                    schema_errors.append(
+                        f"jsonschema.validate raised unexpected error: {exc}"
+                    )
 
     schema_valid = _validate_contract(payload, schema_errors, base=base)
     out_path = base / "target_assessment.json"
@@ -367,11 +373,26 @@ def _persist_pipeline_quality_flags(data_dir_path: Path) -> dict:
 
     try:
         # LangChain @tool wrappers expose the underlying function via `.func`.
-        impl = getattr(validate_drug_md, "func", None) or validate_drug_md
-        report_json = impl(str(data_dir_path))
+        impl = getattr(validate_drug_md, "func", None)
+        if callable(impl):
+            report_json = impl(
+                str(data_dir_path),
+                include_legacy_hypothesis_checks=False,
+                include_renderer_provenance=False,
+            )
+        else:
+            report_json = validate_drug_md.invoke(
+                {
+                    "data_dir": str(data_dir_path),
+                    "include_legacy_hypothesis_checks": False,
+                    "include_renderer_provenance": False,
+                }
+            )
         report = json.loads(report_json) if isinstance(report_json, str) else report_json
     except Exception as exc:
         report = {"valid": False, "error": f"validator raised: {exc}"}
+    if not isinstance(report, dict):
+        report = {"valid": False, "error": "validator returned a non-object payload"}
 
     ta_path = data_dir_path / "target_assessment.json"
     if not ta_path.exists():
@@ -379,6 +400,8 @@ def _persist_pipeline_quality_flags(data_dir_path: Path) -> dict:
     try:
         ta = json.loads(ta_path.read_text(encoding="utf-8"))
     except Exception:
+        return report
+    if not isinstance(ta, dict):
         return report
 
     issues = report.get("issues") or []
@@ -397,7 +420,11 @@ def _persist_pipeline_quality_flags(data_dir_path: Path) -> dict:
 
 
 @tool
-def save_drug_md(data_dir: str, content: str | dict | list) -> str:
+def save_drug_md(
+    data_dir: str,
+    content: str | dict | list,
+    strip_unexpanded_markers: bool = False,
+) -> str:
     """Save drug.md report to disk.
 
     Args:
@@ -412,8 +439,8 @@ def save_drug_md(data_dir: str, content: str | dict | list) -> str:
             "saved": False,
         })
     import re
-    # Strip unexpanded EXPAND placeholders left by timeout
-    content = re.sub(r'\n*<!-- EXPAND:.*?-->\n*', '\n', content)
+    if strip_unexpanded_markers:
+        content = re.sub(r"\n*<!-- EXPAND:.*?-->\n*", "\n", content)
     resolved = _resolve_data_dir(data_dir)
     drug_md_path = resolved / "drug.md"
     drug_md_path.write_text(content, encoding="utf-8")

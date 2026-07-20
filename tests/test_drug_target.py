@@ -178,25 +178,25 @@ class TestSubagentConfigs:
 
     def test_workflow_order(self):
         from src.agents.drug_target.subagents.configs import WORKFLOW_ORDER
-        assert WORKFLOW_ORDER == ["evidence_assessor", "hypothesis_writer"]
+        assert WORKFLOW_ORDER == ["evidence_assessor", "hypothesis_writer", "report_writer"]
 
-    def test_get_subagents_returns_2(self):
+    def test_get_subagents_returns_3(self, tmp_path):
         from src.agents.drug_target.subagents.configs import get_subagents
-        subagents = get_subagents()
-        assert len(subagents) == 2
+        subagents = get_subagents(data_dir=str(tmp_path))
+        assert len(subagents) == 3
 
-    def test_get_subagents_order(self):
+    def test_get_subagents_order(self, tmp_path):
         from src.agents.drug_target.subagents.configs import get_subagents
-        subagents = get_subagents()
+        subagents = get_subagents(data_dir=str(tmp_path))
         names = [s["name"] for s in subagents]
-        assert names == ["evidence_assessor", "hypothesis_writer"]
+        assert names == ["evidence_assessor", "hypothesis_writer", "report_writer"]
 
     def test_custom_tools_appended_to_interpretive_subagents_only(self):
         """Custom tools are appended to all 2 subagents; no summarizer present."""
-        from src.agents.drug_target.subagents.configs import get_subagents
+        from src.agents.drug_target.subagents.configs import get_legacy_subagents
         mock_tool = MagicMock(spec=["name"])
         mock_tool.name = "custom_tool"
-        subagents = get_subagents(custom_tools=[mock_tool])
+        subagents = get_legacy_subagents(custom_tools=[mock_tool])
         # No summarizer in 2-subagent setup
         assert not any(s["name"] == "summarizer" for s in subagents)
         # custom_tool is appended to every subagent
@@ -295,18 +295,15 @@ class TestSubagentConfigs:
         assert "evidence_coverage" in prompt
         assert "specificity" in prompt
 
-    def test_subagent_prompts_registry_has_2_entries(self):
-        """SUBAGENT_PROMPTS contains only evidence_assessor and hypothesis_writer
-        after summarizer/critic/report_writer removal."""
+    def test_subagent_prompts_registry_has_production_and_legacy_entries(self):
         from src.agents.drug_target.subagents.prompts import SUBAGENT_PROMPTS
-        assert len(SUBAGENT_PROMPTS) == 2
-        assert set(SUBAGENT_PROMPTS.keys()) == {"evidence_assessor", "hypothesis_writer"}
+        assert set(SUBAGENT_PROMPTS.keys()) == {"evidence_assessor", "report_writer", "hypothesis_writer"}
 
     def test_orchestrator_prompt_has_no_summarizer_status(self):
         """Row 7: SUMMARIZER_STATUS must not appear in the orchestrator prompt."""
         from src.agents.drug_target.agent import ORCHESTRATOR_SYSTEM_PROMPT_TEMPLATE
         assert "SUMMARIZER_STATUS" not in ORCHESTRATOR_SYSTEM_PROMPT_TEMPLATE
-        assert "EVIDENCE_PIPELINE_COMPLETE" in ORCHESTRATOR_SYSTEM_PROMPT_TEMPLATE
+        assert "REPORT_PIPELINE_COMPLETE" in ORCHESTRATOR_SYSTEM_PROMPT_TEMPLATE
 
     def test_drug_target_config_has_no_summarizer_skill_names(self):
         """Row 8: DrugTargetConfig must not have the removed summarizer_skill_names field."""
@@ -5417,7 +5414,7 @@ class TestIntegration:
 
     @pytest.mark.asyncio
     async def test_run_drug_target_assessment_with_mock_agent(self, mock_data_dir):
-        """Full integration: mock super-graph writes drug.md, integration reads envelope."""
+        """Full integration constructs a guarded direct agent per tool call."""
         from src.agents.drug_target.integration import run_drug_target_assessment
 
         mock_report = "# Drug Target Assessment\n\n## Executive Summary\nMock report."
@@ -5427,25 +5424,39 @@ class TestIntegration:
             "featured_candidates_deep_dive": [],
         }
 
-        # Simulate the super-graph writing artifacts and returning final_state
-        async def mock_graph_ainvoke(initial_state, config=None):
+        async def mock_agent_ainvoke(payload, config=None):
             (mock_data_dir / "drug.md").write_text(mock_report, encoding="utf-8")
+            (mock_data_dir / "report_sections.json").write_text(
+                json.dumps({"schema_version": "hybrid_report_sections/v1"}),
+                encoding="utf-8",
+            )
             (mock_data_dir / "target_assessment.json").write_text(
                 json.dumps(mock_json), encoding="utf-8"
             )
-            return {
-                "messages": [],
-                "report_finalization_error": None,
-                "evidence_truncated": False,
-            }
+            (mock_data_dir / "part4_candidate_selection.json").write_text(
+                json.dumps({"selected_lr_pairs": []}), encoding="utf-8"
+            )
+            (mock_data_dir / "part4_therapeutic_synthesis.md").write_text(
+                "# Part 4\n", encoding="utf-8"
+            )
+            (mock_data_dir / "drug_report.html").write_text(
+                "<html></html>", encoding="utf-8"
+            )
+            audit = json.dumps({"valid": True, "publication": {"status": "passed"}})
+            (mock_data_dir / "drug_report_validation_initial.json").write_text(
+                audit, encoding="utf-8"
+            )
+            (mock_data_dir / "drug_report_validation_final.json").write_text(
+                audit, encoding="utf-8"
+            )
+            return {"messages": []}
 
-        mock_graph = MagicMock()
-        mock_graph.ainvoke = mock_graph_ainvoke
+        mock_agent = MagicMock()
+        mock_agent.ainvoke = mock_agent_ainvoke
 
-        # Patch at graph_builder — integration.py lazy-imports from there at call time
         with patch(
-            "src.agents.drug_target.graph_builder.drug_target_graph",
-            mock_graph,
+            "src.agents.drug_target.agent.create_drug_target_agent",
+            return_value=(mock_agent, None),
         ):
             raw = await run_drug_target_assessment.ainvoke({
                 "data_dir": str(mock_data_dir),
@@ -5459,7 +5470,7 @@ class TestIntegration:
 
     @patch("src.agents.drug_target.agent.create_deep_agent")
     @patch("src.agents.drug_target.agent.create_llm")
-    def test_create_agent_passes_subagents_with_2_entries(
+    def test_create_agent_passes_subagents_with_3_entries(
         self, mock_create_llm, mock_create_deep_agent, tmp_path
     ):
         from src.agents.drug_target.agent import create_drug_target_agent, DrugTargetConfig
@@ -5472,7 +5483,7 @@ class TestIntegration:
 
         call_kwargs = mock_create_deep_agent.call_args
         subagents = call_kwargs.kwargs.get("subagents") or call_kwargs[1].get("subagents")
-        assert len(subagents) == 2
+        assert len(subagents) == 3
 
     def test_shared_skills_middleware_filters_allowed_skill_names(self, tmp_path):
         import asyncio
@@ -5503,11 +5514,10 @@ class TestIntegration:
 
     @patch("src.agents.drug_target.agent.create_deep_agent")
     @patch("src.agents.drug_target.agent.create_llm")
-    def test_create_drug_target_agent_attaches_skills_to_interpretive_subagents_only(
+    def test_create_drug_target_agent_attaches_reporting_skill_to_report_writer(
         self, mock_create_llm, mock_create_deep_agent, tmp_path
     ):
-        """Skills attach to hypothesis_writer only; evidence_assessor has no skills.
-        Summarizer subagent is gone — post-Phase-3 2-subagent topology."""
+        """Interpretive subagents own their skills; assessor stays skillless."""
         from src.agents.drug_target.agent import create_drug_target_agent, DrugTargetConfig
         from src.agents.shared.skill_activator import SkillActivator
         from src.agents.shared.skills_middleware import SkillsMiddleware
@@ -5526,10 +5536,10 @@ class TestIntegration:
         assert "SubagentErrorGuardMiddleware" in mw_names
 
         subagents = call_kwargs.get("subagents", [])
-        # No summarizer in 2-subagent world
+        # No summarizer in the guarded three-subagent workflow.
         assert not any(s["name"] == "summarizer" for s in subagents)
         # evidence_assessor should NOT have SkillsMiddleware (it's not in _skill_subagents)
-        assert len(subagents) == 2
+        assert len(subagents) == 3
 
         ea = next(s for s in subagents if s["name"] == "evidence_assessor")
         ea_mw = ea.get("middleware", [])
@@ -5537,17 +5547,25 @@ class TestIntegration:
         assert not any(isinstance(m, SkillsMiddleware) for m in ea_mw)
         assert not any(isinstance(m, SkillActivator) for m in ea_mw)
 
-        hw = next(s for s in subagents if s["name"] == "hypothesis_writer")
-        hw_mw = hw.get("middleware", [])
-        assert "skills" not in hw
-        assert any(isinstance(m, SkillsMiddleware) for m in hw_mw)
-        hw_activator = next(m for m in hw_mw if isinstance(m, SkillActivator))
-        assert set(hw_activator.skill_registry) == {
+        hypothesis_writer = next(s for s in subagents if s["name"] == "hypothesis_writer")
+        hypothesis_mw = hypothesis_writer.get("middleware", [])
+        assert any(isinstance(m, SkillsMiddleware) for m in hypothesis_mw)
+        hypothesis_activator = next(
+            m for m in hypothesis_mw if isinstance(m, SkillActivator)
+        )
+        assert set(hypothesis_activator.skill_registry) == {
             "drug-target-hypothesis",
             "opentargets-database",
             "gwas-database",
             "chembl-database",
         }
+
+        writer = next(s for s in subagents if s["name"] == "report_writer")
+        writer_mw = writer.get("middleware", [])
+        assert "skills" not in writer
+        assert any(isinstance(m, SkillsMiddleware) for m in writer_mw)
+        writer_activator = next(m for m in writer_mw if isinstance(m, SkillActivator))
+        assert set(writer_activator.skill_registry) == {"drug-target-reporting"}
 
     @patch("src.agents.drug_target.agent.create_deep_agent")
     @patch("src.agents.drug_target.agent.create_llm")
@@ -5622,33 +5640,21 @@ class TestDrugTargetAgent:
         config = DrugTargetConfig(
             data_dir=str(tmp_path),
             enable_skill_activator=False,
-            hypothesis_writer_skill_names=(
-                "drug-target-hypothesis",
-                "opentargets-database",
-                "gwas-database",
-                "chembl-database",
-                "compare-census-gene-pair-by-cell-type",
-                "string-database",
-            ),
+            report_writer_skill_names=("drug-target-reporting",),
         )
         create_drug_target_agent(config)
 
         subagents = mock_create_deep_agent.call_args.kwargs["subagents"]
-        hypothesis_writer = next(
-            subagent for subagent in subagents if subagent["name"] == "hypothesis_writer"
+        report_writer = next(
+            subagent for subagent in subagents if subagent["name"] == "report_writer"
         )
-        middleware = hypothesis_writer.get("middleware", [])
+        middleware = report_writer.get("middleware", [])
 
         skill_middleware = next(
             item for item in middleware if isinstance(item, SkillsMiddleware)
         )
         assert skill_middleware.allowed_skill_names == (
-            "drug-target-hypothesis",
-            "opentargets-database",
-            "gwas-database",
-            "chembl-database",
-            "compare-census-gene-pair-by-cell-type",
-            "string-database",
+            "drug-target-reporting",
         )
         assert not any(isinstance(item, SkillActivator) for item in middleware)
 
@@ -5668,22 +5674,15 @@ class TestDrugTargetAgent:
         config = DrugTargetConfig(
             data_dir=str(tmp_path),
             skill_activation_mode="middleware_plus_governor",
-            hypothesis_writer_skill_names=(
-                "drug-target-hypothesis",
-                "opentargets-database",
-                "gwas-database",
-                "chembl-database",
-                "compare-census-gene-pair-by-cell-type",
-                "string-database",
-            ),
+            report_writer_skill_names=("drug-target-reporting",),
         )
         create_drug_target_agent(config)
 
         subagents = mock_create_deep_agent.call_args.kwargs["subagents"]
-        hypothesis_writer = next(
-            subagent for subagent in subagents if subagent["name"] == "hypothesis_writer"
+        report_writer = next(
+            subagent for subagent in subagents if subagent["name"] == "report_writer"
         )
-        middleware = hypothesis_writer.get("middleware", [])
+        middleware = report_writer.get("middleware", [])
 
         assert any(isinstance(item, SkillsMiddleware) for item in middleware)
         assert any(isinstance(item, SkillActivationGovernor) for item in middleware)
@@ -5692,23 +5691,12 @@ class TestDrugTargetAgent:
             item for item in middleware if isinstance(item, SkillActivationGovernor)
         )
         assert set(governor.skill_registry) == {
-            "drug-target-hypothesis",
-            "opentargets-database",
-            "gwas-database",
-            "chembl-database",
-            "compare-census-gene-pair-by-cell-type",
-            "string-database",
+            "drug-target-reporting",
         }
-        assert governor.hard_required_skill_names == ("drug-target-hypothesis",)
-        assert governor.required_skill_names == ("drug-target-hypothesis",)
-        assert governor.candidate_skill_names == (
-            "opentargets-database",
-            "gwas-database",
-            "chembl-database",
-            "compare-census-gene-pair-by-cell-type",
-            "string-database",
-        )
-        assert governor.artifact_gate == "save_hypothesis_report"
+        assert governor.hard_required_skill_names == ("drug-target-reporting",)
+        assert governor.required_skill_names == ("drug-target-reporting",)
+        assert governor.candidate_skill_names == ()
+        assert governor.artifact_gate == "save_report_sections"
 
 
 # =========================================================================
@@ -5892,32 +5880,20 @@ class TestCensusDiseaseTool:
         assert "query_chembl_target_profile" in EVIDENCE_ASSESSOR_PROMPT
 
     def test_report_writer_prompt_contains_skill_read(self):
-        """Phase H1: REPORT_WRITER_PROMPT must hardcode read_skill_file for drug-target-reporting.
-        Removing the hardcoded load makes report_writer depend on SkillActivator's conditional
-        classification, which previously misclassified report_writer's task as NO_SKILLS_NEEDED
-        and silently dropped every hallucination protection."""
+        """The guarded writer loads its reporting skill before using the handoff."""
         from src.agents.drug_target.subagents.prompts import REPORT_WRITER_PROMPT
 
-        assert 'read_skill_file("skills/drug-target-reporting/SKILL.md")' in REPORT_WRITER_PROMPT
-        assert 'read_skill_file("skills/drug-target-reporting/references/scoring_guide.md")' in REPORT_WRITER_PROMPT
+        assert "Read `skills/drug-target-reporting/SKILL.md`" in REPORT_WRITER_PROMPT
+        assert "Call load_validated_hypothesis_report" in REPORT_WRITER_PROMPT
 
     def test_report_writer_skill_read_is_first_phase_1_step(self):
-        """Phase H7a (structural proxy): the skill read must appear as step 0 of Phase 1,
-        before any other numbered step. This anchors the LLM's first tool call so the
-        skill loads deterministically regardless of SkillActivator's classification."""
+        """The skill read precedes the guarded handoff load."""
         from src.agents.drug_target.subagents.prompts import REPORT_WRITER_PROMPT
 
-        phase1_marker = "### Phase 1: Load Data + Build Reference Card + Save JSON Contract"
-        assert phase1_marker in REPORT_WRITER_PROMPT
-        phase1_idx = REPORT_WRITER_PROMPT.index(phase1_marker)
-        skill_read_idx = REPORT_WRITER_PROMPT.index(
-            'read_skill_file("skills/drug-target-reporting/SKILL.md")'
-        )
-        step_1_idx = REPORT_WRITER_PROMPT.index(
-            "1. Call `load_lr_candidates(data_dir)`"
-        )
-        # skill_read must come after the Phase 1 header but BEFORE the first numbered step
-        assert phase1_idx < skill_read_idx < step_1_idx
+        initial_idx = REPORT_WRITER_PROMPT.index("## INITIAL WRITE")
+        skill_read_idx = REPORT_WRITER_PROMPT.index("Read `skills/drug-target-reporting/SKILL.md`")
+        load_idx = REPORT_WRITER_PROMPT.index("Call load_validated_hypothesis_report")
+        assert initial_idx < skill_read_idx < load_idx
 
     def test_hypothesis_writer_prompt_contains_skill_read(self):
         """Phase H2: HYPOTHESIS_WRITER_PROMPT must hardcode read_skill_file for
@@ -6678,10 +6654,10 @@ def test_compute_rubric_scores_persists_novelty_audit_metadata(tmp_path):
 class TestC3C1Fixes:
     """Regression tests for C3 (hypothesis_writer middleware) and C1 (score normalization)."""
 
-    def test_hypothesis_writer_has_read_file_block_middleware(self):
+    def test_legacy_hypothesis_writer_has_read_file_block_middleware(self, tmp_path):
         """C3 regression: hypothesis_writer must block read_file via middleware."""
-        from src.agents.drug_target.subagents.configs import get_subagents
-        subagents = get_subagents()
+        from src.agents.drug_target.subagents.configs import get_legacy_subagents
+        subagents = get_legacy_subagents(data_dir=str(tmp_path))
         hw = [s for s in subagents if s["name"] == "hypothesis_writer"][0]
         middleware_types = [type(m).__name__ for m in hw.get("middleware", [])]
         assert "ReadFileBlockMiddleware" in middleware_types

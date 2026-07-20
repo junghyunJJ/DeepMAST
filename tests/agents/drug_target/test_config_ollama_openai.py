@@ -9,6 +9,11 @@ resolved hint and exercises the same source-of-truth (the .py file).
 
 import ast
 from pathlib import Path
+from unittest.mock import MagicMock
+
+import pytest
+
+from src.agents.drug_target import agent
 
 
 _AGENT_SRC = (
@@ -21,6 +26,12 @@ def _get_provider_literal_values(filepath: Path) -> list[str]:
     """Return the string members of the 'provider' Literal annotation in DrugTargetConfig."""
     source = filepath.read_text()
     tree = ast.parse(source)
+    aliases = {
+        node.target.id: node.value
+        for node in tree.body
+        if isinstance(node, ast.AnnAssign)
+        and isinstance(node.target, ast.Name)
+    }
     for node in ast.walk(tree):
         if isinstance(node, ast.ClassDef) and node.name == "DrugTargetConfig":
             for item in node.body:
@@ -29,19 +40,15 @@ def _get_provider_literal_values(filepath: Path) -> list[str]:
                     and isinstance(item.target, ast.Name)
                     and item.target.id == "provider"
                 ):
-                    ann_src = ast.get_source_segment(source, item.annotation)
-                    if ann_src:
-                        # Parse strings out of Literal["a", "b", ...]
-                        inner = ast.parse(ann_src, mode="eval")
-                        if (
-                            isinstance(inner.body, ast.Subscript)
-                            and isinstance(inner.body.slice, ast.Tuple)
-                        ):
-                            return [
-                                elt.value
-                                for elt in inner.body.slice.elts
-                                if isinstance(elt, ast.Constant)
-                            ]
+                    annotation = item.annotation
+                    if isinstance(annotation, ast.Name):
+                        annotation = aliases.get(annotation.id, annotation)
+                    if isinstance(annotation, ast.Subscript) and isinstance(annotation.slice, ast.Tuple):
+                        return [
+                            elt.value
+                            for elt in annotation.slice.elts
+                            if isinstance(elt, ast.Constant) and isinstance(elt.value, str)
+                        ]
     return []
 
 
@@ -74,6 +81,22 @@ def test_drug_target_config_provider_literal_still_includes_existing_providers()
         )
 
 
+def test_drug_target_config_provider_uses_shared_provider_alias():
+    tree = ast.parse(_AGENT_SRC.read_text())
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ClassDef) and node.name == "DrugTargetConfig":
+            provider = next(
+                item for item in node.body
+                if isinstance(item, ast.AnnAssign)
+                and isinstance(item.target, ast.Name)
+                and item.target.id == "provider"
+            )
+            assert isinstance(provider.annotation, ast.Name)
+            assert provider.annotation.id == "Provider"
+            return
+    raise AssertionError("DrugTargetConfig.provider annotation not found")
+
+
 def test_subagent_models_field_annotation_accepts_basechatmodel_via_ast():
     """CP-P1-001 (type annotation correctness): DrugTargetConfig.subagent_models
     annotation must mention BaseChatModel (not just str).
@@ -98,3 +121,118 @@ def test_subagent_models_field_annotation_accepts_basechatmodel_via_ast():
                     )
                     return
     raise AssertionError("DrugTargetConfig.subagent_models annotation not found")
+
+
+def test_selected_model_is_shared_by_guarded_orchestrator_and_report_writer(
+    tmp_path: Path,
+    monkeypatch,
+):
+    selected_model = MagicMock()
+    captured: dict = {}
+    compiled_agent = MagicMock()
+    compiled_agent.with_config.return_value = compiled_agent
+
+    def capture_subagents(**kwargs):
+        captured["subagent_kwargs"] = kwargs
+        return [
+            {"name": "evidence_assessor"},
+            {"name": "hypothesis_writer", "model": selected_model},
+            {"name": "report_writer", "model": selected_model},
+        ]
+
+    monkeypatch.setattr(
+        agent,
+        "create_llm",
+        lambda **kwargs: captured.setdefault("llm_kwargs", kwargs) and selected_model,
+    )
+    monkeypatch.setattr(
+        agent,
+        "build_guarded_pipeline",
+        lambda specs, **kwargs: captured.update(specs=specs, **kwargs) or compiled_agent,
+    )
+    monkeypatch.setattr(
+        agent,
+        "get_subagents",
+        capture_subagents,
+    )
+
+    agent.create_drug_target_agent(
+        agent.DrugTargetConfig(
+            provider="ollama-openai",
+            model="qwen3.5:122b",
+            request_timeout_seconds=45.0,
+            workflow_mode="guarded_report",
+            data_dir=str(tmp_path),
+            subagent_models={},
+        )
+    )
+
+    assert captured["llm_kwargs"] == {
+        "provider": "ollama-openai",
+        "model": "qwen3.5:122b",
+        "request_timeout": 45.0,
+    }
+    assert captured["subagent_kwargs"]["report_writer_model"] == "qwen3.5:122b"
+    assert captured["subagent_kwargs"]["report_writer_request_timeout_seconds"] == 45.0
+    assert captured["subagent_kwargs"]["model_overrides"]["report_writer"] is selected_model
+    hypothesis_writer = next(
+        item for item in captured["specs"] if item["name"] == "hypothesis_writer"
+    )
+    report_writer = next(
+        item for item in captured["specs"] if item["name"] == "report_writer"
+    )
+    assert hypothesis_writer["model"] is selected_model
+    assert report_writer["model"] is selected_model
+
+
+def test_unset_timeout_is_omitted_from_guarded_report_construction(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    captured: dict = {}
+    compiled_agent = MagicMock()
+    compiled_agent.with_config.return_value = compiled_agent
+
+    def capture_subagents(**kwargs):
+        captured["subagent_kwargs"] = kwargs
+        return [
+            {"name": "evidence_assessor"},
+            {"name": "report_writer"},
+        ]
+
+    monkeypatch.setattr(
+        agent,
+        "create_llm",
+        lambda **kwargs: captured.setdefault("llm_kwargs", kwargs) or MagicMock(),
+    )
+    monkeypatch.setattr(
+        agent,
+        "get_subagents",
+        capture_subagents,
+    )
+    monkeypatch.setattr(
+        agent,
+        "build_guarded_pipeline",
+        lambda specs, **kwargs: captured.update(specs=specs, **kwargs) or compiled_agent,
+    )
+
+    agent.create_drug_target_agent(
+        agent.DrugTargetConfig(
+            provider="ollama-openai",
+            workflow_mode="guarded_report",
+            data_dir=str(tmp_path),
+            subagent_models={},
+        )
+    )
+
+    assert captured["llm_kwargs"] == {"provider": "ollama-openai"}
+    assert "report_writer_model" not in captured["subagent_kwargs"]
+    assert "report_writer_request_timeout_seconds" not in captured["subagent_kwargs"]
+
+
+def test_guarded_config_rejects_report_writer_subagent_override() -> None:
+    with pytest.raises(ValueError, match=r"DrugTargetConfig\.model"):
+        agent.DrugTargetConfig(
+            workflow_mode="guarded_report",
+            subagent_models={"report_writer": MagicMock()},
+        )

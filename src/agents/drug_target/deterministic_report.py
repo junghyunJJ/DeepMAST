@@ -22,12 +22,15 @@ from src.agents.drug_target.part4_candidate_selector import (
     part4_candidate_selector_enabled,
     part4_candidate_selector_provider_from_config,
 )
+from src.agents.drug_target.hybrid_report_sections import REPORT_SECTIONS_FILENAME
+from src.agents.drug_target.ollama_hypothesis_cards import validation_focus_for_category
 from src.agents.drug_target.therapeutic_synthesis import (
     PART4_SYNTHESIS_FILENAME,
     build_part4_therapeutic_synthesis,
     render_part4_therapeutic_synthesis_markdown,
 )
 from src.agents.drug_target.tools.scoring_metadata import NOVELTY_OPPORTUNITY_LEGEND
+from src.agents.drug_target.tools.stage_logic import _agent_markdown_disease_scope
 
 
 _SCORE_FIELDS = (
@@ -179,9 +182,15 @@ def _required_evidence_paths(base: Path) -> dict[str, Path]:
     }
 
 
-def _missing_required_evidence(base: Path) -> list[dict[str, Any]]:
+def _missing_required_evidence(
+    base: Path,
+    *,
+    require_hypothesis: bool = True,
+) -> list[dict[str, Any]]:
     issues: list[dict[str, Any]] = []
     for name, path in _required_evidence_paths(base).items():
+        if name == "hypothesis_report" and not require_hypothesis:
+            continue
         if not path.exists():
             issues.append(
                 {
@@ -1004,6 +1013,9 @@ def _annotate_hypothesis_tiers(
             rendered_hypotheses.append(hypothesis)
             continue
         rendered_hypothesis = dict(hypothesis)
+        rendered_hypothesis["_validation_focus"] = validation_focus_for_category(
+            _safe_text(rendered_hypothesis.get("category"), "")
+        )
         rank = str(rendered_hypothesis.get("rank") or "")
         snippets = hypothesis_interpretations.get(rank, {})
         snippets = snippets if isinstance(snippets, dict) else {}
@@ -1361,6 +1373,8 @@ def _markdown_template_context(
     filter_lookup = _stage1_filter_lookup(stage1_rows)
     stage1_pair_lookup = _stage1_pair_file_lookup(stage1_pairs, filter_lookup)
     celltype_context = _celltype_context_from_template_context(template_context)
+    disease_scope = template_context.get("disease_scope", {})
+    disease_scope = disease_scope if isinstance(disease_scope, dict) else {}
 
     featured_cards: list[dict[str, Any]] = []
     for candidate in selected:
@@ -1461,7 +1475,7 @@ def _markdown_template_context(
         "stage1_filter_results": _format_stage1_filter_results(stage1_rows),
         "hypothesis_data": hypothesis_data,
         "celltype_context": celltype_context,
-        "disease_scope": {"requires_proxy_note": False},
+        "disease_scope": disease_scope,
         "data_limitations": [],
         "novelty_opportunity_legend": NOVELTY_OPPORTUNITY_LEGEND,
         "interpretations": interpretations,
@@ -1708,9 +1722,19 @@ def _drop_preclinical_duplicates(
     ]
 
 
-def build_report_data(data_dir: str, disease: str) -> dict[str, Any]:
+def build_report_data(
+    data_dir: str,
+    disease: str,
+    hypothesis_data: dict[str, Any] | None = None,
+    *,
+    hypothesis_source: str | None = None,
+) -> dict[str, Any]:
     base = Path(data_dir).expanduser().resolve()
-    issues = _missing_required_evidence(base)
+    require_hypothesis_file = hypothesis_data is None
+    issues = _missing_required_evidence(
+        base,
+        require_hypothesis=require_hypothesis_file,
+    )
     if issues:
         return _invalid_report_data(base, disease, issues)
 
@@ -1730,21 +1754,26 @@ def build_report_data(data_dir: str, disease: str) -> dict[str, Any]:
                 )
             ],
         )
-    try:
-        hypothesis = _load_json(paths["hypothesis_report"])
-    except (json.JSONDecodeError, OSError) as exc:
-        return _invalid_report_data(
-            base,
-            disease,
-            [
-                _invalid_required_json_issue(
-                    base,
-                    "hypothesis_report",
-                    paths["hypothesis_report"],
-                    exc,
-                )
-            ],
-        )
+    if hypothesis_data is None:
+        try:
+            hypothesis = _load_json(paths["hypothesis_report"])
+        except (json.JSONDecodeError, OSError) as exc:
+            return _invalid_report_data(
+                base,
+                disease,
+                [
+                    _invalid_required_json_issue(
+                        base,
+                        "hypothesis_report",
+                        paths["hypothesis_report"],
+                        exc,
+                    )
+                ],
+            )
+        hypothesis_source = "evidence/hypothesis_report.json"
+    else:
+        hypothesis = hypothesis_data.get("hypothesis_report", hypothesis_data)
+        hypothesis_source = hypothesis_source or "drug.md"
     if not isinstance(assessment, dict):
         return _invalid_report_data(
             base,
@@ -1759,6 +1788,16 @@ def build_report_data(data_dir: str, disease: str) -> dict[str, Any]:
             ],
         )
     if not isinstance(hypothesis, dict):
+        path = (
+            "evidence/hypothesis_report.json"
+            if hypothesis_data is None
+            else "drug.md"
+        )
+        message = (
+            "hypothesis_report.json must be a JSON object"
+            if hypothesis_data is None
+            else "injected hypothesis_data must be a JSON object"
+        )
         return _invalid_report_data(
             base,
             disease,
@@ -1766,8 +1805,8 @@ def build_report_data(data_dir: str, disease: str) -> dict[str, Any]:
                 {
                     "code": "INVALID_HYPOTHESIS_SHAPE",
                     "severity": "critical",
-                    "message": "hypothesis_report.json must be a JSON object",
-                    "path": "evidence/hypothesis_report.json",
+                    "message": message,
+                    "path": path,
                 }
             ],
         )
@@ -1785,6 +1824,7 @@ def build_report_data(data_dir: str, disease: str) -> dict[str, Any]:
     )
     if not isinstance(celltype_resolution, dict):
         celltype_resolution = {}
+    disease_scope = _agent_markdown_disease_scope(assessment, base / "evidence")
 
     candidates: list[dict[str, Any]] = []
     for row in sorted(
@@ -1850,6 +1890,12 @@ def build_report_data(data_dir: str, disease: str) -> dict[str, Any]:
     hypotheses = hypothesis.get("hypotheses")
     if not isinstance(hypotheses, list):
         hypotheses = []
+    no_featured_candidates = (
+        isinstance(hypothesis_data, dict)
+        and hypothesis_data.get("no_featured_candidates") is True
+    ) or hypothesis.get("no_featured_candidates") is True
+    if no_featured_candidates:
+        hypothesis = {**hypothesis, "no_featured_candidates": True}
 
     sections = {
         "executive_summary": {
@@ -1872,7 +1918,7 @@ def build_report_data(data_dir: str, disease: str) -> dict[str, Any]:
         },
         "hypotheses": {
             "title": "Mechanistic Hypotheses",
-            "sources": ["evidence/hypothesis_report.json"],
+            "sources": [hypothesis_source],
         },
     }
 
@@ -1889,7 +1935,12 @@ def build_report_data(data_dir: str, disease: str) -> dict[str, Any]:
         for source in candidate["sources"]
         if isinstance(source, str)
     )
-    cited_sources.update(str(path.relative_to(base)) for path in paths.values())
+    cited_sources.update(
+        {
+            "evidence/assessment_results.json",
+            hypothesis_source,
+        }
+    )
     for optional_source in (
         "evidence/stage1_filter_results.json",
         "evidence/stage1_filter_results.csv",
@@ -1908,6 +1959,7 @@ def build_report_data(data_dir: str, disease: str) -> dict[str, Any]:
         "sections": sections,
         "candidates": candidates,
         "hypotheses": hypotheses,
+        "no_featured_candidates": no_featured_candidates,
         "sources": {
             source: {"sha256": _sha256_path(base / source)}
             for source in sorted(cited_sources)
@@ -1917,6 +1969,7 @@ def build_report_data(data_dir: str, disease: str) -> dict[str, Any]:
             "stage1_filter_results": stage1_filter_results,
             "stage1_pairs": stage1_pairs,
             "celltype_resolution": celltype_resolution,
+            "disease_scope": disease_scope,
             "hypothesis_data": hypothesis,
         },
         "issues": [],
@@ -1933,7 +1986,7 @@ def validate_report_data(report_data: dict[str, Any]) -> list[dict[str, Any]]:
                 "message": "report_data schema_version must be drug_target.report_data.v1",
             }
         )
-    if not report_data.get("candidates"):
+    if not report_data.get("candidates") and not report_data.get("no_featured_candidates"):
         issues.append(
             {
                 "code": "NO_CANDIDATES",
@@ -2154,9 +2207,40 @@ def _write_deterministic_render_metadata(base: Path, markdown: str) -> None:
     )
 
 
+def _write_hybrid_render_metadata(base: Path, markdown: str) -> None:
+    source_paths = {
+        "report_sections": REPORT_SECTIONS_FILENAME,
+        "report_data": "report_data.json",
+        "target_assessment": "target_assessment.json",
+    }
+    _write_json(
+        base / "drug_report_render.json",
+        {
+            "schema_version": "drug_report_render.v1",
+            "renderer": "deterministic_report.render_hybrid_report",
+            "mode": "hybrid_jinja_qwen",
+            "source_paths": source_paths,
+            "source_hashes": {
+                key: _sha256_path(base / path)
+                for key, path in source_paths.items()
+                if (base / path).exists()
+            },
+            "rendered_drug_md_sha256": _sha256_text(markdown),
+            "required_slot_count": 0,
+            "rendered_slot_count": 0,
+            "missing_slots": [],
+            "extra_slots": [],
+            "pagination_warnings": [],
+            "created_at": _utc_now(),
+        },
+    )
+
+
 def render_report_markdown(
     report_data: dict[str, Any],
     interpretations: dict[str, Any] | None = None,
+    *,
+    pipeline_recommendations: Sequence[Mapping[str, str]] = (),
 ) -> str:
     template_str = _markdown_template_path().read_text(encoding="utf-8")
     env = Environment(
@@ -2165,10 +2249,84 @@ def render_report_markdown(
         trim_blocks=True,
         lstrip_blocks=True,
     )
-    rendered = env.from_string(template_str).render(
-        **_markdown_template_context(report_data, interpretations=interpretations)
-    )
+    context = _markdown_template_context(report_data, interpretations=interpretations)
+    context["pipeline_recommendations"] = [
+        dict(recommendation) for recommendation in pipeline_recommendations
+    ]
+    rendered = env.from_string(template_str).render(**context)
     return _strip_expand_markers(rendered)
+
+
+def render_hybrid_report(
+    data_dir: str,
+    disease: str,
+    report_sections: Mapping[str, Any],
+) -> tuple[str, dict[str, Any]]:
+    """Render renderer-owned artifacts from an already-canonical sections payload."""
+
+    if not isinstance(report_sections, Mapping):
+        raise ValueError("report_sections must be a canonical mapping")
+    sections = dict(report_sections)
+    if sections.get("schema_version") != "hybrid_report_sections/v1":
+        raise ValueError("report_sections must use hybrid_report_sections/v1")
+    hypothesis_report = sections.get("hypothesis_report")
+    candidate_followups = sections.get("candidate_followups", [])
+    recommendations = sections.get("pipeline_recommendations")
+    if (
+        not isinstance(hypothesis_report, Mapping)
+        or not isinstance(candidate_followups, list)
+        or not isinstance(recommendations, list)
+    ):
+        raise ValueError("report_sections must include canonical hypotheses and recommendations")
+    if not all(isinstance(followup, Mapping) for followup in candidate_followups):
+        raise ValueError("candidate_followups must contain mappings")
+    if not all(isinstance(recommendation, Mapping) for recommendation in recommendations):
+        raise ValueError("pipeline_recommendations must contain mappings")
+
+    base = Path(data_dir).expanduser().resolve()
+    _write_json(base / REPORT_SECTIONS_FILENAME, sections)
+    report_data = build_report_data(
+        str(base),
+        disease,
+        hypothesis_data=sections,
+        hypothesis_source=REPORT_SECTIONS_FILENAME,
+    )
+    issues = validate_report_data(report_data)
+    if issues:
+        raise ValueError(f"hybrid report data is invalid: {issues[0]['code']}")
+    _write_json(base / "report_data.json", report_data)
+
+    target_assessment_issues = _persist_target_assessment_if_applicable(
+        base,
+        report_data,
+    )
+    if target_assessment_issues:
+        raise ValueError(
+            f"target assessment is invalid: {target_assessment_issues[0]['code']}"
+        )
+    if not (base / "target_assessment.json").exists():
+        raise ValueError("hybrid report rendering requires target_assessment.json")
+
+    # Hybrid reports intentionally omit broad legacy interpretation prose.
+    interpretations = {
+        "candidates": {
+            item["gene"].upper(): {
+                "recommendation": (
+                    f"- {item['text']} [source: gene] "
+                    f"[from {item['supporting_source']}]"
+                )
+            }
+            for item in candidate_followups
+        }
+    }
+    markdown = render_report_markdown(
+        report_data,
+        interpretations=interpretations,
+        pipeline_recommendations=recommendations,
+    )
+    (base / "drug.md").write_text(markdown, encoding="utf-8")
+    _write_hybrid_render_metadata(base, markdown)
+    return markdown, report_data
 
 
 async def finalize_report_mvp(state: dict, config: RunnableConfig) -> dict:

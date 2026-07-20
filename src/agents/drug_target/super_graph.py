@@ -1,4 +1,4 @@
-"""Super-graph for Drug Target Assessment.
+"""Compatibility-only legacy super-graph for Drug Target Assessment.
 
 Topology: START → run_deep_agent → validate_and_maybe_retry_hypothesis
 → finalize_report → END
@@ -124,6 +124,7 @@ def _drug_target_config_from_state(
         ),
         data_dir=state["data_dir"],
         disease=state["disease"],
+        workflow_mode="legacy_hypothesis",
         use_checkpointer=use_checkpointer,
         hypothesis_writer_skill_names=(
             tuple(skill_names)

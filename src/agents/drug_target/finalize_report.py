@@ -1,8 +1,9 @@
-"""LangGraph node: finalize_report.
+"""Legacy compatibility LangGraph node: finalize_report.
 
-Production finalization delegates to the no-LLM deterministic report MVP path.
-The former report-expansion implementation remains available as an explicit
-legacy path for transition tests and debugging.
+Guarded production does not dispatch this node: report_writer plus
+DrugReportGuardrailMiddleware own report validation and publication. This
+module remains for explicit ``legacy_hypothesis`` super-graph callers,
+transition tests, and debugging.
 """
 
 from __future__ import annotations
@@ -149,7 +150,8 @@ def _compact_target_drug(entry: dict) -> dict:
 
 
 def _compact_ot_payload(filename: str, payload: dict, top_n: int = _OT_COMPACT_TOP_N) -> dict:
-    target_info = payload.get("target_info") if isinstance(payload.get("target_info"), dict) else {}
+    target_info = payload.get("target_info")
+    target_info = target_info if isinstance(target_info, dict) else {}
     disease_evidence = payload.get("disease_evidence")
     associations = payload.get("associations")
     target_drug_rows = _target_drug_rows(payload)
@@ -262,7 +264,7 @@ def _compact_evidence_if_needed(evidence: dict, reference_card: dict) -> tuple[d
 
 
 async def finalize_report(state: dict, config: RunnableConfig) -> dict:
-    """Production finalizer node. Returns a LangGraph state-update dict."""
+    """Legacy compatibility finalizer node. Returns a LangGraph state update."""
     from src.agents.drug_target.deterministic_report import finalize_report_mvp
 
     return await finalize_report_mvp(state, config)
@@ -328,9 +330,13 @@ def _load_expansion_inputs(data_dir: str, disease: str) -> tuple[dict, dict, dic
 
     # Build reference_card + spec from evidence on disk. Idempotent: rewrites
     # both files. With the summarizer subagent removed (Phase 3 task #8), this
-    # finalize_report node is now the only production caller — invoking it here
+    # Explicit legacy super-graph and traced compatibility callers invoke this
     # makes _load_expansion_inputs self-contained.
-    _call_tool(_build_evidence_summary_st, data_dir=str(base))
+    _call_tool(
+        _build_evidence_summary_st,
+        data_dir=str(base),
+        include_legacy_hypothesis=True,
+    )
 
     # Evidence — load_evidence_files returns a JSON string
     raw_evidence = _call_tool(_load_evidence_files_st, data_dir=str(base))

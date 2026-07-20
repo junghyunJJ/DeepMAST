@@ -1,33 +1,51 @@
 # Drug Target Assessment Agent -- Stage-by-Stage Guide
 
-> **Version**: Current independent agent (`src/agents/drug_target/`) — updated 2026-05-19 for 2-subagent + finalize_report node migration
+> **Version**: Current independent agent (`src/agents/drug_target/`) — updated 2026-07-15 for guarded direct report writing
 > **Supersedes**: `docs/phase47_drug_target_assessment_step_by_step.md` (legacy deep_interpreter Phase 4.7)
 
 ---
 
+> **Current production contract:**
+> ```text
+> prepare -> validate_evidence -> hypothesis_writer
+>         -> validate_hypothesis -> report_writer -> final audit/publication
+> ```
+> The root LLM does not schedule guarded production phases. The root LLM does not schedule guarded production retries. The report_writer is never invoked without a fresh valid hypothesis handoff. Production Section 4 is in `drug.md`; success needs two audits and seven artifacts including `drug_report_validation_final.json`. Configured-directory tools are forced safe, `general-purpose` is blocked, and custom tools are rejected. `legacy_hypothesis` is the explicit outer-super-graph/finalizer compatibility path. Full-agent, E2E, and BC paths are production entrypoints; `run_report_writer_only.py` is diagnostic-only and requires a valid existing handoff.
+
+**Production entrypoints**: construct `create_drug_target_agent` directly with
+`workflow_mode="guarded_report"`, or run `run_drug_target_e2e.py` and
+`run_drug_target_agent_bc.py`. `run_report_writer_only.py` only diagnoses the
+canonical writer against existing evidence.
+
+**Production Reporter integration**: `integration.py` exposes
+`run_drug_target_assessment(data_dir, disease)` for the Deep Interpreter
+Reporter. It lazily imports `create_drug_target_agent`, builds it with
+`workflow_mode="guarded_report"`, and invokes the returned `agent.ainvoke(...)`.
+`super_graph.py` remains the Legacy compatibility super-graph for explicit
+`legacy_hypothesis` callers; the integration tool does not use it.
+
 ## 1. Overview
 
-### Architecture: 2-Subagent + finalize_report Node + 3-Stage Funnel
+### Architecture: Guarded 3-Subagent + 3-Stage Funnel
 
 The Drug Target Assessment Agent evaluates therapeutic potential of ligand-receptor (L-R) pairs
 identified from spatial transcriptomics cell-cell interaction (CCI) analysis.
 
 ```
-LangGraph Super-Graph (graph_builder.py: drug_target_graph)
-  START
-    └── run_deep_agent node (super_graph.py)
-          Orchestrator (agent.py)
-            ├── evidence_assessor   ← 3-Stage Funnel + Inline Rubric
-            └── hypothesis_writer   ← UCB-scored mechanistic hypothesis generation
-    └── finalize_report node (finalize_report.py)
-          Deterministic 6-step: load inputs → token-budget gate → 1 LLM call
-          → validate (schema + cited-only) → render outputs → finalize workspace
-  END
+create_drug_target_agent (guarded_report)
+  guarded_pipeline
+    └── prepare
+    └── evidence_assessor (unless resuming) → validate_evidence
+    └── hypothesis_writer → validate_hypothesis
+    └── report_writer → final audit/publication
 ```
 
-`evidence_assessor` and `hypothesis_writer` follow a **Plan -> Execute -> Reflect**
-cognitive cycle per stage. Report finalization is handled by the deterministic
-`finalize_report` LangGraph node — not a subagent (see §6).
+`evidence_assessor` runs the staged funnel. `hypothesis_writer` creates the
+validated handoff. `report_writer` authors only
+`report_sections.json`; deterministic Jinja rendering owns
+`target_assessment.json` and `drug.md`. The guardrail owns post-write output
+rather than an outer graph node. `request_timeout_seconds` is forwarded to
+supported provider clients when supplied; omitted values retain provider defaults.
 
 ### Input / Output
 
@@ -37,17 +55,81 @@ cognitive cycle per stage. Report finalization is handled by the deterministic
 | Input | `targets.json` (optional) | User-selected interest cell types |
 | Input | `selected_top3_lr.json` (optional/legacy) | Legacy top-3 selection |
 | Output | `evidence/*.json` | Per-stage, per-pair/gene evidence files |
-| Output | `target_assessment.json` | Structured JSON contract |
-| Output | `drug.md` | Publication-quality markdown report |
+| Output | `report_sections.json` | Report-writer-authored structured sections |
+| Output | `target_assessment.json` | Deterministic Jinja structured JSON contract |
+| Output | `drug.md` | Deterministically rendered publication-quality markdown report |
 
 ### Workflow Order
 
 ```
-load_lr_candidates → evidence_assessor → hypothesis_writer → [finalize_report node]
+prepare -> validate_evidence -> hypothesis_writer
+        -> validate_hypothesis -> report_writer -> final audit/publication
 ```
 
-`evidence_assessor` and `hypothesis_writer` run inside the `run_deep_agent` node.
-`finalize_report` is a separate deterministic LangGraph node connected by a static edge.
+The graph, not the root LLM, enforces this phase order. Evidence validation
+fails closed before `hypothesis_writer`; hypothesis validation fails closed
+before `report_writer`. The deterministic coordinator invokes the role nodes
+directly; guarded production has no root task allowlist or completion
+sentinel. When evidence is generated, the role order is
+`evidence_assessor -> hypothesis_writer -> report_writer`, with validation
+gates between roles. The retained outer graph/finalizer is
+`legacy_hypothesis` compatibility only.
+
+To resume existing evidence, the coordinator takes `prepare -> validate_evidence`
+and then regenerates the fresh hypothesis handoff before report writing:
+
+```bash
+export OLLAMA_HOST=http://localhost:6000
+export OLLAMA_BASE_URL=http://localhost:6000
+export OLLAMA_REASONING=false
+export OLLAMA_NUM_PREDICT=4096
+python scripts/run_drug_target_agent_bc.py --data-dir /tmp/deepmast-bc-handoff-qwen --disease "breast cancer" --provider ollama-openai --model qwen3.5:122b --skip-evidence-assessor
+```
+
+A successful publication run requires a fresh valid
+`evidence/hypothesis_report.json`, `report_sections.json`, `drug.md`, and
+`drug_report_validation_final.json` with `valid: true` and
+`publication.status: "passed"`. A durable hypothesis rejection without a
+report audit is fail-closed behavior, not a published report. The coordinator
+retries one `HYPOTHESIS_REPORT_MISSING` on non-Ollama coordinator paths only;
+native Ollama/Qwen instead uses its separate per-unit initial response plus up
+to three local repairs; rejected saves remain under the writer's bounded repair path.
+
+For native Ollama/Qwen, Python still selects all evidence, FEATURED genes,
+L-R pairs, scores, and layout. Source, candidate, and category selection remains
+deterministic. Qwen contributes only four labelled hypothesis cards. Within each
+card, it produces four internal, independently validated card fields with one or
+two sentences each. Deterministic report rendering combines them into the two
+Section 4 reader-facing blocks under deterministic `Validation Focus`.
+
+Generic prospective design details—assay modalities, controls, comparators, and
+readouts—are permitted only for proposed prediction and validation designs; they
+are proposals, not evidence or established biological claims. Named-drug
+rejection is deliberately bounded, not comprehensive medication NER: prompt
+constraints, existing entity checks, and deterministic common-name/stem matching;
+there is no medication dictionary, network lookup, dependency, or assay-modality
+allowlist. Section 3 and Section 5 remain short, bounded sentence units:
+optional one-sentence Section 3 follow-ups and two Section 5 recommendations.
+Every unit is checked locally; an initial response may receive at most three safe
+repairs, then falls back to deterministic text or is omitted. The run writes
+`evidence/llm_enrichment_audit.json`; `DrugReportGuardrailMiddleware` remains
+the final whole-report audit and publication boundary.
+
+`hypothesis_writer` receives the selected evidence and returns four labelled
+hypothesis cards (the bounded `gene-card` units), not a full JSON report.
+Python reads FEATURED genes from `assessment_results.json`, selects the
+validator-required `ot_<GENE>.json` and `stage3_<GENE>.json` evidence, and
+builds 4 final hypotheses before persisting
+`evidence/hypothesis_report.json`. Only interest-cell-intrinsic Stage 1 pairs
+with strict-PASS status may accompany the malignant-cell anchor. The report
+writer returns optional one-sentence Section 3 follow-ups and two bounded
+recommendation sentences for Section 5. Python selects supporting sources from
+the validated handoff, validates those units, and calls
+`production_save_report_sections_tool` before saving `report_sections.json`.
+Non-Ollama providers keep the existing tool-call save path.
+
+`run_report_writer_only.py` is diagnostic-only: it tests a valid existing
+handoff's reporter phase and fails before model invocation without one.
 
 ---
 
@@ -283,9 +365,9 @@ Query template: `"{target_name}"[tiab] AND "Clinical Trial"[pt] AND "adverse eve
 
 ---
 
-## 6. Finalize Report Node (post-2026-05-19)
+## 6. Legacy Finalize Report Node (post-2026-05-19, compatibility only)
 
-The `finalize_report` node (`src/agents/drug_target/finalize_report.py`) is a
+The retained `finalize_report` node (`src/agents/drug_target/finalize_report.py`) is a
 **deterministic LangGraph node**, not a subagent. It runs after `run_deep_agent`
 completes, connected by a static edge. It makes exactly **1 LLM call** (structured
 output, `ReportExpansionsPayload`). All other steps are plain Python.
@@ -340,7 +422,7 @@ All writes in steps 6–7 use `tempfile` + `os.replace` for atomicity.
 ### 6.2 Error Classes
 
 All failures surface via the `report_finalization_error` state field. See
-[`drug_target_agent_reference.md` Section 2.5](drug_target_agent_reference.md#25-finalize_report-node--5-error-classes)
+[`drug_target_agent_reference.md` Section 2.5](drug_target_agent_reference.md#25-legacy-finalize_report-compatibility-node--historical-error-classes)
 for the complete error class table.
 
 ### 6.3 `target_assessment.json` Contract
@@ -398,11 +480,11 @@ the druggability_matrix before writing, and validates the schema contract.
 
 | File | Key Functions |
 |------|---------------|
-| `finalize_report.py` | `finalize_report()`, `_load_expansion_inputs()`, `_llm_fill_expansions_once()`, `_persist_and_validate()`, `_render_outputs()`, `_finalize_workspace()` |
+| `finalize_report.py` | Legacy compatibility `finalize_report()`, `_load_expansion_inputs()`, `_llm_fill_expansions_once()`, `_persist_and_validate()`, `_render_outputs()`, `_finalize_workspace()` |
 | `validators.py` | `validate_cited_only_provenance()` |
 | `tools/report_expansion_schema.py` | `ReportExpansionsPayload`, `validate_report_expansions()`, `_build_provenance_index()` |
 | `super_graph.py` | `DrugTargetState`, `run_deep_agent()`, `build_drug_target_super_graph()` |
-| `graph_builder.py` | `drug_target_graph` (compiled `CompiledStateGraph`) |
+| `graph_builder.py` | Guarded direct-agent deployment entrypoint: `drug_target_graph` builds `workflow_mode="guarded_report"` |
 
 ---
 
@@ -492,17 +574,17 @@ Disease matching uses keyword variants (e.g., for breast cancer:
 
 ---
 
-## 9. Data Flow Diagram
+## 9. Legacy compatibility Data Flow Diagram (`legacy_hypothesis` only)
 
 ```
 lr_candidates.json ─────────────────────────────────────────────────────┐
 targets.json (optional) ────────────────────────────────────────────────┤
                                                                         │
          ┌──────────────────────────────────────────────────────────────▼──┐
-         │         run_deep_agent NODE (super_graph.py)                     │
+         │ LEGACY COMPATIBILITY run_deep_agent NODE (super_graph.py)        │
          │                                                                  │
          │  ┌──────────────────────────────────────────────────────────┐   │
-         │  │              ORCHESTRATOR (agent.py)                     │   │
+         │  │        LEGACY ORCHESTRATOR (agent.py)                    │   │
          │  │  load_lr_candidates() → gene_symbols, lr_pairs          │   │
          │  └──────────────────┬───────────────────────────────────────┘   │
          │                     │                                            │
@@ -543,7 +625,7 @@ targets.json (optional) ──────────────────�
          │  └──────────────────┬───────────────────────────────────────┘   │
          │                     │                                            │
          │  ┌──────────────────▼───────────────────────────────────────┐   │
-         │  │         HYPOTHESIS WRITER (subagent #2)                  │   │
+         │  │ LEGACY COMPATIBILITY HYPOTHESIS WRITER (subagent #2)     │   │
          │  │  UCB-scored mechanistic hypothesis generation             │   │
          │  │  → hypothesis_report.json                                 │   │
          │  └──────────────────┬───────────────────────────────────────┘   │
@@ -551,7 +633,7 @@ targets.json (optional) ──────────────────�
          └─────────────────────┼──────────────────────────────────────────-┘
                                │  static edge
          ┌─────────────────────▼──────────────────────────────────────────-┐
-         │         finalize_report NODE (finalize_report.py)               │
+         │ LEGACY COMPATIBILITY finalize_report NODE (finalize_report.py)  │
          │                                                                  │
          │  1. Idempotency check (drug.md exists? → skip)                  │
          │  2. load_evidence_files() + reference_card + spec               │
@@ -580,15 +662,15 @@ targets.json (optional) ──────────────────�
 
 | File | Role | Key Contents |
 |------|------|-------------|
-| `src/agents/drug_target/super_graph.py` | LangGraph super-graph | `DrugTargetState`, `run_deep_agent()`, `build_drug_target_super_graph()` |
-| `src/agents/drug_target/graph_builder.py` | Compiled graph entry | `drug_target_graph` (module-level `CompiledStateGraph`) |
-| `src/agents/drug_target/finalize_report.py` | Finalize node | `finalize_report()`, `_load_expansion_inputs()`, `_llm_fill_expansions_once()`, `_persist_and_validate()`, `_render_outputs()`, `_finalize_workspace()` |
-| `src/agents/drug_target/finalize_report_prompts.py` | LLM prompts for finalize | `FINALIZE_REPORT_SYSTEM_PROMPT`, `FINALIZE_REPORT_USER_TEMPLATE` |
+| `src/agents/drug_target/super_graph.py` | Legacy compatibility super-graph | `DrugTargetState`, `run_deep_agent()`, `build_drug_target_super_graph()` |
+| `src/agents/drug_target/graph_builder.py` | Guarded direct-agent deployment entrypoint | `drug_target_graph` builds `workflow_mode="guarded_report"` |
+| `src/agents/drug_target/finalize_report.py` | Legacy finalizer | Retained explicit compatibility implementation |
+| `src/agents/drug_target/finalize_report_prompts.py` | Legacy finalizer LLM prompts | `FINALIZE_REPORT_SYSTEM_PROMPT`, `FINALIZE_REPORT_USER_TEMPLATE` |
 | `src/agents/drug_target/validators.py` | Cited-only validation | `validate_cited_only_provenance()` |
-| `src/agents/drug_target/middleware.py` | Subagent middleware | `HypothesisRetryLoopMiddleware` |
+| `src/agents/drug_target/middleware.py` | Guarded production middleware | Cleanup, task allowlist, filesystem, and report guardrails (plus legacy retry) |
 | `src/agents/drug_target/agent.py` | Orchestrator | `DrugTargetConfig`, `create_drug_target_agent()`, `ORCHESTRATOR_SYSTEM_PROMPT` |
-| `src/agents/drug_target/subagents/prompts.py` | Subagent prompts | `EVIDENCE_ASSESSOR_PROMPT`, `HYPOTHESIS_WRITER_PROMPT` |
-| `src/agents/drug_target/subagents/configs.py` | Subagent tool configs | `SUBAGENT_CONFIGS`, `get_subagents()`, `WORKFLOW_ORDER = ["evidence_assessor", "hypothesis_writer"]` |
+| `src/agents/drug_target/subagents/prompts.py` | Subagent prompts | `EVIDENCE_ASSESSOR_PROMPT`, `HYPOTHESIS_WRITER_PROMPT`, `REPORT_WRITER_PROMPT`, legacy prompts |
+| `src/agents/drug_target/subagents/configs.py` | Subagent tool configs | Guarded `get_subagents()`, explicit `get_legacy_subagents()`, `WORKFLOW_ORDER = ["evidence_assessor", "hypothesis_writer", "report_writer"]` |
 | `src/agents/drug_target/tools/__init__.py` | Tool registry | Tool re-exports with lazy imports |
 | `src/agents/drug_target/tools/stage_domain_tools.py` | Domain tools | CELLxGENE, KEGG, Reactome, STRING, VEP, OpenTargets, GWAS, DrugBank/ChEMBL, PubMed |
 | `src/agents/drug_target/tools/census_lr_validation_tools.py` | Census cross-validation | `run_compare_census_lr_pair()`, fuzzy matching logic |
@@ -596,5 +678,5 @@ targets.json (optional) ──────────────────�
 | `src/agents/drug_target/tools/evidence_loader.py` | I/O helpers | `load_lr_candidates`, `load_evidence_files`, `save_evidence` |
 | `src/agents/drug_target/tools/report_expansion_schema.py` | Expansion schema | `ReportExpansionsPayload`, `validate_report_expansions()`, `_build_provenance_index()` |
 | `src/agents/drug_target/tools/common.py` | Cognitive tools | `sequential_thinking`, `think_tool`, `validate_quality` |
-| `src/agents/drug_target/integration.py` | Reporter bridge | `run_drug_target_assessment()` — async tool for deep_interpreter; invokes `drug_target_graph.ainvoke(...)` |
+| `src/agents/drug_target/integration.py` | Production Reporter bridge | `run_drug_target_assessment()` lazily builds a guarded direct agent with `workflow_mode="guarded_report"` and invokes it |
 | `docs/drugtarget/output_schema.json` | JSON schema | Contract schema for `target_assessment.json` |
