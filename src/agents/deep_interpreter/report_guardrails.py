@@ -255,23 +255,14 @@ def _claim_status_counts(claims: list[dict[str, Any]]) -> dict[str, int]:
     }
 
 
-def _validate_synthesis_with_claims(
+def _validate_synthesis_guardrails(
     data_dir: Path,
-    *,
-    provider: str | None,
-    claim_cache: dict[str, list[dict[str, Any]]],
 ) -> tuple[list[dict[str, str]], list[dict[str, Any]], dict[str, list[dict[str, Any]]]]:
     deterministic = validate_synthesis_report(data_dir)
     if any(issue.get("code") in PAPERS_JSON_LOAD_ERROR_CODES for issue in deterministic):
         return deterministic, [], {"issues": [], "results": []}
-    semantic = claim_rag_validation.validate_claims(
-        data_dir,
-        ("synthesis.md",),
-        provider=provider,
-        cache=claim_cache,
-    )
     consistency = synthesis_consistency_validation.validate_synthesis_consistency(data_dir)
-    return deterministic + semantic["issues"] + consistency["issues"], semantic["claims"], consistency
+    return deterministic + consistency["issues"], [], consistency
 
 
 def run_report_guardrail(data_dir: str | Path, *, provider: str | None = None) -> dict[str, Any]:
@@ -343,12 +334,7 @@ def run_synthesis_guardrail(data_dir: str | Path, *, provider: str | None = None
     initial_path = data_dir / "synthesis_guardrail_initial.json"
     final_path = data_dir / "synthesis_guardrail_final.json"
 
-    claim_cache: dict[str, list[dict[str, Any]]] = {}
-    initial_issues, initial_claims, initial_consistency = _validate_synthesis_with_claims(
-        data_dir,
-        provider=provider,
-        claim_cache=claim_cache,
-    )
+    initial_issues, initial_claims, initial_consistency = _validate_synthesis_guardrails(data_dir)
     _write_issues(
         initial_path,
         initial_issues,
@@ -370,11 +356,7 @@ def run_synthesis_guardrail(data_dir: str | Path, *, provider: str | None = None
         changed = repair_synthesis_report(data_dir, current_issues)
         repair_attempt_count += 1
         changed_claims += changed
-        current_issues, current_claims, current_consistency = _validate_synthesis_with_claims(
-            data_dir,
-            provider=provider,
-            claim_cache=claim_cache,
-        )
+        current_issues, current_claims, current_consistency = _validate_synthesis_guardrails(data_dir)
         if changed == 0:
             break
 

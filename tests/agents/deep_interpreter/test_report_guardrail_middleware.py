@@ -167,7 +167,7 @@ def test_run_synthesis_guardrail_repairs_invalid_pmid_and_softens_overclaim(
     assert all(issue["severity"] != "error" for issue in final["issues"])
 
 
-def test_run_synthesis_guardrail_softens_claim_rag_error_and_records_results(
+def test_run_synthesis_guardrail_never_calls_claim_rag_and_keeps_empty_claim_artifacts(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from src.agents.deep_interpreter import report_guardrails
@@ -176,64 +176,58 @@ def test_run_synthesis_guardrail_softens_claim_rag_error_and_records_results(
         json.dumps({"papers": [{"pmid": "11111111", "abstract": "association"}]}),
         encoding="utf-8",
     )
-    claim = "TGFB drives fibrosis (PMID: 11111111)."
+    claim = "MISTy spatial evidence drives fibrosis (PMID: 11111111)."
     (tmp_path / "synthesis.md").write_text(
         f"## Cross-Part Themes\n\n{claim}\n",
         encoding="utf-8",
     )
-    claim_calls = 0
 
-    def fake_claim_validate(*_args, **_kwargs):
-        nonlocal claim_calls
-        claim_calls += 1
-        hedged = claim_calls > 1
-        return {
-            "claims": [
-                {
-                    "status": "overclaimed",
-                    "claim": claim,
-                    "hedged": hedged,
-                }
-            ],
-            "issues": [
-                {
-                    "code": "claim_rag_hypothesis_warning" if hedged else "claim_rag_overclaimed",
-                    "severity": "warning" if hedged else "error",
-                    "file": "synthesis.md",
-                    "section": "## Cross-Part Themes",
-                    "value": claim,
-                    "evidence": "Association only.",
-                    "repair_instruction": "Mark as hypothesis.",
-                }
-            ],
-        }
+    def fail_claim_validate(*_args: Any, **_kwargs: Any) -> dict[str, Any]:
+        raise AssertionError("synthesis guardrail must not call Claim RAG")
 
     monkeypatch.setattr(
-        report_guardrails.claim_rag_validation, "validate_claims", fake_claim_validate
+        report_guardrails.claim_rag_validation, "validate_claims", fail_claim_validate
     )
 
     result = report_guardrails.run_synthesis_guardrail(tmp_path, provider="ollama")
 
+    initial = json.loads(
+        (tmp_path / "synthesis_guardrail_initial.json").read_text(encoding="utf-8")
+    )
     final = json.loads(
         (tmp_path / "synthesis_guardrail_final.json").read_text(encoding="utf-8")
     )
     synthesis = (tmp_path / "synthesis.md").read_text(encoding="utf-8")
     assert result["status"] == "passed"
     assert result["repair_attempt_count"] == 1
-    assert result["claims_validated"] == 1
-    assert result["claims_by_status"]["overclaimed"] == 1
-    assert final["claim_validation"][0]["hedged"] is True
+    assert result["claims_validated"] == 0
+    assert result["claims_by_status"] == {
+        "supported": 0,
+        "overclaimed": 0,
+        "unsupported": 0,
+        "unverifiable": 0,
+    }
+    assert result["validation_results"] == []
+    assert initial["claim_validation"] == []
+    assert final["claim_validation"] == []
     assert "hypothesis requiring validation" in synthesis.lower()
 
 
 def test_run_synthesis_guardrail_repairs_consistency_mismatch(
-    tmp_path: Path,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from src.agents.deep_interpreter import report_guardrails
 
     _write_consistency_guardrail_fixture(
         tmp_path,
         "### 1. ERBB3 (Combined Score: 15)\n",
+    )
+
+    def fail_claim_validate(*_args: Any, **_kwargs: Any) -> dict[str, Any]:
+        raise AssertionError("synthesis consistency guardrail must not call Claim RAG")
+
+    monkeypatch.setattr(
+        report_guardrails.claim_rag_validation, "validate_claims", fail_claim_validate
     )
 
     result = report_guardrails.run_synthesis_guardrail(tmp_path)
@@ -247,6 +241,7 @@ def test_run_synthesis_guardrail_repairs_consistency_mismatch(
     final = json.loads(
         (tmp_path / "synthesis_guardrail_final.json").read_text(encoding="utf-8")
     )
+    assert final["claim_validation"] == []
     assert final["consistency_validation"]
     assert not [issue for issue in final["issues"] if issue["severity"] == "error"]
 
