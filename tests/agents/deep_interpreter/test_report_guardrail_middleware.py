@@ -592,6 +592,70 @@ def test_run_report_guardrail_writes_claim_selection_artifact(
     )
 
 
+def test_run_report_guardrail_preserves_claim_selection_after_repair(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    _write_required_files(tmp_path)
+    validate_calls = 0
+    selections = [
+        {
+            "extracted_claim_count": 3,
+            "selected_claim_count": 1,
+            "skipped_claims": [{"reason": "outside_high_risk_scope"}],
+            "checkpoint_hits": 1,
+            "judgment_batch_count": 1,
+            "single_claim_fallback_count": 0,
+        },
+        {
+            "extracted_claim_count": 2,
+            "selected_claim_count": 1,
+            "skipped_claims": [{"reason": "after_repair_low_risk"}],
+            "checkpoint_hits": 1,
+            "judgment_batch_count": 1,
+            "single_claim_fallback_count": 0,
+        },
+    ]
+
+    def fake_validate(_data_dir: Path) -> list[dict[str, str]]:
+        nonlocal validate_calls
+        validate_calls += 1
+        if validate_calls == 1:
+            return [{"severity": "error", "code": "pmid_not_in_papers"}]
+        return []
+
+    claim_calls = 0
+
+    def fake_claim_validate(*_args: Any, **_kwargs: Any) -> dict[str, Any]:
+        nonlocal claim_calls
+        selection = selections[claim_calls]
+        claim_calls += 1
+        return {"claims": [], "issues": [], "selection": selection}
+
+    monkeypatch.setattr(
+        report_guardrails.validate_report_script, "validate_report", fake_validate
+    )
+    monkeypatch.setattr(
+        report_guardrails.claim_rag_validation, "validate_claims", fake_claim_validate
+    )
+    monkeypatch.setattr(
+        report_guardrails.repair_report_script,
+        "repair_report",
+        lambda *_args, **_kwargs: 1,
+    )
+
+    result = report_guardrails.run_report_guardrail(tmp_path, provider="ollama")
+
+    final = json.loads(
+        (tmp_path / "report_validation_final.json").read_text(encoding="utf-8")
+    )
+    assert result["status"] == "passed"
+    assert result["repair_attempt_count"] == 1
+    assert claim_calls == 2
+    assert final["claim_selection"] == selections[1]
+
+
 def test_run_report_guardrail_retries_up_to_three_repairs(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
