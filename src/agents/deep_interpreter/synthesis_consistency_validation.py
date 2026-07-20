@@ -32,6 +32,11 @@ _QUANT_SECTION_RE = re.compile(
     r"(?P<body>.*?)(?=^###\s+|\Z)",
     re.MULTILINE | re.DOTALL | re.IGNORECASE,
 )
+_QUANT_HEADING_RE = re.compile(
+    r"^###\s+(?P<label>[A-Za-z][A-Za-z0-9 _/-]*?[A-Za-z0-9])\s*=\s*"
+    r"(?P<value>-?\d+(?:\.\d+)?)\s*$",
+    re.MULTILINE,
+)
 
 
 def validate_synthesis_consistency(data_dir: str | Path) -> dict[str, list[dict[str, Any]]]:
@@ -66,13 +71,33 @@ def validate_synthesis_consistency(data_dir: str | Path) -> dict[str, list[dict[
                 "source_pair": str(interaction),
             }
 
+    has_candidate_source = (data_dir / "part4_therapeutic_synthesis.md").exists()
+    if (
+        has_part4_selection
+        and not has_candidate_source
+        and _SYNTHESIS_CANDIDATE_RE.search(synthesis)
+    ):
+        _add_source_warning(issues, "part4_therapeutic_synthesis.md")
+
     for gene, fact in _extract_candidate_scores(data_dir).items():
         canonical[f"candidate_score:{gene}"] = fact
-    canonical.update(_extract_quantitative_facts(data_dir))
+
+    part_paths = (
+        data_dir / "part1_final.md",
+        data_dir / "part2_final.md",
+        data_dir / "part3_final.md",
+    )
+    part_files = tuple(path for path in part_paths if path.exists())
+    synthesis_quant_matches = _synthesis_quant_matches(synthesis)
+    if synthesis_quant_matches:
+        for path in part_paths:
+            if not path.exists():
+                _add_source_warning(issues, path.name)
+    canonical.update(_extract_quantitative_facts(part_files))
 
     results: list[dict[str, Any]] = []
     for match in _SYNTHESIS_CANDIDATE_RE.finditer(synthesis):
-        if not has_part4_selection:
+        if not has_part4_selection or not has_candidate_source:
             continue
         rank = match.group("rank")
         gene = match.group("gene").upper()
@@ -103,6 +128,8 @@ def validate_synthesis_consistency(data_dir: str | Path) -> dict[str, list[dict[
                 value=rank,
                 replacement=score_fact["rank"],
                 repairable=_can_repair(synthesis, rank),
+                start=match.start("rank"),
+                end=match.end("rank"),
             )
         if score != score_fact["canonical_value"]:
             _add_issue(
@@ -111,6 +138,8 @@ def validate_synthesis_consistency(data_dir: str | Path) -> dict[str, list[dict[
                 value=score,
                 replacement=score_fact["canonical_value"],
                 repairable=_can_repair(synthesis, score),
+                start=match.start("score"),
+                end=match.end("score"),
             )
 
     for match in _LR_RE.finditer(synthesis):
@@ -144,9 +173,11 @@ def validate_synthesis_consistency(data_dir: str | Path) -> dict[str, list[dict[
                 value=value,
                 replacement=replacement,
                 repairable=_can_repair(synthesis, value),
+                start=match.start("value"),
+                end=match.end("value"),
             )
 
-    for match in _QUANT_RE.finditer(synthesis):
+    for match in synthesis_quant_matches:
         key = f"quant:{_normalize_label(match.group('label'))}"
         fact = canonical.get(key)
         if fact is None:
@@ -168,6 +199,8 @@ def validate_synthesis_consistency(data_dir: str | Path) -> dict[str, list[dict[
                 value=value,
                 replacement=replacement,
                 repairable=_can_repair(synthesis, value),
+                start=match.start("value"),
+                end=match.end("value"),
             )
 
     return {"issues": issues, "results": results}
@@ -179,8 +212,7 @@ def repair_synthesis_consistency(
     """Replace only issue values with their exact canonical replacements."""
     path = Path(data_dir).expanduser().resolve() / "synthesis.md"
     current = path.read_text(encoding="utf-8")
-    changed = 0
-    cursor = 0
+    replacements: list[tuple[int, int, str]] = []
     for issue in issues:
         if not issue.get("repairable"):
             continue
@@ -188,11 +220,24 @@ def repair_synthesis_consistency(
         replacement = issue.get("replacement") or ""
         if not value or not replacement:
             continue
-        at = current.find(value, cursor)
-        if at < 0:
+        start = issue.get("start_offset")
+        end = issue.get("end_offset")
+        if (
+            isinstance(start, int)
+            and isinstance(end, int)
+            and current[start:end] == value
+        ):
+            replacements.append((start, end, replacement))
+        elif current.count(value) == 1:
+            at = current.find(value)
+            replacements.append((at, at + len(value), replacement))
+    changed = 0
+    last_start = len(current) + 1
+    for start, end, replacement in sorted(replacements, reverse=True):
+        if end > last_start:
             continue
-        current = current[:at] + replacement + current[at + len(value) :]
-        cursor = at + len(replacement)
+        current = current[:start] + replacement + current[end:]
+        last_start = start
         changed += 1
     if changed:
         path.write_text(current, encoding="utf-8")
@@ -215,7 +260,7 @@ def _load_part4_selection(
         )
         return None
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        payload = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
         issues.append(
             {
@@ -227,6 +272,18 @@ def _load_part4_selection(
             }
         )
         return None
+    if not isinstance(payload, dict):
+        issues.append(
+            {
+                "code": "synthesis_consistency_source_malformed",
+                "severity": "warning",
+                "file": path.name,
+                "value": path.name,
+                "repairable": False,
+            }
+        )
+        return None
+    return payload
 
 
 def _extract_candidate_scores(data_dir: Path) -> dict[str, dict[str, str]]:
@@ -246,18 +303,42 @@ def _extract_candidate_scores(data_dir: Path) -> dict[str, dict[str, str]]:
     return facts
 
 
-def _extract_quantitative_facts(data_dir: Path) -> dict[str, dict[str, str]]:
+def _extract_quantitative_facts(paths: tuple[Path, ...]) -> dict[str, dict[str, str]]:
     facts: dict[str, dict[str, str]] = {}
-    for name in ("part1_final.md", "part2_final.md", "part3_final.md"):
-        text = _read_text(data_dir / name) or ""
+    for path in paths:
+        text = path.read_text(encoding="utf-8")
+        for match in _QUANT_HEADING_RE.finditer(text):
+            facts[f"quant:{_normalize_label(match.group('label'))}"] = {
+                "source_file": path.name,
+                "kind": "quantitative",
+                "canonical_value": match.group("value"),
+            }
         for section in _QUANT_SECTION_RE.finditer(text):
             for match in _QUANT_RE.finditer(section.group("body")):
                 facts[f"quant:{_normalize_label(match.group('label'))}"] = {
-                    "source_file": name,
+                    "source_file": path.name,
                     "kind": "quantitative",
                     "canonical_value": match.group("value"),
                 }
     return facts
+
+
+def _synthesis_quant_matches(text: str) -> list[re.Match[str]]:
+    return [
+        match for match in _QUANT_RE.finditer(text) if not _LR_RE.search(match.group(0))
+    ]
+
+
+def _add_source_warning(issues: list[dict[str, Any]], name: str) -> None:
+    issues.append(
+        {
+            "code": "synthesis_consistency_source_missing",
+            "severity": "warning",
+            "file": name,
+            "value": name,
+            "repairable": False,
+        }
+    )
 
 
 def _add_issue(
@@ -267,19 +348,23 @@ def _add_issue(
     value: str,
     replacement: str,
     repairable: bool,
+    start: int | None = None,
+    end: int | None = None,
 ) -> None:
-    issues.append(
-        {
-            "code": code,
-            "severity": "error",
-            "file": "synthesis.md",
-            "value": value,
-            "replacement": replacement,
-            "observed_value": value,
-            "canonical_value": replacement,
-            "repairable": repairable,
-        }
-    )
+    issue = {
+        "code": code,
+        "severity": "error",
+        "file": "synthesis.md",
+        "value": value,
+        "replacement": replacement,
+        "observed_value": value,
+        "canonical_value": replacement,
+        "repairable": repairable,
+    }
+    if start is not None and end is not None:
+        issue["start_offset"] = start
+        issue["end_offset"] = end
+    issues.append(issue)
 
 
 def _result(

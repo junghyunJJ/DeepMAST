@@ -80,6 +80,26 @@ def test_repair_replaces_only_literal_source_derived_values(tmp_path: Path) -> N
     )
 
 
+def test_repair_handles_issues_out_of_document_order(tmp_path: Path) -> None:
+    _write_base_sources(tmp_path)
+    (tmp_path / "synthesis.md").write_text(
+        "### 1. ERBB3 (Combined Score: 15)\n"
+        "CDH1-ERBB3 combinedscore = 0.7000.\n"
+        "Factor3 estrogen enrichment estimate = -4.200.\n",
+        encoding="utf-8",
+    )
+    issues = list(reversed(validate_synthesis_consistency(tmp_path)["issues"]))
+
+    changed = repair_synthesis_consistency(tmp_path, issues)
+
+    assert changed == 3
+    assert (tmp_path / "synthesis.md").read_text(encoding="utf-8") == (
+        "### 1. ERBB3 (Combined Score: 16)\n"
+        "CDH1-ERBB3 combinedscore = 0.8141.\n"
+        "Factor3 estrogen enrichment estimate = -5.480.\n"
+    )
+
+
 def test_unselected_candidate_and_lr_pair_are_unrepairable(tmp_path: Path) -> None:
     _write_base_sources(tmp_path)
     (tmp_path / "synthesis.md").write_text(
@@ -132,6 +152,99 @@ def test_malformed_part4_json_warns(tmp_path: Path) -> None:
     assert issue["code"] == "synthesis_consistency_source_malformed"
     assert issue["severity"] == "warning"
     assert issue["repairable"] is False
+
+
+def test_wrong_shape_part4_json_warns_without_crashing(tmp_path: Path) -> None:
+    (tmp_path / "part4_candidate_selection.json").write_text("[]", encoding="utf-8")
+    (tmp_path / "synthesis.md").write_text(
+        "### 1. ERBB3 (Combined Score: 15)\n",
+        encoding="utf-8",
+    )
+
+    result = validate_synthesis_consistency(tmp_path)
+
+    assert [issue["code"] for issue in result["issues"]] == [
+        "synthesis_consistency_source_malformed"
+    ]
+    assert result["issues"][0]["severity"] == "warning"
+    assert result["results"] == []
+
+
+def test_missing_dependent_text_sources_warn_and_skip_checks(tmp_path: Path) -> None:
+    (tmp_path / "part4_candidate_selection.json").write_text(
+        json.dumps(
+            {
+                "selected_genes": ["ERBB3"],
+                "selected_lr_pairs": [
+                    {"interaction": "CDH1^ERBB3", "combinedscore": 0.8141}
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / "synthesis.md").write_text(
+        "### 1. ERBB3 (Combined Score: 15)\n"
+        "Factor3 estrogen enrichment estimate = -4.200.\n",
+        encoding="utf-8",
+    )
+
+    result = validate_synthesis_consistency(tmp_path)
+
+    assert result["issues"] == [
+        {
+            "code": "synthesis_consistency_source_missing",
+            "severity": "warning",
+            "file": "part4_therapeutic_synthesis.md",
+            "value": "part4_therapeutic_synthesis.md",
+            "repairable": False,
+        },
+        {
+            "code": "synthesis_consistency_source_missing",
+            "severity": "warning",
+            "file": "part1_final.md",
+            "value": "part1_final.md",
+            "repairable": False,
+        },
+        {
+            "code": "synthesis_consistency_source_missing",
+            "severity": "warning",
+            "file": "part2_final.md",
+            "value": "part2_final.md",
+            "repairable": False,
+        },
+        {
+            "code": "synthesis_consistency_source_missing",
+            "severity": "warning",
+            "file": "part3_final.md",
+            "value": "part3_final.md",
+            "repairable": False,
+        },
+    ]
+    assert all(issue["severity"] == "warning" for issue in result["issues"])
+    assert result["results"] == []
+
+
+def test_part_numeric_heading_facts_are_extracted_without_free_text(tmp_path: Path) -> None:
+    _write_base_sources(tmp_path)
+    (tmp_path / "part1_final.md").write_text(
+        "### Factor3 estrogen enrichment estimate = -5.480\n"
+        "Biological Interpretation: Factor3 estrogen enrichment estimate = -9.900.\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "part2_final.md").unlink()
+    (tmp_path / "synthesis.md").write_text(
+        "Factor3 estrogen enrichment estimate = -4.200.\n",
+        encoding="utf-8",
+    )
+
+    [issue] = [
+        issue
+        for issue in validate_synthesis_consistency(tmp_path)["issues"]
+        if issue["severity"] == "error"
+    ]
+
+    assert issue["code"] == "synthesis_consistency_quantitative_mismatch"
+    assert issue["replacement"] == "-5.480"
 
 
 def test_source_text_with_no_explicit_anchor_creates_no_issue(tmp_path: Path) -> None:
