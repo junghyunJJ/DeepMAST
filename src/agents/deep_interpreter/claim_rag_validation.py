@@ -15,6 +15,7 @@ from scripts import validate_report as validate_report_script
 from src.agents.deep_interpreter.tools.literature_rag import (
     search_literature_fulltext as _search_literature_fulltext,
 )
+from src.agents.deep_interpreter.tools.mcp_clients import run_async
 from src.agents.model import create_llm
 
 
@@ -36,6 +37,7 @@ HIGH_RISK_CLAIM_RE = re.compile(
     re.IGNORECASE,
 )
 MAX_CLAIMS_PER_JUDGMENT = 5
+MAX_SKIPPED_CLAIM_SAMPLES = 50
 CLAIM_RAG_CHECKPOINT_FILENAME = "claim_rag_checkpoint.json"
 DEFAULT_JUDGE_NUM_PREDICT = 3000
 DEFAULT_JUDGE_TIMEOUT_SECONDS = 300.0
@@ -76,24 +78,31 @@ def _positive_float_env(name: str, default: float) -> float:
     return value
 
 
-def _create_judge_llm(provider: str | None, *, single_claim: bool = False) -> Any:
-    timeout_name = (
+def _judge_timeout_seconds(*, single_claim: bool = False) -> float:
+    return _positive_float_env(
         "CLAIM_RAG_SINGLE_CLAIM_TIMEOUT_SECONDS"
         if single_claim
-        else "CLAIM_RAG_JUDGE_TIMEOUT_SECONDS"
-    )
-    timeout_default = (
+        else "CLAIM_RAG_JUDGE_TIMEOUT_SECONDS",
         DEFAULT_SINGLE_CLAIM_TIMEOUT_SECONDS
         if single_claim
-        else DEFAULT_JUDGE_TIMEOUT_SECONDS
+        else DEFAULT_JUDGE_TIMEOUT_SECONDS,
     )
+
+
+def _create_judge_llm(provider: str | None, *, single_claim: bool = False) -> Any:
+    effective_provider = (provider or os.getenv("LLM_PROVIDER", "openai")).lower()
+    thinking_kwargs: dict[str, bool] = {}
+    if effective_provider == "ollama":
+        thinking_kwargs["reasoning"] = True
+    elif effective_provider in {"vllm", "ollama-openai"}:
+        thinking_kwargs["enable_thinking"] = True
     return create_llm(
         provider,
-        reasoning=True,
+        **thinking_kwargs,
         num_predict=_positive_int_env(
             "CLAIM_RAG_JUDGE_NUM_PREDICT", DEFAULT_JUDGE_NUM_PREDICT
         ),
-        request_timeout=_positive_float_env(timeout_name, timeout_default),
+        request_timeout=_judge_timeout_seconds(single_claim=single_claim),
     )
 
 
@@ -237,9 +246,17 @@ def _retrieve_evidence(
     candidate_pmids: Sequence[str],
     data_dir: Path,
 ) -> list[dict[str, str]]:
+    return _retrieve_evidence_status(claim, candidate_pmids, data_dir)[0]
+
+
+def _retrieve_evidence_status(
+    claim: str,
+    candidate_pmids: Sequence[str],
+    data_dir: Path,
+) -> tuple[list[dict[str, str]], str | None]:
     allowed = set(candidate_pmids)
     if not allowed:
-        return []
+        return [], None
     try:
         results = search_literature_fulltext.invoke(
             {
@@ -247,10 +264,11 @@ def _retrieve_evidence(
                 "part_name": "all",
                 "limit": 15,
                 "data_dir": str(data_dir),
+                "strict": True,
             }
         )
-    except Exception:
-        return []
+    except Exception as exc:
+        return [], f"Literature retrieval failed: {type(exc).__name__}: {exc}."
     evidence: list[dict[str, str]] = []
     for result in results:
         pmid = _result_pmid(result)
@@ -259,7 +277,10 @@ def _retrieve_evidence(
             evidence.append({"pmid": pmid, "source": "full_text", "text": text[:1200]})
         if len(evidence) == 3:
             break
-    return evidence or _abstract_evidence(claim, candidate_pmids, _paper_map(data_dir))
+    return (
+        evidence or _abstract_evidence(claim, candidate_pmids, _paper_map(data_dir)),
+        None,
+    )
 
 
 def _judgment_prompt(group: dict[str, Any]) -> str:
@@ -337,18 +358,24 @@ def _write_checkpoint(path: Path, checkpoint: dict[str, Any]) -> None:
     )
 
 
-def _has_failed_judge_result(results: list[dict[str, Any]]) -> bool:
+def _has_incomplete_judge_result(results: list[dict[str, Any]]) -> bool:
     return any(
         str(item.get("reason", "")).startswith("Claim judge failed:")
+        or str(item.get("reason", "")) == "Claim judge omitted this claim."
+        or str(item.get("reason", "")).startswith("Literature retrieval failed:")
         for item in results
     )
 
 
-def _invoke_judgment(model: Any, group: dict[str, Any]) -> list[ClaimJudgment]:
+def _invoke_judgment(
+    model: Any, group: dict[str, Any], *, timeout_seconds: float | None = None
+) -> list[ClaimJudgment]:
     structured_model = model.with_structured_output(ClaimJudgmentBatch)
-    response = structured_model.invoke(
-        [HumanMessage(content=_judgment_prompt(group))]
-    )
+    messages = [HumanMessage(content=_judgment_prompt(group))]
+    if hasattr(structured_model, "ainvoke"):
+        response = run_async(structured_model.ainvoke(messages), timeout=timeout_seconds)
+    else:
+        response = structured_model.invoke(messages)
     return response.judgments
 
 
@@ -363,12 +390,18 @@ def _judge_source_batch(
 ) -> list[dict[str, Any]]:
     evidence_items = [item for item in batch if item["evidence"]]
     missing = {
-        item["index"]: _unverifiable(item, "No allowed PMID evidence was retrieved.")
+        item["index"]: _unverifiable(
+            item,
+            item.get("unverifiable_reason")
+            or "No allowed PMID evidence was retrieved.",
+        )
         for item in batch
         if not item["evidence"]
     }
     judgments: dict[int, ClaimJudgment] = {}
     failed: dict[int, dict[str, Any]] = {}
+    primary_timeout = _judge_timeout_seconds()
+    fallback_timeout = _judge_timeout_seconds(single_claim=True)
     if evidence_items:
         try:
             if model is None and get_model is not None:
@@ -377,7 +410,11 @@ def _judge_source_batch(
             judgments.update(
                 {
                     item.claim_index: item
-                    for item in _invoke_judgment(model, {**group, "claims": evidence_items})
+                    for item in _invoke_judgment(
+                        model,
+                        {**group, "claims": evidence_items},
+                        timeout_seconds=primary_timeout,
+                    )
                 }
             )
         except Exception as primary_exc:
@@ -392,7 +429,9 @@ def _judge_source_batch(
                         {
                             judgment.claim_index: judgment
                             for judgment in _invoke_judgment(
-                                fallback_model, {**group, "claims": [item]}
+                                fallback_model,
+                                {**group, "claims": [item]},
+                                timeout_seconds=fallback_timeout,
                             )
                         }
                     )
@@ -456,17 +495,23 @@ def _judge_group(
             results.extend(saved["results"])
             continue
 
-        enriched = [
-            {
-                **item,
-                "file": group["file"],
-                "section": group["section"],
-                "evidence": item.get("evidence")
-                if "evidence" in item or data_dir is None
-                else _retrieve_evidence(item["claim"], item["candidate_pmids"], data_dir),
-            }
-            for item in batch
-        ]
+        enriched = []
+        for item in batch:
+            evidence = item.get("evidence") if "evidence" in item else None
+            unverifiable_reason = item.get("unverifiable_reason")
+            if "evidence" not in item and data_dir is not None:
+                evidence, unverifiable_reason = _retrieve_evidence_status(
+                    item["claim"], item["candidate_pmids"], data_dir
+                )
+            enriched.append(
+                {
+                    **item,
+                    "file": group["file"],
+                    "section": group["section"],
+                    "evidence": evidence or [],
+                    "unverifiable_reason": unverifiable_reason,
+                }
+            )
         judged = _judge_source_batch(
             group,
             enriched,
@@ -476,7 +521,7 @@ def _judge_group(
             get_fallback_model,
             stats,
         )
-        if not _has_failed_judge_result(judged):
+        if not _has_incomplete_judge_result(judged):
             batches[key] = {"results": judged}
             flush_checkpoint()
         results.extend(judged)
@@ -536,6 +581,8 @@ def validate_claims(
     selection: dict[str, Any] = {
         "extracted_claim_count": 0,
         "selected_claim_count": 0,
+        "skipped_claim_count": 0,
+        "skipped_claims_truncated": False,
         "skipped_claims": [],
         "checkpoint_hits": 0,
         "judgment_batch_count": 0,
@@ -551,15 +598,19 @@ def validate_claims(
                 selection["selected_claim_count"] += 1
                 selected_claims.append(item)
                 continue
-            selection["skipped_claims"].append(
-                {
-                    "file": group["file"],
-                    "section": group["section"],
-                    "index": item["index"],
-                    "claim": item["claim"],
-                    "reason": "outside_high_risk_scope",
-                }
-            )
+            selection["skipped_claim_count"] += 1
+            if len(selection["skipped_claims"]) < MAX_SKIPPED_CLAIM_SAMPLES:
+                selection["skipped_claims"].append(
+                    {
+                        "file": group["file"],
+                        "section": group["section"],
+                        "index": item["index"],
+                        "claim": item["claim"],
+                        "reason": "outside_high_risk_scope",
+                    }
+                )
+            else:
+                selection["skipped_claims_truncated"] = True
         if selected_claims:
             selected_groups.append({**group, "claims": selected_claims})
 
@@ -593,7 +644,8 @@ def validate_claims(
             get_model=get_model,
             get_fallback_model=get_fallback_model,
         )
-        cache[cache_key] = judged
+        if not _has_incomplete_judge_result(judged):
+            cache[cache_key] = judged
         results.extend(judged)
 
     selection.update(stats)

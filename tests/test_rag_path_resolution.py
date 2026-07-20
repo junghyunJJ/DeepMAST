@@ -236,6 +236,87 @@ class TestRagCollectionNamespaceRouting:
         assert captured["query"] == "ICAM1 fibrosis"
         assert captured["limit"] == 3
 
+    def test_search_literature_fulltext_strict_raises_rag_search_error(
+        self, tmp_path, monkeypatch
+    ):
+        literature_rag.reset_rag_state()
+        literature_rag._RAG_STATE["available"] = True
+
+        async def failing_search_fulltext_rag(
+            query, collection_name, limit, strict: bool = False
+        ):
+            if not strict:
+                return []
+            assert strict is True
+            raise RuntimeError("rag backend down")
+
+        monkeypatch.setattr(
+            literature_rag, "search_fulltext_rag", failing_search_fulltext_rag
+        )
+
+        default_result = literature_rag.search_literature_fulltext.invoke(
+            {
+                "query": "ICAM1 fibrosis",
+                "part_name": "all",
+                "limit": 3,
+                "data_dir": str(tmp_path),
+            }
+        )
+        assert default_result == []
+
+        with pytest.raises(literature_rag.RAGSearchError):
+            literature_rag.search_literature_fulltext.invoke(
+                {
+                    "query": "ICAM1 fibrosis",
+                    "part_name": "all",
+                    "limit": 3,
+                    "data_dir": str(tmp_path),
+                    "strict": True,
+                }
+            )
+
+    def test_search_literature_fulltext_missing_collection_default_empty_strict_raises(
+        self, tmp_path, monkeypatch
+    ):
+        literature_rag.reset_rag_state()
+        literature_rag._RAG_STATE["available"] = True
+
+        async def missing_collection(collection_name):
+            return None
+
+        monkeypatch.setattr(
+            literature_rag, "_lookup_collection_from_db", missing_collection
+        )
+
+        args = {
+            "query": "ICAM1 fibrosis",
+            "part_name": "all",
+            "limit": 3,
+            "data_dir": str(tmp_path),
+        }
+
+        assert literature_rag.search_literature_fulltext.invoke(args) == []
+
+        with pytest.raises(literature_rag.RAGSearchError):
+            literature_rag.search_literature_fulltext.invoke({**args, "strict": True})
+
+    def test_search_literature_fulltext_unavailable_default_empty_strict_raises(
+        self, tmp_path
+    ):
+        literature_rag.reset_rag_state()
+        literature_rag._RAG_STATE["available"] = False
+        args = {
+            "query": "ICAM1 fibrosis",
+            "part_name": "all",
+            "limit": 3,
+            "data_dir": str(tmp_path),
+        }
+
+        assert literature_rag.search_literature_fulltext.invoke(args) == []
+
+        with pytest.raises(literature_rag.RAGSearchError):
+            literature_rag.search_literature_fulltext.invoke({**args, "strict": True})
+
     def test_validate_claim_fulltext_uses_namespaced_key(self, tmp_path, monkeypatch):
         literature_rag.reset_rag_state()
         literature_rag._RAG_STATE["available"] = True
@@ -453,6 +534,114 @@ class TestRagSniIntegration:
                 "score": 0.7,
             }
         ]
+
+    @pytest.mark.asyncio
+    async def test_search_fulltext_rag_default_returns_empty_when_all_standard_queries_error(
+        self, monkeypatch
+    ):
+        literature_rag.reset_rag_state()
+        literature_rag._RAG_STATE["collection_ids"]["all"] = "collection-id"
+
+        async def fake_agentic_search_with_sni(query, collection_id, limit, search_type):
+            return []
+
+        async def fake_generate_multi_query(query, num_queries=5):
+            return [query, f"{query} mechanism"]
+
+        async def failing_search_single_query(query, collection_id, limit, search_type):
+            raise RuntimeError(f"standard search failed for {query}")
+
+        monkeypatch.setattr(
+            literature_rag,
+            "_agentic_search_with_sni",
+            fake_agentic_search_with_sni,
+        )
+        monkeypatch.setattr(
+            literature_rag, "generate_multi_query", fake_generate_multi_query
+        )
+        monkeypatch.setattr(
+            literature_rag, "_search_single_query", failing_search_single_query
+        )
+
+        result = await literature_rag.search_fulltext_rag("ICAM1 fibrosis", "all")
+
+        assert result == []
+
+    @pytest.mark.asyncio
+    async def test_search_fulltext_rag_strict_raises_when_all_standard_queries_error(
+        self, monkeypatch
+    ):
+        literature_rag.reset_rag_state()
+        literature_rag._RAG_STATE["collection_ids"]["all"] = "collection-id"
+
+        async def fake_agentic_search_with_sni(query, collection_id, limit, search_type):
+            return []
+
+        async def fake_generate_multi_query(query, num_queries=5):
+            return [query, f"{query} mechanism"]
+
+        async def failing_search_single_query(
+            query, collection_id, limit, search_type, strict: bool = False
+        ):
+            raise RuntimeError(f"standard search failed for {query}")
+
+        monkeypatch.setattr(
+            literature_rag,
+            "_agentic_search_with_sni",
+            fake_agentic_search_with_sni,
+        )
+        monkeypatch.setattr(
+            literature_rag, "generate_multi_query", fake_generate_multi_query
+        )
+        monkeypatch.setattr(
+            literature_rag, "_search_single_query", failing_search_single_query
+        )
+
+        with pytest.raises(literature_rag.RAGSearchError):
+            await literature_rag.search_fulltext_rag(
+                "ICAM1 fibrosis", "all", strict=True
+            )
+
+    @pytest.mark.asyncio
+    async def test_search_fulltext_rag_strict_returns_empty_for_successful_zero_hits(
+        self, monkeypatch
+    ):
+        literature_rag.reset_rag_state()
+        literature_rag._RAG_STATE["collection_ids"]["all"] = "collection-id"
+
+        async def fake_agentic_search_with_sni(query, collection_id, limit, search_type):
+            return []
+
+        async def fake_generate_multi_query(query, num_queries=5):
+            return [query]
+
+        saw_strict = False
+
+        async def zero_hit_search_single_query(
+            query, collection_id, limit, search_type, strict: bool = False
+        ):
+            nonlocal saw_strict
+            saw_strict = strict
+            return []
+
+        monkeypatch.setattr(
+            literature_rag,
+            "_agentic_search_with_sni",
+            fake_agentic_search_with_sni,
+        )
+        monkeypatch.setattr(
+            literature_rag, "generate_multi_query", fake_generate_multi_query
+        )
+        monkeypatch.setattr(
+            literature_rag, "_search_single_query", zero_hit_search_single_query
+        )
+
+        result = await literature_rag.search_fulltext_rag(
+            "ICAM1 fibrosis", "all", strict=True
+        )
+
+        assert result == []
+        assert saw_strict is True
 
 
 class TestResolvePathFallback:

@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+import asyncio
 import json
+import time
 from pathlib import Path
+
+import pytest
 
 from src.agents.deep_interpreter import claim_rag_validation
 
@@ -240,6 +244,36 @@ def test_validate_claims_retrieves_only_high_risk_biological_claims(
     ]
 
 
+def test_validate_claims_caps_skipped_claim_details_when_low_risk_claims_exceed_sample_limit(
+    tmp_path: Path,
+) -> None:
+    max_samples = claim_rag_validation.MAX_SKIPPED_CLAIM_SAMPLES
+    claim_count = max_samples + 3
+    _write_papers(tmp_path / "papers.json")
+    low_risk_claims = "\n".join(
+        f"Spatial cluster {index} contains marker-enriched cells (PMID: 11111111)."
+        for index in range(claim_count)
+    )
+    (tmp_path / "part1_final.md").write_text(
+        "## Analysis 1-1\n"
+        "### Biological Interpretation\n"
+        f"{low_risk_claims}\n"
+        "### References\n"
+        "- PMID: 11111111\n",
+        encoding="utf-8",
+    )
+
+    result = claim_rag_validation.validate_claims(
+        tmp_path, ("part1_final.md",), llm=FakeStructuredModel()
+    )
+
+    assert result["selection"]["extracted_claim_count"] == claim_count
+    assert result["selection"]["selected_claim_count"] == 0
+    assert result["selection"]["skipped_claim_count"] == claim_count
+    assert len(result["selection"]["skipped_claims"]) == max_samples
+    assert result["selection"]["skipped_claims_truncated"] is True
+
+
 class BatchLimitedStructuredModel:
     def __init__(self) -> None:
         self.batch_sizes: list[int] = []
@@ -288,6 +322,25 @@ def test_create_judge_llm_uses_bounded_reasoning_configuration(monkeypatch) -> N
     }
 
 
+def test_create_judge_llm_uses_vllm_thinking_configuration(monkeypatch) -> None:
+    captured: dict[str, object] = {}
+    monkeypatch.setattr(
+        claim_rag_validation,
+        "create_llm",
+        lambda provider, **kwargs: captured.update(provider=provider, **kwargs)
+        or object(),
+    )
+
+    claim_rag_validation._create_judge_llm("vllm")
+
+    assert captured == {
+        "provider": "vllm",
+        "enable_thinking": True,
+        "num_predict": 3000,
+        "request_timeout": 300.0,
+    }
+
+
 class TimeoutPrimaryModel(BatchLimitedStructuredModel):
     def invoke(self, messages):
         payload = json.loads(
@@ -314,6 +367,45 @@ class FailingFallbackModel(SingleClaimFallbackModel):
         )
         self.batch_sizes.append(len(payload))
         raise RuntimeError("fallback failed")
+
+
+class SlowAsyncStructuredModel:
+    def with_structured_output(self, _schema):
+        return self
+
+    async def ainvoke(self, _messages):
+        await asyncio.sleep(0.05)
+        return claim_rag_validation.ClaimJudgmentBatch(judgments=[])
+
+
+def test_invoke_judgment_enforces_total_wall_clock_timeout() -> None:
+    group = {
+        "file": "synthesis.md",
+        "section": "## Therapeutic Implications",
+        "claims": [
+            {
+                "index": 0,
+                "claim": "TGFB drives fibrosis.",
+                "candidate_pmids": ["11111111"],
+                "evidence": [
+                    {
+                        "pmid": "11111111",
+                        "source": "abstract",
+                        "text": "TGFB is associated with fibrosis.",
+                    }
+                ],
+            }
+        ],
+    }
+
+    start = time.perf_counter()
+    with pytest.raises(TimeoutError):
+        claim_rag_validation._invoke_judgment(
+            SlowAsyncStructuredModel(), group, timeout_seconds=0.01
+        )
+    elapsed = time.perf_counter() - start
+
+    assert elapsed < 0.2
 
 
 def test_judge_group_falls_back_to_single_claim_batches_after_primary_timeout() -> None:
@@ -390,6 +482,64 @@ def test_judge_group_does_not_persist_failed_judge_results() -> None:
     results = claim_rag_validation._judge_group(group, primary, fallback, checkpoint, flush)
 
     assert results[0]["reason"] == "Claim judge failed: RuntimeError."
+    assert checkpoint["batches"] == {}
+    assert flushes == 0
+
+
+def test_judge_group_does_not_persist_batch_when_judge_omits_evidence_claim() -> None:
+    class OmitSecondClaimModel(BatchLimitedStructuredModel):
+        def invoke(self, messages):
+            payload = json.loads(
+                messages[0].content.split("Claims and evidence:\n", maxsplit=1)[1]
+            )
+            self.batch_sizes.append(len(payload))
+            return claim_rag_validation.ClaimJudgmentBatch(
+                judgments=[
+                    claim_rag_validation.ClaimJudgment(
+                        claim_index=payload[0]["claim_index"],
+                        status="supported",
+                        reason="The supplied evidence directly supports the claim.",
+                        supporting_pmids=["11111111"],
+                        evidence_quote="Evidence supports the claim.",
+                    )
+                ]
+            )
+
+    model = OmitSecondClaimModel()
+    checkpoint = {"version": 1, "batches": {}}
+    flushes = 0
+    group = {
+        "file": "synthesis.md",
+        "section": "## Therapeutic Implications",
+        "claims": [
+            {
+                "index": index,
+                "claim": f"Claim {index} is supported.",
+                "candidate_pmids": ["11111111"],
+                "hedged": False,
+                "file": "synthesis.md",
+                "section": "## Therapeutic Implications",
+                "evidence": [
+                    {
+                        "pmid": "11111111",
+                        "source": "abstract",
+                        "text": "Evidence supports the claim.",
+                    }
+                ],
+            }
+            for index in range(2)
+        ],
+    }
+
+    def flush() -> None:
+        nonlocal flushes
+        flushes += 1
+
+    results = claim_rag_validation._judge_group(group, model, None, checkpoint, flush)
+
+    assert model.batch_sizes == [2]
+    assert [item["status"] for item in results] == ["supported", "unverifiable"]
+    assert results[1]["reason"] == "Claim judge omitted this claim."
     assert checkpoint["batches"] == {}
     assert flushes == 0
 
@@ -571,6 +721,212 @@ def test_missing_evidence_becomes_warning_without_model_call(
 
     assert result["claims"][0]["status"] == "unverifiable"
     assert result["issues"][0]["severity"] == "warning"
+
+
+def test_retrieval_outage_is_unverifiable_without_judge_or_checkpoint(
+    tmp_path: Path, monkeypatch
+) -> None:
+    (tmp_path / "papers.json").write_text(
+        json.dumps({"papers": [{"pmid": "11111111", "abstract": ""}]}),
+        encoding="utf-8",
+    )
+    (tmp_path / "part1_final.md").write_text(
+        "## Analysis 1-1\n"
+        "### Biological Interpretation\n"
+        "TGFB drives fibrosis (PMID: 11111111).\n"
+        "### References\n"
+        "- PMID: 11111111\n",
+        encoding="utf-8",
+    )
+
+    def fail_search(_args):
+        raise RuntimeError("rag down")
+
+    monkeypatch.setattr(
+        claim_rag_validation.search_literature_fulltext, "invoke", fail_search
+    )
+
+    class FailModel:
+        def with_structured_output(self, _schema):
+            raise AssertionError("Retrieval failure must not invoke the judge")
+
+    result = claim_rag_validation.validate_claims(
+        tmp_path, ("part1_final.md",), llm=FailModel()
+    )
+
+    assert result["claims"][0]["status"] == "unverifiable"
+    assert (
+        result["claims"][0]["reason"]
+        == "Literature retrieval failed: RuntimeError: rag down."
+    )
+    assert not (
+        tmp_path / claim_rag_validation.CLAIM_RAG_CHECKPOINT_FILENAME
+    ).exists()
+
+
+def test_validate_claims_does_not_cache_transient_retrieval_failures(
+    tmp_path: Path, monkeypatch
+) -> None:
+    (tmp_path / "papers.json").write_text(
+        json.dumps({"papers": [{"pmid": "11111111", "abstract": ""}]}),
+        encoding="utf-8",
+    )
+    (tmp_path / "part1_final.md").write_text(
+        "## Analysis 1-1\n"
+        "### Biological Interpretation\n"
+        "TGFB drives fibrosis (PMID: 11111111).\n"
+        "### References\n"
+        "- PMID: 11111111\n",
+        encoding="utf-8",
+    )
+    searches = 0
+
+    def transient_search(_args):
+        nonlocal searches
+        searches += 1
+        if searches == 1:
+            raise RuntimeError("rag down")
+        return [
+            {
+                "page_content": "TGFB drives fibrosis.",
+                "metadata": {"filename": "pmid_11111111.txt"},
+                "score": 0.8,
+            }
+        ]
+
+    class SupportedModel:
+        calls = 0
+
+        def with_structured_output(self, _schema):
+            return self
+
+        def invoke(self, _messages):
+            self.calls += 1
+            return claim_rag_validation.ClaimJudgmentBatch(
+                judgments=[
+                    claim_rag_validation.ClaimJudgment(
+                        claim_index=0,
+                        status="supported",
+                        reason="The supplied evidence directly supports the claim.",
+                        supporting_pmids=["11111111"],
+                        evidence_quote="TGFB drives fibrosis.",
+                    )
+                ]
+            )
+
+    monkeypatch.setattr(
+        claim_rag_validation.search_literature_fulltext, "invoke", transient_search
+    )
+    cache: dict[str, list[dict]] = {}
+    model = SupportedModel()
+
+    first = claim_rag_validation.validate_claims(
+        tmp_path, ("part1_final.md",), llm=model, cache=cache
+    )
+    second = claim_rag_validation.validate_claims(
+        tmp_path, ("part1_final.md",), llm=model, cache=cache
+    )
+
+    assert first["claims"][0]["reason"].startswith("Literature retrieval failed:")
+    assert searches == 2
+    assert model.calls == 1
+    assert second["claims"][0]["status"] == "supported"
+
+
+def test_validate_claims_uses_strict_search_and_retries_strict_failures(
+    tmp_path: Path, monkeypatch
+) -> None:
+    (tmp_path / "papers.json").write_text(
+        json.dumps({"papers": [{"pmid": "11111111", "abstract": ""}]}),
+        encoding="utf-8",
+    )
+    (tmp_path / "part1_final.md").write_text(
+        "## Analysis 1-1\n"
+        "### Biological Interpretation\n"
+        "TGFB drives fibrosis (PMID: 11111111).\n"
+        "### References\n"
+        "- PMID: 11111111\n",
+        encoding="utf-8",
+    )
+    calls: list[dict[str, object]] = []
+
+    def strict_failure(args):
+        calls.append(args)
+        if args.get("strict") is True:
+            raise RuntimeError("strict rag down")
+        return []
+
+    monkeypatch.setattr(
+        claim_rag_validation.search_literature_fulltext, "invoke", strict_failure
+    )
+
+    class FailModel:
+        def with_structured_output(self, _schema):
+            raise AssertionError("Retrieval failure must not invoke the judge")
+
+    cache: dict[str, list[dict]] = {}
+
+    first = claim_rag_validation.validate_claims(
+        tmp_path, ("part1_final.md",), llm=FailModel(), cache=cache
+    )
+    second = claim_rag_validation.validate_claims(
+        tmp_path, ("part1_final.md",), llm=FailModel(), cache=cache
+    )
+
+    assert [call["strict"] for call in calls] == [True, True]
+    assert first["claims"][0]["reason"].startswith("Literature retrieval failed:")
+    assert second["claims"][0]["reason"].startswith("Literature retrieval failed:")
+    assert cache == {}
+
+
+def test_validate_claims_does_not_fallback_to_abstract_or_cache_when_strict_search_fails(
+    tmp_path: Path, monkeypatch
+) -> None:
+    (tmp_path / "papers.json").write_text(
+        json.dumps(
+            {
+                "papers": [
+                    {
+                        "pmid": "11111111",
+                        "abstract": "TGFB drives fibrosis in disease tissue.",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / "part1_final.md").write_text(
+        "## Analysis 1-1\n"
+        "### Biological Interpretation\n"
+        "TGFB drives fibrosis (PMID: 11111111).\n"
+        "### References\n"
+        "- PMID: 11111111\n",
+        encoding="utf-8",
+    )
+
+    def fail_search(_args):
+        raise RuntimeError("strict rag down")
+
+    monkeypatch.setattr(
+        claim_rag_validation.search_literature_fulltext, "invoke", fail_search
+    )
+
+    class FailModel:
+        def with_structured_output(self, _schema):
+            raise AssertionError("Retrieval failure must not invoke the judge")
+
+    cache: dict[str, list[dict]] = {}
+
+    result = claim_rag_validation.validate_claims(
+        tmp_path, ("part1_final.md",), llm=FailModel(), cache=cache
+    )
+
+    assert result["claims"][0]["status"] == "unverifiable"
+    assert result["claims"][0]["reason"].startswith("Literature retrieval failed:")
+    assert not (
+        tmp_path / claim_rag_validation.CLAIM_RAG_CHECKPOINT_FILENAME
+    ).exists()
+    assert cache == {}
 
 
 def test_section_cache_skips_unchanged_retrieval_and_judgment(

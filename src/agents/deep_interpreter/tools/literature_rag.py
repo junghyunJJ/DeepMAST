@@ -35,6 +35,10 @@ from src.agents.deep_interpreter.tools.mcp_clients import (
 logger = logging.getLogger(__name__)
 
 
+class RAGSearchError(RuntimeError):
+    """Raised when strict RAG search cannot complete."""
+
+
 # =============================================================================
 # Async-safe file I/O helpers
 # =============================================================================
@@ -1293,6 +1297,7 @@ async def _search_single_query(
     collection_id: str,
     limit: int,
     search_type: str,
+    strict: bool = False,
 ) -> list[dict]:
     """Internal single-query search (no multi_query).
 
@@ -1318,6 +1323,8 @@ async def _search_single_query(
                 break
 
         if search_tool is None:
+            if strict:
+                raise RAGSearchError("RAG search_documents tool not found")
             return []
 
         result = await search_tool.ainvoke({
@@ -1382,6 +1389,8 @@ async def _search_single_query(
 
     except Exception as e:
         logger.warning(f"Single query search failed: {e}")
+        if strict:
+            raise
         return []
 
 
@@ -1465,6 +1474,7 @@ async def search_fulltext_rag(
     collection_name: str,
     limit: int = 10,
     search_type: str = "hybrid",
+    strict: bool = False,
 ) -> list[dict]:
     """Search indexed papers using multi-query semantic/hybrid search.
 
@@ -1500,16 +1510,22 @@ async def search_fulltext_rag(
     if collection_id is None:
         logger.debug(f"search_fulltext_rag: Collection {collection_name} not found in cache or DB")
         logger.warning(f"Collection {collection_name} not indexed")
+        if strict:
+            raise RAGSearchError(f"Collection {collection_name} not indexed")
         return []
 
     logger.debug(f"search_fulltext_rag: Using collection_id: {collection_id}")
 
-    agentic_results = await _agentic_search_with_sni(
-        query=query,
-        collection_id=collection_id,
-        limit=limit,
-        search_type=search_type,
-    )
+    try:
+        agentic_results = await _agentic_search_with_sni(
+            query=query,
+            collection_id=collection_id,
+            limit=limit,
+            search_type=search_type,
+        )
+    except Exception as e:
+        logger.warning("SNI agentic search failed: %r", e, exc_info=True)
+        agentic_results = []
     if agentic_results:
         return agentic_results
 
@@ -1519,14 +1535,34 @@ async def search_fulltext_rag(
 
     # Search with each query and collect all results
     all_results = []
+    errors = []
     for i, q in enumerate(queries):
         q_preview = q[:50] + "..." if len(q) > 50 else q
         logger.debug(f"search_fulltext_rag: searching query {i+1}/{len(queries)}: {q_preview}")
-        results = await _search_single_query(q, collection_id, limit=3, search_type=search_type)
+        try:
+            if strict:
+                results = await _search_single_query(
+                    q,
+                    collection_id,
+                    limit=3,
+                    search_type=search_type,
+                    strict=True,
+                )
+            else:
+                results = await _search_single_query(
+                    q, collection_id, limit=3, search_type=search_type
+                )
+        except Exception as e:
+            errors.append(e)
+            logger.warning(f"Standard query search failed: {e}")
+            continue
         all_results.extend(results)
         logger.debug(f"  -> got {len(results)} results (total: {len(all_results)})")
 
     logger.debug(f"search_fulltext_rag: total {len(all_results)} results from multi-query")
+
+    if strict and errors and len(errors) == len(queries):
+        raise RAGSearchError(f"All standard RAG queries failed: {errors[0]}")
 
     # Deduplicate by content (keep highest score)
     seen = {}
@@ -2002,6 +2038,7 @@ def search_literature_fulltext(
     part_name: str = "part1",
     limit: int = 5,
     data_dir: str = "",
+    strict: bool = False,
 ) -> list[dict]:
     """Search full-text papers using semantic search (RAG mode only).
 
@@ -2011,6 +2048,8 @@ def search_literature_fulltext(
         limit: Maximum results to return
         data_dir: Data directory used to namespace the RAG collection.
             Falls back to DEEP_INTERPRETER_DATA_DIR, then legacy part_name.
+        strict: Raise RAGSearchError for RAG infrastructure failures instead
+            of returning [].
 
     Returns:
         List of relevant text chunks with:
@@ -2037,15 +2076,25 @@ def search_literature_fulltext(
     if not _RAG_STATE.get("available"):
         logger.debug("search_literature_fulltext: RAG not available, returning empty results")
         logger.debug("RAG not available, returning empty results")
+        if strict:
+            raise RAGSearchError("RAG not available")
         return []
 
     try:
         collection_key = _rag_collection_key(part_name, data_dir)
-        result = run_async(search_fulltext_rag(query, collection_key, limit), timeout=300)
+        if strict:
+            search = search_fulltext_rag(query, collection_key, limit, strict=True)
+        else:
+            search = search_fulltext_rag(query, collection_key, limit)
+        result = run_async(search, timeout=300)
         logger.debug(f"search_literature_fulltext: returning {len(result)} results")
         return result
     except Exception as e:
         logger.warning(f"Full-text search failed: {type(e).__name__}: {e}")
+        if strict:
+            if isinstance(e, RAGSearchError):
+                raise
+            raise RAGSearchError(str(e)) from e
         return []
 
 
