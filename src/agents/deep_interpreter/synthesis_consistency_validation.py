@@ -324,9 +324,11 @@ def _extract_quantitative_facts(paths: tuple[Path, ...]) -> dict[str, dict[str, 
 
 
 def _synthesis_quant_matches(text: str) -> list[re.Match[str]]:
-    return [
+    matches = [
         match for match in _QUANT_RE.finditer(text) if not _LR_RE.search(match.group(0))
     ]
+    matches.extend(_QUANT_HEADING_RE.finditer(text))
+    return sorted(matches, key=lambda match: match.start())
 
 
 def _add_source_warning(issues: list[dict[str, Any]], name: str) -> None:

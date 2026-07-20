@@ -247,6 +247,31 @@ def test_part_numeric_heading_facts_are_extracted_without_free_text(tmp_path: Pa
     assert issue["replacement"] == "-5.480"
 
 
+def test_synthesis_numeric_heading_mismatch_is_repairable(tmp_path: Path) -> None:
+    _write_base_sources(tmp_path)
+    (tmp_path / "part1_final.md").write_text(
+        "### Factor3 estrogen enrichment estimate = -5.480\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "part2_final.md").unlink()
+    (tmp_path / "synthesis.md").write_text(
+        "### Factor3 estrogen enrichment estimate = -4.200\n",
+        encoding="utf-8",
+    )
+
+    result = validate_synthesis_consistency(tmp_path)
+    [issue] = [item for item in result["issues"] if item["severity"] == "error"]
+
+    assert issue["code"] == "synthesis_consistency_quantitative_mismatch"
+    assert issue["value"] == "-4.200"
+    assert issue["replacement"] == "-5.480"
+    assert issue["repairable"] is True
+    assert repair_synthesis_consistency(tmp_path, [issue]) == 1
+    assert (tmp_path / "synthesis.md").read_text(encoding="utf-8") == (
+        "### Factor3 estrogen enrichment estimate = -5.480\n"
+    )
+
+
 def test_source_text_with_no_explicit_anchor_creates_no_issue(tmp_path: Path) -> None:
     _write_base_sources(tmp_path)
     (tmp_path / "part2_final.md").write_text(

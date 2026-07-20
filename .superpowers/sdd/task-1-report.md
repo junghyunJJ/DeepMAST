@@ -105,3 +105,21 @@ Status: DONE
 - Compile command/output:
   - `OPENAI_API_KEY=test uv run python -m py_compile src/agents/deep_interpreter/synthesis_consistency_validation.py tests/agents/deep_interpreter/test_synthesis_consistency_validation.py`
   - Output: passed.
+
+## Final Fix Wave
+
+### Finding: Synthesis-side numeric headings were not parsed
+
+- Changed files:
+  - `src/agents/deep_interpreter/synthesis_consistency_validation.py`
+  - `tests/agents/deep_interpreter/test_synthesis_consistency_validation.py`
+- Fix: `_synthesis_quant_matches` now includes the bounded `_QUANT_HEADING_RE` form and sorts all quantitative matches by source offset, preserving literal replacement safety for heading values.
+- RED command/output:
+  - `OPENAI_API_KEY=test uv run pytest -q tests/agents/deep_interpreter/test_synthesis_consistency_validation.py`
+  - Output: `test_synthesis_numeric_heading_mismatch_is_repairable` failed with `ValueError: not enough values to unpack`.
+- GREEN command/output:
+  - `OPENAI_API_KEY=test uv run pytest -q tests/agents/deep_interpreter/test_synthesis_consistency_validation.py`
+  - Output: `11 passed, 1 warning in 2.52s`.
+- Ruff command/output:
+  - `OPENAI_API_KEY=test uv run ruff check src/agents/deep_interpreter/synthesis_consistency_validation.py tests/agents/deep_interpreter/test_synthesis_consistency_validation.py`
+  - Output: `All checks passed!`.
