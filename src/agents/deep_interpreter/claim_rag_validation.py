@@ -25,6 +25,14 @@ EXPLICIT_HYPOTHESIS_RE = re.compile(
     r"\b(hypothesis|hypothesized|needs validation|requiring validation|novel finding)\b",
     re.IGNORECASE,
 )
+HIGH_RISK_CLAIM_RE = re.compile(
+    r"\b(activat(?:e|es|ed|ing|ion)|caus(?:e|es|ed|ing|al)|"
+    r"drives?|driving|induces?|inhibits?|mediates?|mechanis[ms]?|"
+    r"promotes?|regulat(?:e|es|ed|ing|ion|ory)|suppresses?|"
+    r"therapeutic|therapy|treatment|drug(?:gability)?|target(?:ing)?|"
+    r"resistan(?:ce|t)|sensitive|clinical|prognos(?:is|tic))\b",
+    re.IGNORECASE,
+)
 MAX_CLAIMS_PER_JUDGMENT = 5
 
 
@@ -46,6 +54,10 @@ class _SearchLiteratureFulltext:
 
 
 search_literature_fulltext = _SearchLiteratureFulltext()
+
+
+def _is_high_risk_claim(claim: str) -> bool:
+    return bool(HIGH_RISK_CLAIM_RE.search(claim))
 
 
 def _paper_map(data_dir: Path) -> dict[str, dict[str, Any]]:
@@ -340,8 +352,34 @@ def validate_claims(
     cache = cache if cache is not None else {}
     model = llm
     results: list[dict[str, Any]] = []
+    selection: dict[str, Any] = {
+        "extracted_claim_count": 0,
+        "selected_claim_count": 0,
+        "skipped_claims": [],
+    }
+    selected_groups: list[dict[str, Any]] = []
 
     for group in _extract_claim_groups(data_dir, filenames):
+        selected_claims: list[dict[str, Any]] = []
+        for item in group["claims"]:
+            selection["extracted_claim_count"] += 1
+            if _is_high_risk_claim(str(item["claim"])):
+                selection["selected_claim_count"] += 1
+                selected_claims.append(item)
+                continue
+            selection["skipped_claims"].append(
+                {
+                    "file": group["file"],
+                    "section": group["section"],
+                    "index": item["index"],
+                    "claim": item["claim"],
+                    "reason": "outside_high_risk_scope",
+                }
+            )
+        if selected_claims:
+            selected_groups.append({**group, "claims": selected_claims})
+
+    for group in selected_groups:
         cache_key = json.dumps(group, sort_keys=True, ensure_ascii=False)
         cached = cache.get(cache_key)
         if cached is not None:
@@ -368,4 +406,4 @@ def validate_claims(
         results.extend(judged)
 
     issues = [issue for result in results if (issue := _issue_for(result)) is not None]
-    return {"claims": results, "issues": issues}
+    return {"claims": results, "issues": issues, "selection": selection}

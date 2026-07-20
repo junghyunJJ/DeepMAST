@@ -548,6 +548,50 @@ def test_run_report_guardrail_merges_claim_errors_and_revalidates_after_repair(
     assert final["claim_validation"][0]["status"] == "supported"
 
 
+def test_run_report_guardrail_writes_claim_selection_artifact(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    _write_required_files(tmp_path)
+    monkeypatch.setattr(
+        report_guardrails.validate_report_script,
+        "validate_report",
+        lambda _data_dir: [],
+    )
+    monkeypatch.setattr(
+        report_guardrails.claim_rag_validation,
+        "validate_claims",
+        lambda *_args, **_kwargs: {
+            "claims": [],
+            "issues": [],
+            "selection": {
+                "extracted_claim_count": 3,
+                "selected_claim_count": 2,
+                "skipped_claims": [
+                    {
+                        "file": "part1_final.md",
+                        "section": "## Analysis 1-1",
+                        "index": 1,
+                        "claim": "The spatial pattern contains three clusters (PMID: 11111111).",
+                        "reason": "outside_high_risk_scope",
+                    }
+                ],
+            },
+        },
+    )
+
+    report_guardrails.run_report_guardrail(tmp_path, provider="ollama")
+
+    initial = json.loads(
+        (tmp_path / "report_validation_initial.json").read_text(encoding="utf-8")
+    )
+    assert initial["claim_selection"]["selected_claim_count"] == 2
+    assert initial["claim_selection"]["skipped_claims"][0]["reason"] == (
+        "outside_high_risk_scope"
+    )
+
+
 def test_run_report_guardrail_retries_up_to_three_repairs(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

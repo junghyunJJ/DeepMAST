@@ -191,6 +191,55 @@ class FakeStructuredModel:
         )
 
 
+def test_validate_claims_retrieves_only_high_risk_biological_claims(
+    tmp_path: Path, monkeypatch
+) -> None:
+    _write_papers(tmp_path / "papers.json")
+    (tmp_path / "part1_final.md").write_text(
+        "## Analysis 1-1\n"
+        "### Biological Interpretation\n"
+        "TGFB drives fibrosis (PMID: 11111111).\n"
+        "The spatial pattern contains three clusters (PMID: 11111111).\n"
+        "CXCL12 is a therapeutic target (PMID: 22222222).\n"
+        "### References\n"
+        "- PMID: 11111111\n"
+        "- PMID: 22222222\n",
+        encoding="utf-8",
+    )
+    searched: list[str] = []
+    monkeypatch.setattr(
+        claim_rag_validation.search_literature_fulltext,
+        "invoke",
+        lambda args: searched.append(args["query"])
+        or [
+            {
+                "page_content": "TGFB is associated with fibrosis.",
+                "metadata": {"filename": "pmid_11111111.txt"},
+            }
+        ],
+    )
+
+    result = claim_rag_validation.validate_claims(
+        tmp_path, ("part1_final.md",), llm=FakeStructuredModel()
+    )
+
+    assert searched == [
+        "TGFB drives fibrosis (PMID: 11111111).",
+        "CXCL12 is a therapeutic target (PMID: 22222222).",
+    ]
+    assert result["selection"]["extracted_claim_count"] == 3
+    assert result["selection"]["selected_claim_count"] == 2
+    assert result["selection"]["skipped_claims"] == [
+        {
+            "file": "part1_final.md",
+            "section": "## Analysis 1-1",
+            "index": 1,
+            "claim": "The spatial pattern contains three clusters (PMID: 11111111).",
+            "reason": "outside_high_risk_scope",
+        }
+    ]
+
+
 class BatchLimitedStructuredModel:
     def __init__(self) -> None:
         self.batch_sizes: list[int] = []

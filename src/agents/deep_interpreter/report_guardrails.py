@@ -48,12 +48,15 @@ def _issue_payload(
     issues: list[dict[str, str]],
     claim_validation: list[dict[str, Any]] | None = None,
     consistency_validation: list[dict[str, Any]] | None = None,
+    claim_selection: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     payload: dict[str, Any] = {"issue_count": len(issues), "issues": issues}
     if claim_validation is not None:
         payload["claim_validation"] = claim_validation
     if consistency_validation is not None:
         payload["consistency_validation"] = consistency_validation
+    if claim_selection is not None:
+        payload["claim_selection"] = claim_selection
     return payload
 
 
@@ -62,10 +65,16 @@ def _write_issues(
     issues: list[dict[str, str]],
     claim_validation: list[dict[str, Any]] | None = None,
     consistency_validation: list[dict[str, Any]] | None = None,
+    claim_selection: dict[str, Any] | None = None,
 ) -> None:
     path.write_text(
         json.dumps(
-            _issue_payload(issues, claim_validation, consistency_validation),
+            _issue_payload(
+                issues,
+                claim_validation,
+                consistency_validation,
+                claim_selection,
+            ),
             indent=2,
             ensure_ascii=False,
         )
@@ -134,17 +143,17 @@ def _validate_part_reports(
     *,
     provider: str | None,
     claim_cache: dict[str, list[dict[str, Any]]],
-) -> tuple[list[dict[str, str]], list[dict[str, Any]]]:
+) -> tuple[list[dict[str, str]], list[dict[str, Any]], dict[str, Any] | None]:
     deterministic = validate_report_script.validate_report(data_dir)
     if any(issue.get("code") in PAPERS_JSON_LOAD_ERROR_CODES for issue in deterministic):
-        return deterministic, []
+        return deterministic, [], None
     semantic = claim_rag_validation.validate_claims(
         data_dir,
         REQUIRED_PART_FILES,
         provider=provider,
         cache=claim_cache,
     )
-    return deterministic + semantic["issues"], semantic["claims"]
+    return deterministic + semantic["issues"], semantic["claims"], semantic.get("selection")
 
 
 def validate_synthesis_report(data_dir: str | Path) -> list[dict[str, str]]:
@@ -275,16 +284,22 @@ def run_report_guardrail(data_dir: str | Path, *, provider: str | None = None) -
     final_path = data_dir / "report_validation_final.json"
 
     claim_cache: dict[str, list[dict[str, Any]]] = {}
-    initial_issues, initial_claims = _validate_part_reports(
+    initial_issues, initial_claims, initial_selection = _validate_part_reports(
         data_dir,
         provider=provider,
         claim_cache=claim_cache,
     )
-    _write_issues(initial_path, initial_issues, initial_claims)
+    _write_issues(
+        initial_path,
+        initial_issues,
+        initial_claims,
+        claim_selection=initial_selection,
+    )
     initial_error_count = _error_count(initial_issues)
 
     current_issues = initial_issues
     current_claims = initial_claims
+    current_selection = initial_selection
     issues_path = initial_path
     changed_sections = 0
     repair_attempt_count = 0
@@ -300,18 +315,28 @@ def run_report_guardrail(data_dir: str | Path, *, provider: str | None = None) -
         )
         repair_attempt_count += 1
         changed_sections += changed
-        current_issues, current_claims = _validate_part_reports(
+        current_issues, current_claims, current_selection = _validate_part_reports(
             data_dir,
             provider=provider,
             claim_cache=claim_cache,
         )
-        _write_issues(final_path, current_issues, current_claims)
+        _write_issues(
+            final_path,
+            current_issues,
+            current_claims,
+            claim_selection=current_selection,
+        )
         if changed == 0:
             break
         issues_path = final_path
 
     final_issues = current_issues
-    _write_issues(final_path, final_issues, current_claims)
+    _write_issues(
+        final_path,
+        final_issues,
+        current_claims,
+        claim_selection=current_selection,
+    )
     final_error_count = _error_count(final_issues)
 
     return {
