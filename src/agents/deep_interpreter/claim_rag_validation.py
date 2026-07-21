@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import os
 import re
+import time
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, Literal
@@ -49,7 +51,9 @@ MAX_SKIPPED_CLAIM_SAMPLES = 50
 CLAIM_RAG_CHECKPOINT_FILENAME = "claim_rag_checkpoint.json"
 DEFAULT_JUDGE_NUM_PREDICT = 3000
 DEFAULT_JUDGE_TIMEOUT_SECONDS = 300.0
+DEFAULT_PRIMARY_JUDGE_TIMEOUT_SECONDS = 180.0
 DEFAULT_SINGLE_CLAIM_TIMEOUT_SECONDS = 120.0
+DEADLINE_EXHAUSTED_REASON = "Claim judge batch deadline exhausted."
 
 
 class ClaimJudgment(BaseModel):
@@ -90,11 +94,21 @@ def _judge_timeout_seconds(*, single_claim: bool = False) -> float:
     return _positive_float_env(
         "CLAIM_RAG_SINGLE_CLAIM_TIMEOUT_SECONDS"
         if single_claim
-        else "CLAIM_RAG_JUDGE_TIMEOUT_SECONDS",
+        else "CLAIM_RAG_PRIMARY_JUDGE_TIMEOUT_SECONDS",
         DEFAULT_SINGLE_CLAIM_TIMEOUT_SECONDS
         if single_claim
-        else DEFAULT_JUDGE_TIMEOUT_SECONDS,
+        else DEFAULT_PRIMARY_JUDGE_TIMEOUT_SECONDS,
     )
+
+
+def _judge_batch_deadline_seconds() -> float:
+    return _positive_float_env(
+        "CLAIM_RAG_JUDGE_TIMEOUT_SECONDS", DEFAULT_JUDGE_TIMEOUT_SECONDS
+    )
+
+
+def _judge_batch_size(provider: str | None) -> int:
+    return 1 if (provider or "").lower() == "ollama" else MAX_CLAIMS_PER_JUDGMENT
 
 
 def _create_judge_llm(provider: str | None, *, single_claim: bool = False) -> Any:
@@ -398,6 +412,7 @@ def _has_incomplete_judge_result(results: list[dict[str, Any]]) -> bool:
     return any(
         str(item.get("reason", "")).startswith("Claim judge failed:")
         or str(item.get("reason", "")) == "Claim judge omitted this claim."
+        or str(item.get("reason", "")) == DEADLINE_EXHAUSTED_REASON
         or str(item.get("reason", "")).startswith("Literature retrieval failed:")
         for item in results
     )
@@ -413,7 +428,10 @@ def _invoke_judgment(
     if hasattr(structured_model, "ainvoke"):
         response = run_async(structured_model.ainvoke(messages), timeout=timeout_seconds)
     else:
-        response = structured_model.invoke(messages)
+        response = run_async(
+            asyncio.to_thread(structured_model.invoke, messages),
+            timeout=timeout_seconds,
+        )
     return response.judgments
 
 
@@ -438,12 +456,27 @@ def _judge_source_batch(
     }
     judgments: dict[int, ClaimJudgment] = {}
     failed: dict[int, dict[str, Any]] = {}
+    deadline = time.monotonic() + _judge_batch_deadline_seconds()
     primary_timeout = _judge_timeout_seconds()
     fallback_timeout = _judge_timeout_seconds(single_claim=True)
+
+    def remaining_timeout(requested: float) -> float | None:
+        remaining = deadline - time.monotonic()
+        return min(requested, remaining) if remaining > 0 else None
+
+    def exhaust_deadline(items: list[dict[str, Any]]) -> None:
+        stats["judge_deadline_exhaustion_count"] += len(items)
+        for item in items:
+            failed[item["index"]] = _unverifiable(item, DEADLINE_EXHAUSTED_REASON)
+
     if evidence_items:
         try:
             if model is None and get_model is not None:
                 model = get_model()
+            timeout = remaining_timeout(primary_timeout)
+            if timeout is None:
+                exhaust_deadline(evidence_items)
+                raise TimeoutError(DEADLINE_EXHAUSTED_REASON)
             stats["judgment_batch_count"] += 1
             judgments.update(
                 {
@@ -451,12 +484,18 @@ def _judge_source_batch(
                     for item in _invoke_judgment(
                         model,
                         {**group, "claims": evidence_items},
-                        timeout_seconds=primary_timeout,
+                        timeout_seconds=timeout,
                     )
                 }
             )
         except Exception as primary_exc:
-            for item in evidence_items:
+            for offset, item in enumerate(evidence_items):
+                if item["index"] in failed:
+                    continue
+                timeout = remaining_timeout(fallback_timeout)
+                if timeout is None:
+                    exhaust_deadline(evidence_items[offset:])
+                    break
                 try:
                     if fallback_model is None and get_fallback_model is not None:
                         fallback_model = get_fallback_model()
@@ -469,7 +508,7 @@ def _judge_source_batch(
                             for judgment in _invoke_judgment(
                                 fallback_model,
                                 {**group, "claims": [item]},
-                                timeout_seconds=fallback_timeout,
+                                timeout_seconds=timeout,
                             )
                         }
                     )
@@ -525,6 +564,7 @@ def _judge_group(
     stats: dict[str, int] | None = None,
     get_model: Any | None = None,
     get_fallback_model: Any | None = None,
+    provider: str | None = None,
 ) -> list[dict[str, Any]]:
     checkpoint = checkpoint if checkpoint is not None else {"version": 1, "batches": {}}
     batches = checkpoint.setdefault("batches", {})
@@ -534,10 +574,12 @@ def _judge_group(
         "checkpoint_hits": 0,
         "judgment_batch_count": 0,
         "single_claim_fallback_count": 0,
+        "judge_deadline_exhaustion_count": 0,
     }
     results: list[dict[str, Any]] = []
-    for start in range(0, len(group["claims"]), MAX_CLAIMS_PER_JUDGMENT):
-        batch = group["claims"][start : start + MAX_CLAIMS_PER_JUDGMENT]
+    batch_size = _judge_batch_size(provider)
+    for start in range(0, len(group["claims"]), batch_size):
+        batch = group["claims"][start : start + batch_size]
         key = _checkpoint_key(group, batch)
         saved = batches.get(key)
         if isinstance(saved, dict) and isinstance(saved.get("results"), list):
@@ -628,6 +670,7 @@ def validate_claims(
     cache: dict[str, list[dict[str, Any]]] | None = None,
 ) -> dict[str, Any]:
     data_dir = Path(data_dir).expanduser().resolve()
+    effective_provider = provider or os.getenv("LLM_PROVIDER", "openai")
     cache = cache if cache is not None else {}
     model = llm
     fallback_model: Any | None = None
@@ -637,6 +680,7 @@ def validate_claims(
         "checkpoint_hits": 0,
         "judgment_batch_count": 0,
         "single_claim_fallback_count": 0,
+        "judge_deadline_exhaustion_count": 0,
     }
     results: list[dict[str, Any]] = []
     selection: dict[str, Any] = {
@@ -651,6 +695,8 @@ def validate_claims(
         "checkpoint_hits": 0,
         "judgment_batch_count": 0,
         "single_claim_fallback_count": 0,
+        "judge_batch_size": _judge_batch_size(effective_provider),
+        "judge_deadline_exhaustion_count": 0,
     }
     selected_groups: list[dict[str, Any]] = []
 
@@ -710,13 +756,13 @@ def validate_claims(
         def get_fallback_model() -> Any:
             nonlocal fallback_model
             if fallback_model is None:
-                fallback_model = _create_judge_llm(provider, single_claim=True)
+                fallback_model = _create_judge_llm(effective_provider, single_claim=True)
             return fallback_model
 
         def get_model() -> Any:
             nonlocal model
             if model is None:
-                model = _create_judge_llm(provider)
+                model = _create_judge_llm(effective_provider)
             return model
 
         judged = _judge_group(
@@ -729,6 +775,7 @@ def validate_claims(
             stats=stats,
             get_model=get_model,
             get_fallback_model=get_fallback_model,
+            provider=effective_provider,
         )
         if not _has_incomplete_judge_result(judged):
             cache[cache_key] = judged

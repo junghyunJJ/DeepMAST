@@ -4,6 +4,7 @@ import asyncio
 import json
 import time
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -505,13 +506,15 @@ def test_inline_pairs_bypass_the_non_inline_selection_cap(
     )
 
     result = claim_rag_validation.validate_claims(
-        tmp_path, ("part1_final.md",), llm=EchoSupportingPmidsModel()
+        tmp_path, ("part1_final.md",), provider="openai", llm=EchoSupportingPmidsModel()
     )
 
     assert result["selection"]["non_inline_selected_count"] == 30
     assert result["selection"]["inline_citation_expected_count"] == 2
     assert result["selection"]["selected_claim_count"] == 32
     assert result["inline_citation_coverage"]["expected_count"] == 2
+    assert result["selection"]["judge_batch_size"] == 5
+    assert result["selection"]["judge_deadline_exhaustion_count"] == 0
 
 
 def test_unknown_inline_pmid_is_expected_in_incomplete_coverage(tmp_path: Path) -> None:
@@ -624,7 +627,7 @@ def test_create_judge_llm_uses_bounded_reasoning_configuration(monkeypatch) -> N
         "provider": "ollama",
         "reasoning": False,
         "num_predict": 3000,
-        "request_timeout": 300.0,
+        "request_timeout": 180.0,
     }
 
 
@@ -643,7 +646,7 @@ def test_create_judge_llm_uses_vllm_thinking_configuration(monkeypatch) -> None:
         "provider": "vllm",
         "enable_thinking": False,
         "num_predict": 3000,
-        "request_timeout": 300.0,
+        "request_timeout": 180.0,
     }
 
     captured.clear()
@@ -653,8 +656,52 @@ def test_create_judge_llm_uses_vllm_thinking_configuration(monkeypatch) -> None:
         "provider": "ollama-openai",
         "enable_thinking": False,
         "num_predict": 3000,
-        "request_timeout": 300.0,
+        "request_timeout": 180.0,
     }
+
+
+def test_ollama_uses_one_claim_per_judgment() -> None:
+    assert claim_rag_validation._judge_batch_size("ollama") == 1
+    assert claim_rag_validation._judge_batch_size("vllm") == 5
+
+
+def test_validate_claims_uses_ollama_one_claim_batches(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_papers(tmp_path / "papers.json")
+    (tmp_path / "part1_final.md").write_text(
+        "## Analysis 1-1\n"
+        "### Biological Interpretation\n"
+        "TGFB drives fibrosis (PMID: 11111111).\n"
+        "CXCL12 regulates immune migration (PMID: 22222222).\n"
+        "### References\n"
+        "- PMID: 11111111\n"
+        "- PMID: 22222222\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        claim_rag_validation.search_literature_fulltext,
+        "invoke",
+        lambda args: [
+            {
+                "page_content": "Evidence supports the claim.",
+                "metadata": {
+                    "filename": "pmid_22222222.txt"
+                    if "CXCL12" in args["query"]
+                    else "pmid_11111111.txt"
+                },
+            }
+        ],
+    )
+    model = BatchLimitedStructuredModel()
+
+    result = claim_rag_validation.validate_claims(
+        tmp_path, ("part1_final.md",), provider="ollama", llm=model
+    )
+
+    assert model.batch_sizes == [1, 1]
+    assert result["selection"]["judge_batch_size"] == 1
+    assert result["selection"]["judge_deadline_exhaustion_count"] == 0
 
 
 class TimeoutPrimaryModel(BatchLimitedStructuredModel):
@@ -758,6 +805,56 @@ def test_invoke_judgment_enforces_total_wall_clock_timeout() -> None:
     elapsed = time.perf_counter() - start
 
     assert elapsed < 0.2
+
+
+def test_batch_deadline_stops_serial_fallbacks(monkeypatch: pytest.MonkeyPatch) -> None:
+    clock = SimpleNamespace(value=0.0)
+    monkeypatch.setattr(claim_rag_validation.time, "monotonic", lambda: clock.value)
+
+    class ExhaustingPrimary(TimeoutPrimaryModel):
+        def invoke(self, messages):
+            clock.value = 301.0
+            return super().invoke(messages)
+
+    batch = [
+        {
+            "index": index,
+            "claim": f"Claim {index}.",
+            "candidate_pmids": ["11111111"],
+            "hedged": False,
+            "file": "part1_final.md",
+            "section": "## Biology",
+            "evidence": [
+                {"pmid": "11111111", "source": "abstract", "text": "Evidence."}
+            ],
+        }
+        for index in range(2)
+    ]
+    primary = ExhaustingPrimary()
+    fallback = SingleClaimFallbackModel()
+
+    stats = {
+        "judgment_batch_count": 0,
+        "single_claim_fallback_count": 0,
+        "judge_deadline_exhaustion_count": 0,
+    }
+
+    results = claim_rag_validation._judge_source_batch(
+        {"file": "part1_final.md", "section": "## Biology"},
+        batch,
+        primary,
+        lambda: primary,
+        fallback,
+        lambda: fallback,
+        stats,
+    )
+
+    assert fallback.batch_sizes == []
+    assert stats["judge_deadline_exhaustion_count"] == 2
+    assert [row["reason"] for row in results] == [
+        "Claim judge batch deadline exhausted.",
+        "Claim judge batch deadline exhausted.",
+    ]
 
 
 def test_judge_group_falls_back_to_single_claim_batches_after_primary_timeout() -> None:
