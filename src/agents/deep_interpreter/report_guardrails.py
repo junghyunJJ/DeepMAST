@@ -49,6 +49,7 @@ def _issue_payload(
     claim_validation: list[dict[str, Any]] | None = None,
     consistency_validation: list[dict[str, Any]] | None = None,
     claim_selection: dict[str, Any] | None = None,
+    inline_citation_coverage: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     payload: dict[str, Any] = {"issue_count": len(issues), "issues": issues}
     if claim_validation is not None:
@@ -57,6 +58,8 @@ def _issue_payload(
         payload["consistency_validation"] = consistency_validation
     if claim_selection is not None:
         payload["claim_selection"] = claim_selection
+    if inline_citation_coverage is not None:
+        payload["inline_citation_coverage"] = inline_citation_coverage
     return payload
 
 
@@ -66,6 +69,7 @@ def _write_issues(
     claim_validation: list[dict[str, Any]] | None = None,
     consistency_validation: list[dict[str, Any]] | None = None,
     claim_selection: dict[str, Any] | None = None,
+    inline_citation_coverage: dict[str, Any] | None = None,
 ) -> None:
     path.write_text(
         json.dumps(
@@ -74,6 +78,7 @@ def _write_issues(
                 claim_validation,
                 consistency_validation,
                 claim_selection,
+                inline_citation_coverage,
             ),
             indent=2,
             ensure_ascii=False,
@@ -143,17 +148,27 @@ def _validate_part_reports(
     *,
     provider: str | None,
     claim_cache: dict[str, list[dict[str, Any]]],
-) -> tuple[list[dict[str, str]], list[dict[str, Any]], dict[str, Any] | None]:
+) -> tuple[
+    list[dict[str, str]],
+    list[dict[str, Any]],
+    dict[str, Any] | None,
+    dict[str, Any] | None,
+]:
     deterministic = validate_report_script.validate_report(data_dir)
     if any(issue.get("code") in PAPERS_JSON_LOAD_ERROR_CODES for issue in deterministic):
-        return deterministic, [], None
+        return deterministic, [], None, None
     semantic = claim_rag_validation.validate_claims(
         data_dir,
         REQUIRED_PART_FILES,
         provider=provider,
         cache=claim_cache,
     )
-    return deterministic + semantic["issues"], semantic["claims"], semantic.get("selection")
+    return (
+        deterministic + semantic["issues"],
+        semantic["claims"],
+        semantic.get("selection"),
+        semantic.get("inline_citation_coverage"),
+    )
 
 
 def validate_synthesis_report(data_dir: str | Path) -> list[dict[str, str]]:
@@ -217,9 +232,24 @@ def validate_synthesis_report(data_dir: str | Path) -> list[dict[str, str]]:
     return issues
 
 
-def repair_synthesis_report(data_dir: str | Path, issues: list[dict[str, str]]) -> int:
+def repair_synthesis_report(
+    data_dir: str | Path,
+    issues: list[dict[str, str]],
+    claim_validation: list[dict[str, Any]] | None = None,
+) -> int:
     data_dir = Path(data_dir).expanduser().resolve()
     changed_claims = 0
+    claim_validation = claim_validation or []
+
+    for issue in issues:
+        if issue.get("severity") != "error":
+            continue
+        if repair_report_script._repair_inline_citation_issue(
+            data_dir,
+            issue,
+            claim_validation,
+        ):
+            changed_claims += 1
 
     path = data_dir / "synthesis.md"
     current = path.read_text(encoding="utf-8")
@@ -266,12 +296,33 @@ def _claim_status_counts(claims: list[dict[str, Any]]) -> dict[str, int]:
 
 def _validate_synthesis_guardrails(
     data_dir: Path,
-) -> tuple[list[dict[str, str]], list[dict[str, Any]], dict[str, list[dict[str, Any]]]]:
+    *,
+    provider: str | None,
+    claim_cache: dict[str, list[dict[str, Any]]],
+) -> tuple[
+    list[dict[str, str]],
+    list[dict[str, Any]],
+    dict[str, list[dict[str, Any]]],
+    dict[str, Any] | None,
+    dict[str, Any] | None,
+]:
     deterministic = validate_synthesis_report(data_dir)
     if any(issue.get("code") in PAPERS_JSON_LOAD_ERROR_CODES for issue in deterministic):
-        return deterministic, [], {"issues": [], "results": []}
+        return deterministic, [], {"issues": [], "results": []}, None, None
+    semantic = claim_rag_validation.validate_claims(
+        data_dir,
+        ("synthesis.md",),
+        provider=provider,
+        cache=claim_cache,
+    )
     consistency = synthesis_consistency_validation.validate_synthesis_consistency(data_dir)
-    return deterministic + consistency["issues"], [], consistency
+    return (
+        deterministic + semantic["issues"] + consistency["issues"],
+        semantic["claims"],
+        consistency,
+        semantic.get("selection"),
+        semantic.get("inline_citation_coverage"),
+    )
 
 
 def run_report_guardrail(data_dir: str | Path, *, provider: str | None = None) -> dict[str, Any]:
@@ -284,7 +335,7 @@ def run_report_guardrail(data_dir: str | Path, *, provider: str | None = None) -
     final_path = data_dir / "report_validation_final.json"
 
     claim_cache: dict[str, list[dict[str, Any]]] = {}
-    initial_issues, initial_claims, initial_selection = _validate_part_reports(
+    initial_issues, initial_claims, initial_selection, initial_coverage = _validate_part_reports(
         data_dir,
         provider=provider,
         claim_cache=claim_cache,
@@ -294,12 +345,14 @@ def run_report_guardrail(data_dir: str | Path, *, provider: str | None = None) -
         initial_issues,
         initial_claims,
         claim_selection=initial_selection,
+        inline_citation_coverage=initial_coverage,
     )
     initial_error_count = _error_count(initial_issues)
 
     current_issues = initial_issues
     current_claims = initial_claims
     current_selection = initial_selection
+    current_coverage = initial_coverage
     issues_path = initial_path
     changed_sections = 0
     repair_attempt_count = 0
@@ -316,7 +369,7 @@ def run_report_guardrail(data_dir: str | Path, *, provider: str | None = None) -
         )
         repair_attempt_count += 1
         changed_sections += changed
-        current_issues, current_claims, current_selection = _validate_part_reports(
+        current_issues, current_claims, current_selection, current_coverage = _validate_part_reports(
             data_dir,
             provider=provider,
             claim_cache=claim_cache,
@@ -326,6 +379,7 @@ def run_report_guardrail(data_dir: str | Path, *, provider: str | None = None) -
             current_issues,
             current_claims,
             claim_selection=current_selection,
+            inline_citation_coverage=current_coverage,
         )
         if changed == 0:
             break
@@ -337,6 +391,7 @@ def run_report_guardrail(data_dir: str | Path, *, provider: str | None = None) -
         final_issues,
         current_claims,
         claim_selection=current_selection,
+        inline_citation_coverage=current_coverage,
     )
     final_error_count = _error_count(final_issues)
 
@@ -360,18 +415,33 @@ def run_synthesis_guardrail(data_dir: str | Path, *, provider: str | None = None
     initial_path = data_dir / "synthesis_guardrail_initial.json"
     final_path = data_dir / "synthesis_guardrail_final.json"
 
-    initial_issues, initial_claims, initial_consistency = _validate_synthesis_guardrails(data_dir)
+    claim_cache: dict[str, list[dict[str, Any]]] = {}
+    (
+        initial_issues,
+        initial_claims,
+        initial_consistency,
+        initial_selection,
+        initial_coverage,
+    ) = _validate_synthesis_guardrails(
+        data_dir,
+        provider=provider,
+        claim_cache=claim_cache,
+    )
     _write_issues(
         initial_path,
         initial_issues,
         initial_claims,
         initial_consistency["results"],
+        claim_selection=initial_selection,
+        inline_citation_coverage=initial_coverage,
     )
     initial_error_count = _error_count(initial_issues)
 
     current_issues = initial_issues
     current_claims = initial_claims
     current_consistency = initial_consistency
+    current_selection = initial_selection
+    current_coverage = initial_coverage
     changed_claims = 0
     repair_attempt_count = 0
 
@@ -379,10 +449,24 @@ def run_synthesis_guardrail(data_dir: str | Path, *, provider: str | None = None
         _error_count(current_issues)
         and repair_attempt_count < MAX_GUARDRAIL_REPAIR_PASSES
     ):
-        changed = repair_synthesis_report(data_dir, current_issues)
+        changed = repair_synthesis_report(
+            data_dir,
+            current_issues,
+            current_claims,
+        )
         repair_attempt_count += 1
         changed_claims += changed
-        current_issues, current_claims, current_consistency = _validate_synthesis_guardrails(data_dir)
+        (
+            current_issues,
+            current_claims,
+            current_consistency,
+            current_selection,
+            current_coverage,
+        ) = _validate_synthesis_guardrails(
+            data_dir,
+            provider=provider,
+            claim_cache=claim_cache,
+        )
         if changed == 0:
             break
 
@@ -392,6 +476,8 @@ def run_synthesis_guardrail(data_dir: str | Path, *, provider: str | None = None
         final_issues,
         current_claims,
         current_consistency["results"],
+        claim_selection=current_selection,
+        inline_citation_coverage=current_coverage,
     )
     final_error_count = _error_count(final_issues)
 
@@ -407,6 +493,8 @@ def run_synthesis_guardrail(data_dir: str | Path, *, provider: str | None = None
         "claims_validated": len(current_claims),
         "claims_by_status": _claim_status_counts(current_claims),
         "validation_results": current_claims,
+        "claim_selection": current_selection,
+        "inline_citation_coverage": current_coverage,
         "consistency_checked": True,
         "consistency_issue_count": len(initial_consistency["issues"]),
         "consistency_validation": current_consistency["results"],

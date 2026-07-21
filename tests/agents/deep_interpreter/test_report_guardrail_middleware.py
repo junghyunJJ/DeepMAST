@@ -167,7 +167,7 @@ def test_run_synthesis_guardrail_repairs_invalid_pmid_and_softens_overclaim(
     assert all(issue["severity"] != "error" for issue in final["issues"])
 
 
-def test_run_synthesis_guardrail_never_calls_claim_rag_and_keeps_empty_claim_artifacts(
+def test_run_synthesis_guardrail_validates_synthesis_claim_rag_artifacts(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from src.agents.deep_interpreter import report_guardrails
@@ -176,17 +176,52 @@ def test_run_synthesis_guardrail_never_calls_claim_rag_and_keeps_empty_claim_art
         json.dumps({"papers": [{"pmid": "11111111", "abstract": "association"}]}),
         encoding="utf-8",
     )
-    claim = "MISTy spatial evidence drives fibrosis (PMID: 11111111)."
+    claim = "MISTy spatial evidence is associated with fibrosis (PMID: 11111111)."
     (tmp_path / "synthesis.md").write_text(
         f"## Cross-Part Themes\n\n{claim}\n",
         encoding="utf-8",
     )
+    called_filenames: list[tuple[str, ...]] = []
 
-    def fail_claim_validate(*_args: Any, **_kwargs: Any) -> dict[str, Any]:
-        raise AssertionError("synthesis guardrail must not call Claim RAG")
+    def fake_claim_validate(
+        _data_dir: Path,
+        filenames: tuple[str, ...],
+        **_kwargs: Any,
+    ) -> dict[str, Any]:
+        called_filenames.append(filenames)
+        return {
+            "claims": [
+                {
+                    "status": "supported",
+                    "claim": claim,
+                    "inline_pmid": "11111111",
+                }
+            ],
+            "issues": [],
+            "selection": {
+                "selected_claim_count": 1,
+                "inline_citation_expected_count": 1,
+            },
+            "inline_citation_coverage": {
+                "expected_count": 1,
+                "evaluated_count": 1,
+                "supported_count": 1,
+                "coverage_complete": True,
+                "citations": [
+                    {
+                        "file": "synthesis.md",
+                        "section": "## Cross-Part Themes",
+                        "source_claim_index": 0,
+                        "inline_pmid": "11111111",
+                        "claim": claim,
+                        "status": "supported",
+                    }
+                ],
+            },
+        }
 
     monkeypatch.setattr(
-        report_guardrails.claim_rag_validation, "validate_claims", fail_claim_validate
+        report_guardrails.claim_rag_validation, "validate_claims", fake_claim_validate
     )
 
     result = report_guardrails.run_synthesis_guardrail(tmp_path, provider="ollama")
@@ -197,20 +232,114 @@ def test_run_synthesis_guardrail_never_calls_claim_rag_and_keeps_empty_claim_art
     final = json.loads(
         (tmp_path / "synthesis_guardrail_final.json").read_text(encoding="utf-8")
     )
-    synthesis = (tmp_path / "synthesis.md").read_text(encoding="utf-8")
     assert result["status"] == "passed"
-    assert result["repair_attempt_count"] == 1
-    assert result["claims_validated"] == 0
-    assert result["claims_by_status"] == {
-        "supported": 0,
-        "overclaimed": 0,
-        "unsupported": 0,
-        "unverifiable": 0,
-    }
-    assert result["validation_results"] == []
-    assert initial["claim_validation"] == []
-    assert final["claim_validation"] == []
-    assert "hypothesis requiring validation" in synthesis.lower()
+    assert called_filenames == [("synthesis.md",)]
+    assert result["claims_validated"] == 1
+    assert result["claims_by_status"]["supported"] == 1
+    assert initial["claim_validation"][0]["inline_pmid"] == "11111111"
+    assert final["claim_validation"][0]["inline_pmid"] == "11111111"
+    assert initial["claim_selection"]["selected_claim_count"] == 1
+    assert final["claim_selection"]["selected_claim_count"] == 1
+    assert initial["inline_citation_coverage"]["coverage_complete"] is True
+    assert final["inline_citation_coverage"]["coverage_complete"] is True
+
+
+def test_run_synthesis_guardrail_removes_only_unsupported_sibling_citation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    (tmp_path / "papers.json").write_text(
+        json.dumps(
+            {
+                "papers": [
+                    {"pmid": "11111111", "abstract": "supported"},
+                    {"pmid": "22222222", "abstract": "unsupported"},
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    claim = "TGFB is associated with fibrosis (PMID: 11111111; PMID: 22222222)."
+    (tmp_path / "synthesis.md").write_text(
+        f"## Cross-Part Themes\n\n{claim}\n",
+        encoding="utf-8",
+    )
+
+    def fake_claim_validate(
+        _data_dir: Path,
+        filenames: tuple[str, ...],
+        **_kwargs: Any,
+    ) -> dict[str, Any]:
+        assert filenames == ("synthesis.md",)
+        text = (tmp_path / "synthesis.md").read_text(encoding="utf-8")
+        has_unsupported = "22222222" in text
+        claims = [
+            {
+                "file": "synthesis.md",
+                "section": "## Cross-Part Themes",
+                "source_claim_index": 0,
+                "inline_pmid": "11111111",
+                "claim": claim,
+                "status": "supported",
+                "supporting_pmids": ["11111111"],
+                "evidence_quote": "supported",
+                "reason": "supported",
+            }
+        ]
+        if has_unsupported:
+            claims.append(
+                {
+                    "file": "synthesis.md",
+                    "section": "## Cross-Part Themes",
+                    "source_claim_index": 0,
+                    "inline_pmid": "22222222",
+                    "claim": claim,
+                    "status": "unsupported",
+                    "supporting_pmids": [],
+                    "evidence_quote": "",
+                    "reason": "unsupported",
+                }
+            )
+        return {
+            "claims": claims,
+            "issues": [
+                {
+                    "code": "inline_citation_unsupported",
+                    "severity": "error",
+                    "file": "synthesis.md",
+                    "section": "## Cross-Part Themes",
+                    "source_claim_index": 0,
+                    "inline_pmid": "22222222",
+                    "value": claim,
+                }
+            ]
+            if has_unsupported
+            else [],
+            "selection": {"selected_claim_count": len(claims)},
+            "inline_citation_coverage": {
+                "expected_count": len(claims),
+                "evaluated_count": len(claims),
+                "supported_count": 1,
+                "coverage_complete": not has_unsupported,
+                "citations": claims,
+            },
+        }
+
+    monkeypatch.setattr(
+        report_guardrails.claim_rag_validation, "validate_claims", fake_claim_validate
+    )
+
+    result = report_guardrails.run_synthesis_guardrail(tmp_path, provider="ollama")
+
+    synthesis = (tmp_path / "synthesis.md").read_text(encoding="utf-8")
+    final = json.loads(
+        (tmp_path / "synthesis_guardrail_final.json").read_text(encoding="utf-8")
+    )
+    assert result["status"] == "passed"
+    assert "11111111" in synthesis
+    assert "22222222" not in synthesis
+    assert final["inline_citation_coverage"]["coverage_complete"] is True
 
 
 def test_run_synthesis_guardrail_repairs_consistency_mismatch(
@@ -221,13 +350,6 @@ def test_run_synthesis_guardrail_repairs_consistency_mismatch(
     _write_consistency_guardrail_fixture(
         tmp_path,
         "### 1. ERBB3 (Combined Score: 15)\n",
-    )
-
-    def fail_claim_validate(*_args: Any, **_kwargs: Any) -> dict[str, Any]:
-        raise AssertionError("synthesis consistency guardrail must not call Claim RAG")
-
-    monkeypatch.setattr(
-        report_guardrails.claim_rag_validation, "validate_claims", fail_claim_validate
     )
 
     result = report_guardrails.run_synthesis_guardrail(tmp_path)
@@ -400,7 +522,11 @@ def test_run_synthesis_guardrail_retries_up_to_three_repairs(
         severity = "warning" if validate_count == 4 else "error"
         return [{"severity": severity, "code": "bounded_synthesis_retry"}]
 
-    def fake_repair(_data_dir: Path, _issues: list[dict[str, str]]) -> int:
+    def fake_repair(
+        _data_dir: Path,
+        _issues: list[dict[str, str]],
+        _claim_validation: list[dict[str, Any]] | None = None,
+    ) -> int:
         nonlocal repair_count
         repair_count += 1
         return 1
