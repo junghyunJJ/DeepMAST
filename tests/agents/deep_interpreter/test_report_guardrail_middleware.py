@@ -342,6 +342,77 @@ def test_run_synthesis_guardrail_removes_only_unsupported_sibling_citation(
     assert final["inline_citation_coverage"]["coverage_complete"] is True
 
 
+def test_run_synthesis_guardrail_hedges_sole_unsupported_inline_citation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    (tmp_path / "papers.json").write_text(
+        json.dumps({"papers": [{"pmid": "22222222", "abstract": "association only"}]}),
+        encoding="utf-8",
+    )
+    claim = "TGFB drives fibrosis (PMID: 22222222)."
+    (tmp_path / "synthesis.md").write_text(
+        f"## Cross-Part Themes\n\n{claim}\n",
+        encoding="utf-8",
+    )
+
+    def fake_claim_validate(
+        _data_dir: Path,
+        filenames: tuple[str, ...],
+        **_kwargs: Any,
+    ) -> dict[str, Any]:
+        assert filenames == ("synthesis.md",)
+        text = (tmp_path / "synthesis.md").read_text(encoding="utf-8")
+        hedged = "hypothesis requiring validation" in text.lower()
+        citation = {
+            "file": "synthesis.md",
+            "section": "## Cross-Part Themes",
+            "source_claim_index": 0,
+            "inline_pmid": "22222222",
+            "claim": claim,
+            "status": "overclaimed" if not hedged else "supported",
+            "supporting_pmids": [],
+            "evidence_quote": "association only",
+            "reason": "paper supports association only",
+        }
+        return {
+            "claims": [citation],
+            "issues": []
+            if hedged
+            else [
+                {
+                    "code": "inline_citation_overclaimed",
+                    "severity": "error",
+                    "file": "synthesis.md",
+                    "section": "## Cross-Part Themes",
+                    "source_claim_index": 0,
+                    "inline_pmid": "22222222",
+                    "value": claim,
+                }
+            ],
+            "selection": {"selected_claim_count": 1},
+            "inline_citation_coverage": {
+                "expected_count": 1,
+                "evaluated_count": 1,
+                "supported_count": 1 if hedged else 0,
+                "coverage_complete": hedged,
+                "citations": [citation],
+            },
+        }
+
+    monkeypatch.setattr(
+        report_guardrails.claim_rag_validation, "validate_claims", fake_claim_validate
+    )
+
+    result = report_guardrails.run_synthesis_guardrail(tmp_path, provider="ollama")
+
+    synthesis = (tmp_path / "synthesis.md").read_text(encoding="utf-8")
+    assert result["status"] == "passed"
+    assert "PMID: 22222222" in synthesis
+    assert "hypothesis requiring validation" in synthesis.lower()
+
+
 def test_run_synthesis_guardrail_repairs_consistency_mismatch(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

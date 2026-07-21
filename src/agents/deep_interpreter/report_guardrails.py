@@ -259,6 +259,8 @@ def repair_synthesis_report(
             "unsupported_synthesis_overclaim",
             "claim_rag_overclaimed",
             "claim_rag_unsupported",
+            "inline_citation_unsupported",
+            "inline_citation_overclaimed",
         }:
             continue
         claim = issue.get("value") or ""
