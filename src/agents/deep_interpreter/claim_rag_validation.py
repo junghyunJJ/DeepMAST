@@ -101,9 +101,9 @@ def _create_judge_llm(provider: str | None, *, single_claim: bool = False) -> An
     effective_provider = (provider or os.getenv("LLM_PROVIDER", "openai")).lower()
     thinking_kwargs: dict[str, bool] = {}
     if effective_provider == "ollama":
-        thinking_kwargs["reasoning"] = True
+        thinking_kwargs["reasoning"] = False
     elif effective_provider in {"vllm", "ollama-openai"}:
-        thinking_kwargs["enable_thinking"] = True
+        thinking_kwargs["enable_thinking"] = False
     return create_llm(
         provider,
         **thinking_kwargs,

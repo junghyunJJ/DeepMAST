@@ -396,12 +396,13 @@ def test_create_judge_llm_uses_bounded_reasoning_configuration(monkeypatch) -> N
         or object(),
     )
     monkeypatch.setenv("OLLAMA_NUM_PREDICT", "12000")
+    monkeypatch.setenv("OLLAMA_REASONING", "true")
 
     claim_rag_validation._create_judge_llm("ollama")
 
     assert captured == {
         "provider": "ollama",
-        "reasoning": True,
+        "reasoning": False,
         "num_predict": 3000,
         "request_timeout": 300.0,
     }
@@ -420,7 +421,7 @@ def test_create_judge_llm_uses_vllm_thinking_configuration(monkeypatch) -> None:
 
     assert captured == {
         "provider": "vllm",
-        "enable_thinking": True,
+        "enable_thinking": False,
         "num_predict": 3000,
         "request_timeout": 300.0,
     }
