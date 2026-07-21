@@ -50,6 +50,7 @@ def test_part_claims_prefer_inline_pmid_then_section_references(tmp_path: Path) 
         "CXCL12 may regulate immune migration.",
     ]
     assert group["claims"][0]["candidate_pmids"] == ["11111111"]
+    assert group["claims"][0]["inline_pmids"] == ["11111111"]
     assert group["claims"][1]["candidate_pmids"] == ["22222222", "33333333"]
     assert group["claims"][0]["hedged"] is True
 
@@ -195,7 +196,7 @@ class FakeStructuredModel:
         )
 
 
-def test_validate_claims_retrieves_only_high_risk_biological_claims(
+def test_validate_claims_retrieves_bounded_union_of_claim_categories(
     tmp_path: Path, monkeypatch
 ) -> None:
     _write_papers(tmp_path / "papers.json")
@@ -203,11 +204,13 @@ def test_validate_claims_retrieves_only_high_risk_biological_claims(
         "## Analysis 1-1\n"
         "### Biological Interpretation\n"
         "TGFB drives fibrosis (PMID: 11111111).\n"
-        "The spatial pattern contains three clusters (PMID: 11111111).\n"
-        "CXCL12 is a therapeutic target (PMID: 22222222).\n"
+        "The spatial pattern contains three clusters.\n"
+        "CXCL12 marks the migratory region (PMID: 22222222).\n"
+        "ERBB has established roles in proliferation.\n"
         "### References\n"
         "- PMID: 11111111\n"
-        "- PMID: 22222222\n",
+        "- PMID: 22222222\n"
+        "- PMID: 33333333\n",
         encoding="utf-8",
     )
     searched: list[str] = []
@@ -229,17 +232,28 @@ def test_validate_claims_retrieves_only_high_risk_biological_claims(
 
     assert searched == [
         "TGFB drives fibrosis (PMID: 11111111).",
-        "CXCL12 is a therapeutic target (PMID: 22222222).",
+        "CXCL12 marks the migratory region (PMID: 22222222).",
+        "ERBB has established roles in proliferation.",
     ]
-    assert result["selection"]["extracted_claim_count"] == 3
-    assert result["selection"]["selected_claim_count"] == 2
+    assert [claim["selection_reason"] for claim in result["claims"]] == [
+        "high_risk",
+        "inline_pmid",
+        "external_evidence",
+    ]
+    assert result["selection"]["extracted_claim_count"] == 4
+    assert result["selection"]["selected_claim_count"] == 3
+    assert result["selection"]["selection_reason_counts"] == {
+        "high_risk": 1,
+        "inline_pmid": 1,
+        "external_evidence": 1,
+    }
     assert result["selection"]["skipped_claims"] == [
         {
             "file": "part1_final.md",
             "section": "## Analysis 1-1",
             "index": 1,
-            "claim": "The spatial pattern contains three clusters (PMID: 11111111).",
-            "reason": "outside_high_risk_scope",
+            "claim": "The spatial pattern contains three clusters.",
+            "reason": "outside_claim_rag_scope",
         }
     ]
 
@@ -251,7 +265,7 @@ def test_validate_claims_caps_skipped_claim_details_when_low_risk_claims_exceed_
     claim_count = max_samples + 3
     _write_papers(tmp_path / "papers.json")
     low_risk_claims = "\n".join(
-        f"Spatial cluster {index} contains marker-enriched cells (PMID: 11111111)."
+        f"Spatial cluster {index} contains marker-enriched cells."
         for index in range(claim_count)
     )
     (tmp_path / "part1_final.md").write_text(

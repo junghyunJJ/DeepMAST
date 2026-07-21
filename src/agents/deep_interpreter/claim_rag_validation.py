@@ -36,6 +36,13 @@ HIGH_RISK_CLAIM_RE = re.compile(
     r"resistan(?:ce|t)|sensitive|clinical|prognos(?:is|tic))\b",
     re.IGNORECASE,
 )
+EXTERNAL_EVIDENCE_CLAIM_RE = re.compile(
+    r"\b(known (?:biology|mechanisms?|roles?)|established roles?|"
+    r"literature (?:evidence|support)|aligns? with evidence|"
+    r"(?:studies have|study has|has been) shown|"
+    r"described in (?:the )?literature)\b",
+    re.IGNORECASE,
+)
 MAX_CLAIMS_PER_JUDGMENT = 5
 MAX_SKIPPED_CLAIM_SAMPLES = 50
 CLAIM_RAG_CHECKPOINT_FILENAME = "claim_rag_checkpoint.json"
@@ -110,6 +117,17 @@ def _is_high_risk_claim(claim: str) -> bool:
     return bool(HIGH_RISK_CLAIM_RE.search(claim))
 
 
+def _selection_reason(item: dict[str, Any]) -> str | None:
+    claim = str(item["claim"])
+    if _is_high_risk_claim(claim):
+        return "high_risk"
+    if item["inline_pmids"]:
+        return "inline_pmid"
+    if EXTERNAL_EVIDENCE_CLAIM_RE.search(claim):
+        return "external_evidence"
+    return None
+
+
 def _paper_map(data_dir: Path) -> dict[str, dict[str, Any]]:
     data = json.loads((data_dir / "papers.json").read_text(encoding="utf-8"))
     rows = data.get("papers") if isinstance(data, dict) else data
@@ -162,6 +180,7 @@ def _claim_items(
             {
                 "index": index,
                 "claim": claim,
+                "inline_pmids": inline_pmids,
                 "candidate_pmids": candidate_pmids,
                 "hedged": bool(
                     validate_report_script.MECHANISTIC_HEDGE_RE.search(claim)
@@ -581,6 +600,7 @@ def validate_claims(
     selection: dict[str, Any] = {
         "extracted_claim_count": 0,
         "selected_claim_count": 0,
+        "selection_reason_counts": {},
         "skipped_claim_count": 0,
         "skipped_claims_truncated": False,
         "skipped_claims": [],
@@ -594,9 +614,13 @@ def validate_claims(
         selected_claims: list[dict[str, Any]] = []
         for item in group["claims"]:
             selection["extracted_claim_count"] += 1
-            if _is_high_risk_claim(str(item["claim"])):
+            reason = _selection_reason(item)
+            if reason is not None:
                 selection["selected_claim_count"] += 1
-                selected_claims.append(item)
+                selection["selection_reason_counts"][reason] = (
+                    selection["selection_reason_counts"].get(reason, 0) + 1
+                )
+                selected_claims.append({**item, "selection_reason": reason})
                 continue
             selection["skipped_claim_count"] += 1
             if len(selection["skipped_claims"]) < MAX_SKIPPED_CLAIM_SAMPLES:
@@ -606,7 +630,7 @@ def validate_claims(
                         "section": group["section"],
                         "index": item["index"],
                         "claim": item["claim"],
-                        "reason": "outside_high_risk_scope",
+                        "reason": "outside_claim_rag_scope",
                     }
                 )
             else:
