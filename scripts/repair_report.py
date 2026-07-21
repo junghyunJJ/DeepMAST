@@ -13,6 +13,10 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
 SECTION_RE = re.compile(r"(^## .+?$)(.*?)(?=^## |\Z)", re.MULTILINE | re.DOTALL)
+REPAIRABLE_INLINE_CITATION_CODES = {
+    "inline_citation_unsupported",
+    "inline_citation_overclaimed",
+}
 
 
 def _content(message: Any) -> str:
@@ -103,14 +107,16 @@ def _repair_inline_citation_issue(
     issue: dict[str, Any],
     claim_validation: list[dict[str, Any]],
 ) -> bool:
-    if not str(issue.get("code", "")).startswith("inline_citation_"):
+    if issue.get("code") not in REPAIRABLE_INLINE_CITATION_CODES:
         return False
     filename = issue.get("file") or ""
+    section = str(issue.get("section") or "")
     inline_pmid = str(issue.get("inline_pmid") or "")
     value = str(issue.get("value") or "")
     path = (data_dir / filename).resolve()
     if (
-        not inline_pmid
+        not section
+        or not inline_pmid
         or not value
         or not path.is_relative_to(data_dir)
         or path.suffix != ".md"
@@ -129,13 +135,20 @@ def _repair_inline_citation_issue(
         return False
 
     text = path.read_text(encoding="utf-8")
-    claim_at = text.find(value)
+    found = _find_section(text, section)
+    if found is None:
+        return False
+    start, end, section_text = found
+    claim_at = section_text.find(value)
     if claim_at < 0:
         return False
     repaired_value = _remove_inline_pmid(value, inline_pmid)
     if repaired_value == value:
         return False
-    repaired = text[:claim_at] + repaired_value + text[claim_at + len(value) :]
+    repaired_section = (
+        section_text[:claim_at] + repaired_value + section_text[claim_at + len(value) :]
+    )
+    repaired = text[:start] + repaired_section + text[end:]
     path.write_text(repaired, encoding="utf-8")
     return True
 

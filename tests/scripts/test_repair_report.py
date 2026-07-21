@@ -377,3 +377,69 @@ def test_inline_pmid_repair_requires_supported_sibling(tmp_path: Path) -> None:
 
     assert repair_report._repair_inline_citation_issue(tmp_path.resolve(), issue, rows) is False
     assert (tmp_path / "part1_final.md").read_text(encoding="utf-8") == report
+
+
+def test_inline_pmid_repair_only_changes_named_section(tmp_path: Path) -> None:
+    claim = "TGFB is associated with fibrosis (PMID: 11111111; PMID: 22222222)."
+    report = f"## Earlier\n{claim}\n## Biology\n{claim}\n"
+    (tmp_path / "part1_final.md").write_text(report, encoding="utf-8")
+    issue = {
+        "severity": "error",
+        "code": "inline_citation_unsupported",
+        "file": "part1_final.md",
+        "section": "## Biology",
+        "source_claim_index": 0,
+        "inline_pmid": "22222222",
+        "value": claim,
+    }
+    rows = [
+        {
+            "file": "part1_final.md",
+            "section": "## Biology",
+            "source_claim_index": 0,
+            "inline_pmid": "11111111",
+            "status": "supported",
+        },
+        {
+            "file": "part1_final.md",
+            "section": "## Biology",
+            "source_claim_index": 0,
+            "inline_pmid": "22222222",
+            "status": "unsupported",
+        },
+    ]
+
+    assert repair_report._repair_inline_citation_issue(tmp_path.resolve(), issue, rows) is True
+    repaired = (tmp_path / "part1_final.md").read_text(encoding="utf-8")
+    assert f"## Earlier\n{claim}\n" in repaired
+    assert (
+        "## Biology\nTGFB is associated with fibrosis (PMID: 11111111).\n" in repaired
+    )
+
+
+def test_inline_pmid_repair_ignores_unverifiable_and_unknown_codes(tmp_path: Path) -> None:
+    claim = "TGFB is associated with fibrosis (PMID: 11111111; PMID: 22222222)."
+    for code in ("inline_citation_unverifiable", "inline_citation_surprising"):
+        report = tmp_path / f"{code}.md"
+        report.write_text(f"## Biology\n{claim}\n", encoding="utf-8")
+        issue = {
+            "severity": "error",
+            "code": code,
+            "file": report.name,
+            "section": "## Biology",
+            "source_claim_index": 0,
+            "inline_pmid": "22222222",
+            "value": claim,
+        }
+        rows = [
+            {
+                "file": report.name,
+                "section": "## Biology",
+                "source_claim_index": 0,
+                "inline_pmid": "11111111",
+                "status": "supported",
+            }
+        ]
+
+        assert repair_report._repair_inline_citation_issue(tmp_path.resolve(), issue, rows) is False
+        assert report.read_text(encoding="utf-8") == f"## Biology\n{claim}\n"
