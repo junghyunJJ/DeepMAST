@@ -94,6 +94,40 @@ def test_inline_claim_issue_retains_citation_coordinates() -> None:
     assert issue["inline_pmid"] == "22222222"
 
 
+@pytest.mark.parametrize(
+    ("status", "inline_pmid", "hedged", "expected_severity"),
+    [
+        ("unsupported", "22222222", True, "error"),
+        ("overclaimed", "22222222", True, "error"),
+        ("unverifiable", "22222222", True, "warning"),
+        ("unsupported", None, True, "warning"),
+    ],
+)
+def test_issue_severity_applies_hedged_warning_only_to_non_inline_claim_rag_issues(
+    status: str,
+    inline_pmid: str | None,
+    hedged: bool,
+    expected_severity: str,
+) -> None:
+    issue = claim_rag_validation._issue_for(
+        {
+            "status": status,
+            "hedged": hedged,
+            "supporting_pmids": [],
+            "evidence_quote": "",
+            "reason": "Judge result.",
+            "file": "part1_final.md",
+            "section": "## Biology",
+            "source_claim_index": 0,
+            "inline_pmid": inline_pmid,
+            "claim": "TGFB may be associated with fibrosis.",
+        }
+    )
+
+    assert issue is not None
+    assert issue["severity"] == expected_severity
+
+
 def test_reference_pmid_list_creates_no_claim_item(tmp_path: Path) -> None:
     _write_papers(tmp_path / "papers.json")
     (tmp_path / "part1_final.md").write_text(

@@ -583,8 +583,8 @@ def _issue_for(result: dict[str, Any]) -> dict[str, Any] | None:
     if status == "supported":
         return None
     hedged = bool(result["hedged"])
-    severity = "warning" if status == "unverifiable" or hedged else "error"
     inline_pmid = result.get("inline_pmid")
+    severity = "warning" if status == "unverifiable" or (hedged and not inline_pmid) else "error"
     code = (
         f"inline_citation_{status}"
         if inline_pmid

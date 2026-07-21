@@ -4,6 +4,8 @@ import importlib.util
 import json
 from pathlib import Path
 
+from src.agents.deep_interpreter import claim_rag_validation
+
 
 SCRIPT_PATH = Path(__file__).resolve().parents[2] / "scripts" / "repair_report.py"
 SPEC = importlib.util.spec_from_file_location("repair_report", SCRIPT_PATH)
@@ -351,6 +353,51 @@ def test_repair_removes_only_unsupported_inline_pmid_when_sibling_supports(
     repaired = (tmp_path / "part1_final.md").read_text(encoding="utf-8")
     assert "11111111" in repaired
     assert "22222222" not in repaired
+
+
+def test_repair_handles_hedged_failed_inline_pmid_when_sibling_supports(
+    tmp_path: Path,
+) -> None:
+    claim = "TGFB may be associated with fibrosis (PMID: 11111111; PMID: 22222222)."
+    (tmp_path / "part1_final.md").write_text(f"## Biology\n{claim}\n", encoding="utf-8")
+    issue = claim_rag_validation._issue_for(
+        {
+            "status": "unsupported",
+            "hedged": True,
+            "supporting_pmids": [],
+            "evidence_quote": "",
+            "reason": "The cited paper does not support this claim.",
+            "file": "part1_final.md",
+            "section": "## Biology",
+            "source_claim_index": 0,
+            "inline_pmid": "22222222",
+            "claim": claim,
+        }
+    )
+    assert issue is not None
+    assert issue["severity"] == "error"
+    issues_path = tmp_path / "issues.json"
+    issues_path.write_text(json.dumps({"issues": [issue]}), encoding="utf-8")
+    rows = [
+        {
+            "file": "part1_final.md",
+            "section": "## Biology",
+            "source_claim_index": 0,
+            "inline_pmid": "11111111",
+            "status": "supported",
+        },
+        {
+            "file": "part1_final.md",
+            "section": "## Biology",
+            "source_claim_index": 0,
+            "inline_pmid": "22222222",
+            "status": "unsupported",
+        },
+    ]
+
+    assert repair_report.repair_report(tmp_path, issues_path, claim_validation=rows) == 1
+    repaired = (tmp_path / "part1_final.md").read_text(encoding="utf-8")
+    assert repaired == "## Biology\nTGFB may be associated with fibrosis (PMID: 11111111).\n"
 
 
 def test_inline_pmid_repair_requires_supported_sibling(tmp_path: Path) -> None:
