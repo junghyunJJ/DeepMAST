@@ -42,3 +42,14 @@ Status: DONE
 - `uv` printed the ambient `VIRTUAL_ENV` mismatch warning while using the project environment.
 - Pytest retained pre-existing warnings from LangGraph `config_schema` deprecation and LangChain `parallel_tool_calls` model kwargs in the model tests.
 - Pyright reported a newer version is available after passing.
+
+## Review Fix Evidence
+
+- Added direct coverage that `_create_judge_llm("ollama-openai")` forwards `enable_thinking=False` while preserving `num_predict=3000` and `request_timeout=300.0`.
+- `OPENAI_API_KEY=test LANGCHAIN_TRACING_V2=false uv run pytest -q tests/agents/deep_interpreter/test_claim_rag_validation.py tests/agents/test_model_ollama_openai.py`
+  - Result: `58 passed, 4 warnings in 4.64s`.
+- `uv run ruff check src/agents/deep_interpreter/claim_rag_validation.py tests/agents/deep_interpreter/test_claim_rag_validation.py`
+  - Result: `All checks passed!`.
+- `uv run pyright src/agents/deep_interpreter/claim_rag_validation.py tests/agents/deep_interpreter/test_claim_rag_validation.py`
+  - Result: `0 errors, 0 warnings, 0 informations`.
+- Notes: `uv` printed the ambient `VIRTUAL_ENV` mismatch warning; Pyright also reported a newer version is available.

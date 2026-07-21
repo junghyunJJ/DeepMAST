@@ -426,6 +426,16 @@ def test_create_judge_llm_uses_vllm_thinking_configuration(monkeypatch) -> None:
         "request_timeout": 300.0,
     }
 
+    captured.clear()
+    claim_rag_validation._create_judge_llm("ollama-openai")
+
+    assert captured == {
+        "provider": "ollama-openai",
+        "enable_thinking": False,
+        "num_predict": 3000,
+        "request_timeout": 300.0,
+    }
+
 
 class TimeoutPrimaryModel(BatchLimitedStructuredModel):
     def invoke(self, messages):
