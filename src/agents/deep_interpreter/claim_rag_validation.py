@@ -391,7 +391,9 @@ def _has_incomplete_judge_result(results: list[dict[str, Any]]) -> bool:
 def _invoke_judgment(
     model: Any, group: dict[str, Any], *, timeout_seconds: float | None = None
 ) -> list[ClaimJudgment]:
-    structured_model = model.with_structured_output(ClaimJudgmentBatch)
+    structured_model = model.with_structured_output(
+        ClaimJudgmentBatch, method="function_calling"
+    )
     messages = [HumanMessage(content=_judgment_prompt(group))]
     if hasattr(structured_model, "ainvoke"):
         response = run_async(structured_model.ainvoke(messages), timeout=timeout_seconds)

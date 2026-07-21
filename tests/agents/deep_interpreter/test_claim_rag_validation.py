@@ -179,7 +179,7 @@ def test_abstract_fallback_is_limited_to_allowed_pmids(tmp_path: Path, monkeypat
 
 
 class FakeStructuredModel:
-    def with_structured_output(self, _schema):
+    def with_structured_output(self, _schema, *, method=None):
         return self
 
     def invoke(self, _messages):
@@ -363,7 +363,7 @@ class BatchLimitedStructuredModel:
     def __init__(self) -> None:
         self.batch_sizes: list[int] = []
 
-    def with_structured_output(self, _schema):
+    def with_structured_output(self, _schema, *, method=None):
         return self
 
     def invoke(self, messages):
@@ -466,12 +466,48 @@ class FailingFallbackModel(SingleClaimFallbackModel):
 
 
 class SlowAsyncStructuredModel:
-    def with_structured_output(self, _schema):
+    def with_structured_output(self, _schema, *, method=None):
         return self
 
     async def ainvoke(self, _messages):
         await asyncio.sleep(0.05)
         return claim_rag_validation.ClaimJudgmentBatch(judgments=[])
+
+
+def test_invoke_judgment_uses_function_calling_structured_output() -> None:
+    class CapturingModel(FakeStructuredModel):
+        schema = None
+        method = None
+
+        def with_structured_output(self, schema, *, method=None):
+            self.schema = schema
+            self.method = method
+            return self
+
+    model = CapturingModel()
+    group = {
+        "file": "synthesis.md",
+        "section": "## Therapeutic Implications",
+        "claims": [
+            {
+                "index": 0,
+                "claim": "TGFB drives fibrosis.",
+                "candidate_pmids": ["11111111"],
+                "evidence": [
+                    {
+                        "pmid": "11111111",
+                        "source": "abstract",
+                        "text": "TGFB is associated with fibrosis.",
+                    }
+                ],
+            }
+        ],
+    }
+
+    claim_rag_validation._invoke_judgment(model, group)
+
+    assert model.schema is claim_rag_validation.ClaimJudgmentBatch
+    assert model.method == "function_calling"
 
 
 def test_invoke_judgment_enforces_total_wall_clock_timeout() -> None:
@@ -850,7 +886,7 @@ def test_missing_evidence_becomes_warning_without_model_call(
     )
 
     class FailModel:
-        def with_structured_output(self, _schema):
+        def with_structured_output(self, _schema, *, method=None):
             raise AssertionError("No evidence must not invoke the judge")
 
     result = claim_rag_validation.validate_claims(
@@ -885,7 +921,7 @@ def test_retrieval_outage_is_unverifiable_without_judge_or_checkpoint(
     )
 
     class FailModel:
-        def with_structured_output(self, _schema):
+        def with_structured_output(self, _schema, *, method=None):
             raise AssertionError("Retrieval failure must not invoke the judge")
 
     result = claim_rag_validation.validate_claims(
@@ -935,7 +971,7 @@ def test_validate_claims_does_not_cache_transient_retrieval_failures(
     class SupportedModel:
         calls = 0
 
-        def with_structured_output(self, _schema):
+        def with_structured_output(self, _schema, *, method=None):
             return self
 
         def invoke(self, _messages):
@@ -999,7 +1035,7 @@ def test_validate_claims_uses_strict_search_and_retries_strict_failures(
     )
 
     class FailModel:
-        def with_structured_output(self, _schema):
+        def with_structured_output(self, _schema, *, method=None):
             raise AssertionError("Retrieval failure must not invoke the judge")
 
     cache: dict[str, list[dict]] = {}
@@ -1050,7 +1086,7 @@ def test_validate_claims_does_not_fallback_to_abstract_or_cache_when_strict_sear
     )
 
     class FailModel:
-        def with_structured_output(self, _schema):
+        def with_structured_output(self, _schema, *, method=None):
             raise AssertionError("Retrieval failure must not invoke the judge")
 
     cache: dict[str, list[dict]] = {}
