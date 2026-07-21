@@ -44,6 +44,7 @@ EXTERNAL_EVIDENCE_CLAIM_RE = re.compile(
     re.IGNORECASE,
 )
 MAX_CLAIMS_PER_JUDGMENT = 5
+MAX_SELECTED_CLAIMS = 30
 MAX_SKIPPED_CLAIM_SAMPLES = 50
 CLAIM_RAG_CHECKPOINT_FILENAME = "claim_rag_checkpoint.json"
 DEFAULT_JUDGE_NUM_PREDICT = 3000
@@ -347,6 +348,7 @@ def _checkpoint_key(group: dict[str, Any], claims: list[dict[str, Any]]) -> str:
                 "claim": item["claim"],
                 "candidate_pmids": item["candidate_pmids"],
                 "hedged": item["hedged"],
+                "selection_reason": item.get("selection_reason"),
             }
             for item in claims
         ],
@@ -615,7 +617,10 @@ def validate_claims(
         for item in group["claims"]:
             selection["extracted_claim_count"] += 1
             reason = _selection_reason(item)
-            if reason is not None:
+            if (
+                reason is not None
+                and selection["selected_claim_count"] < MAX_SELECTED_CLAIMS
+            ):
                 selection["selected_claim_count"] += 1
                 selection["selection_reason_counts"][reason] = (
                     selection["selection_reason_counts"].get(reason, 0) + 1
@@ -630,7 +635,11 @@ def validate_claims(
                         "section": group["section"],
                         "index": item["index"],
                         "claim": item["claim"],
-                        "reason": "outside_claim_rag_scope",
+                        "reason": (
+                            "selection_limit_reached"
+                            if reason is not None
+                            else "outside_claim_rag_scope"
+                        ),
                     }
                 )
             else:

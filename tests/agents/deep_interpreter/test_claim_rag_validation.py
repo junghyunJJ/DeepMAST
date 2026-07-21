@@ -258,6 +258,21 @@ def test_validate_claims_retrieves_bounded_union_of_claim_categories(
     ]
 
 
+@pytest.mark.parametrize(
+    "claim",
+    [
+        "TGFB is associated with fibrosis.",
+        "TGFB and CXCL12 have crosstalk.",
+        "TGFB interacts with CXCL12.",
+        "TGFB may be relevant to fibrosis.",
+    ],
+)
+def test_selection_reason_excludes_generic_associations_and_hedges(claim: str) -> None:
+    assert claim_rag_validation._selection_reason(
+        {"claim": claim, "inline_pmids": []}
+    ) is None
+
+
 def test_validate_claims_caps_skipped_claim_details_when_low_risk_claims_exceed_sample_limit(
     tmp_path: Path,
 ) -> None:
@@ -286,6 +301,62 @@ def test_validate_claims_caps_skipped_claim_details_when_low_risk_claims_exceed_
     assert result["selection"]["skipped_claim_count"] == claim_count
     assert len(result["selection"]["skipped_claims"]) == max_samples
     assert result["selection"]["skipped_claims_truncated"] is True
+
+
+def test_validate_claims_caps_matching_claims_and_audits_overflow(
+    tmp_path: Path, monkeypatch
+) -> None:
+    max_claims = 30
+    claims = [
+        f"TGFB drives fibrosis in sample {index} (PMID: 11111111)."
+        for index in range(max_claims + 2)
+    ]
+    _write_papers(tmp_path / "papers.json")
+    (tmp_path / "part1_final.md").write_text(
+        "## Analysis 1-1\n"
+        "### Biological Interpretation\n"
+        + "\n".join(claims[:29])
+        + "\n### References\n"
+        "- PMID: 11111111\n"
+        "## Analysis 1-2\n"
+        "### Biological Interpretation\n"
+        + "\n".join(claims[29:])
+        + "\n### References\n"
+        "- PMID: 11111111\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        claim_rag_validation.search_literature_fulltext,
+        "invoke",
+        lambda _args: [
+            {
+                "page_content": "TGFB is associated with fibrosis.",
+                "metadata": {"filename": "pmid_11111111.txt"},
+            }
+        ],
+    )
+
+    result = claim_rag_validation.validate_claims(
+        tmp_path, ("part1_final.md",), llm=BatchLimitedStructuredModel()
+    )
+
+    assert [claim["claim"] for claim in result["claims"]] == claims[:max_claims]
+    assert result["selection"]["extracted_claim_count"] == len(claims)
+    assert result["selection"]["selected_claim_count"] == max_claims
+    assert result["selection"]["selection_reason_counts"] == {
+        "high_risk": max_claims
+    }
+    assert result["selection"]["skipped_claim_count"] == 2
+    assert result["selection"]["skipped_claims"] == [
+        {
+            "file": "part1_final.md",
+            "section": "## Analysis 1-2",
+            "index": index - 29,
+            "claim": claims[index],
+            "reason": "selection_limit_reached",
+        }
+        for index in range(max_claims, len(claims))
+    ]
 
 
 class BatchLimitedStructuredModel:
@@ -460,6 +531,48 @@ def test_judge_group_falls_back_to_single_claim_batches_after_primary_timeout() 
     assert fallback.batch_sizes == [1, 1]
     assert [item["status"] for item in results] == ["supported", "supported"]
     assert flushes == 1
+
+
+def test_judge_group_does_not_reuse_checkpoint_without_selection_reason() -> None:
+    model = BatchLimitedStructuredModel()
+    group = {
+        "file": "synthesis.md",
+        "section": "## Therapeutic Implications",
+        "claims": [
+            {
+                "index": 0,
+                "claim": "TGFB drives fibrosis.",
+                "candidate_pmids": ["11111111"],
+                "hedged": False,
+                "selection_reason": "high_risk",
+                "evidence": [
+                    {
+                        "pmid": "11111111",
+                        "source": "abstract",
+                        "text": "Evidence supports the claim.",
+                    }
+                ],
+            }
+        ],
+    }
+    legacy_claim = {
+        key: value
+        for key, value in group["claims"][0].items()
+        if key != "selection_reason"
+    }
+    checkpoint = {
+        "version": 1,
+        "batches": {
+            claim_rag_validation._checkpoint_key(group, [legacy_claim]): {
+                "results": [{"status": "unsupported"}]
+            }
+        },
+    }
+
+    results = claim_rag_validation._judge_group(group, model, checkpoint=checkpoint)
+
+    assert model.batch_sizes == [1]
+    assert [result["status"] for result in results] == ["supported"]
 
 
 def test_judge_group_does_not_persist_failed_judge_results() -> None:
