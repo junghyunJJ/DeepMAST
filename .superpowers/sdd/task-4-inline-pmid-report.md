@@ -38,3 +38,26 @@ GREEN / verification:
 
 Scope:
 - Did not modify report guardrail, repairs, `mcp_clients`, or `.superpowers/sdd/task-3-report.md`.
+
+Sync-only structured timeout root-cause fix: DONE
+
+Root cause:
+- Sync-only structured model calls were wrapped as `run_async(asyncio.to_thread(...))`; after timeout, `asyncio.run()` waited for default executor shutdown, so `_invoke_judgment()` did not return promptly.
+
+Changes:
+- `src/agents/deep_interpreter/claim_rag_validation.py` keeps native `ainvoke` on the existing `run_async` path.
+- Sync-only `invoke` with a timeout now uses a local one-call `ThreadPoolExecutor` and `future.result(timeout=...)`.
+- On timeout it cancels queued work, calls `shutdown(wait=False, cancel_futures=True)`, and raises `TimeoutError` promptly.
+- Normal sync structured-output results are still asserted.
+
+RED:
+- `OPENAI_API_KEY=test uv run pytest -q tests/agents/deep_interpreter/test_claim_rag_validation.py::test_invoke_judgment_sync_only_timeout_returns_promptly` -> failed with `assert 0.3059511670144275 < 0.2`.
+
+GREEN / verification:
+- `OPENAI_API_KEY=test uv run pytest -q tests/agents/deep_interpreter/test_claim_rag_validation.py::test_invoke_judgment_uses_function_calling_structured_output tests/agents/deep_interpreter/test_claim_rag_validation.py::test_invoke_judgment_enforces_total_wall_clock_timeout tests/agents/deep_interpreter/test_claim_rag_validation.py::test_invoke_judgment_sync_only_timeout_returns_promptly` -> 3 passed, 1 warning.
+- `OPENAI_API_KEY=test uv run pytest -q tests/agents/deep_interpreter/test_claim_rag_validation.py` -> 46 passed, 1 warning.
+- `uv run ruff check src/agents/deep_interpreter/claim_rag_validation.py tests/agents/deep_interpreter/test_claim_rag_validation.py` -> All checks passed.
+- `uv run pyright src/agents/deep_interpreter/claim_rag_validation.py tests/agents/deep_interpreter/test_claim_rag_validation.py` -> 0 errors, 0 warnings, 0 informations.
+
+Scope:
+- Did not modify `mcp_clients`, report guardrails, Task 3 user report, or other work.

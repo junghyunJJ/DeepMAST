@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import hashlib
 import json
 import os
@@ -428,10 +429,23 @@ def _invoke_judgment(
     if hasattr(structured_model, "ainvoke"):
         response = run_async(structured_model.ainvoke(messages), timeout=timeout_seconds)
     else:
-        response = run_async(
-            asyncio.to_thread(structured_model.invoke, messages),
-            timeout=timeout_seconds,
-        )
+        if timeout_seconds is None:
+            response = structured_model.invoke(messages)
+        else:
+            executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+            future = executor.submit(structured_model.invoke, messages)
+            timed_out = False
+            try:
+                response = future.result(timeout=timeout_seconds)
+            except concurrent.futures.TimeoutError as exc:
+                timed_out = True
+                # Running sync calls cannot be forcibly stopped; return promptly.
+                future.cancel()
+                executor.shutdown(wait=False, cancel_futures=True)
+                raise TimeoutError("Claim judge timed out.") from exc
+            finally:
+                if not timed_out:
+                    executor.shutdown()
     return response.judgments
 
 

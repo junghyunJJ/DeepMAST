@@ -741,6 +741,15 @@ class SlowAsyncStructuredModel:
         return claim_rag_validation.ClaimJudgmentBatch(judgments=[])
 
 
+class SlowSyncStructuredModel:
+    def with_structured_output(self, _schema, *, method=None):
+        return self
+
+    def invoke(self, _messages):
+        time.sleep(0.3)
+        return claim_rag_validation.ClaimJudgmentBatch(judgments=[])
+
+
 def test_invoke_judgment_uses_function_calling_structured_output() -> None:
     class CapturingModel(FakeStructuredModel):
         schema = None
@@ -771,10 +780,11 @@ def test_invoke_judgment_uses_function_calling_structured_output() -> None:
         ],
     }
 
-    claim_rag_validation._invoke_judgment(model, group)
+    judgments = claim_rag_validation._invoke_judgment(model, group)
 
     assert model.schema is claim_rag_validation.ClaimJudgmentBatch
     assert model.method == "function_calling"
+    assert judgments[0].status == "overclaimed"
 
 
 def test_invoke_judgment_enforces_total_wall_clock_timeout() -> None:
@@ -801,6 +811,36 @@ def test_invoke_judgment_enforces_total_wall_clock_timeout() -> None:
     with pytest.raises(TimeoutError):
         claim_rag_validation._invoke_judgment(
             SlowAsyncStructuredModel(), group, timeout_seconds=0.01
+        )
+    elapsed = time.perf_counter() - start
+
+    assert elapsed < 0.2
+
+
+def test_invoke_judgment_sync_only_timeout_returns_promptly() -> None:
+    group = {
+        "file": "synthesis.md",
+        "section": "## Therapeutic Implications",
+        "claims": [
+            {
+                "index": 0,
+                "claim": "TGFB drives fibrosis.",
+                "candidate_pmids": ["11111111"],
+                "evidence": [
+                    {
+                        "pmid": "11111111",
+                        "source": "abstract",
+                        "text": "TGFB is associated with fibrosis.",
+                    }
+                ],
+            }
+        ],
+    }
+
+    start = time.perf_counter()
+    with pytest.raises(TimeoutError):
+        claim_rag_validation._invoke_judgment(
+            SlowSyncStructuredModel(), group, timeout_seconds=0.01
         )
     elapsed = time.perf_counter() - start
 
