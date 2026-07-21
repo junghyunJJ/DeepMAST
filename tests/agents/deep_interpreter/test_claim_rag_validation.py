@@ -55,6 +55,38 @@ def test_part_claims_prefer_inline_pmid_then_section_references(tmp_path: Path) 
     assert group["claims"][0]["hedged"] is True
 
 
+def test_claim_items_expand_each_inline_pmid_into_exact_candidate() -> None:
+    items = claim_rag_validation._claim_items(
+        ["TGFB drives fibrosis (PMID: 11111111; PMID: 22222222)."],
+        [],
+        {"11111111", "22222222"},
+    )
+
+    assert [
+        (item["source_claim_index"], item["inline_pmid"], item["candidate_pmids"])
+        for item in items
+    ] == [
+        (0, "11111111", ["11111111"]),
+        (0, "22222222", ["22222222"]),
+    ]
+    assert [item["index"] for item in items] == [0, 1]
+
+
+def test_reference_pmid_list_creates_no_claim_item(tmp_path: Path) -> None:
+    _write_papers(tmp_path / "papers.json")
+    (tmp_path / "part1_final.md").write_text(
+        "## Analysis 1-1\n"
+        "### Biological Interpretation\n"
+        "### References\n"
+        "- PMID: 11111111\n",
+        encoding="utf-8",
+    )
+
+    groups = claim_rag_validation._extract_claim_groups(tmp_path, ("part1_final.md",))
+
+    assert groups == []
+
+
 def test_synthesis_claim_without_inline_pmid_uses_papers_universe(tmp_path: Path) -> None:
     _write_papers(tmp_path / "papers.json")
     (tmp_path / "synthesis.md").write_text(
@@ -196,6 +228,33 @@ class FakeStructuredModel:
         )
 
 
+class EchoSupportingPmidsModel:
+    def __init__(self, supporting_pmids: list[str] | None = None) -> None:
+        self.supporting_pmids = supporting_pmids
+
+    def with_structured_output(self, _schema, *, method=None):
+        return self
+
+    def invoke(self, messages):
+        payload = json.loads(
+            messages[0].content.split("Claims and evidence:\n", maxsplit=1)[1]
+        )
+        return claim_rag_validation.ClaimJudgmentBatch(
+            judgments=[
+                claim_rag_validation.ClaimJudgment(
+                    claim_index=item["claim_index"],
+                    status="supported",
+                    reason="The supplied evidence directly supports the claim.",
+                    supporting_pmids=self.supporting_pmids
+                    if self.supporting_pmids is not None
+                    else item["candidate_pmids"],
+                    evidence_quote="Evidence supports the claim.",
+                )
+                for item in payload
+            ]
+        )
+
+
 def test_validate_claims_retrieves_bounded_union_of_claim_categories(
     tmp_path: Path, monkeypatch
 ) -> None:
@@ -308,7 +367,7 @@ def test_validate_claims_caps_matching_claims_and_audits_overflow(
 ) -> None:
     max_claims = 30
     claims = [
-        f"TGFB drives fibrosis in sample {index} (PMID: 11111111)."
+        f"TGFB drives fibrosis in sample {index}."
         for index in range(max_claims + 2)
     ]
     _write_papers(tmp_path / "papers.json")
@@ -359,6 +418,111 @@ def test_validate_claims_caps_matching_claims_and_audits_overflow(
     ]
 
 
+def test_inline_pairs_bypass_the_non_inline_selection_cap(
+    tmp_path: Path, monkeypatch
+) -> None:
+    non_inline_claims = [
+        f"TGFB drives fibrosis in sample {index}." for index in range(31)
+    ]
+    _write_papers(tmp_path / "papers.json")
+    (tmp_path / "part1_final.md").write_text(
+        "## Analysis 1-1\n"
+        "### Biological Interpretation\n"
+        + "\n".join(non_inline_claims)
+        + "\nTGFB drives fibrosis (PMID: 11111111; PMID: 22222222).\n"
+        "### References\n"
+        "- PMID: 11111111\n"
+        "- PMID: 22222222\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        claim_rag_validation.search_literature_fulltext,
+        "invoke",
+        lambda args: [
+            {
+                "page_content": "Evidence supports the claim.",
+                "metadata": {"filename": f"pmid_{pmid}.txt"},
+            }
+            for pmid in ("11111111", "22222222", "33333333")
+            if pmid in args["query"] or "PMID:" not in args["query"]
+        ],
+    )
+
+    result = claim_rag_validation.validate_claims(
+        tmp_path, ("part1_final.md",), llm=EchoSupportingPmidsModel()
+    )
+
+    assert result["selection"]["non_inline_selected_count"] == 30
+    assert result["selection"]["inline_citation_expected_count"] == 2
+    assert result["selection"]["selected_claim_count"] == 32
+    assert result["inline_citation_coverage"]["expected_count"] == 2
+
+
+def test_unknown_inline_pmid_is_expected_in_incomplete_coverage(tmp_path: Path) -> None:
+    _write_papers(tmp_path / "papers.json")
+    (tmp_path / "part1_final.md").write_text(
+        "## Analysis 1-1\n"
+        "### Biological Interpretation\n"
+        "TGFB drives fibrosis (PMID: 99999999).\n"
+        "### References\n"
+        "- PMID: 11111111\n",
+        encoding="utf-8",
+    )
+
+    result = claim_rag_validation.validate_claims(
+        tmp_path, ("part1_final.md",), llm=EchoSupportingPmidsModel()
+    )
+
+    assert result["inline_citation_coverage"]["coverage_complete"] is False
+    assert result["inline_citation_coverage"]["citations"] == [
+        {
+            "file": "part1_final.md",
+            "section": "## Analysis 1-1",
+            "source_claim_index": 0,
+            "inline_pmid": "99999999",
+            "claim": "TGFB drives fibrosis (PMID: 99999999).",
+            "status": "unverifiable",
+            "supporting_pmids": [],
+            "evidence_quote": "",
+            "reason": "No allowed PMID evidence was retrieved.",
+        }
+    ]
+
+
+def test_inline_supported_status_requires_exact_pmid(tmp_path: Path, monkeypatch) -> None:
+    _write_papers(tmp_path / "papers.json")
+    (tmp_path / "part1_final.md").write_text(
+        "## Analysis 1-1\n"
+        "### Biological Interpretation\n"
+        "TGFB drives fibrosis (PMID: 11111111).\n"
+        "### References\n"
+        "- PMID: 11111111\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        claim_rag_validation.search_literature_fulltext,
+        "invoke",
+        lambda _args: [
+            {
+                "page_content": "Evidence supports the claim.",
+                "metadata": {"filename": "pmid_11111111.txt"},
+            }
+        ],
+    )
+
+    result = claim_rag_validation.validate_claims(
+        tmp_path,
+        ("part1_final.md",),
+        llm=EchoSupportingPmidsModel(["22222222"]),
+    )
+
+    assert result["claims"][0]["status"] == "unverifiable"
+    assert result["claims"][0]["reason"] == (
+        "Inline citation PMID 11111111 was not included in supporting_pmids."
+    )
+    assert result["inline_citation_coverage"]["coverage_complete"] is False
+
+
 class BatchLimitedStructuredModel:
     def __init__(self) -> None:
         self.batch_sizes: list[int] = []
@@ -379,7 +543,7 @@ class BatchLimitedStructuredModel:
                     claim_index=item["claim_index"],
                     status="supported",
                     reason="The supplied evidence directly supports the claim.",
-                    supporting_pmids=["11111111"],
+                    supporting_pmids=item["candidate_pmids"],
                     evidence_quote="Evidence supports the claim.",
                 )
                 for item in payload

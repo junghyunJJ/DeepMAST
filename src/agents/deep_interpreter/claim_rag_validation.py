@@ -44,7 +44,7 @@ EXTERNAL_EVIDENCE_CLAIM_RE = re.compile(
     re.IGNORECASE,
 )
 MAX_CLAIMS_PER_JUDGMENT = 5
-MAX_SELECTED_CLAIMS = 30
+MAX_NON_INLINE_SELECTED_CLAIMS = 30
 MAX_SKIPPED_CLAIM_SAMPLES = 50
 CLAIM_RAG_CHECKPOINT_FILENAME = "claim_rag_checkpoint.json"
 DEFAULT_JUDGE_NUM_PREDICT = 3000
@@ -122,7 +122,7 @@ def _selection_reason(item: dict[str, Any]) -> str | None:
     claim = str(item["claim"])
     if _is_high_risk_claim(claim):
         return "high_risk"
-    if item["inline_pmids"]:
+    if item.get("inline_pmid"):
         return "inline_pmid"
     if EXTERNAL_EVIDENCE_CLAIM_RE.search(claim):
         return "external_evidence"
@@ -169,26 +169,38 @@ def _claim_items(
     known_pmids: set[str],
 ) -> list[dict[str, Any]]:
     items: list[dict[str, Any]] = []
-    for index, claim in enumerate(claims):
+    for source_claim_index, claim in enumerate(claims):
         if EXPLICIT_HYPOTHESIS_RE.search(claim):
             continue
         inline_pmids = sorted(set(validate_report_script.PMID_RE.findall(claim)))
-        following = claims[index + 1] if index + 1 < len(claims) else ""
-        candidate_pmids = [
-            pmid for pmid in (inline_pmids or fallback_pmids) if pmid in known_pmids
-        ]
-        items.append(
-            {
-                "index": index,
-                "claim": claim,
-                "inline_pmids": inline_pmids,
-                "candidate_pmids": candidate_pmids,
-                "hedged": bool(
-                    validate_report_script.MECHANISTIC_HEDGE_RE.search(claim)
-                    or EXPLICIT_HYPOTHESIS_RE.search(following)
-                ),
-            }
+        following = (
+            claims[source_claim_index + 1]
+            if source_claim_index + 1 < len(claims)
+            else ""
         )
+        hedged = bool(
+            validate_report_script.MECHANISTIC_HEDGE_RE.search(claim)
+            or EXPLICIT_HYPOTHESIS_RE.search(following)
+        )
+        for inline_pmid in inline_pmids or [None]:
+            candidate_pmids = (
+                [inline_pmid]
+                if inline_pmid in known_pmids
+                else []
+                if inline_pmid
+                else [pmid for pmid in fallback_pmids if pmid in known_pmids]
+            )
+            items.append(
+                {
+                    "index": len(items),
+                    "source_claim_index": source_claim_index,
+                    "claim": claim,
+                    "inline_pmids": inline_pmids,
+                    "inline_pmid": inline_pmid,
+                    "candidate_pmids": candidate_pmids,
+                    "hedged": hedged,
+                }
+            )
     return items
 
 
@@ -308,6 +320,7 @@ def _judgment_prompt(group: dict[str, Any]) -> str:
         {
             "claim_index": item["index"],
             "claim": item["claim"],
+            "inline_pmid": item.get("inline_pmid"),
             "candidate_pmids": item["candidate_pmids"],
             "evidence": item["evidence"],
         }
@@ -316,7 +329,7 @@ def _judgment_prompt(group: dict[str, Any]) -> str:
     return f"""Judge each biological claim using only its supplied evidence.
 
 Statuses:
-- supported: evidence directly supports the same subject, relation, direction, disease, and cell context.
+- supported: evidence directly supports the same subject, relation, direction, disease, and cell context. If inline_pmid is set, supporting_pmids must include that exact PMID.
 - overclaimed: evidence supports a weaker association but the claim adds causality, mechanism, direction, therapeutic effect, or unsupported context.
 - unsupported: supplied evidence directly conflicts with the claim or supports a materially different relation.
 - unverifiable: evidence is absent, ambiguous, or insufficient. Absence of a statement is not contradiction.
@@ -345,6 +358,8 @@ def _checkpoint_key(group: dict[str, Any], claims: list[dict[str, Any]]) -> str:
         "claims": [
             {
                 "index": item["index"],
+                "source_claim_index": item.get("source_claim_index", item["index"]),
+                "inline_pmid": item.get("inline_pmid"),
                 "claim": item["claim"],
                 "candidate_pmids": item["candidate_pmids"],
                 "hedged": item["hedged"],
@@ -475,6 +490,18 @@ def _judge_source_batch(
         if judgment is None:
             results.append(_unverifiable(item, "Claim judge omitted this claim."))
             continue
+        if (
+            item.get("inline_pmid")
+            and judgment.status == "supported"
+            and item["inline_pmid"] not in judgment.supporting_pmids
+        ):
+            results.append(
+                _unverifiable(
+                    item,
+                    f"Inline citation PMID {item['inline_pmid']} was not included in supporting_pmids.",
+                )
+            )
+            continue
         results.append(
             {
                 **item,
@@ -604,6 +631,8 @@ def validate_claims(
     selection: dict[str, Any] = {
         "extracted_claim_count": 0,
         "selected_claim_count": 0,
+        "non_inline_selected_count": 0,
+        "inline_citation_expected_count": 0,
         "selection_reason_counts": {},
         "skipped_claim_count": 0,
         "skipped_claims_truncated": False,
@@ -619,11 +648,22 @@ def validate_claims(
         for item in group["claims"]:
             selection["extracted_claim_count"] += 1
             reason = _selection_reason(item)
+            if item["inline_pmid"]:
+                selection["inline_citation_expected_count"] += 1
+                selection["selected_claim_count"] += 1
+                if reason is not None:
+                    selection["selection_reason_counts"][reason] = (
+                        selection["selection_reason_counts"].get(reason, 0) + 1
+                    )
+                selected_claims.append({**item, "selection_reason": reason})
+                continue
             if (
                 reason is not None
-                and selection["selected_claim_count"] < MAX_SELECTED_CLAIMS
+                and selection["non_inline_selected_count"]
+                < MAX_NON_INLINE_SELECTED_CLAIMS
             ):
                 selection["selected_claim_count"] += 1
+                selection["non_inline_selected_count"] += 1
                 selection["selection_reason_counts"][reason] = (
                     selection["selection_reason_counts"].get(reason, 0) + 1
                 )
@@ -685,4 +725,33 @@ def validate_claims(
 
     selection.update(stats)
     issues = [issue for result in results if (issue := _issue_for(result)) is not None]
-    return {"claims": results, "issues": issues, "selection": selection}
+    citations = [
+        {
+            "file": result["file"],
+            "section": result["section"],
+            "source_claim_index": result["source_claim_index"],
+            "inline_pmid": result["inline_pmid"],
+            "claim": result["claim"],
+            "status": result["status"],
+            "supporting_pmids": result["supporting_pmids"],
+            "evidence_quote": result["evidence_quote"],
+            "reason": result["reason"],
+        }
+        for result in results
+        if result.get("inline_pmid")
+    ]
+    return {
+        "claims": results,
+        "issues": issues,
+        "selection": selection,
+        "inline_citation_coverage": {
+            "expected_count": len(citations),
+            "evaluated_count": len(citations),
+            "supported_count": sum(
+                row["status"] == "supported" for row in citations
+            ),
+            "coverage_complete": bool(citations)
+            and all(row["status"] == "supported" for row in citations),
+            "citations": citations,
+        },
+    }
