@@ -312,6 +312,7 @@ def run_report_guardrail(data_dir: str | Path, *, provider: str | None = None) -
             data_dir,
             issues_path,
             provider=provider,
+            claim_validation=current_claims,
         )
         repair_attempt_count += 1
         changed_sections += changed

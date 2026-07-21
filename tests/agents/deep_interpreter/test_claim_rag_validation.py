@@ -72,6 +72,28 @@ def test_claim_items_expand_each_inline_pmid_into_exact_candidate() -> None:
     assert [item["index"] for item in items] == [0, 1]
 
 
+def test_inline_claim_issue_retains_citation_coordinates() -> None:
+    issue = claim_rag_validation._issue_for(
+        {
+            "status": "unsupported",
+            "hedged": False,
+            "supporting_pmids": [],
+            "evidence_quote": "",
+            "reason": "The cited paper does not support this claim.",
+            "file": "part1_final.md",
+            "section": "## Biology",
+            "source_claim_index": 3,
+            "inline_pmid": "22222222",
+            "claim": "TGFB drives fibrosis (PMID: 22222222).",
+        }
+    )
+
+    assert issue is not None
+    assert issue["code"] == "inline_citation_unsupported"
+    assert issue["source_claim_index"] == 3
+    assert issue["inline_pmid"] == "22222222"
+
+
 def test_reference_pmid_list_creates_no_claim_item(tmp_path: Path) -> None:
     _write_papers(tmp_path / "papers.json")
     (tmp_path / "part1_final.md").write_text(
@@ -1016,7 +1038,7 @@ def test_validate_claims_maps_overclaim_to_repairable_issue(
     assert result["claims"][0]["status"] == "overclaimed"
     assert result["issues"] == [
         {
-            "code": "claim_rag_overclaimed",
+            "code": "inline_citation_overclaimed",
             "severity": "error",
             "file": "part1_final.md",
             "section": "## Analysis 1-1",
@@ -1028,6 +1050,8 @@ def test_validate_claims_maps_overclaim_to_repairable_issue(
             "repair_instruction": (
                 "Rewrite only this claim to match the supported association; do not add a new PMID."
             ),
+            "source_claim_index": 0,
+            "inline_pmid": "11111111",
         }
     ]
 

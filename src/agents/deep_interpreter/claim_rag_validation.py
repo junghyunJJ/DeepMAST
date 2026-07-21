@@ -578,14 +578,21 @@ def _judge_group(
     return results
 
 
-def _issue_for(result: dict[str, Any]) -> dict[str, str] | None:
+def _issue_for(result: dict[str, Any]) -> dict[str, Any] | None:
     status = str(result["status"])
     if status == "supported":
         return None
     hedged = bool(result["hedged"])
     severity = "warning" if status == "unverifiable" or hedged else "error"
-    code = "claim_rag_hypothesis_warning" if hedged else f"claim_rag_{status}"
-    pmids = ", ".join(result["supporting_pmids"]) or "none"
+    inline_pmid = result.get("inline_pmid")
+    code = (
+        f"inline_citation_{status}"
+        if inline_pmid
+        else "claim_rag_hypothesis_warning"
+        if hedged
+        else f"claim_rag_{status}"
+    )
+    pmids = ", ".join(str(pmid) for pmid in result["supporting_pmids"]) or "none"
     quote = str(result["evidence_quote"]).strip()
     evidence = f"{result['reason']} PMIDs: {pmids}."
     if quote:
@@ -597,7 +604,7 @@ def _issue_for(result: dict[str, Any]) -> dict[str, str] | None:
         if status == "overclaimed"
         else "Remove the unsupported assertion or mark it as a hypothesis requiring validation; do not add a new PMID."
     )
-    return {
+    issue: dict[str, Any] = {
         "code": code,
         "severity": severity,
         "file": str(result["file"]),
@@ -606,6 +613,10 @@ def _issue_for(result: dict[str, Any]) -> dict[str, str] | None:
         "evidence": evidence,
         "repair_instruction": instruction,
     }
+    if inline_pmid:
+        issue["source_claim_index"] = result.get("source_claim_index")
+        issue["inline_pmid"] = str(inline_pmid)
+    return issue
 
 
 def validate_claims(

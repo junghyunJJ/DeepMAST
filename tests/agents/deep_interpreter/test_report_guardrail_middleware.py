@@ -449,13 +449,19 @@ def test_run_report_guardrail_stops_after_first_successful_repair(
         ]
 
     def fake_repair(
-        data_dir: Path, issues_path: Path, *, provider: str | None = None, llm=None
+        data_dir: Path,
+        issues_path: Path,
+        *,
+        provider: str | None = None,
+        llm=None,
+        claim_validation: list[dict[str, Any]] | None = None,
     ) -> int:
         calls.append("repair")
         assert data_dir == tmp_path.resolve()
         assert issues_path == tmp_path.resolve() / "report_validation_initial.json"
         assert provider == "ollama"
         assert llm is None
+        assert claim_validation == []
         return 1
 
     monkeypatch.setattr(report_guardrails.validate_report_script, "validate_report", fake_validate)
@@ -519,9 +525,16 @@ def test_run_report_guardrail_merges_claim_errors_and_revalidates_after_repair(
 
     repair_calls = 0
 
-    def fake_repair(*_args, **_kwargs):
+    def fake_repair(
+        *_args: Any,
+        claim_validation: list[dict[str, Any]] | None = None,
+        **_kwargs: Any,
+    ) -> int:
         nonlocal repair_calls
         repair_calls += 1
+        assert claim_validation == [
+            {"status": "overclaimed", "claim": "TGFB drives fibrosis."}
+        ]
         return 1
 
     monkeypatch.setattr(
@@ -670,7 +683,12 @@ def test_run_report_guardrail_retries_up_to_three_repairs(
         return [{"severity": severity, "code": "bounded_retry"}]
 
     def fake_repair(
-        data_dir: Path, issues_path: Path, *, provider: str | None = None, llm=None
+        data_dir: Path,
+        issues_path: Path,
+        *,
+        provider: str | None = None,
+        llm=None,
+        claim_validation: list[dict[str, Any]] | None = None,
     ) -> int:
         calls.append("repair")
         assert data_dir == tmp_path.resolve()
@@ -678,6 +696,7 @@ def test_run_report_guardrail_retries_up_to_three_repairs(
             tmp_path.resolve() / "report_validation_initial.json",
             tmp_path.resolve() / "report_validation_final.json",
         }
+        assert claim_validation == []
         return 1
 
     monkeypatch.setattr(report_guardrails.validate_report_script, "validate_report", fake_validate)
@@ -715,10 +734,16 @@ def test_run_report_guardrail_records_remaining_errors_without_raising(
         return [{"severity": "error", "code": "still_bad"}]
 
     def fake_repair(
-        data_dir: Path, issues_path: Path, *, provider: str | None = None, llm=None
+        data_dir: Path,
+        issues_path: Path,
+        *,
+        provider: str | None = None,
+        llm=None,
+        claim_validation: list[dict[str, Any]] | None = None,
     ) -> int:
         nonlocal repair_count
         repair_count += 1
+        assert claim_validation == []
         return 0
 
     monkeypatch.setattr(report_guardrails.validate_report_script, "validate_report", fake_validate)
