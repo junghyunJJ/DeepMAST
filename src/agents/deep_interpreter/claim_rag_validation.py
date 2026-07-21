@@ -513,6 +513,12 @@ def _judge_source_batch(
                         }
                     )
                 except Exception as fallback_exc:
+                    if (
+                        isinstance(fallback_exc, TimeoutError)
+                        and deadline - time.monotonic() <= 0
+                    ):
+                        exhaust_deadline(evidence_items[offset:])
+                        break
                     failed[item["index"]] = _unverifiable(
                         item, f"Claim judge failed: {type(fallback_exc).__name__}."
                     )

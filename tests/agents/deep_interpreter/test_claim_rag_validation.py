@@ -857,6 +857,64 @@ def test_batch_deadline_stops_serial_fallbacks(monkeypatch: pytest.MonkeyPatch) 
     ]
 
 
+def test_fallback_timeout_that_consumes_deadline_exhausts_current_and_remaining(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    clock = SimpleNamespace(value=0.0)
+    monkeypatch.setattr(claim_rag_validation.time, "monotonic", lambda: clock.value)
+
+    class DeadlineConsumingFallback(SingleClaimFallbackModel):
+        def invoke(self, messages):
+            payload = json.loads(
+                messages[0].content.split("Claims and evidence:\n", maxsplit=1)[1]
+            )
+            self.batch_sizes.append(len(payload))
+            clock.value = 301.0
+            raise TimeoutError("fallback timed out")
+
+    batch = [
+        {
+            "index": index,
+            "claim": f"Claim {index}.",
+            "candidate_pmids": ["11111111"],
+            "hedged": False,
+            "file": "part1_final.md",
+            "section": "## Biology",
+            "evidence": [
+                {"pmid": "11111111", "source": "abstract", "text": "Evidence."}
+            ],
+        }
+        for index in range(3)
+    ]
+    primary = TimeoutPrimaryModel()
+    fallback = DeadlineConsumingFallback()
+    stats = {
+        "judgment_batch_count": 0,
+        "single_claim_fallback_count": 0,
+        "judge_deadline_exhaustion_count": 0,
+    }
+
+    results = claim_rag_validation._judge_source_batch(
+        {"file": "part1_final.md", "section": "## Biology"},
+        batch,
+        primary,
+        lambda: primary,
+        fallback,
+        lambda: fallback,
+        stats,
+    )
+
+    assert primary.batch_sizes == [3]
+    assert fallback.batch_sizes == [1]
+    assert stats["single_claim_fallback_count"] == 1
+    assert stats["judge_deadline_exhaustion_count"] == 3
+    assert [row["reason"] for row in results] == [
+        "Claim judge batch deadline exhausted.",
+        "Claim judge batch deadline exhausted.",
+        "Claim judge batch deadline exhausted.",
+    ]
+
+
 def test_judge_group_falls_back_to_single_claim_batches_after_primary_timeout() -> None:
     primary = TimeoutPrimaryModel()
     fallback = SingleClaimFallbackModel()
