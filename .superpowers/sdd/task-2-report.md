@@ -53,3 +53,16 @@ Status: DONE
 - `uv run pyright src/agents/deep_interpreter/claim_rag_validation.py tests/agents/deep_interpreter/test_claim_rag_validation.py`
   - Result: `0 errors, 0 warnings, 0 informations`.
 - Notes: `uv` printed the ambient `VIRTUAL_ENV` mismatch warning; Pyright also reported a newer version is available.
+
+## Hedged Inline Citation Review Fix
+
+- Fix commit: `96b0c48`
+- Changed: hedged `inline_citation_unsupported` and `inline_citation_overclaimed` now remain `error`; `inline_citation_unverifiable` remains `warning`; hedged non-inline Claim-RAG issues still downgrade to warning.
+- Regression: added repair coverage proving a hedged failed inline PMID is removed when a supported sibling citation remains.
+- TDD RED: `OPENAI_API_KEY=test LANGCHAIN_TRACING_V2=false uv run pytest -q tests/scripts/test_repair_report.py::test_repair_handles_hedged_failed_inline_pmid_when_sibling_supports` failed because severity was `warning`.
+- TDD RED: `OPENAI_API_KEY=test LANGCHAIN_TRACING_V2=false uv run pytest -q tests/agents/deep_interpreter/test_claim_rag_validation.py::test_issue_severity_applies_hedged_warning_only_to_non_inline_claim_rag_issues` failed for hedged inline `unsupported` and `overclaimed`.
+- GREEN: `OPENAI_API_KEY=test LANGCHAIN_TRACING_V2=false uv run pytest -q tests/scripts/test_repair_report.py::test_repair_handles_hedged_failed_inline_pmid_when_sibling_supports tests/agents/deep_interpreter/test_claim_rag_validation.py::test_issue_severity_applies_hedged_warning_only_to_non_inline_claim_rag_issues` -> 5 passed, 1 warning.
+- Verification: `OPENAI_API_KEY=test LANGCHAIN_TRACING_V2=false uv run pytest -q tests/scripts/test_repair_report.py tests/agents/deep_interpreter/test_claim_rag_validation.py tests/agents/deep_interpreter/test_report_guardrail_middleware.py` -> 80 passed, 1 warning.
+- Ruff: `uv run ruff check scripts/repair_report.py src/agents/deep_interpreter/claim_rag_validation.py src/agents/deep_interpreter/report_guardrails.py tests/scripts/test_repair_report.py tests/agents/deep_interpreter/test_claim_rag_validation.py tests/agents/deep_interpreter/test_report_guardrail_middleware.py` -> All checks passed.
+- Pyright: `uv run pyright scripts/repair_report.py src/agents/deep_interpreter/claim_rag_validation.py src/agents/deep_interpreter/report_guardrails.py tests/scripts/test_repair_report.py tests/agents/deep_interpreter/test_claim_rag_validation.py tests/agents/deep_interpreter/test_report_guardrail_middleware.py` -> 0 errors, 0 warnings, 0 informations.
+- Notes: did not touch Synthesis Task3, deadlines Task4, `mcp_clients`, or user-owned `.superpowers/sdd/task-3-report.md`.
