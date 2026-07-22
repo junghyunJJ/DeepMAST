@@ -552,6 +552,7 @@ def test_run_synthesis_guardrail_repairs_claim_rag_inline_contradiction(
         lambda *_args, **_kwargs: InlineContradictionModel(),
     )
     repair_model_call_count = 0
+    repair_model_providers: list[str | None] = []
 
     def rewrite_to_still_contradicted(_prompt: str) -> str:
         nonlocal repair_model_call_count
@@ -559,19 +560,25 @@ def test_run_synthesis_guardrail_repairs_claim_rag_inline_contradiction(
         return "LAMA5 correlates with worse recurrence-free survival (PMID: 40694271)."
 
     repair_model = SimpleNamespace(invoke=rewrite_to_still_contradicted)
+
+    def create_repair_model(provider: str | None) -> Any:
+        repair_model_providers.append(provider)
+        return repair_model
+
     monkeypatch.setattr(
         report_guardrails.repair_report_script,
         "_create_model",
-        lambda *_args, **_kwargs: repair_model,
+        create_repair_model,
     )
 
-    result = report_guardrails.run_synthesis_guardrail(tmp_path)
+    result = report_guardrails.run_synthesis_guardrail(tmp_path, provider="ollama")
 
     initial = json.loads(
         (tmp_path / "synthesis_guardrail_initial.json").read_text(encoding="utf-8")
     )
     text = (tmp_path / "synthesis.md").read_text(encoding="utf-8")
     assert repair_model_call_count == 1
+    assert repair_model_providers == ["ollama"]
     assert result["status"] == "passed"
     assert result["repair_attempt_count"] == 2
     assert initial["issues"][0]["reason"].startswith("The claim incorrectly states")
@@ -765,8 +772,10 @@ def test_run_synthesis_guardrail_retries_up_to_three_repairs(
         _issues: list[dict[str, str]],
         _claim_validation: list[dict[str, Any]] | None = None,
         *,
+        provider: str | None = None,
         deterministic_contradictions: bool = False,
     ) -> int:
+        _ = provider
         _ = deterministic_contradictions
         nonlocal repair_count
         repair_count += 1
