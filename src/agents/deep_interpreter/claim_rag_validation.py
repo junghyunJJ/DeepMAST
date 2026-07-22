@@ -673,6 +673,8 @@ def _issue_for(result: dict[str, Any]) -> dict[str, Any] | None:
         "section": str(result["section"]),
         "value": str(result["claim"]),
         "evidence": evidence,
+        "reason": str(result["reason"]),
+        "evidence_quote": quote,
         "repair_instruction": instruction,
     }
     if inline_pmid:

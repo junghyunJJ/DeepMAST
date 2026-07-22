@@ -477,6 +477,102 @@ def test_repair_synthesis_report_falls_back_when_contradiction_rewrite_omits_pmi
     assert "this remains a hypothesis requiring validation." in text
 
 
+def test_run_synthesis_guardrail_repairs_claim_rag_inline_contradiction(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from src.agents.deep_interpreter import claim_rag_validation, report_guardrails
+
+    real_claim_rag_validation = importlib.reload(claim_rag_validation)
+    claim = (
+        "LAMA5 is downregulated and correlates with worse recurrence-free survival "
+        "(PMID: 40694271), indicating metastatic progression."
+    )
+    evidence_quote = (
+        "Higher LAMA5 expression was associated with better recurrence-free survival."
+    )
+    (tmp_path / "papers.json").write_text(
+        json.dumps({"papers": [{"pmid": "40694271", "abstract": evidence_quote}]}),
+        encoding="utf-8",
+    )
+    (tmp_path / "synthesis.md").write_text(
+        f"## Integrated Biological Narrative\n\n{claim}\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        report_guardrails.claim_rag_validation,
+        "validate_claims",
+        real_claim_rag_validation.validate_claims,
+    )
+    monkeypatch.setattr(
+        real_claim_rag_validation.search_literature_fulltext,
+        "invoke",
+        lambda _args: [
+            {
+                "page_content": evidence_quote,
+                "metadata": {"filename": "pmid_40694271.txt"},
+                "score": 0.9,
+            }
+        ],
+    )
+
+    class InlineContradictionModel:
+        def with_structured_output(self, _schema: Any, *, method: str | None = None) -> Any:
+            return self
+
+        def invoke(self, messages: list[Any]) -> Any:
+            payload = json.loads(
+                messages[0].content.split("Claims and evidence:\n", maxsplit=1)[1]
+            )
+            item = payload[0]
+            overclaimed = "worse recurrence-free survival" in item["claim"]
+            return real_claim_rag_validation.ClaimJudgmentBatch(
+                judgments=[
+                    real_claim_rag_validation.ClaimJudgment(
+                        claim_index=item["claim_index"],
+                        status="overclaimed" if overclaimed else "supported",
+                        reason=(
+                            "The claim incorrectly states worse survival; the evidence states better survival."
+                            if overclaimed
+                            else "The corrected claim matches the supplied evidence."
+                        ),
+                        supporting_pmids=["40694271"],
+                        evidence_quote=evidence_quote,
+                    )
+                ]
+            )
+
+    monkeypatch.setattr(
+        real_claim_rag_validation,
+        "_create_judge_llm",
+        lambda *_args, **_kwargs: InlineContradictionModel(),
+    )
+    repair_model = SimpleNamespace(
+        invoke=lambda _prompt: (
+            "Higher LAMA5 expression was associated with better recurrence-free "
+            "survival (PMID: 40694271). This remains a hypothesis requiring validation."
+        )
+    )
+    monkeypatch.setattr(
+        report_guardrails.repair_report_script,
+        "_create_model",
+        lambda *_args, **_kwargs: repair_model,
+    )
+
+    result = report_guardrails.run_synthesis_guardrail(tmp_path)
+
+    initial = json.loads(
+        (tmp_path / "synthesis_guardrail_initial.json").read_text(encoding="utf-8")
+    )
+    text = (tmp_path / "synthesis.md").read_text(encoding="utf-8")
+    assert result["status"] == "passed"
+    assert result["repair_attempt_count"] == 1
+    assert initial["issues"][0]["reason"].startswith("The claim incorrectly states")
+    assert initial["issues"][0]["evidence_quote"] == evidence_quote
+    assert "better recurrence-free survival (PMID: 40694271)" in text
+    assert "worse recurrence-free survival" not in text
+
+
 def test_run_synthesis_guardrail_repairs_consistency_mismatch(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

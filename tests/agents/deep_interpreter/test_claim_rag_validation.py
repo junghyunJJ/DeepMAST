@@ -1276,6 +1276,8 @@ def test_validate_claims_maps_overclaim_to_repairable_issue(
                 "The evidence supports association, not causation. "
                 "PMIDs: 11111111. Evidence: TGFB is associated with fibrosis."
             ),
+            "reason": "The evidence supports association, not causation.",
+            "evidence_quote": "TGFB is associated with fibrosis.",
             "repair_instruction": (
                 "Rewrite only this claim to match the supported association; do not add a new PMID."
             ),
