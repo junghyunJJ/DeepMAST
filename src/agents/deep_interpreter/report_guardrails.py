@@ -96,6 +96,14 @@ def _error_count(issues: list[dict[str, str]]) -> int:
     return sum(1 for issue in issues if issue.get("severity") == "error")
 
 
+def _issue_claim_key(issue: dict[str, str]) -> tuple[str, str, str]:
+    return (
+        str(issue.get("file") or ""),
+        str(issue.get("section") or ""),
+        str(issue.get("value") or ""),
+    )
+
+
 def _missing_required_files(data_dir: Path) -> list[str]:
     return [name for name in REQUIRED_PART_FILES if not (data_dir / name).exists()]
 
@@ -533,11 +541,18 @@ def run_synthesis_guardrail(data_dir: str | Path, *, provider: str | None = None
     current_coverage = initial_coverage
     changed_claims = 0
     repair_attempt_count = 0
+    terminal_repair_count = 0
+    last_repair_error_keys: set[tuple[str, str, str]] = set()
 
     while (
         _error_count(current_issues)
         and repair_attempt_count < MAX_GUARDRAIL_REPAIR_PASSES
     ):
+        last_repair_error_keys = {
+            _issue_claim_key(issue)
+            for issue in current_issues
+            if issue.get("severity") == "error"
+        }
         changed = repair_synthesis_report(
             data_dir,
             current_issues,
@@ -561,6 +576,35 @@ def run_synthesis_guardrail(data_dir: str | Path, *, provider: str | None = None
         if changed == 0:
             break
 
+    newly_surfaced_errors = [
+        issue
+        for issue in current_issues
+        if issue.get("severity") == "error"
+        and _issue_claim_key(issue) not in last_repair_error_keys
+    ]
+    if repair_attempt_count == MAX_GUARDRAIL_REPAIR_PASSES and newly_surfaced_errors:
+        terminal_repair_count = 1
+        terminal_changed = repair_synthesis_report(
+            data_dir,
+            newly_surfaced_errors,
+            current_claims,
+            provider=provider,
+            deterministic_contradictions=True,
+        )
+        changed_claims += terminal_changed
+        if terminal_changed:
+            (
+                current_issues,
+                current_claims,
+                current_consistency,
+                current_selection,
+                current_coverage,
+            ) = _validate_synthesis_guardrails(
+                data_dir,
+                provider=provider,
+                claim_cache=claim_cache,
+            )
+
     final_issues = current_issues
     _write_issues(
         final_path,
@@ -578,6 +622,7 @@ def run_synthesis_guardrail(data_dir: str | Path, *, provider: str | None = None
         "initial_issue_count": len(initial_issues),
         "initial_error_count": initial_error_count,
         "repair_attempt_count": repair_attempt_count,
+        "terminal_repair_count": terminal_repair_count,
         "changed_claims": changed_claims,
         "final_issue_count": len(final_issues),
         "final_error_count": final_error_count,

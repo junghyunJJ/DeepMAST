@@ -794,6 +794,152 @@ def test_run_synthesis_guardrail_retries_up_to_three_repairs(
     assert result["final_error_count"] == 0
 
 
+def test_run_synthesis_guardrail_terminally_repairs_new_final_error(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    _write_synthesis_required_files(tmp_path)
+    persistent = {
+        "severity": "error",
+        "code": "existing_error",
+        "file": "synthesis.md",
+        "section": "## Existing",
+        "value": "Existing error",
+    }
+    latent = {
+        "severity": "warning",
+        "code": "claim_rag_unverifiable",
+        "file": "synthesis.md",
+        "section": "## Clinical/Biological Implications",
+        "value": "Analysis-derived claim",
+    }
+    promoted = {
+        **latent,
+        "severity": "error",
+        "code": "claim_rag_unsupported",
+    }
+    repaired = {
+        **latent,
+        "code": "claim_rag_hypothesis_warning",
+    }
+    validations = [
+        [persistent, latent],
+        [persistent, latent],
+        [persistent, latent],
+        [promoted],
+        [repaired],
+    ]
+    validate_count = 0
+    repaired_issue_batches: list[list[dict[str, str]]] = []
+
+    def fake_validate(
+        _data_dir: Path,
+        *,
+        provider: str | None,
+        claim_cache: dict[str, list[dict[str, Any]]],
+    ) -> tuple[
+        list[dict[str, str]],
+        list[dict[str, Any]],
+        dict[str, list[dict[str, Any]]],
+        None,
+        None,
+    ]:
+        nonlocal validate_count
+        _ = provider, claim_cache
+        issues = validations[validate_count]
+        validate_count += 1
+        return issues, [], {"issues": [], "results": []}, None, None
+
+    def fake_repair(
+        _data_dir: Path,
+        issues: list[dict[str, str]],
+        _claim_validation: list[dict[str, Any]] | None = None,
+        *,
+        provider: str | None = None,
+        deterministic_contradictions: bool = False,
+    ) -> int:
+        _ = provider
+        repaired_issue_batches.append(issues)
+        if len(repaired_issue_batches) == 4:
+            assert deterministic_contradictions is True
+        return 1
+
+    monkeypatch.setattr(report_guardrails, "_validate_synthesis_guardrails", fake_validate)
+    monkeypatch.setattr(report_guardrails, "repair_synthesis_report", fake_repair)
+
+    result = report_guardrails.run_synthesis_guardrail(tmp_path, provider="ollama")
+
+    assert validate_count == 5
+    assert len(repaired_issue_batches) == 4
+    assert repaired_issue_batches[-1] == [promoted]
+    assert result["status"] == "passed"
+    assert result["repair_attempt_count"] == 3
+    assert result["terminal_repair_count"] == 1
+    assert result["final_error_count"] == 0
+
+
+def test_run_synthesis_guardrail_does_not_terminally_retry_persistent_error(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    _write_synthesis_required_files(tmp_path)
+    persistent = {
+        "severity": "error",
+        "code": "claim_rag_unsupported",
+        "file": "synthesis.md",
+        "section": "## Clinical/Biological Implications",
+        "value": "Persistent unsupported claim",
+    }
+    validate_count = 0
+    repair_count = 0
+
+    def fake_validate(
+        _data_dir: Path,
+        *,
+        provider: str | None,
+        claim_cache: dict[str, list[dict[str, Any]]],
+    ) -> tuple[
+        list[dict[str, str]],
+        list[dict[str, Any]],
+        dict[str, list[dict[str, Any]]],
+        None,
+        None,
+    ]:
+        nonlocal validate_count
+        _ = provider, claim_cache
+        validate_count += 1
+        return [persistent], [], {"issues": [], "results": []}, None, None
+
+    def fake_repair(
+        _data_dir: Path,
+        _issues: list[dict[str, str]],
+        _claim_validation: list[dict[str, Any]] | None = None,
+        *,
+        provider: str | None = None,
+        deterministic_contradictions: bool = False,
+    ) -> int:
+        nonlocal repair_count
+        _ = provider, deterministic_contradictions
+        repair_count += 1
+        return 1
+
+    monkeypatch.setattr(report_guardrails, "_validate_synthesis_guardrails", fake_validate)
+    monkeypatch.setattr(report_guardrails, "repair_synthesis_report", fake_repair)
+
+    result = report_guardrails.run_synthesis_guardrail(tmp_path)
+
+    assert validate_count == 4
+    assert repair_count == 3
+    assert result["status"] == "failed"
+    assert result["repair_attempt_count"] == 3
+    assert result["terminal_repair_count"] == 0
+    assert result["final_error_count"] == 1
+
+
 def test_run_report_guardrail_stops_after_first_successful_repair(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
