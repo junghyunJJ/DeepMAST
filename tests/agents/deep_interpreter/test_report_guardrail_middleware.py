@@ -413,6 +413,70 @@ def test_run_synthesis_guardrail_hedges_sole_unsupported_inline_citation(
     assert "hypothesis requiring validation" in synthesis.lower()
 
 
+def test_repair_synthesis_report_rewrites_explicit_inline_contradiction(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    claim = (
+        "LAMA5 is downregulated and correlates with worse recurrence-free survival "
+        "(PMID: 40694271), indicating metastatic progression."
+    )
+    (tmp_path / "synthesis.md").write_text(claim + "\n", encoding="utf-8")
+    issues = [
+        {
+            "severity": "error",
+            "code": "inline_citation_overclaimed",
+            "file": "synthesis.md",
+            "value": claim,
+            "inline_pmid": "40694271",
+            "evidence_quote": "Higher LAMA5 expression was associated with better recurrence-free survival.",
+            "reason": "The claim incorrectly states worse survival; the evidence states better survival.",
+        }
+    ]
+
+    model = SimpleNamespace(
+        invoke=lambda _prompt: (
+            "Higher LAMA5 expression was associated with better recurrence-free "
+            "survival (PMID: 40694271). This remains a hypothesis requiring validation."
+        )
+    )
+    monkeypatch.setattr(report_guardrails.repair_report_script, "_create_model", lambda *_: model)
+
+    assert report_guardrails.repair_synthesis_report(tmp_path, issues) == 1
+    text = (tmp_path / "synthesis.md").read_text(encoding="utf-8")
+    assert "better recurrence-free survival (PMID: 40694271)" in text
+    assert "This remains a hypothesis requiring validation." in text
+    assert "worse recurrence-free survival" not in text
+
+
+def test_repair_synthesis_report_falls_back_when_contradiction_rewrite_omits_pmid(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    claim = "LAMA5 correlates with worse recurrence-free survival (PMID: 40694271)."
+    (tmp_path / "synthesis.md").write_text(claim + "\n", encoding="utf-8")
+    issues = [
+        {
+            "severity": "error",
+            "code": "inline_citation_overclaimed",
+            "file": "synthesis.md",
+            "value": claim,
+            "inline_pmid": "40694271",
+            "evidence_quote": "Higher LAMA5 expression was associated with better recurrence-free survival.",
+            "reason": "The claim incorrectly states worse survival; the evidence states better survival.",
+        }
+    ]
+    model = SimpleNamespace(invoke=lambda _prompt: "Higher LAMA5 expression was better.")
+    monkeypatch.setattr(report_guardrails.repair_report_script, "_create_model", lambda *_: model)
+
+    assert report_guardrails.repair_synthesis_report(tmp_path, issues) == 1
+    text = (tmp_path / "synthesis.md").read_text(encoding="utf-8")
+    assert claim in text
+    assert "this remains a hypothesis requiring validation." in text
+
+
 def test_run_synthesis_guardrail_repairs_consistency_mismatch(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -36,6 +36,10 @@ SYNTHESIS_HTML_FRAGMENT_RE = re.compile(
     r"</(?:article|div|h[1-6]|li|ol|p|section|table|ul)>",
     re.IGNORECASE | re.MULTILINE,
 )
+EXPLICIT_INLINE_CONTRADICTION_RE = re.compile(
+    r"\b(contradict|incorrectly states)\b",
+    re.IGNORECASE,
+)
 PAPERS_JSON_LOAD_ERROR_CODES = {
     "papers_json_missing",
     "papers_json_unreadable",
@@ -232,6 +236,51 @@ def validate_synthesis_report(data_dir: str | Path) -> list[dict[str, str]]:
     return issues
 
 
+def _repair_explicit_inline_contradiction(data_dir: Path, issue: dict[str, str]) -> bool:
+    if issue.get("code") != "inline_citation_overclaimed":
+        return False
+    pmid = str(issue.get("inline_pmid") or "")
+    evidence_quote = str(issue.get("evidence_quote") or "")
+    claim = str(issue.get("value") or "")
+    reason = str(issue.get("reason") or "")
+    if not (
+        pmid
+        and evidence_quote
+        and claim
+        and EXPLICIT_INLINE_CONTRADICTION_RE.search(reason)
+    ):
+        return False
+
+    path = data_dir / "synthesis.md"
+    text = path.read_text(encoding="utf-8")
+    claim_at = text.find(claim)
+    if claim_at < 0:
+        return False
+
+    prompt = f"""Rewrite only this claim using the supplied evidence quote and the exact PMID.
+Keep only facts explicitly stated in the quote. Preserve PMID: {pmid} on the factual sentence.
+Move any unsupported mechanism, prognosis extension, or therapeutic implication to exactly:
+This remains a hypothesis requiring validation.
+Return complete Markdown replacement text only.
+
+Claim:
+{claim}
+
+Evidence quote:
+{evidence_quote}
+"""
+    try:
+        model = repair_report_script._create_model(None)
+        replacement = repair_report_script._content(model.invoke(prompt)).strip()
+    except Exception:
+        return False
+
+    if not replacement or pmid not in replacement:
+        return False
+    path.write_text(text[:claim_at] + replacement + text[claim_at + len(claim) :], encoding="utf-8")
+    return True
+
+
 def repair_synthesis_report(
     data_dir: str | Path,
     issues: list[dict[str, str]],
@@ -249,6 +298,9 @@ def repair_synthesis_report(
             issue,
             claim_validation,
         ):
+            changed_claims += 1
+            continue
+        if _repair_explicit_inline_contradiction(data_dir, issue):
             changed_claims += 1
 
     path = data_dir / "synthesis.md"
