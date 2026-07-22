@@ -236,7 +236,29 @@ def validate_synthesis_report(data_dir: str | Path) -> list[dict[str, str]]:
     return issues
 
 
-def _repair_explicit_inline_contradiction(data_dir: Path, issue: dict[str, str]) -> bool:
+def _exact_evidence_fallback(pmid: str, evidence_quote: str) -> str:
+    fact = " ".join(evidence_quote.split()).strip()
+    fact = re.sub(
+        rf"\s*\(PMID:\s*{re.escape(pmid)}\)\s*[.!?]?\s*$",
+        "",
+        fact,
+        flags=re.IGNORECASE,
+    )
+    fact = fact.strip().rstrip(".!?")
+    if not fact:
+        return ""
+    return (
+        f"{fact} (PMID: {pmid}). "
+        "This remains a hypothesis requiring validation."
+    )
+
+
+def _repair_explicit_inline_contradiction(
+    data_dir: Path,
+    issue: dict[str, str],
+    *,
+    deterministic_only: bool = False,
+) -> bool:
     if issue.get("code") != "inline_citation_overclaimed":
         return False
     pmid = str(issue.get("inline_pmid") or "")
@@ -257,7 +279,9 @@ def _repair_explicit_inline_contradiction(data_dir: Path, issue: dict[str, str])
     if claim_at < 0:
         return False
 
-    prompt = f"""Rewrite only this claim using the supplied evidence quote and the exact PMID.
+    replacement = ""
+    if not deterministic_only:
+        prompt = f"""Rewrite only this claim using the supplied evidence quote and the exact PMID.
 Keep only facts explicitly stated in the quote. Preserve PMID: {pmid} on the factual sentence.
 Move any unsupported mechanism, prognosis extension, or therapeutic implication to exactly:
 This remains a hypothesis requiring validation.
@@ -269,13 +293,15 @@ Claim:
 Evidence quote:
 {evidence_quote}
 """
-    try:
-        model = repair_report_script._create_model(None)
-        replacement = repair_report_script._content(model.invoke(prompt)).strip()
-    except Exception:
-        return False
+        try:
+            model = repair_report_script._create_model(None)
+            replacement = repair_report_script._content(model.invoke(prompt)).strip()
+        except Exception:
+            replacement = ""
 
     if not replacement or pmid not in replacement:
+        replacement = _exact_evidence_fallback(pmid, evidence_quote)
+    if not replacement:
         return False
     path.write_text(text[:claim_at] + replacement + text[claim_at + len(claim) :], encoding="utf-8")
     return True
@@ -285,6 +311,8 @@ def repair_synthesis_report(
     data_dir: str | Path,
     issues: list[dict[str, str]],
     claim_validation: list[dict[str, Any]] | None = None,
+    *,
+    deterministic_contradictions: bool = False,
 ) -> int:
     data_dir = Path(data_dir).expanduser().resolve()
     changed_claims = 0
@@ -300,7 +328,11 @@ def repair_synthesis_report(
         ):
             changed_claims += 1
             continue
-        if _repair_explicit_inline_contradiction(data_dir, issue):
+        if _repair_explicit_inline_contradiction(
+            data_dir,
+            issue,
+            deterministic_only=deterministic_contradictions,
+        ):
             changed_claims += 1
 
     path = data_dir / "synthesis.md"
@@ -507,6 +539,7 @@ def run_synthesis_guardrail(data_dir: str | Path, *, provider: str | None = None
             data_dir,
             current_issues,
             current_claims,
+            deterministic_contradictions=repair_attempt_count > 0,
         )
         repair_attempt_count += 1
         changed_claims += changed

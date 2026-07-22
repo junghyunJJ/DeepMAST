@@ -473,8 +473,12 @@ def test_repair_synthesis_report_falls_back_when_contradiction_rewrite_omits_pmi
 
     assert report_guardrails.repair_synthesis_report(tmp_path, issues) == 1
     text = (tmp_path / "synthesis.md").read_text(encoding="utf-8")
-    assert claim in text
-    assert "this remains a hypothesis requiring validation." in text
+    assert (
+        "Higher LAMA5 expression was associated with better recurrence-free survival "
+        "(PMID: 40694271)."
+    ) in text
+    assert "This remains a hypothesis requiring validation." in text
+    assert "worse recurrence-free survival" not in text
 
 
 def test_run_synthesis_guardrail_repairs_claim_rag_inline_contradiction(
@@ -547,12 +551,14 @@ def test_run_synthesis_guardrail_repairs_claim_rag_inline_contradiction(
         "_create_judge_llm",
         lambda *_args, **_kwargs: InlineContradictionModel(),
     )
-    repair_model = SimpleNamespace(
-        invoke=lambda _prompt: (
-            "Higher LAMA5 expression was associated with better recurrence-free "
-            "survival (PMID: 40694271). This remains a hypothesis requiring validation."
-        )
-    )
+    repair_model_call_count = 0
+
+    def rewrite_to_still_contradicted(_prompt: str) -> str:
+        nonlocal repair_model_call_count
+        repair_model_call_count += 1
+        return "LAMA5 correlates with worse recurrence-free survival (PMID: 40694271)."
+
+    repair_model = SimpleNamespace(invoke=rewrite_to_still_contradicted)
     monkeypatch.setattr(
         report_guardrails.repair_report_script,
         "_create_model",
@@ -565,8 +571,9 @@ def test_run_synthesis_guardrail_repairs_claim_rag_inline_contradiction(
         (tmp_path / "synthesis_guardrail_initial.json").read_text(encoding="utf-8")
     )
     text = (tmp_path / "synthesis.md").read_text(encoding="utf-8")
+    assert repair_model_call_count == 1
     assert result["status"] == "passed"
-    assert result["repair_attempt_count"] == 1
+    assert result["repair_attempt_count"] == 2
     assert initial["issues"][0]["reason"].startswith("The claim incorrectly states")
     assert initial["issues"][0]["evidence_quote"] == evidence_quote
     assert "better recurrence-free survival (PMID: 40694271)" in text
@@ -757,7 +764,10 @@ def test_run_synthesis_guardrail_retries_up_to_three_repairs(
         _data_dir: Path,
         _issues: list[dict[str, str]],
         _claim_validation: list[dict[str, Any]] | None = None,
+        *,
+        deterministic_contradictions: bool = False,
     ) -> int:
+        _ = deterministic_contradictions
         nonlocal repair_count
         repair_count += 1
         return 1
