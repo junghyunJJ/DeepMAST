@@ -180,11 +180,13 @@ def _build_interpreter_save_retry_message(
     if part not in {1, 2, 3}:
         raise ValueError("interpreter save retry requires Part 1, 2, or 3")
     base_message = _build_subagent_message("interpreter", data_dir, {}, part)
-    return f"""Retry Part {part} output creation for {data_dir}.
+    return f"""Continue the existing Part {part} attempt for {data_dir}.
 
-Do not copy or save the previous chat-only response.
-Re-read /data_path.txt, /interpretation_guide.md, and /papers.json, then call load_analysis_data for the data directory.
-Regenerate the complete assigned Part from the source inputs.
+Use the conversation and tool results above. Do not restart the analysis from scratch.
+Reuse an existing load_analysis_data result when it is already present in the conversation.
+Call load_analysis_data only if no usable result is present.
+Do not blindly save a generic or incomplete previous response.
+Correct or complete the report so it satisfies every assigned Part requirement.
 
 {base_message}
 
@@ -357,16 +359,18 @@ async def run(args: argparse.Namespace) -> int:
         invoke_attempt_count += 1
         attempt: dict[str, Any] = {"retry_number": retry_number}
         try:
+            retry_message = {
+                "role": "user",
+                "content": _build_interpreter_save_retry_message(
+                    data_dir,
+                    args.part,
+                ),
+            }
             result = await agent.ainvoke(
                 {
                     "messages": [
-                        {
-                            "role": "user",
-                            "content": _build_interpreter_save_retry_message(
-                                data_dir,
-                                args.part,
-                            ),
-                        }
+                        *messages,
+                        retry_message,
                     ]
                 },
                 config=None,
