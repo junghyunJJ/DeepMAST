@@ -56,6 +56,45 @@ def test_part_claims_prefer_inline_pmid_then_section_references(tmp_path: Path) 
     assert group["claims"][0]["hedged"] is True
 
 
+def test_part_inline_pmid_claims_outside_interpretation_are_extracted_once(
+    tmp_path: Path,
+) -> None:
+    _write_papers(tmp_path / "papers.json")
+    (tmp_path / "part1_final.md").write_text(
+        "## Analysis 1-1\n"
+        "### Key Findings\n"
+        "CXCL12 regulates immune migration (PMID: 22222222).\n"
+        "TGFB promotes fibrosis (PMID: 11111111).\n"
+        "### Biological Interpretation\n"
+        "CXCL12 regulates immune migration (PMID: 22222222).\n"
+        "ERBB signaling supports proliferation.\n"
+        "### References\n"
+        "- ERBB drives proliferation (PMID: 33333333).\n",
+        encoding="utf-8",
+    )
+
+    [group] = claim_rag_validation._extract_claim_groups(
+        tmp_path, ("part1_final.md",)
+    )
+
+    assert [
+        (item["claim"], item["inline_pmid"], item["candidate_pmids"])
+        for item in group["claims"]
+    ] == [
+        (
+            "CXCL12 regulates immune migration (PMID: 22222222).",
+            "22222222",
+            ["22222222"],
+        ),
+        (
+            "ERBB signaling supports proliferation.",
+            None,
+            ["33333333"],
+        ),
+        ("TGFB promotes fibrosis (PMID: 11111111).", "11111111", ["11111111"]),
+    ]
+
+
 def test_claim_items_expand_each_inline_pmid_into_exact_candidate() -> None:
     items = claim_rag_validation._claim_items(
         ["TGFB drives fibrosis (PMID: 11111111; PMID: 22222222)."],

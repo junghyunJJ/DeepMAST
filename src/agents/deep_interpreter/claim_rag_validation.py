@@ -26,6 +26,7 @@ REFERENCE_BLOCK_RE = re.compile(
     r"^### References\s*$\n?(.*?)(?=^### |\Z)",
     re.MULTILINE | re.DOTALL | re.IGNORECASE,
 )
+PMID_RE = validate_report_script.PMID_RE
 MARKDOWN_TABLE_RE = re.compile(r"^\s*\|.*\|\s*$")
 EXPLICIT_HYPOTHESIS_RE = re.compile(
     r"\b(hypothesis|hypothesized|needs validation|requiring validation|novel finding)\b",
@@ -175,7 +176,15 @@ def _reference_pmids(section_body: str) -> list[str]:
     match = REFERENCE_BLOCK_RE.search(section_body)
     if match is None:
         return []
-    return sorted(set(validate_report_script.PMID_RE.findall(match.group(1))))
+    return sorted(set(PMID_RE.findall(match.group(1))))
+
+
+def _inline_pmid_claims_outside_references(section_body: str) -> list[str]:
+    return [
+        claim
+        for claim in _clean_claims(REFERENCE_BLOCK_RE.sub("", section_body))
+        if PMID_RE.search(claim)
+    ]
 
 
 def _claim_items(
@@ -187,7 +196,7 @@ def _claim_items(
     for source_claim_index, claim in enumerate(claims):
         if EXPLICIT_HYPOTHESIS_RE.search(claim):
             continue
-        inline_pmids = sorted(set(validate_report_script.PMID_RE.findall(claim)))
+        inline_pmids = sorted(set(PMID_RE.findall(claim)))
         following = (
             claims[source_claim_index + 1]
             if source_claim_index + 1 < len(claims)
@@ -242,6 +251,11 @@ def _extract_claim_groups(
                     section_body
                 )
                 claims = [claim for block in blocks for claim in _clean_claims(block)]
+                seen_claims = set(claims)
+                for claim in _inline_pmid_claims_outside_references(section_body):
+                    if claim not in seen_claims:
+                        claims.append(claim)
+                        seen_claims.add(claim)
                 fallback_pmids = _reference_pmids(section_body)
             claim_items = _claim_items(claims, fallback_pmids, set(paper_pmids))
             if claim_items:
