@@ -343,6 +343,38 @@ def test_inline_evidence_appends_exact_abstract_to_full_text(
     }
 
 
+def test_non_inline_full_text_hit_does_not_load_papers(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setattr(
+        claim_rag_validation.search_literature_fulltext,
+        "invoke",
+        lambda _args: [
+            {
+                "page_content": "TGFB is associated with fibrosis.",
+                "metadata": {"filename": "pmid_11111111.txt"},
+            }
+        ],
+    )
+
+    def fail_paper_map(_data_dir: Path):
+        raise AssertionError("_paper_map should not be called")
+
+    monkeypatch.setattr(claim_rag_validation, "_paper_map", fail_paper_map)
+
+    evidence = claim_rag_validation._retrieve_evidence(
+        "TGFB drives fibrosis.", ["11111111"], tmp_path
+    )
+
+    assert evidence == [
+        {
+            "pmid": "11111111",
+            "source": "full_text",
+            "text": "TGFB is associated with fibrosis.",
+        }
+    ]
+
+
 def test_abstract_fallback_is_limited_to_allowed_pmids(tmp_path: Path, monkeypatch) -> None:
     _write_papers(tmp_path / "papers.json")
     monkeypatch.setattr(

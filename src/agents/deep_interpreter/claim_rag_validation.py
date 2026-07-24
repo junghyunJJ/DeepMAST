@@ -341,11 +341,12 @@ def _retrieve_evidence_status(
             evidence.append({"pmid": pmid, "source": "full_text", "text": text[:1200]})
         if len(evidence) == 3:
             break
-    abstract_evidence = _abstract_evidence(claim, candidate_pmids, _paper_map(data_dir))
     if include_abstract:
-        evidence.extend(abstract_evidence)
+        evidence.extend(
+            _abstract_evidence(claim, candidate_pmids, _paper_map(data_dir))
+        )
     elif not evidence:
-        evidence = abstract_evidence
+        evidence = _abstract_evidence(claim, candidate_pmids, _paper_map(data_dir))
     return evidence, None
 
 
