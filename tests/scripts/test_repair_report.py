@@ -490,3 +490,34 @@ def test_inline_pmid_repair_ignores_unverifiable_and_unknown_codes(tmp_path: Pat
 
         assert repair_report._repair_inline_citation_issue(tmp_path.resolve(), issue, rows) is False
         assert report.read_text(encoding="utf-8") == f"## Biology\n{claim}\n"
+
+
+def test_pathway_factor_repair_prompt_separates_annotations_from_measurements() -> None:
+    prompt = repair_report._build_prompt(
+        {
+            "code": "unsupported_pathway_factor_significance",
+            "severity": "error",
+            "file": "part2_final.md",
+            "section": "## Analysis 2-8: Pathway-Factor Enrichment",
+            "value": "Factor2: TNFa",
+            "evidence": "sig_liana_pathway_factor.csv lacks the claimed factor-pathway support.",
+            "repair_instruction": (
+                "Rephrase as an LR-annotation-based hypothesis, "
+                "not measured pathway-factor significance."
+            ),
+        },
+        (
+            "## Analysis 2-8: Pathway-Factor Enrichment\n"
+            "TNFa annotation may provide context for Factor2 regions."
+        ),
+    )
+
+    assert (
+        "Keep L-R pathway annotations and measured factor-pathway results "
+        "in separate sentences."
+    ) in prompt
+    assert (
+        "Do not place an unsupported pathway label and factor label in the "
+        "same sentence unless that sentence explicitly states that no "
+        "measured association was identified."
+    ) in prompt

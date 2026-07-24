@@ -839,3 +839,95 @@ def test_ignores_general_literature_mechanism_without_report_evidence_terms(tmp_
 
     assert not any(i["code"] == "unsupported_mechanistic_interpretation" for i in issues)
     assert not any(i["code"] == "mechanistic_interpretation_warning" for i in issues)
+
+
+def test_flags_ambiguous_lr_annotation_factor_sentence(tmp_path: Path) -> None:
+    _write_json(tmp_path / "papers.json", [])
+    _write_csv(
+        tmp_path / "sig_liana_pathway_factor.csv",
+        [
+            {
+                "factor": "Factor2",
+                "pathway": "NFkB",
+                "estimate": -3.2899,
+                "pval": 0.0011,
+                "adj_pval": 0.0254,
+            }
+        ],
+    )
+    _write_csv(
+        tmp_path / "sig_PathwayEnrich_decoupler.csv",
+        [
+            {
+                "group": "1",
+                "reference": "rest",
+                "name": "TNFa",
+                "stat": 81.4,
+                "meanchange": 3.13,
+                "pval": 0.0,
+                "fdr": 0.0,
+            }
+        ],
+    )
+    (tmp_path / "part2_final.md").write_text(
+        "## Analysis 2-8: Pathway-Factor Enrichment\n"
+        "- The NFkB annotation for ICAM1^MUC1 "
+        "(JAK-STAT;NFkB;TNFa) provides context for Factor2 regions, "
+        "suggesting pathway involvement despite lack of enrichment significance.\n",
+        encoding="utf-8",
+    )
+
+    issues = validate_report.validate_report(tmp_path)
+
+    assert any(
+        issue["code"] == "unsupported_pathway_factor_significance"
+        and issue["value"] == "Factor2: TNFa"
+        for issue in issues
+    )
+
+
+def test_accepts_separated_lr_annotation_and_factor_measurement(
+    tmp_path: Path,
+) -> None:
+    _write_json(tmp_path / "papers.json", [])
+    _write_csv(
+        tmp_path / "sig_liana_pathway_factor.csv",
+        [
+            {
+                "factor": "Factor2",
+                "pathway": "NFkB",
+                "estimate": -3.2899,
+                "pval": 0.0011,
+                "adj_pval": 0.0254,
+            }
+        ],
+    )
+    _write_csv(
+        tmp_path / "sig_PathwayEnrich_decoupler.csv",
+        [
+            {
+                "group": "1",
+                "reference": "rest",
+                "name": "TNFa",
+                "stat": 81.4,
+                "meanchange": 3.13,
+                "pval": 0.0,
+                "fdr": 0.0,
+            }
+        ],
+    )
+    (tmp_path / "part2_final.md").write_text(
+        "## Analysis 2-8: Pathway-Factor Enrichment\n"
+        "ICAM1^MUC1 carries NFkB and TNFa labels in the L-R annotation dataset.\n\n"
+        "Only Factor2-NFkB was supported by sig_liana_pathway_factor.csv. "
+        "No measured Factor2-TNFa association was identified; TNFa involvement "
+        "therefore remains an annotation-based hypothesis.\n",
+        encoding="utf-8",
+    )
+
+    issues = validate_report.validate_report(tmp_path)
+
+    assert not any(
+        issue["code"] == "unsupported_pathway_factor_significance"
+        for issue in issues
+    )

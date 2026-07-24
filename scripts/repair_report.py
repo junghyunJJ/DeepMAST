@@ -162,6 +162,9 @@ Do not replace the cited paper or add a new PMID to rescue a claim.
 Rewrite causal or mechanistic report-derived claims as associations or hypotheses.
 Do not claim treatment sensitivity, resistance, patient stratification, or therapeutic vulnerability unless the validation issue provides direct support for that exact claim.
 Do not invent new PMIDs, p-values, scores, files, or pathway significance.
+For unsupported_pathway_factor_significance, Keep L-R pathway annotations and measured factor-pathway results in separate sentences.
+Do not place an unsupported pathway label and factor label in the same sentence unless that sentence explicitly states that no measured association was identified.
+State which factor-pathway relationship is measured, which pathway is annotation-only, and that annotation-only involvement remains a hypothesis.
 Do not add therapeutic/druggability conclusions to Part3.
 
 Validation issue:
