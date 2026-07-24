@@ -281,8 +281,66 @@ def test_evidence_filter_rejects_results_outside_allowed_pmids(
         "TGFB drives fibrosis.", ["11111111"], tmp_path
     )
 
-    assert [item["pmid"] for item in evidence] == ["11111111"]
-    assert evidence[0]["source"] == "full_text"
+    assert evidence == [
+        {
+            "pmid": "11111111",
+            "source": "full_text",
+            "text": "TGFB is associated with fibrosis.",
+        }
+    ]
+
+
+def test_inline_evidence_appends_exact_abstract_to_full_text(
+    tmp_path: Path, monkeypatch
+) -> None:
+    (tmp_path / "papers.json").write_text(
+        json.dumps(
+            {
+                "papers": [
+                    {
+                        "pmid": "26148232",
+                        "abstract": (
+                            "LRIG1 correlated positively with ERalpha, but inversely "
+                            "with ErbB3 in clinical breast cancer datasets."
+                        ),
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        claim_rag_validation.search_literature_fulltext,
+        "invoke",
+        lambda _args: [
+            {
+                "page_content": (
+                    "LRIG1 overexpression modestly decreased ErbB3 protein levels "
+                    "in luminal breast cancer cell lines."
+                ),
+                "metadata": {"filename": "pmid_26148232.txt"},
+            }
+        ],
+    )
+
+    evidence, reason = claim_rag_validation._retrieve_evidence_status(
+        "Clinical data indicate that LRIG1 expression correlates positively "
+        "with ERalpha and inversely with ErbB3.",
+        ["26148232"],
+        tmp_path,
+        include_abstract=True,
+    )
+
+    assert reason is None
+    assert [item["source"] for item in evidence] == ["full_text", "abstract"]
+    assert evidence[1] == {
+        "pmid": "26148232",
+        "source": "abstract",
+        "text": (
+            "LRIG1 correlated positively with ERalpha, but inversely with "
+            "ErbB3 in clinical breast cancer datasets."
+        ),
+    }
 
 
 def test_abstract_fallback_is_limited_to_allowed_pmids(tmp_path: Path, monkeypatch) -> None:
@@ -1034,6 +1092,59 @@ def test_judge_group_falls_back_to_single_claim_batches_after_primary_timeout() 
     assert flushes == 1
 
 
+def test_judge_group_requests_abstract_union_only_for_inline_claims(
+    tmp_path: Path, monkeypatch
+) -> None:
+    include_abstract_values: list[bool] = []
+
+    def fake_retrieve(
+        _claim: str,
+        _candidate_pmids: list[str],
+        _data_dir: Path,
+        *,
+        include_abstract: bool = False,
+    ):
+        include_abstract_values.append(include_abstract)
+        return (
+            [{"pmid": "11111111", "source": "abstract", "text": "Evidence."}],
+            None,
+        )
+
+    monkeypatch.setattr(
+        claim_rag_validation, "_retrieve_evidence_status", fake_retrieve
+    )
+    group = {
+        "file": "part1_final.md",
+        "section": "## Biology",
+        "claims": [
+            {
+                "index": 0,
+                "source_claim_index": 0,
+                "claim": "Inline claim (PMID: 11111111).",
+                "candidate_pmids": ["11111111"],
+                "inline_pmid": "11111111",
+                "hedged": False,
+            },
+            {
+                "index": 1,
+                "source_claim_index": 1,
+                "claim": "Non-inline claim.",
+                "candidate_pmids": ["11111111"],
+                "inline_pmid": None,
+                "hedged": False,
+            },
+        ],
+    }
+
+    claim_rag_validation._judge_group(
+        group,
+        EchoSupportingPmidsModel(),
+        data_dir=tmp_path,
+    )
+
+    assert include_abstract_values == [True, False]
+
+
 def test_judge_group_does_not_reuse_checkpoint_without_selection_reason() -> None:
     model = BatchLimitedStructuredModel()
     group = {
@@ -1074,6 +1185,51 @@ def test_judge_group_does_not_reuse_checkpoint_without_selection_reason() -> Non
 
     assert model.batch_sizes == [1]
     assert [result["status"] for result in results] == ["supported"]
+
+
+def test_checkpoint_key_changes_with_evidence_policy(monkeypatch) -> None:
+    group = {"file": "part1_final.md", "section": "## Biology"}
+    claims = [
+        {
+            "index": 0,
+            "claim": "LRIG1 correlates with ERalpha.",
+            "candidate_pmids": ["26148232"],
+            "inline_pmid": "26148232",
+            "hedged": False,
+            "selection_reason": "inline_pmid",
+        }
+    ]
+    current = claim_rag_validation.CLAIM_RAG_EVIDENCE_POLICY_VERSION
+    current_key = claim_rag_validation._checkpoint_key(group, claims)
+
+    monkeypatch.setattr(
+        claim_rag_validation,
+        "CLAIM_RAG_EVIDENCE_POLICY_VERSION",
+        current + 1,
+    )
+
+    assert claim_rag_validation._checkpoint_key(group, claims) != current_key
+
+
+def test_judgment_prompt_classifies_missing_statements_as_unverifiable() -> None:
+    prompt = claim_rag_validation._judgment_prompt(
+        {
+            "file": "part1_final.md",
+            "section": "## Biology",
+            "claims": [
+                {
+                    "index": 0,
+                    "claim": "Claim.",
+                    "inline_pmid": "26148232",
+                    "candidate_pmids": ["26148232"],
+                    "evidence": [],
+                }
+            ],
+        }
+    )
+
+    assert "does not mention" in prompt
+    assert "use unverifiable, not unsupported" in prompt
 
 
 def test_judge_group_does_not_persist_failed_judge_results() -> None:

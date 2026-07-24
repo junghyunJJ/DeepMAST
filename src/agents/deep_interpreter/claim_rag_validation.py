@@ -50,6 +50,7 @@ EXTERNAL_EVIDENCE_CLAIM_RE = re.compile(
 MAX_CLAIMS_PER_JUDGMENT = 5
 MAX_NON_INLINE_SELECTED_CLAIMS = 30
 MAX_SKIPPED_CLAIM_SAMPLES = 50
+CLAIM_RAG_EVIDENCE_POLICY_VERSION = 2
 CLAIM_RAG_CHECKPOINT_FILENAME = "claim_rag_checkpoint.json"
 DEFAULT_JUDGE_NUM_PREDICT = 3000
 DEFAULT_JUDGE_TIMEOUT_SECONDS = 300.0
@@ -314,6 +315,8 @@ def _retrieve_evidence_status(
     claim: str,
     candidate_pmids: Sequence[str],
     data_dir: Path,
+    *,
+    include_abstract: bool = False,
 ) -> tuple[list[dict[str, str]], str | None]:
     allowed = set(candidate_pmids)
     if not allowed:
@@ -338,10 +341,12 @@ def _retrieve_evidence_status(
             evidence.append({"pmid": pmid, "source": "full_text", "text": text[:1200]})
         if len(evidence) == 3:
             break
-    return (
-        evidence or _abstract_evidence(claim, candidate_pmids, _paper_map(data_dir)),
-        None,
-    )
+    abstract_evidence = _abstract_evidence(claim, candidate_pmids, _paper_map(data_dir))
+    if include_abstract:
+        evidence.extend(abstract_evidence)
+    elif not evidence:
+        evidence = abstract_evidence
+    return evidence, None
 
 
 def _judgment_prompt(group: dict[str, Any]) -> str:
@@ -362,6 +367,7 @@ Statuses:
 - overclaimed: evidence supports a weaker association but the claim adds causality, mechanism, direction, therapeutic effect, or unsupported context.
 - unsupported: supplied evidence directly conflicts with the claim or supports a materially different relation.
 - unverifiable: evidence is absent, ambiguous, or insufficient. Absence of a statement is not contradiction.
+If your reason would only say that the supplied evidence "does not mention", "does not contain", or "does not report" the claim, use unverifiable, not unsupported. Use unsupported only for an explicit conflict or materially different asserted relation.
 
 Do not use outside knowledge. Retrieval similarity is not support. Return exactly one judgment for every claim_index. Keep evidence_quote short and copied from supplied evidence.
 
@@ -382,6 +388,7 @@ def _unverifiable(item: dict[str, Any], reason: str) -> dict[str, Any]:
 
 def _checkpoint_key(group: dict[str, Any], claims: list[dict[str, Any]]) -> str:
     payload = {
+        "evidence_policy_version": CLAIM_RAG_EVIDENCE_POLICY_VERSION,
         "file": group["file"],
         "section": group["section"],
         "claims": [
@@ -627,7 +634,10 @@ def _judge_group(
             unverifiable_reason = item.get("unverifiable_reason")
             if "evidence" not in item and data_dir is not None:
                 evidence, unverifiable_reason = _retrieve_evidence_status(
-                    item["claim"], item["candidate_pmids"], data_dir
+                    item["claim"],
+                    item["candidate_pmids"],
+                    data_dir,
+                    include_abstract=bool(item.get("inline_pmid")),
                 )
             enriched.append(
                 {
