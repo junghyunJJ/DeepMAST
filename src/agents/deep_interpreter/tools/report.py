@@ -1377,9 +1377,12 @@ def _generate_html_report_impl(
                 cards = []
                 for t in druggable[:10]:
                     tract = t.get("tractability", {})
-                    modalities = ", ".join(
-                        f"{k}: {', '.join(v)}" for k, v in tract.items() if v
-                    )
+                    if isinstance(tract, dict):
+                        modalities = ", ".join(
+                            f"{k}: {', '.join(v)}" for k, v in tract.items() if v
+                        )
+                    else:
+                        modalities = str(tract or "")
                     assoc = t.get("association_score", 0)
                     score_cls = "tractability-high" if assoc > 0.5 else "tractability-low"
                     cards.append(f"""

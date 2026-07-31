@@ -588,6 +588,7 @@ def _get_cci_rag_base_url() -> str:
 
 RAG_COLLECTION_PREFIX = "deep_interpreter_"
 DEFAULT_PAPERS_DIR = "res/papers"
+RAG_INDEX_BATCH_SIZE = 20
 
 # Module-level cache for RAG state
 _RAG_STATE: dict[str, Any] = {
@@ -1172,30 +1173,37 @@ async def index_papers_to_vectordb(
             logger.error("Failed to parse collection_id from create response: %r", result)
             return {"success": False, "error": "Could not create/find collection"}
 
-        # Index papers
-        result = await tools_map['add_docs'].ainvoke({
-            "collection_id": collection_id,
-            "file_paths": file_paths,
-            "chunk_size": 3000,
-            "chunk_overlap": 200,
-            "rebuild_wiki": False,
-        })
-
-        # Parse indexing result
+        # Large handoffs can exceed the MCP upload timeout in one request.
         chunk_ids = []
-        if isinstance(result, dict):
-            chunk_ids = result.get("added_chunk_ids", [])
-        elif isinstance(result, list) and len(result) > 0:
-            item = result[0]
-            if isinstance(item, dict):
+        for offset in range(0, len(file_paths), RAG_INDEX_BATCH_SIZE):
+            batch = file_paths[offset : offset + RAG_INDEX_BATCH_SIZE]
+            result = await tools_map['add_docs'].ainvoke({
+                "collection_id": collection_id,
+                "file_paths": batch,
+                "chunk_size": 3000,
+                "chunk_overlap": 200,
+                "rebuild_wiki": False,
+            })
+            batch_chunk_ids = []
+            if isinstance(result, dict):
+                batch_chunk_ids = result.get("added_chunk_ids", [])
+            elif isinstance(result, list) and result and isinstance(result[0], dict):
+                item = result[0]
                 if 'text' in item:
                     try:
-                        data = json.loads(item['text'])
-                        chunk_ids = data.get("added_chunk_ids", [])
+                        batch_chunk_ids = json.loads(item['text']).get("added_chunk_ids", [])
                     except json.JSONDecodeError:
-                        pass
+                        text = str(item['text'])
+                        if re.search(r"Created\s+[1-9]\d*\s+total chunks", text):
+                            batch_chunk_ids = [f"batch-{offset}"]
                 else:
-                    chunk_ids = item.get("added_chunk_ids", [])
+                    batch_chunk_ids = item.get("added_chunk_ids", [])
+            if not batch_chunk_ids:
+                return {
+                    "success": False,
+                    "error": f"No chunks indexed for batch starting at {offset}",
+                }
+            chunk_ids.extend(batch_chunk_ids)
 
         logger.debug(f"index_papers_to_vectordb: SUCCESS - {len(file_paths)} papers, {len(chunk_ids)} chunks")
         logger.info(f"Indexed {len(file_paths)} papers to {full_collection_name}")

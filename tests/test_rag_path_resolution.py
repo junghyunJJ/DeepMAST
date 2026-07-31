@@ -384,6 +384,63 @@ class TestRagSniIntegration:
         assert rebuild.calls == [{"collection_id": "collection-id"}]
 
     @pytest.mark.asyncio
+    async def test_index_papers_batches_large_uploads(self, monkeypatch):
+        literature_rag.reset_rag_state()
+
+        class FakeTool:
+            def __init__(self, name, result):
+                self.name = name
+                self.result = result
+                self.calls = []
+
+            async def ainvoke(self, args):
+                self.calls.append(args)
+                return self.result
+
+        create = FakeTool("create_collection", {"id": "collection-id"})
+        add_docs = FakeTool("add_documents_from_files", {"added_chunk_ids": ["chunk"]})
+        rebuild = FakeTool("rebuild_llm_wiki", '{"status":"success"}')
+
+        async def fake_tools():
+            return [create, add_docs, rebuild]
+
+        monkeypatch.setattr(literature_rag, "_get_cci_rag_tools", fake_tools)
+
+        files = [f"/tmp/paper-{index}.txt" for index in range(21)]
+        result = await literature_rag.index_papers_to_vectordb(files, "all")
+
+        assert result["success"] is True
+        assert [len(call["file_paths"]) for call in add_docs.calls] == [20, 1]
+
+    @pytest.mark.asyncio
+    async def test_index_papers_accepts_mcp_success_text(self, monkeypatch):
+        literature_rag.reset_rag_state()
+
+        class FakeTool:
+            def __init__(self, name, result):
+                self.name = name
+                self.result = result
+
+            async def ainvoke(self, _args):
+                return self.result
+
+        create = FakeTool("create_collection", {"id": "collection-id"})
+        add_docs = FakeTool(
+            "add_documents_from_files",
+            [{"text": "Uploaded 1 file(s) successfully! Created 3 total chunks."}],
+        )
+        rebuild = FakeTool("rebuild_llm_wiki", '{"status":"success"}')
+
+        async def fake_tools():
+            return [create, add_docs, rebuild]
+
+        monkeypatch.setattr(literature_rag, "_get_cci_rag_tools", fake_tools)
+
+        result = await literature_rag.index_papers_to_vectordb(["/tmp/paper.txt"], "all")
+
+        assert result["success"] is True
+
+    @pytest.mark.asyncio
     async def test_index_papers_skips_llm_wiki_rebuild_for_existing_collection(
         self, monkeypatch
     ):
