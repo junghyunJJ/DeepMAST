@@ -11,6 +11,8 @@ from pathlib import Path
 from typing import Any, TypeVar, cast
 
 from langchain.agents.middleware import AgentMiddleware
+from langchain_core.messages import BaseMessage
+from langchain_core.runnables import Runnable, RunnableConfig, RunnableLambda
 from langchain.tools.tool_node import ToolCallRequest
 from langchain_core.messages import ToolCall, ToolMessage
 from langgraph.types import Command
@@ -177,6 +179,48 @@ async def run_reporter_with_recovery(
         raise ReporterRecoveryError("REPORTER failed after two attempts.")
 
     raise ReporterRecoveryError("REPORTER recovery loop exited unexpectedly.")
+
+
+def _first_user_message_text(state: Any) -> str:
+    if not isinstance(state, dict):
+        return ""
+    messages = state.get("messages")
+    if not isinstance(messages, list):
+        return ""
+    for message in messages:
+        if isinstance(message, BaseMessage):
+            if message.type == "human":
+                return str(message.content)
+            continue
+        if isinstance(message, dict) and message.get("role") == "user":
+            return str(message.get("content", ""))
+    return ""
+
+
+def wrap_reporter_runnable(
+    agent: Any,
+    data_dir: str | Path,
+    *,
+    timeout_seconds: float | None = None,
+) -> Runnable:
+    async def invoke(state: Any, config: RunnableConfig | None = None) -> Any:
+        async def run_attempt(description: str) -> Any:
+            return await agent.ainvoke(
+                {"messages": [{"role": "user", "content": description}]},
+                config=config,
+            )
+
+        return await run_reporter_with_recovery(
+            invoke=run_attempt,
+            initial_description=_first_user_message_text(state),
+            data_dir=data_dir,
+            timeout_seconds=timeout_seconds,
+        )
+
+    config = cast(RunnableConfig, getattr(agent, "config", {}))
+    wrapped = RunnableLambda(invoke).with_config(config)
+    object.__setattr__(wrapped, "reporter_recovery_enabled", True)
+    return wrapped
 
 
 class ReporterTaskRecoveryMiddleware(AgentMiddleware):

@@ -1449,8 +1449,19 @@ def test_standalone_subagent_graph_uses_configured_middleware(
     calls: list[dict[str, Any]] = []
 
     class FakeAgent:
+        async def ainvoke(
+            self,
+            state: dict[str, Any],
+            config: dict[str, Any] | None = None,
+        ) -> dict[str, Any]:
+            return {"state": state, "config": config}
+
         def with_config(self, config: dict[str, int]) -> SimpleNamespace:
-            return SimpleNamespace(config=config)
+            return SimpleNamespace(
+                config=config,
+                ainvoke=self.ainvoke,
+                reporter_recovery_enabled=False,
+            )
 
     def fake_create_agent(*_args: Any, **kwargs: Any) -> FakeAgent:
         calls.append(kwargs)
@@ -1488,11 +1499,13 @@ def test_standalone_subagent_graph_uses_configured_middleware(
     assert len(report_guardrails) == 1
     assert report_guardrails[0]._resolved_data_dir() == tmp_path.resolve()
     assert report_guardrails[0]._provider == "ollama"
+    assert getattr(graph, "reporter_recovery_enabled", False) is False
 
     graph = graph_builder.create_subagent_graph("reporter", provider="ollama")
 
     call = calls[-1]
     middleware = call["middleware"]
     assert graph.config == {"recursion_limit": 200}
+    assert getattr(graph, "reporter_recovery_enabled", False) is True
     assert any(isinstance(item, WriteFileArgGuardMiddleware) for item in middleware)
     assert not any(isinstance(item, ReportGuardrailMiddleware) for item in middleware)

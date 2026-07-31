@@ -29,6 +29,10 @@ from src.agents.deep_interpreter.agent import (  # noqa: E402
 from src.agents.deep_interpreter.wrapper_agent import (  # noqa: E402
     DeepInterpreterWrapperAgent,
 )
+from src.agents.deep_interpreter.reporter_recovery import (  # noqa: E402
+    reporter_attempt_timeout_seconds,
+    wrap_reporter_runnable,
+)
 from src.agents.model import create_llm  # noqa: E402
 
 Provider = Literal["openai", "google", "ollama", "ollama-openai", "vllm", "claude", "openrouter"]
@@ -278,7 +282,14 @@ def create_subagent_graph(
         "reporter": 200,
     }
     limit = SUBAGENT_RECURSION_LIMITS.get(subagent_name, 100)
-    return agent.with_config({"recursion_limit": limit})
+    configured_agent = agent.with_config({"recursion_limit": limit})
+    if subagent_name != "reporter":
+        return configured_agent
+    return wrap_reporter_runnable(
+        configured_agent,
+        data_dir=data_dir,
+        timeout_seconds=reporter_attempt_timeout_seconds(),
+    )
 
 
 # -----------------------------------------------------------------------------

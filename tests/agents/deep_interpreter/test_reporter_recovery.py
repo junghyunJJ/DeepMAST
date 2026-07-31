@@ -3,12 +3,16 @@ from __future__ import annotations
 import asyncio
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
+from langchain_core.messages import ToolMessage
+from langchain.tools.tool_node import ToolCallRequest
 
 from src.agents.deep_interpreter.reporter_recovery import (
     DEFAULT_REPORTER_ATTEMPT_TIMEOUT_SECONDS,
     ReporterRecoveryError,
+    ReporterTaskRecoveryMiddleware,
     inspect_reporter_completion,
     reporter_attempt_timeout_seconds,
     run_reporter_with_recovery,
@@ -76,6 +80,108 @@ def test_inspect_reporter_completion_accepts_complete_pass(tmp_path: Path) -> No
 
     assert result["complete"] is True
     assert result["missing_outputs"] == []
+
+
+def test_deep_interpreter_agent_attaches_reporter_recovery_middleware(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.agents.deep_interpreter.agent import (
+        DeepInterpreterConfig,
+        create_deep_interpreter_agent,
+    )
+
+    created: dict[str, object] = {}
+
+    def fake_create_deep_agent(**kwargs: object) -> SimpleNamespace:
+        created.update(kwargs)
+        return SimpleNamespace()
+
+    monkeypatch.setenv("REPORTER_ATTEMPT_TIMEOUT_SECONDS", "12.5")
+    monkeypatch.setattr(
+        "src.agents.deep_interpreter.agent.create_llm",
+        lambda *_args, **_kwargs: object(),
+    )
+    monkeypatch.setattr(
+        "src.agents.deep_interpreter.agent.create_deep_agent",
+        fake_create_deep_agent,
+    )
+
+    create_deep_interpreter_agent(
+        DeepInterpreterConfig(provider="ollama", data_dir=str(tmp_path))
+    )
+
+    middleware = created["middleware"]
+    assert isinstance(middleware, list)
+    reporter_recovery = [
+        item for item in middleware if isinstance(item, ReporterTaskRecoveryMiddleware)
+    ]
+    assert len(reporter_recovery) == 1
+    assert reporter_recovery[0]._data_dir == tmp_path.resolve()
+    assert reporter_recovery[0]._timeout_seconds == 12.5
+
+
+@pytest.mark.asyncio
+async def test_reporter_task_recovery_middleware_intercepts_only_reporter_task(
+    tmp_path: Path,
+) -> None:
+    middleware = ReporterTaskRecoveryMiddleware(data_dir=tmp_path, timeout_seconds=1)
+    seen_calls: list[dict[str, object]] = []
+    reporter_attempts = 0
+
+    async def handler(request: ToolCallRequest) -> ToolMessage:
+        nonlocal reporter_attempts
+        seen_calls.append(request.tool_call)
+        args = request.tool_call.get("args")
+        if isinstance(args, dict) and args.get("subagent_type") == "reporter":
+            reporter_attempts += 1
+        if reporter_attempts == 2:
+            _write_reporter_outputs(tmp_path, status="passed", errors=0)
+        return ToolMessage(
+            content=f"attempt-{len(seen_calls)}",
+            tool_call_id=str(request.tool_call["id"]),
+        )
+
+    non_reporter = ToolCallRequest(
+        tool_call={
+            "name": "task",
+            "args": {"subagent_type": "interpreter", "description": "interpret"},
+            "id": "call-interpreter",
+            "type": "tool_call",
+        },
+        tool=None,
+        state={},
+        runtime=None,
+    )
+    result = await middleware.awrap_tool_call(non_reporter, handler)
+
+    assert result.content == "attempt-1"
+    assert len(seen_calls) == 1
+    assert not (tmp_path / "reporter_recovery.json").exists()
+
+    reporter = ToolCallRequest(
+        tool_call={
+            "name": "task",
+            "args": {"subagent_type": "reporter", "description": "report"},
+            "id": "call-reporter",
+            "type": "tool_call",
+        },
+        tool=None,
+        state={},
+        runtime=None,
+    )
+    result = await middleware.awrap_tool_call(reporter, handler)
+
+    assert result.content == "attempt-3"
+    assert len(seen_calls) == 3
+    first_reporter_args = seen_calls[1]["args"]
+    second_reporter_args = seen_calls[2]["args"]
+    assert isinstance(first_reporter_args, dict)
+    assert isinstance(second_reporter_args, dict)
+    assert first_reporter_args["description"] == "report"
+    assert second_reporter_args["description"].startswith("[REPORTER_RECOVERY]")
+    assert seen_calls[2]["id"] == "call-reporter"
+    assert second_reporter_args["subagent_type"] == "reporter"
 
 
 @pytest.mark.asyncio
