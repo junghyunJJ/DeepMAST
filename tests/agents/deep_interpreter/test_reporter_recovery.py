@@ -7,8 +7,10 @@ from pathlib import Path
 import pytest
 
 from src.agents.deep_interpreter.reporter_recovery import (
+    DEFAULT_REPORTER_ATTEMPT_TIMEOUT_SECONDS,
     ReporterRecoveryError,
     inspect_reporter_completion,
+    reporter_attempt_timeout_seconds,
     run_reporter_with_recovery,
 )
 
@@ -33,6 +35,27 @@ def _write_reporter_outputs(data_dir: Path, *, status: str, errors: int) -> None
     (data_dir / "CCI_Analysis_Report.html").write_text(
         "<html>report</html>",
         encoding="utf-8",
+    )
+
+
+def test_reporter_attempt_timeout_seconds_accepts_positive_override(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("REPORTER_ATTEMPT_TIMEOUT_SECONDS", "12.5")
+
+    assert reporter_attempt_timeout_seconds() == 12.5
+
+
+@pytest.mark.parametrize("value", ["nan", "inf"])
+def test_reporter_attempt_timeout_seconds_rejects_non_finite_override(
+    monkeypatch: pytest.MonkeyPatch,
+    value: str,
+) -> None:
+    monkeypatch.setenv("REPORTER_ATTEMPT_TIMEOUT_SECONDS", value)
+
+    assert (
+        reporter_attempt_timeout_seconds()
+        == DEFAULT_REPORTER_ATTEMPT_TIMEOUT_SECONDS
     )
 
 

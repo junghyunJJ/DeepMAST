@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import math
 import os
 import shutil
 import time
@@ -42,7 +43,7 @@ def reporter_attempt_timeout_seconds() -> float:
         )
     except ValueError:
         return DEFAULT_REPORTER_ATTEMPT_TIMEOUT_SECONDS
-    if timeout <= 0:
+    if not math.isfinite(timeout) or timeout <= 0:
         return DEFAULT_REPORTER_ATTEMPT_TIMEOUT_SECONDS
     return timeout
 
