@@ -413,6 +413,42 @@ class TestRagSniIntegration:
         assert [len(call["file_paths"]) for call in add_docs.calls] == [20, 1]
 
     @pytest.mark.asyncio
+    async def test_index_papers_deletes_new_partial_collection_after_batch_failure(
+        self, monkeypatch
+    ):
+        literature_rag.reset_rag_state()
+
+        class FakeTool:
+            def __init__(self, name, results):
+                self.name = name
+                self.results = iter(results)
+                self.calls = []
+
+            async def ainvoke(self, args):
+                self.calls.append(args)
+                return next(self.results)
+
+        create = FakeTool("create_collection", [{"id": "collection-id"}])
+        add_docs = FakeTool(
+            "add_documents_from_files",
+            [{"added_chunk_ids": ["chunk-1"]}, {"added_chunk_ids": []}],
+        )
+        delete = FakeTool("delete_collection", ["deleted"])
+
+        async def fake_tools():
+            return [create, add_docs, delete]
+
+        monkeypatch.setattr(literature_rag, "_get_cci_rag_tools", fake_tools)
+
+        result = await literature_rag.index_papers_to_vectordb(
+            [f"/tmp/paper-{index}.txt" for index in range(21)], "all"
+        )
+
+        assert result["success"] is False
+        assert delete.calls == [{"collection_id": "collection-id"}]
+        assert "all" not in literature_rag._RAG_STATE["collection_ids"]
+
+    @pytest.mark.asyncio
     async def test_index_papers_accepts_mcp_success_text(self, monkeypatch):
         literature_rag.reset_rag_state()
 

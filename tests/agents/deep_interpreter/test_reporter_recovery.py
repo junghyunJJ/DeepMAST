@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast
@@ -268,6 +269,64 @@ async def test_reporter_recovery_retries_once_after_timeout(tmp_path: Path) -> N
     assert audit["status"] == "passed"
     assert audit["attempts"][0]["timed_out"] is True
     assert audit["recovery_used"] is True
+
+
+@pytest.mark.asyncio
+async def test_reporter_recovery_retries_when_first_attempt_leaves_stale_outputs(
+    tmp_path: Path,
+) -> None:
+    _write_reporter_outputs(tmp_path, status="passed", errors=0)
+    prompts: list[str] = []
+
+    async def invoke(description: str) -> dict[str, list[dict[str, str]]]:
+        prompts.append(description)
+        if len(prompts) == 2:
+            _write_reporter_outputs(tmp_path, status="passed", errors=0)
+        return {"messages": [{"role": "assistant", "content": "done"}]}
+
+    await run_reporter_with_recovery(
+        invoke=invoke,
+        initial_description="normal reporter request",
+        data_dir=tmp_path,
+        timeout_seconds=1,
+    )
+
+    assert len(prompts) == 2
+    assert prompts[1].startswith("[REPORTER_RECOVERY]")
+
+
+def test_reporter_task_recovery_middleware_times_out_sync_reporter(
+    tmp_path: Path,
+) -> None:
+    middleware = ReporterTaskRecoveryMiddleware(data_dir=tmp_path, timeout_seconds=0.01)
+    attempts = 0
+    request = ToolCallRequest(
+        tool_call={
+            "name": "task",
+            "args": {"subagent_type": "reporter", "description": "report"},
+            "id": "call-reporter",
+            "type": "tool_call",
+        },
+        tool=None,
+        state={},
+        runtime=cast(Any, None),
+    )
+
+    def handler(_request: ToolCallRequest) -> ToolMessage:
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            time.sleep(0.2)
+        else:
+            _write_reporter_outputs(tmp_path, status="passed", errors=0)
+        return ToolMessage(content="done", tool_call_id="call-reporter")
+
+    started = time.monotonic()
+    result = middleware.wrap_tool_call(request, handler)
+
+    assert isinstance(result, ToolMessage)
+    assert attempts == 2
+    assert time.monotonic() - started < 0.1
 
 
 @pytest.mark.asyncio

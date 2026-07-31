@@ -711,6 +711,79 @@ def test_inline_supported_status_requires_exact_pmid(tmp_path: Path, monkeypatch
     assert result["inline_citation_coverage"]["coverage_complete"] is False
 
 
+def test_claim_judge_rejects_pmids_and_quotes_outside_retrieved_evidence(
+    tmp_path: Path, monkeypatch
+) -> None:
+    class UnboundedEvidenceModel(EchoSupportingPmidsModel):
+        def invoke(self, messages):
+            response = super().invoke(messages)
+            for judgment in response.judgments:
+                judgment.supporting_pmids = ["99999999"]
+                judgment.evidence_quote = "Invented outside evidence."
+            return response
+
+    _write_papers(tmp_path / "papers.json")
+    (tmp_path / "synthesis.md").write_text(
+        "## Evidence\n"
+        "TGFB drives fibrosis in fibrotic lung tissue.\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        claim_rag_validation.search_literature_fulltext,
+        "invoke",
+        lambda _args: [
+            {
+                "page_content": "TGFB is associated with fibrosis.",
+                "metadata": {"filename": "pmid_11111111.txt"},
+            }
+        ],
+    )
+
+    result = claim_rag_validation.validate_claims(
+        tmp_path, ("synthesis.md",), llm=UnboundedEvidenceModel()
+    )
+
+    assert result["claims"][0]["status"] == "unverifiable"
+    assert result["claims"][0]["supporting_pmids"] == []
+    assert result["claims"][0]["evidence_quote"] == ""
+
+
+def test_claim_checkpoint_is_not_reused_when_evidence_changes() -> None:
+    class CountingModel(EchoSupportingPmidsModel):
+        def __init__(self) -> None:
+            super().__init__()
+            self.calls = 0
+
+        def invoke(self, messages):
+            self.calls += 1
+            return super().invoke(messages)
+
+    checkpoint = {"version": 1, "batches": {}}
+    model = CountingModel()
+    base = {
+        "file": "synthesis.md",
+        "section": "## Evidence",
+        "claims": [
+            {
+                "index": 0,
+                "source_claim_index": 0,
+                "claim": "TGFB drives fibrosis in fibrotic lung tissue.",
+                "candidate_pmids": ["11111111"],
+                "inline_pmid": None,
+                "hedged": False,
+                "selection_reason": "high_risk",
+            }
+        ],
+    }
+    first = {**base, "claims": [{**base["claims"][0], "evidence": [{"pmid": "11111111", "text": "Evidence A."}]}]}
+    second = {**base, "claims": [{**base["claims"][0], "evidence": [{"pmid": "11111111", "text": "Evidence B."}]}]}
+
+    claim_rag_validation._judge_group(first, model, checkpoint=checkpoint)
+    claim_rag_validation._judge_group(second, model, checkpoint=checkpoint)
+
+    assert model.calls == 2
+
+
 class BatchLimitedStructuredModel:
     def __init__(self) -> None:
         self.batch_sizes: list[int] = []
@@ -1455,7 +1528,10 @@ def test_validate_claims_persists_completed_batches_before_keyboard_interrupt(
         tmp_path, ("part1_final.md",), llm=successful
     )
 
-    assert searched == ["CXCL12 regulates immune migration (PMID: 22222222)."]
+    assert searched == [
+        "TGFB drives fibrosis (PMID: 11111111).",
+        "CXCL12 regulates immune migration (PMID: 22222222).",
+    ]
     assert successful.batch_sizes == [1]
     assert [item["status"] for item in result["claims"]] == ["supported", "supported"]
     assert result["selection"]["checkpoint_hits"] == 1

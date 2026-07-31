@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import json
 import math
 import os
@@ -50,7 +51,18 @@ def reporter_attempt_timeout_seconds() -> float:
     return timeout
 
 
-def inspect_reporter_completion(data_dir: str | Path) -> dict[str, Any]:
+def _reporter_output_state(data_dir: Path) -> dict[str, tuple[int, int]]:
+    return {
+        name: ((data_dir / name).stat().st_mtime_ns, (data_dir / name).stat().st_size)
+        for name in REPORTER_OUTPUTS
+        if (data_dir / name).is_file()
+    }
+
+
+def inspect_reporter_completion(
+    data_dir: str | Path,
+    previous_state: dict[str, tuple[int, int]] | None = None,
+) -> dict[str, Any]:
     root = Path(data_dir)
     missing_outputs = [
         name
@@ -74,9 +86,16 @@ def inspect_reporter_completion(data_dir: str | Path) -> dict[str, Any]:
         guardrail = {}
     status = guardrail.get("status")
     final_error_count = guardrail.get("final_error_count")
+    current_state = _reporter_output_state(root)
+    stale_outputs = [
+        name
+        for name, state in (previous_state or {}).items()
+        if current_state.get(name) == state
+    ]
 
     complete = (
         not missing_outputs
+        and not stale_outputs
         and status == "passed"
         and final_error_count == 0
     )
@@ -86,6 +105,7 @@ def inspect_reporter_completion(data_dir: str | Path) -> dict[str, Any]:
         "guardrail_status": status,
         "final_error_count": final_error_count,
         "validation_parse_error": parse_error,
+        "stale_outputs": stale_outputs,
     }
 
 
@@ -151,17 +171,18 @@ async def run_reporter_with_recovery(
             "attempt": attempt_number,
             "timed_out": False,
         }
+        previous_state = _reporter_output_state(root)
         try:
             result = await asyncio.wait_for(invoke(description), timeout=timeout)
         except TimeoutError:
             attempt["timed_out"] = True
             attempt["duration_seconds"] = time.monotonic() - started
-            attempt["completion"] = inspect_reporter_completion(root)
+            attempt["completion"] = inspect_reporter_completion(root, previous_state)
             cast(list[dict[str, Any]], audit["attempts"]).append(attempt)
             audit["attempt_count"] = attempt_number
         else:
             attempt["duration_seconds"] = time.monotonic() - started
-            attempt["completion"] = inspect_reporter_completion(root)
+            attempt["completion"] = inspect_reporter_completion(root, previous_state)
             cast(list[dict[str, Any]], audit["attempts"]).append(attempt)
             audit["attempt_count"] = attempt_number
             if attempt["completion"]["complete"]:
@@ -250,19 +271,26 @@ class ReporterTaskRecoveryMiddleware(AgentMiddleware):
     ) -> ToolMessage | Command:
         if not self._is_reporter_task(request):
             return handler(request)
+        args = request.tool_call["args"]
+        executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)
 
-        result = handler(request)
-        if inspect_reporter_completion(self._data_dir)["complete"]:
-            return result
+        async def invoke(description: str) -> ToolMessage | Command:
+            patched_args = {**args, "description": description}
+            tool_call = cast(ToolCall, {**request.tool_call, "args": patched_args})
+            future = executor.submit(handler, request.override(tool_call=tool_call))
+            return await asyncio.wrap_future(future)
 
-        _copy_first_synthesis(self._data_dir)
-        args = dict(request.tool_call["args"])
-        args["description"] = build_reporter_recovery_message(self._data_dir)
-        tool_call = cast(ToolCall, {**request.tool_call, "args": args})
-        second = handler(request.override(tool_call=tool_call))
-        if not inspect_reporter_completion(self._data_dir)["complete"]:
-            raise ReporterRecoveryError("REPORTER failed after two attempts.")
-        return second
+        try:
+            return asyncio.run(
+                run_reporter_with_recovery(
+                    invoke=invoke,
+                    initial_description=str(args.get("description", "")),
+                    data_dir=self._data_dir,
+                    timeout_seconds=self._timeout_seconds,
+                )
+            )
+        finally:
+            executor.shutdown(wait=False, cancel_futures=True)
 
     async def awrap_tool_call(
         self,

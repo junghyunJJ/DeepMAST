@@ -401,6 +401,7 @@ def _checkpoint_key(group: dict[str, Any], claims: list[dict[str, Any]]) -> str:
                 "candidate_pmids": item["candidate_pmids"],
                 "hedged": item["hedged"],
                 "selection_reason": item.get("selection_reason"),
+                "evidence": item.get("evidence", []),
             }
             for item in claims
         ],
@@ -583,6 +584,24 @@ def _judge_source_batch(
                 )
             )
             continue
+        evidence_pmids = {str(entry.get("pmid")) for entry in item["evidence"]}
+        evidence_text = [str(entry.get("text", "")) for entry in item["evidence"]]
+        if (
+            not set(judgment.supporting_pmids).issubset(
+                set(item["candidate_pmids"]) & evidence_pmids
+            )
+            or (
+                judgment.evidence_quote
+                and not any(judgment.evidence_quote in text for text in evidence_text)
+            )
+        ):
+            results.append(
+                _unverifiable(
+                    item,
+                    "Claim judge supplied PMID or quote outside retrieved evidence.",
+                )
+            )
+            continue
         results.append(
             {
                 **item,
@@ -622,13 +641,6 @@ def _judge_group(
     batch_size = _judge_batch_size(provider)
     for start in range(0, len(group["claims"]), batch_size):
         batch = group["claims"][start : start + batch_size]
-        key = _checkpoint_key(group, batch)
-        saved = batches.get(key)
-        if isinstance(saved, dict) and isinstance(saved.get("results"), list):
-            stats["checkpoint_hits"] += 1
-            results.extend(saved["results"])
-            continue
-
         enriched = []
         for item in batch:
             evidence = item.get("evidence") if "evidence" in item else None
@@ -649,6 +661,12 @@ def _judge_group(
                     "unverifiable_reason": unverifiable_reason,
                 }
             )
+        key = _checkpoint_key(group, enriched)
+        saved = batches.get(key)
+        if isinstance(saved, dict) and isinstance(saved.get("results"), list):
+            stats["checkpoint_hits"] += 1
+            results.extend(saved["results"])
+            continue
         judged = _judge_source_batch(
             group,
             enriched,

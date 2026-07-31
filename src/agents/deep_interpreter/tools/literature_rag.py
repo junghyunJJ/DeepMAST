@@ -1022,6 +1022,10 @@ async def index_papers_to_vectordb(
     """
     full_collection_name = f"{RAG_COLLECTION_PREFIX}{collection_name}"
     logger.debug(f"index_papers_to_vectordb: {len(file_paths)} files, collection={full_collection_name}")
+    collection_id = None
+    collection_created = False
+    tools_map = {}
+    result: Any = None
 
     try:
         logger.debug(f"index_papers_to_vectordb: connecting via cached stdio transport")
@@ -1029,7 +1033,6 @@ async def index_papers_to_vectordb(
         logger.debug(f"index_papers_to_vectordb: got {len(tools)} tools")
 
         # Find required tools
-        tools_map = {}
         for tool_obj in tools:
             name = getattr(tool_obj, 'name', '')
             if 'create_collection' in name:
@@ -1160,6 +1163,7 @@ async def index_papers_to_vectordb(
                             collection_id = item.get("id")
 
                 if collection_id:
+                    collection_created = True
                     _RAG_STATE["collection_ids"][collection_name] = collection_id
                     logger.info(f"Created collection: {full_collection_name} (id: {collection_id})")
             except Exception as e:
@@ -1199,6 +1203,11 @@ async def index_papers_to_vectordb(
                 else:
                     batch_chunk_ids = item.get("added_chunk_ids", [])
             if not batch_chunk_ids:
+                if collection_created:
+                    _RAG_STATE["collection_ids"].pop(collection_name, None)
+                    if "delete" in tools_map:
+                        await tools_map["delete"].ainvoke({"collection_id": collection_id})
+                    collection_created = False
                 return {
                     "success": False,
                     "error": f"No chunks indexed for batch starting at {offset}",
@@ -1220,6 +1229,13 @@ async def index_papers_to_vectordb(
         }
 
     except Exception as e:
+        if collection_created and collection_id:
+            _RAG_STATE["collection_ids"].pop(collection_name, None)
+            if "delete" in tools_map:
+                try:
+                    await tools_map["delete"].ainvoke({"collection_id": collection_id})
+                except Exception:
+                    logger.exception("Failed to delete partial collection %s", collection_id)
         logger.debug(f"index_papers_to_vectordb: EXCEPTION {type(e).__name__}: {e}")
         logger.error(f"Indexing failed: {e}")
         return {"success": False, "error": str(e)}
