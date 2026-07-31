@@ -81,6 +81,15 @@ uv run pyright \
 0 errors, 0 warnings, 0 informations
 ```
 
+Whitespace check:
+```bash
+git diff --check
+```
+
+```text
+passed with no output
+```
+
 ```bash
 git diff --check
 ```
@@ -101,3 +110,34 @@ passed with no output
 - Live Ollama execution was not run; verification stayed model-free per the brief.
 - Pytest emits a pre-existing LangGraph deprecation warning from `src/base/base_agent.py:129`.
 - `uv` warns that the active `VIRTUAL_ENV` differs from the project `.venv`; commands still completed successfully.
+
+## Review Fix Evidence
+- Updated `tests/agents/deep_interpreter/test_reporter_recovery.py` type annotations in the middleware test: `seen_calls` is `list[ToolCall]`, `runtime` is explicitly cast for `ToolCallRequest`, and `ToolMessage | Command` results are narrowed before `.content`.
+- Production behavior was not changed.
+
+Focused pytest:
+```bash
+OPENAI_API_KEY=test uv run pytest -q tests/agents/deep_interpreter/test_reporter_recovery.py tests/agents/deep_interpreter/test_report_guardrail_middleware.py -k 'reporter_recovery or standalone_subagent_graph_uses_configured_middleware'
+```
+
+```text
+11 passed, 32 deselected, 1 warning
+```
+
+Ruff:
+```bash
+uv run ruff check src/agents/deep_interpreter/reporter_recovery.py src/agents/deep_interpreter/middleware/__init__.py src/agents/deep_interpreter/agent.py src/agents/deep_interpreter/graph_builder.py tests/agents/deep_interpreter/test_reporter_recovery.py tests/agents/deep_interpreter/test_report_guardrail_middleware.py
+```
+
+```text
+All checks passed!
+```
+
+Pyright:
+```bash
+uv run pyright src/agents/deep_interpreter/reporter_recovery.py src/agents/deep_interpreter/middleware/__init__.py src/agents/deep_interpreter/agent.py src/agents/deep_interpreter/graph_builder.py tests/agents/deep_interpreter/test_reporter_recovery.py tests/agents/deep_interpreter/test_report_guardrail_middleware.py
+```
+
+```text
+0 errors, 0 warnings, 0 informations
+```

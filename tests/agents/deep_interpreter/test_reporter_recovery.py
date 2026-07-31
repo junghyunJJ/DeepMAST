@@ -4,9 +4,10 @@ import asyncio
 import json
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any, cast
 
 import pytest
-from langchain_core.messages import ToolMessage
+from langchain_core.messages import ToolCall, ToolMessage
 from langchain.tools.tool_node import ToolCallRequest
 
 from src.agents.deep_interpreter.reporter_recovery import (
@@ -126,8 +127,9 @@ async def test_reporter_task_recovery_middleware_intercepts_only_reporter_task(
     tmp_path: Path,
 ) -> None:
     middleware = ReporterTaskRecoveryMiddleware(data_dir=tmp_path, timeout_seconds=1)
-    seen_calls: list[dict[str, object]] = []
+    seen_calls: list[ToolCall] = []
     reporter_attempts = 0
+    runtime = cast(Any, None)
 
     async def handler(request: ToolCallRequest) -> ToolMessage:
         nonlocal reporter_attempts
@@ -151,10 +153,11 @@ async def test_reporter_task_recovery_middleware_intercepts_only_reporter_task(
         },
         tool=None,
         state={},
-        runtime=None,
+        runtime=runtime,
     )
     result = await middleware.awrap_tool_call(non_reporter, handler)
 
+    assert isinstance(result, ToolMessage)
     assert result.content == "attempt-1"
     assert len(seen_calls) == 1
     assert not (tmp_path / "reporter_recovery.json").exists()
@@ -168,10 +171,11 @@ async def test_reporter_task_recovery_middleware_intercepts_only_reporter_task(
         },
         tool=None,
         state={},
-        runtime=None,
+        runtime=runtime,
     )
     result = await middleware.awrap_tool_call(reporter, handler)
 
+    assert isinstance(result, ToolMessage)
     assert result.content == "attempt-3"
     assert len(seen_calls) == 3
     first_reporter_args = seen_calls[1]["args"]
