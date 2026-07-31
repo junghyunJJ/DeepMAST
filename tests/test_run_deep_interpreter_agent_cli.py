@@ -7,6 +7,8 @@ import sys
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 
 SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "run_deep_interpreter_agent.py"
 SPEC = importlib.util.spec_from_file_location("run_deep_interpreter_agent", SCRIPT_PATH)
@@ -73,51 +75,86 @@ def test_reporter_message_delegates_reporter_artifacts_to_html_tool(tmp_path):
     assert "generate_html_report writes synthesis_validation.json and synthesis_targets.json" in message
 
 
-def test_part3_save_retry_only_applies_to_missing_part3_output():
-    args = SimpleNamespace(subagent="interpreter", part=3)
+@pytest.mark.parametrize("part", [1, 2, 3])
+def test_interpreter_save_retry_applies_to_each_missing_part_output(part):
+    args = SimpleNamespace(subagent="interpreter", part=part)
+    output = f"part{part}_final.md"
 
-    assert run_script._should_retry_part3_save(args, ["part3_final.md"])
-    assert not run_script._should_retry_part3_save(args, [])
-    assert not run_script._should_retry_part3_save(args, ["part3_final.md", "other.md"])
-    assert not run_script._should_retry_part3_save(
-        SimpleNamespace(subagent="interpreter", part=2),
-        ["part3_final.md"],
-    )
-    assert not run_script._should_retry_part3_save(
-        SimpleNamespace(subagent="reporter", part=3),
-        ["part3_final.md"],
+    assert run_script._should_retry_interpreter_save(args, [output])
+    assert not run_script._should_retry_interpreter_save(args, [])
+    assert not run_script._should_retry_interpreter_save(args, [output, "other.md"])
+    assert not run_script._should_retry_interpreter_save(
+        SimpleNamespace(subagent="reporter", part=part),
+        [output],
     )
 
 
-def test_part3_save_retry_message_does_not_save_generic_chat_response(tmp_path):
-    message = run_script._build_part3_save_retry_message(tmp_path)
+def test_interpreter_save_retry_rejects_wrong_part_output():
+    args = SimpleNamespace(subagent="interpreter", part=1)
 
-    assert "Do not copy or save the previous chat-only response" in message
-    assert "/data_path.txt" in message
-    assert "/interpretation_guide.md" in message
-    assert "/papers.json" in message
-    assert "call load_analysis_data for the data directory" in message
-    assert "Part 3 ligand-receptor interpretation only" in message
-    assert "selected_genes and selected_lr_pairs" in message
-    assert "therapeutic synthesis, druggability, drug ranking, and clinical prioritization" in message
-    assert (
-        'write_file(file_path="/part3_final.md", content=<complete markdown Part 3 report>)'
-        in message
+    assert not run_script._should_retry_interpreter_save(
+        args,
+        ["part2_final.md"],
     )
+
+
+@pytest.mark.parametrize("part", [1, 2, 3])
+def test_interpreter_save_retry_message_continues_prior_context(tmp_path, part):
+    message = run_script._build_interpreter_save_retry_message(tmp_path, part)
+
+    assert "Continue the existing Part" in message
+    assert "conversation and tool results above" in message
+    assert "Do not restart the analysis from scratch" in message
+    assert "Reuse an existing load_analysis_data result" in message
+    assert "only if no usable result is present" in message
+    assert "Do not blindly save a generic or incomplete previous response" in message
+    assert f"Part {part} ONLY" in message
+    assert f'write_file(file_path="/part{part}_final.md"' in message
     assert "A chat response without that tool call is incomplete." in message
 
 
-class _Part3RetryAgent:
-    def __init__(self, data_dir: Path, *, write_on_call: int | None):
+def test_part3_retry_message_keeps_selected_pair_and_therapeutic_boundaries(tmp_path):
+    message = run_script._build_interpreter_save_retry_message(tmp_path, 3)
+
+    assert "selected_genes" in message
+    assert "selected_lr_pairs" in message
+    assert "therapeutic synthesis" in message
+
+
+class _InterpreterRetryAgent:
+    def __init__(
+        self,
+        data_dir: Path,
+        *,
+        part: int,
+        write_on_call: int | None,
+    ):
         self.data_dir = data_dir
+        self.part = part
         self.write_on_call = write_on_call
         self.calls = 0
+        self.payloads = []
 
     async def ainvoke(self, payload, config=None):
         self.calls += 1
+        self.payloads.append(payload)
         if self.calls == self.write_on_call:
-            (self.data_dir / "part3_final.md").write_text("# Part 3\n", encoding="utf-8")
-        return {"messages": [{"content": payload["messages"][0]["content"]}]}
+            output = self.data_dir / f"part{self.part}_final.md"
+            output.write_text(f"# Part {self.part}\n", encoding="utf-8")
+        return {
+            "messages": [
+                *payload["messages"],
+                {
+                    "role": "assistant",
+                    "content": f"attempt-{self.calls}",
+                },
+                {
+                    "role": "tool",
+                    "content": f"tool-result-{self.calls}",
+                    "tool_call_id": f"tool-call-{self.calls}",
+                },
+            ]
+        }
 
 
 class _GuardrailFailureAgent:
@@ -145,49 +182,73 @@ def _args(tmp_path: Path, part: int) -> SimpleNamespace:
     )
 
 
-def test_run_retries_part3_until_third_total_attempt(tmp_path, monkeypatch, capsys):
-    fake_agent = _Part3RetryAgent(tmp_path, write_on_call=3)
+@pytest.mark.parametrize("part", [1, 2, 3])
+def test_run_retries_each_interpreter_part_until_third_total_attempt(
+    tmp_path,
+    monkeypatch,
+    capsys,
+    part,
+):
+    fake_agent = _InterpreterRetryAgent(
+        tmp_path,
+        part=part,
+        write_on_call=3,
+    )
     monkeypatch.setitem(
         sys.modules,
         "src.agents.deep_interpreter.graph_builder",
         SimpleNamespace(create_subagent_graph=lambda *_args, **_kwargs: fake_agent),
     )
 
-    exit_code = asyncio.run(run_script.run(_args(tmp_path, 3)))
+    exit_code = asyncio.run(run_script.run(_args(tmp_path, part)))
 
     stdout = capsys.readouterr().out
     assert exit_code == 0
     assert fake_agent.calls == 3
-    assert stdout.count('"event": "part3_save_retry_start"') == 2
+    assert stdout.count(f'"event": "part{part}_save_retry_start"') == 2
     assert '"invoke_attempt_count": 3' in stdout
     assert '"retry_attempt_count": 2' in stdout
     assert "invoke_complete" in stdout
-    assert (tmp_path / "part3_final.md").exists()
+    assert (tmp_path / f"part{part}_final.md").exists()
 
 
-def test_run_stops_after_three_part3_attempts_when_output_remains_missing(
-    tmp_path, monkeypatch, capsys
+@pytest.mark.parametrize("part", [1, 2, 3])
+def test_run_stops_each_part_after_three_attempts_when_output_is_missing(
+    tmp_path,
+    monkeypatch,
+    capsys,
+    part,
 ):
-    fake_agent = _Part3RetryAgent(tmp_path, write_on_call=None)
+    fake_agent = _InterpreterRetryAgent(
+        tmp_path,
+        part=part,
+        write_on_call=None,
+    )
     monkeypatch.setitem(
         sys.modules,
         "src.agents.deep_interpreter.graph_builder",
         SimpleNamespace(create_subagent_graph=lambda *_args, **_kwargs: fake_agent),
     )
 
-    exit_code = asyncio.run(run_script.run(_args(tmp_path, 3)))
+    exit_code = asyncio.run(run_script.run(_args(tmp_path, part)))
 
     stdout = capsys.readouterr().out
     assert exit_code == 1
     assert fake_agent.calls == 3
-    assert stdout.count('"event": "part3_save_retry_start"') == 2
+    assert stdout.count(f'"event": "part{part}_save_retry_start"') == 2
     assert '"invoke_attempt_count": 3' in stdout
     assert "invoke_incomplete" in stdout
-    assert not (tmp_path / "part3_final.md").exists()
 
 
-def test_run_stops_part3_retry_as_soon_as_output_exists(tmp_path, monkeypatch, capsys):
-    fake_agent = _Part3RetryAgent(tmp_path, write_on_call=2)
+def test_run_carries_message_history_into_each_save_retry(
+    tmp_path,
+    monkeypatch,
+):
+    fake_agent = _InterpreterRetryAgent(
+        tmp_path,
+        part=3,
+        write_on_call=None,
+    )
     monkeypatch.setitem(
         sys.modules,
         "src.agents.deep_interpreter.graph_builder",
@@ -196,10 +257,62 @@ def test_run_stops_part3_retry_as_soon_as_output_exists(tmp_path, monkeypatch, c
 
     exit_code = asyncio.run(run_script.run(_args(tmp_path, 3)))
 
+    assert exit_code == 1
+    assert len(fake_agent.payloads) == 3
+
+    initial_messages = fake_agent.payloads[0]["messages"]
+    first_retry_messages = fake_agent.payloads[1]["messages"]
+    second_retry_messages = fake_agent.payloads[2]["messages"]
+
+    assert first_retry_messages[:-1] == [
+        *initial_messages,
+        {"role": "assistant", "content": "attempt-1"},
+        {
+            "role": "tool",
+            "content": "tool-result-1",
+            "tool_call_id": "tool-call-1",
+        },
+    ]
+    assert first_retry_messages[-1]["role"] == "user"
+    assert "Continue the existing Part 3 attempt" in first_retry_messages[-1]["content"]
+
+    assert second_retry_messages[:-1] == [
+        *first_retry_messages,
+        {"role": "assistant", "content": "attempt-2"},
+        {
+            "role": "tool",
+            "content": "tool-result-2",
+            "tool_call_id": "tool-call-2",
+        },
+    ]
+    assert second_retry_messages[-1]["role"] == "user"
+    assert "Continue the existing Part 3 attempt" in second_retry_messages[-1]["content"]
+
+
+@pytest.mark.parametrize("part", [1, 2, 3])
+def test_run_stops_retry_when_each_part_output_exists(
+    tmp_path,
+    monkeypatch,
+    capsys,
+    part,
+):
+    fake_agent = _InterpreterRetryAgent(
+        tmp_path,
+        part=part,
+        write_on_call=2,
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "src.agents.deep_interpreter.graph_builder",
+        SimpleNamespace(create_subagent_graph=lambda *_args, **_kwargs: fake_agent),
+    )
+
+    exit_code = asyncio.run(run_script.run(_args(tmp_path, part)))
+
     stdout = capsys.readouterr().out
     assert exit_code == 0
     assert fake_agent.calls == 2
-    assert stdout.count('"event": "part3_save_retry_start"') == 1
+    assert stdout.count(f'"event": "part{part}_save_retry_start"') == 1
     assert '"invoke_attempt_count": 2' in stdout
 
 
@@ -223,17 +336,3 @@ def test_run_returns_nonzero_when_report_guardrail_raises(
     assert '"exception_type": "RuntimeError"' in captured.err
     assert "Report guardrail failed with 1 hard error" in captured.err
     assert "part3_save_retry_start" not in captured.out
-
-
-def test_run_does_not_retry_part2_missing_output(tmp_path, monkeypatch):
-    fake_agent = _Part3RetryAgent(tmp_path, write_on_call=2)
-    monkeypatch.setitem(
-        sys.modules,
-        "src.agents.deep_interpreter.graph_builder",
-        SimpleNamespace(create_subagent_graph=lambda *_args, **_kwargs: fake_agent),
-    )
-
-    exit_code = asyncio.run(run_script.run(_args(tmp_path, 2)))
-
-    assert exit_code == 1
-    assert fake_agent.calls == 1

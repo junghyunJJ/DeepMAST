@@ -236,6 +236,87 @@ class TestRagCollectionNamespaceRouting:
         assert captured["query"] == "ICAM1 fibrosis"
         assert captured["limit"] == 3
 
+    def test_search_literature_fulltext_strict_raises_rag_search_error(
+        self, tmp_path, monkeypatch
+    ):
+        literature_rag.reset_rag_state()
+        literature_rag._RAG_STATE["available"] = True
+
+        async def failing_search_fulltext_rag(
+            query, collection_name, limit, strict: bool = False
+        ):
+            if not strict:
+                return []
+            assert strict is True
+            raise RuntimeError("rag backend down")
+
+        monkeypatch.setattr(
+            literature_rag, "search_fulltext_rag", failing_search_fulltext_rag
+        )
+
+        default_result = literature_rag.search_literature_fulltext.invoke(
+            {
+                "query": "ICAM1 fibrosis",
+                "part_name": "all",
+                "limit": 3,
+                "data_dir": str(tmp_path),
+            }
+        )
+        assert default_result == []
+
+        with pytest.raises(literature_rag.RAGSearchError):
+            literature_rag.search_literature_fulltext.invoke(
+                {
+                    "query": "ICAM1 fibrosis",
+                    "part_name": "all",
+                    "limit": 3,
+                    "data_dir": str(tmp_path),
+                    "strict": True,
+                }
+            )
+
+    def test_search_literature_fulltext_missing_collection_default_empty_strict_raises(
+        self, tmp_path, monkeypatch
+    ):
+        literature_rag.reset_rag_state()
+        literature_rag._RAG_STATE["available"] = True
+
+        async def missing_collection(collection_name):
+            return None
+
+        monkeypatch.setattr(
+            literature_rag, "_lookup_collection_from_db", missing_collection
+        )
+
+        args = {
+            "query": "ICAM1 fibrosis",
+            "part_name": "all",
+            "limit": 3,
+            "data_dir": str(tmp_path),
+        }
+
+        assert literature_rag.search_literature_fulltext.invoke(args) == []
+
+        with pytest.raises(literature_rag.RAGSearchError):
+            literature_rag.search_literature_fulltext.invoke({**args, "strict": True})
+
+    def test_search_literature_fulltext_unavailable_default_empty_strict_raises(
+        self, tmp_path
+    ):
+        literature_rag.reset_rag_state()
+        literature_rag._RAG_STATE["available"] = False
+        args = {
+            "query": "ICAM1 fibrosis",
+            "part_name": "all",
+            "limit": 3,
+            "data_dir": str(tmp_path),
+        }
+
+        assert literature_rag.search_literature_fulltext.invoke(args) == []
+
+        with pytest.raises(literature_rag.RAGSearchError):
+            literature_rag.search_literature_fulltext.invoke({**args, "strict": True})
+
     def test_validate_claim_fulltext_uses_namespaced_key(self, tmp_path, monkeypatch):
         literature_rag.reset_rag_state()
         literature_rag._RAG_STATE["available"] = True
@@ -301,6 +382,99 @@ class TestRagSniIntegration:
         assert add_docs.calls[0]["chunk_size"] == 3000
         assert add_docs.calls[0]["chunk_overlap"] == 200
         assert rebuild.calls == [{"collection_id": "collection-id"}]
+
+    @pytest.mark.asyncio
+    async def test_index_papers_batches_large_uploads(self, monkeypatch):
+        literature_rag.reset_rag_state()
+
+        class FakeTool:
+            def __init__(self, name, result):
+                self.name = name
+                self.result = result
+                self.calls = []
+
+            async def ainvoke(self, args):
+                self.calls.append(args)
+                return self.result
+
+        create = FakeTool("create_collection", {"id": "collection-id"})
+        add_docs = FakeTool("add_documents_from_files", {"added_chunk_ids": ["chunk"]})
+        rebuild = FakeTool("rebuild_llm_wiki", '{"status":"success"}')
+
+        async def fake_tools():
+            return [create, add_docs, rebuild]
+
+        monkeypatch.setattr(literature_rag, "_get_cci_rag_tools", fake_tools)
+
+        files = [f"/tmp/paper-{index}.txt" for index in range(21)]
+        result = await literature_rag.index_papers_to_vectordb(files, "all")
+
+        assert result["success"] is True
+        assert [len(call["file_paths"]) for call in add_docs.calls] == [20, 1]
+
+    @pytest.mark.asyncio
+    async def test_index_papers_deletes_new_partial_collection_after_batch_failure(
+        self, monkeypatch
+    ):
+        literature_rag.reset_rag_state()
+
+        class FakeTool:
+            def __init__(self, name, results):
+                self.name = name
+                self.results = iter(results)
+                self.calls = []
+
+            async def ainvoke(self, args):
+                self.calls.append(args)
+                return next(self.results)
+
+        create = FakeTool("create_collection", [{"id": "collection-id"}])
+        add_docs = FakeTool(
+            "add_documents_from_files",
+            [{"added_chunk_ids": ["chunk-1"]}, {"added_chunk_ids": []}],
+        )
+        delete = FakeTool("delete_collection", ["deleted"])
+
+        async def fake_tools():
+            return [create, add_docs, delete]
+
+        monkeypatch.setattr(literature_rag, "_get_cci_rag_tools", fake_tools)
+
+        result = await literature_rag.index_papers_to_vectordb(
+            [f"/tmp/paper-{index}.txt" for index in range(21)], "all"
+        )
+
+        assert result["success"] is False
+        assert delete.calls == [{"collection_id": "collection-id"}]
+        assert "all" not in literature_rag._RAG_STATE["collection_ids"]
+
+    @pytest.mark.asyncio
+    async def test_index_papers_accepts_mcp_success_text(self, monkeypatch):
+        literature_rag.reset_rag_state()
+
+        class FakeTool:
+            def __init__(self, name, result):
+                self.name = name
+                self.result = result
+
+            async def ainvoke(self, _args):
+                return self.result
+
+        create = FakeTool("create_collection", {"id": "collection-id"})
+        add_docs = FakeTool(
+            "add_documents_from_files",
+            [{"text": "Uploaded 1 file(s) successfully! Created 3 total chunks."}],
+        )
+        rebuild = FakeTool("rebuild_llm_wiki", '{"status":"success"}')
+
+        async def fake_tools():
+            return [create, add_docs, rebuild]
+
+        monkeypatch.setattr(literature_rag, "_get_cci_rag_tools", fake_tools)
+
+        result = await literature_rag.index_papers_to_vectordb(["/tmp/paper.txt"], "all")
+
+        assert result["success"] is True
 
     @pytest.mark.asyncio
     async def test_index_papers_skips_llm_wiki_rebuild_for_existing_collection(
@@ -453,6 +627,114 @@ class TestRagSniIntegration:
                 "score": 0.7,
             }
         ]
+
+    @pytest.mark.asyncio
+    async def test_search_fulltext_rag_default_returns_empty_when_all_standard_queries_error(
+        self, monkeypatch
+    ):
+        literature_rag.reset_rag_state()
+        literature_rag._RAG_STATE["collection_ids"]["all"] = "collection-id"
+
+        async def fake_agentic_search_with_sni(query, collection_id, limit, search_type):
+            return []
+
+        async def fake_generate_multi_query(query, num_queries=5):
+            return [query, f"{query} mechanism"]
+
+        async def failing_search_single_query(query, collection_id, limit, search_type):
+            raise RuntimeError(f"standard search failed for {query}")
+
+        monkeypatch.setattr(
+            literature_rag,
+            "_agentic_search_with_sni",
+            fake_agentic_search_with_sni,
+        )
+        monkeypatch.setattr(
+            literature_rag, "generate_multi_query", fake_generate_multi_query
+        )
+        monkeypatch.setattr(
+            literature_rag, "_search_single_query", failing_search_single_query
+        )
+
+        result = await literature_rag.search_fulltext_rag("ICAM1 fibrosis", "all")
+
+        assert result == []
+
+    @pytest.mark.asyncio
+    async def test_search_fulltext_rag_strict_raises_when_all_standard_queries_error(
+        self, monkeypatch
+    ):
+        literature_rag.reset_rag_state()
+        literature_rag._RAG_STATE["collection_ids"]["all"] = "collection-id"
+
+        async def fake_agentic_search_with_sni(query, collection_id, limit, search_type):
+            return []
+
+        async def fake_generate_multi_query(query, num_queries=5):
+            return [query, f"{query} mechanism"]
+
+        async def failing_search_single_query(
+            query, collection_id, limit, search_type, strict: bool = False
+        ):
+            raise RuntimeError(f"standard search failed for {query}")
+
+        monkeypatch.setattr(
+            literature_rag,
+            "_agentic_search_with_sni",
+            fake_agentic_search_with_sni,
+        )
+        monkeypatch.setattr(
+            literature_rag, "generate_multi_query", fake_generate_multi_query
+        )
+        monkeypatch.setattr(
+            literature_rag, "_search_single_query", failing_search_single_query
+        )
+
+        with pytest.raises(literature_rag.RAGSearchError):
+            await literature_rag.search_fulltext_rag(
+                "ICAM1 fibrosis", "all", strict=True
+            )
+
+    @pytest.mark.asyncio
+    async def test_search_fulltext_rag_strict_returns_empty_for_successful_zero_hits(
+        self, monkeypatch
+    ):
+        literature_rag.reset_rag_state()
+        literature_rag._RAG_STATE["collection_ids"]["all"] = "collection-id"
+
+        async def fake_agentic_search_with_sni(query, collection_id, limit, search_type):
+            return []
+
+        async def fake_generate_multi_query(query, num_queries=5):
+            return [query]
+
+        saw_strict = False
+
+        async def zero_hit_search_single_query(
+            query, collection_id, limit, search_type, strict: bool = False
+        ):
+            nonlocal saw_strict
+            saw_strict = strict
+            return []
+
+        monkeypatch.setattr(
+            literature_rag,
+            "_agentic_search_with_sni",
+            fake_agentic_search_with_sni,
+        )
+        monkeypatch.setattr(
+            literature_rag, "generate_multi_query", fake_generate_multi_query
+        )
+        monkeypatch.setattr(
+            literature_rag, "_search_single_query", zero_hit_search_single_query
+        )
+
+        result = await literature_rag.search_fulltext_rag(
+            "ICAM1 fibrosis", "all", strict=True
+        )
+
+        assert result == []
+        assert saw_strict is True
 
 
 class TestResolvePathFallback:

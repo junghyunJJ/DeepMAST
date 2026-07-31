@@ -35,6 +35,10 @@ from src.agents.deep_interpreter.tools.mcp_clients import (
 logger = logging.getLogger(__name__)
 
 
+class RAGSearchError(RuntimeError):
+    """Raised when strict RAG search cannot complete."""
+
+
 # =============================================================================
 # Async-safe file I/O helpers
 # =============================================================================
@@ -584,6 +588,7 @@ def _get_cci_rag_base_url() -> str:
 
 RAG_COLLECTION_PREFIX = "deep_interpreter_"
 DEFAULT_PAPERS_DIR = "res/papers"
+RAG_INDEX_BATCH_SIZE = 20
 
 # Module-level cache for RAG state
 _RAG_STATE: dict[str, Any] = {
@@ -1017,6 +1022,10 @@ async def index_papers_to_vectordb(
     """
     full_collection_name = f"{RAG_COLLECTION_PREFIX}{collection_name}"
     logger.debug(f"index_papers_to_vectordb: {len(file_paths)} files, collection={full_collection_name}")
+    collection_id = None
+    collection_created = False
+    tools_map = {}
+    result: Any = None
 
     try:
         logger.debug(f"index_papers_to_vectordb: connecting via cached stdio transport")
@@ -1024,7 +1033,6 @@ async def index_papers_to_vectordb(
         logger.debug(f"index_papers_to_vectordb: got {len(tools)} tools")
 
         # Find required tools
-        tools_map = {}
         for tool_obj in tools:
             name = getattr(tool_obj, 'name', '')
             if 'create_collection' in name:
@@ -1155,6 +1163,7 @@ async def index_papers_to_vectordb(
                             collection_id = item.get("id")
 
                 if collection_id:
+                    collection_created = True
                     _RAG_STATE["collection_ids"][collection_name] = collection_id
                     logger.info(f"Created collection: {full_collection_name} (id: {collection_id})")
             except Exception as e:
@@ -1168,30 +1177,42 @@ async def index_papers_to_vectordb(
             logger.error("Failed to parse collection_id from create response: %r", result)
             return {"success": False, "error": "Could not create/find collection"}
 
-        # Index papers
-        result = await tools_map['add_docs'].ainvoke({
-            "collection_id": collection_id,
-            "file_paths": file_paths,
-            "chunk_size": 3000,
-            "chunk_overlap": 200,
-            "rebuild_wiki": False,
-        })
-
-        # Parse indexing result
+        # Large handoffs can exceed the MCP upload timeout in one request.
         chunk_ids = []
-        if isinstance(result, dict):
-            chunk_ids = result.get("added_chunk_ids", [])
-        elif isinstance(result, list) and len(result) > 0:
-            item = result[0]
-            if isinstance(item, dict):
+        for offset in range(0, len(file_paths), RAG_INDEX_BATCH_SIZE):
+            batch = file_paths[offset : offset + RAG_INDEX_BATCH_SIZE]
+            result = await tools_map['add_docs'].ainvoke({
+                "collection_id": collection_id,
+                "file_paths": batch,
+                "chunk_size": 3000,
+                "chunk_overlap": 200,
+                "rebuild_wiki": False,
+            })
+            batch_chunk_ids = []
+            if isinstance(result, dict):
+                batch_chunk_ids = result.get("added_chunk_ids", [])
+            elif isinstance(result, list) and result and isinstance(result[0], dict):
+                item = result[0]
                 if 'text' in item:
                     try:
-                        data = json.loads(item['text'])
-                        chunk_ids = data.get("added_chunk_ids", [])
+                        batch_chunk_ids = json.loads(item['text']).get("added_chunk_ids", [])
                     except json.JSONDecodeError:
-                        pass
+                        text = str(item['text'])
+                        if re.search(r"Created\s+[1-9]\d*\s+total chunks", text):
+                            batch_chunk_ids = [f"batch-{offset}"]
                 else:
-                    chunk_ids = item.get("added_chunk_ids", [])
+                    batch_chunk_ids = item.get("added_chunk_ids", [])
+            if not batch_chunk_ids:
+                if collection_created:
+                    _RAG_STATE["collection_ids"].pop(collection_name, None)
+                    if "delete" in tools_map:
+                        await tools_map["delete"].ainvoke({"collection_id": collection_id})
+                    collection_created = False
+                return {
+                    "success": False,
+                    "error": f"No chunks indexed for batch starting at {offset}",
+                }
+            chunk_ids.extend(batch_chunk_ids)
 
         logger.debug(f"index_papers_to_vectordb: SUCCESS - {len(file_paths)} papers, {len(chunk_ids)} chunks")
         logger.info(f"Indexed {len(file_paths)} papers to {full_collection_name}")
@@ -1208,6 +1229,13 @@ async def index_papers_to_vectordb(
         }
 
     except Exception as e:
+        if collection_created and collection_id:
+            _RAG_STATE["collection_ids"].pop(collection_name, None)
+            if "delete" in tools_map:
+                try:
+                    await tools_map["delete"].ainvoke({"collection_id": collection_id})
+                except Exception:
+                    logger.exception("Failed to delete partial collection %s", collection_id)
         logger.debug(f"index_papers_to_vectordb: EXCEPTION {type(e).__name__}: {e}")
         logger.error(f"Indexing failed: {e}")
         return {"success": False, "error": str(e)}
@@ -1293,6 +1321,7 @@ async def _search_single_query(
     collection_id: str,
     limit: int,
     search_type: str,
+    strict: bool = False,
 ) -> list[dict]:
     """Internal single-query search (no multi_query).
 
@@ -1318,6 +1347,8 @@ async def _search_single_query(
                 break
 
         if search_tool is None:
+            if strict:
+                raise RAGSearchError("RAG search_documents tool not found")
             return []
 
         result = await search_tool.ainvoke({
@@ -1382,6 +1413,8 @@ async def _search_single_query(
 
     except Exception as e:
         logger.warning(f"Single query search failed: {e}")
+        if strict:
+            raise
         return []
 
 
@@ -1465,6 +1498,7 @@ async def search_fulltext_rag(
     collection_name: str,
     limit: int = 10,
     search_type: str = "hybrid",
+    strict: bool = False,
 ) -> list[dict]:
     """Search indexed papers using multi-query semantic/hybrid search.
 
@@ -1500,16 +1534,22 @@ async def search_fulltext_rag(
     if collection_id is None:
         logger.debug(f"search_fulltext_rag: Collection {collection_name} not found in cache or DB")
         logger.warning(f"Collection {collection_name} not indexed")
+        if strict:
+            raise RAGSearchError(f"Collection {collection_name} not indexed")
         return []
 
     logger.debug(f"search_fulltext_rag: Using collection_id: {collection_id}")
 
-    agentic_results = await _agentic_search_with_sni(
-        query=query,
-        collection_id=collection_id,
-        limit=limit,
-        search_type=search_type,
-    )
+    try:
+        agentic_results = await _agentic_search_with_sni(
+            query=query,
+            collection_id=collection_id,
+            limit=limit,
+            search_type=search_type,
+        )
+    except Exception as e:
+        logger.warning("SNI agentic search failed: %r", e, exc_info=True)
+        agentic_results = []
     if agentic_results:
         return agentic_results
 
@@ -1519,14 +1559,34 @@ async def search_fulltext_rag(
 
     # Search with each query and collect all results
     all_results = []
+    errors = []
     for i, q in enumerate(queries):
         q_preview = q[:50] + "..." if len(q) > 50 else q
         logger.debug(f"search_fulltext_rag: searching query {i+1}/{len(queries)}: {q_preview}")
-        results = await _search_single_query(q, collection_id, limit=3, search_type=search_type)
+        try:
+            if strict:
+                results = await _search_single_query(
+                    q,
+                    collection_id,
+                    limit=3,
+                    search_type=search_type,
+                    strict=True,
+                )
+            else:
+                results = await _search_single_query(
+                    q, collection_id, limit=3, search_type=search_type
+                )
+        except Exception as e:
+            errors.append(e)
+            logger.warning(f"Standard query search failed: {e}")
+            continue
         all_results.extend(results)
         logger.debug(f"  -> got {len(results)} results (total: {len(all_results)})")
 
     logger.debug(f"search_fulltext_rag: total {len(all_results)} results from multi-query")
+
+    if strict and errors and len(errors) == len(queries):
+        raise RAGSearchError(f"All standard RAG queries failed: {errors[0]}")
 
     # Deduplicate by content (keep highest score)
     seen = {}
@@ -2002,6 +2062,7 @@ def search_literature_fulltext(
     part_name: str = "part1",
     limit: int = 5,
     data_dir: str = "",
+    strict: bool = False,
 ) -> list[dict]:
     """Search full-text papers using semantic search (RAG mode only).
 
@@ -2011,6 +2072,8 @@ def search_literature_fulltext(
         limit: Maximum results to return
         data_dir: Data directory used to namespace the RAG collection.
             Falls back to DEEP_INTERPRETER_DATA_DIR, then legacy part_name.
+        strict: Raise RAGSearchError for RAG infrastructure failures instead
+            of returning [].
 
     Returns:
         List of relevant text chunks with:
@@ -2037,15 +2100,25 @@ def search_literature_fulltext(
     if not _RAG_STATE.get("available"):
         logger.debug("search_literature_fulltext: RAG not available, returning empty results")
         logger.debug("RAG not available, returning empty results")
+        if strict:
+            raise RAGSearchError("RAG not available")
         return []
 
     try:
         collection_key = _rag_collection_key(part_name, data_dir)
-        result = run_async(search_fulltext_rag(query, collection_key, limit), timeout=300)
+        if strict:
+            search = search_fulltext_rag(query, collection_key, limit, strict=True)
+        else:
+            search = search_fulltext_rag(query, collection_key, limit)
+        result = run_async(search, timeout=300)
         logger.debug(f"search_literature_fulltext: returning {len(result)} results")
         return result
     except Exception as e:
         logger.warning(f"Full-text search failed: {type(e).__name__}: {e}")
+        if strict:
+            if isinstance(e, RAGSearchError):
+                raise
+            raise RAGSearchError(str(e)) from e
         return []
 
 

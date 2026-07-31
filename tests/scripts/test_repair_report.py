@@ -4,6 +4,8 @@ import importlib.util
 import json
 from pathlib import Path
 
+from src.agents.deep_interpreter import claim_rag_validation
+
 
 SCRIPT_PATH = Path(__file__).resolve().parents[2] / "scripts" / "repair_report.py"
 SPEC = importlib.util.spec_from_file_location("repair_report", SCRIPT_PATH)
@@ -286,3 +288,236 @@ def test_repair_prompt_requires_association_language_for_mechanistic_issues(tmp_
 
     assert "Rewrite causal or mechanistic report-derived claims as associations or hypotheses." in prompt
     assert "Do not claim treatment sensitivity, resistance, patient stratification, or therapeutic vulnerability unless the validation issue provides direct support for that exact claim." in prompt
+
+
+def test_claim_rag_repair_prompt_forbids_new_evidence() -> None:
+    prompt = repair_report._build_prompt(
+        {
+            "code": "claim_rag_overclaimed",
+            "severity": "error",
+            "file": "part1_final.md",
+            "section": "## Analysis 1-1",
+            "value": "TGFB drives fibrosis.",
+            "evidence": "PMID 11111111 supports association only.",
+            "repair_instruction": "Rewrite as association.",
+        },
+        "## Analysis 1-1\nTGFB drives fibrosis.\n",
+    )
+
+    assert "use only the evidence in the validation issue" in prompt.lower()
+    assert "do not replace the cited paper" in prompt.lower()
+
+
+def test_repair_removes_only_unsupported_inline_pmid_when_sibling_supports(
+    tmp_path: Path,
+) -> None:
+    report = "## Biology\nTGFB is associated with fibrosis (PMID: 11111111; PMID: 22222222).\n"
+    (tmp_path / "part1_final.md").write_text(report, encoding="utf-8")
+    issues_path = tmp_path / "issues.json"
+    issues_path.write_text(
+        json.dumps(
+            {
+                "issues": [
+                    {
+                        "severity": "error",
+                        "code": "inline_citation_unsupported",
+                        "file": "part1_final.md",
+                        "section": "## Biology",
+                        "source_claim_index": 0,
+                        "inline_pmid": "22222222",
+                        "value": "TGFB is associated with fibrosis (PMID: 11111111; PMID: 22222222).",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    rows = [
+        {
+            "file": "part1_final.md",
+            "section": "## Biology",
+            "source_claim_index": 0,
+            "inline_pmid": "11111111",
+            "status": "supported",
+        },
+        {
+            "file": "part1_final.md",
+            "section": "## Biology",
+            "source_claim_index": 0,
+            "inline_pmid": "22222222",
+            "status": "unsupported",
+        },
+    ]
+
+    assert repair_report.repair_report(tmp_path, issues_path, claim_validation=rows) == 1
+    repaired = (tmp_path / "part1_final.md").read_text(encoding="utf-8")
+    assert "11111111" in repaired
+    assert "22222222" not in repaired
+
+
+def test_repair_handles_hedged_failed_inline_pmid_when_sibling_supports(
+    tmp_path: Path,
+) -> None:
+    claim = "TGFB may be associated with fibrosis (PMID: 11111111; PMID: 22222222)."
+    (tmp_path / "part1_final.md").write_text(f"## Biology\n{claim}\n", encoding="utf-8")
+    issue = claim_rag_validation._issue_for(
+        {
+            "status": "unsupported",
+            "hedged": True,
+            "supporting_pmids": [],
+            "evidence_quote": "",
+            "reason": "The cited paper does not support this claim.",
+            "file": "part1_final.md",
+            "section": "## Biology",
+            "source_claim_index": 0,
+            "inline_pmid": "22222222",
+            "claim": claim,
+        }
+    )
+    assert issue is not None
+    assert issue["severity"] == "error"
+    issues_path = tmp_path / "issues.json"
+    issues_path.write_text(json.dumps({"issues": [issue]}), encoding="utf-8")
+    rows = [
+        {
+            "file": "part1_final.md",
+            "section": "## Biology",
+            "source_claim_index": 0,
+            "inline_pmid": "11111111",
+            "status": "supported",
+        },
+        {
+            "file": "part1_final.md",
+            "section": "## Biology",
+            "source_claim_index": 0,
+            "inline_pmid": "22222222",
+            "status": "unsupported",
+        },
+    ]
+
+    assert repair_report.repair_report(tmp_path, issues_path, claim_validation=rows) == 1
+    repaired = (tmp_path / "part1_final.md").read_text(encoding="utf-8")
+    assert repaired == "## Biology\nTGFB may be associated with fibrosis (PMID: 11111111).\n"
+
+
+def test_inline_pmid_repair_requires_supported_sibling(tmp_path: Path) -> None:
+    report = "## Biology\nTGFB is associated with fibrosis (PMID: 22222222).\n"
+    (tmp_path / "part1_final.md").write_text(report, encoding="utf-8")
+    issue = {
+        "severity": "error",
+        "code": "inline_citation_unsupported",
+        "file": "part1_final.md",
+        "section": "## Biology",
+        "source_claim_index": 0,
+        "inline_pmid": "22222222",
+        "value": "TGFB is associated with fibrosis (PMID: 22222222).",
+    }
+    rows = [
+        {
+            "file": "part1_final.md",
+            "section": "## Biology",
+            "source_claim_index": 0,
+            "inline_pmid": "22222222",
+            "status": "unsupported",
+        }
+    ]
+
+    assert repair_report._repair_inline_citation_issue(tmp_path.resolve(), issue, rows) is False
+    assert (tmp_path / "part1_final.md").read_text(encoding="utf-8") == report
+
+
+def test_inline_pmid_repair_only_changes_named_section(tmp_path: Path) -> None:
+    claim = "TGFB is associated with fibrosis (PMID: 11111111; PMID: 22222222)."
+    report = f"## Earlier\n{claim}\n## Biology\n{claim}\n"
+    (tmp_path / "part1_final.md").write_text(report, encoding="utf-8")
+    issue = {
+        "severity": "error",
+        "code": "inline_citation_unsupported",
+        "file": "part1_final.md",
+        "section": "## Biology",
+        "source_claim_index": 0,
+        "inline_pmid": "22222222",
+        "value": claim,
+    }
+    rows = [
+        {
+            "file": "part1_final.md",
+            "section": "## Biology",
+            "source_claim_index": 0,
+            "inline_pmid": "11111111",
+            "status": "supported",
+        },
+        {
+            "file": "part1_final.md",
+            "section": "## Biology",
+            "source_claim_index": 0,
+            "inline_pmid": "22222222",
+            "status": "unsupported",
+        },
+    ]
+
+    assert repair_report._repair_inline_citation_issue(tmp_path.resolve(), issue, rows) is True
+    repaired = (tmp_path / "part1_final.md").read_text(encoding="utf-8")
+    assert f"## Earlier\n{claim}\n" in repaired
+    assert (
+        "## Biology\nTGFB is associated with fibrosis (PMID: 11111111).\n" in repaired
+    )
+
+
+def test_inline_pmid_repair_ignores_unverifiable_and_unknown_codes(tmp_path: Path) -> None:
+    claim = "TGFB is associated with fibrosis (PMID: 11111111; PMID: 22222222)."
+    for code in ("inline_citation_unverifiable", "inline_citation_surprising"):
+        report = tmp_path / f"{code}.md"
+        report.write_text(f"## Biology\n{claim}\n", encoding="utf-8")
+        issue = {
+            "severity": "error",
+            "code": code,
+            "file": report.name,
+            "section": "## Biology",
+            "source_claim_index": 0,
+            "inline_pmid": "22222222",
+            "value": claim,
+        }
+        rows = [
+            {
+                "file": report.name,
+                "section": "## Biology",
+                "source_claim_index": 0,
+                "inline_pmid": "11111111",
+                "status": "supported",
+            }
+        ]
+
+        assert repair_report._repair_inline_citation_issue(tmp_path.resolve(), issue, rows) is False
+        assert report.read_text(encoding="utf-8") == f"## Biology\n{claim}\n"
+
+
+def test_pathway_factor_repair_prompt_separates_annotations_from_measurements() -> None:
+    prompt = repair_report._build_prompt(
+        {
+            "code": "unsupported_pathway_factor_significance",
+            "severity": "error",
+            "file": "part2_final.md",
+            "section": "## Analysis 2-8: Pathway-Factor Enrichment",
+            "value": "Factor2: TNFa",
+            "evidence": "sig_liana_pathway_factor.csv lacks the claimed factor-pathway support.",
+            "repair_instruction": (
+                "Rephrase as an LR-annotation-based hypothesis, "
+                "not measured pathway-factor significance."
+            ),
+        },
+        (
+            "## Analysis 2-8: Pathway-Factor Enrichment\n"
+            "TNFa annotation may provide context for Factor2 regions."
+        ),
+    )
+
+    assert (
+        "Keep L-R pathway annotations and measured factor-pathway results "
+        "in separate sentences."
+    ) in prompt
+    assert (
+        "Do not place an unsupported pathway label and factor label in the "
+        "same sentence unless that sentence explicitly states that no "
+        "measured association was identified."
+    ) in prompt

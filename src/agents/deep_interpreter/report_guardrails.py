@@ -7,6 +7,8 @@ from typing import Any
 
 from scripts import repair_report as repair_report_script
 from scripts import validate_report as validate_report_script
+from src.agents.deep_interpreter import claim_rag_validation
+from src.agents.deep_interpreter import synthesis_consistency_validation
 
 
 REQUIRED_PART_FILES = (
@@ -34,21 +36,72 @@ SYNTHESIS_HTML_FRAGMENT_RE = re.compile(
     r"</(?:article|div|h[1-6]|li|ol|p|section|table|ul)>",
     re.IGNORECASE | re.MULTILINE,
 )
+EXPLICIT_INLINE_CONTRADICTION_RE = re.compile(
+    r"\b(contradict|incorrectly states)\b",
+    re.IGNORECASE,
+)
+PAPERS_JSON_LOAD_ERROR_CODES = {
+    "papers_json_missing",
+    "papers_json_unreadable",
+    "papers_json_malformed",
+    "papers_json_invalid",
+}
 
 
-def _issue_payload(issues: list[dict[str, str]]) -> dict[str, Any]:
-    return {"issue_count": len(issues), "issues": issues}
+def _issue_payload(
+    issues: list[dict[str, str]],
+    claim_validation: list[dict[str, Any]] | None = None,
+    consistency_validation: list[dict[str, Any]] | None = None,
+    claim_selection: dict[str, Any] | None = None,
+    inline_citation_coverage: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {"issue_count": len(issues), "issues": issues}
+    if claim_validation is not None:
+        payload["claim_validation"] = claim_validation
+    if consistency_validation is not None:
+        payload["consistency_validation"] = consistency_validation
+    if claim_selection is not None:
+        payload["claim_selection"] = claim_selection
+    if inline_citation_coverage is not None:
+        payload["inline_citation_coverage"] = inline_citation_coverage
+    return payload
 
 
-def _write_issues(path: Path, issues: list[dict[str, str]]) -> None:
+def _write_issues(
+    path: Path,
+    issues: list[dict[str, str]],
+    claim_validation: list[dict[str, Any]] | None = None,
+    consistency_validation: list[dict[str, Any]] | None = None,
+    claim_selection: dict[str, Any] | None = None,
+    inline_citation_coverage: dict[str, Any] | None = None,
+) -> None:
     path.write_text(
-        json.dumps(_issue_payload(issues), indent=2, ensure_ascii=False) + "\n",
+        json.dumps(
+            _issue_payload(
+                issues,
+                claim_validation,
+                consistency_validation,
+                claim_selection,
+                inline_citation_coverage,
+            ),
+            indent=2,
+            ensure_ascii=False,
+        )
+        + "\n",
         encoding="utf-8",
     )
 
 
 def _error_count(issues: list[dict[str, str]]) -> int:
     return sum(1 for issue in issues if issue.get("severity") == "error")
+
+
+def _issue_claim_key(issue: dict[str, str]) -> tuple[str, str, str]:
+    return (
+        str(issue.get("file") or ""),
+        str(issue.get("section") or ""),
+        str(issue.get("value") or ""),
+    )
 
 
 def _missing_required_files(data_dir: Path) -> list[str]:
@@ -100,6 +153,34 @@ def _synthesis_issue(
         "evidence": evidence,
         "repair_instruction": repair_instruction,
     }
+
+
+def _validate_part_reports(
+    data_dir: Path,
+    *,
+    provider: str | None,
+    claim_cache: dict[str, list[dict[str, Any]]],
+) -> tuple[
+    list[dict[str, str]],
+    list[dict[str, Any]],
+    dict[str, Any] | None,
+    dict[str, Any] | None,
+]:
+    deterministic = validate_report_script.validate_report(data_dir)
+    if any(issue.get("code") in PAPERS_JSON_LOAD_ERROR_CODES for issue in deterministic):
+        return deterministic, [], None, None
+    semantic = claim_rag_validation.validate_claims(
+        data_dir,
+        REQUIRED_PART_FILES,
+        provider=provider,
+        cache=claim_cache,
+    )
+    return (
+        deterministic + semantic["issues"],
+        semantic["claims"],
+        semantic.get("selection"),
+        semantic.get("inline_citation_coverage"),
+    )
 
 
 def validate_synthesis_report(data_dir: str | Path) -> list[dict[str, str]]:
@@ -163,15 +244,119 @@ def validate_synthesis_report(data_dir: str | Path) -> list[dict[str, str]]:
     return issues
 
 
-def repair_synthesis_report(data_dir: str | Path, issues: list[dict[str, str]]) -> int:
+def _exact_evidence_fallback(pmid: str, evidence_quote: str) -> str:
+    fact = " ".join(evidence_quote.split()).strip()
+    fact = re.sub(
+        rf"\s*\(PMID:\s*{re.escape(pmid)}\)\s*[.!?]?\s*$",
+        "",
+        fact,
+        flags=re.IGNORECASE,
+    )
+    fact = fact.strip().rstrip(".!?")
+    if not fact:
+        return ""
+    return (
+        f"{fact} (PMID: {pmid}). "
+        "This remains a hypothesis requiring validation."
+    )
+
+
+def _repair_explicit_inline_contradiction(
+    data_dir: Path,
+    issue: dict[str, str],
+    *,
+    provider: str | None = None,
+    deterministic_only: bool = False,
+) -> bool:
+    if issue.get("code") != "inline_citation_overclaimed":
+        return False
+    pmid = str(issue.get("inline_pmid") or "")
+    evidence_quote = str(issue.get("evidence_quote") or "")
+    claim = str(issue.get("value") or "")
+    reason = str(issue.get("reason") or "")
+    if not (
+        pmid
+        and evidence_quote
+        and claim
+        and EXPLICIT_INLINE_CONTRADICTION_RE.search(reason)
+    ):
+        return False
+
+    path = data_dir / "synthesis.md"
+    text = path.read_text(encoding="utf-8")
+    claim_at = text.find(claim)
+    if claim_at < 0:
+        return False
+
+    replacement = ""
+    if not deterministic_only:
+        prompt = f"""Rewrite only this claim using the supplied evidence quote and the exact PMID.
+Keep only facts explicitly stated in the quote. Preserve PMID: {pmid} on the factual sentence.
+Move any unsupported mechanism, prognosis extension, or therapeutic implication to exactly:
+This remains a hypothesis requiring validation.
+Return complete Markdown replacement text only.
+
+Claim:
+{claim}
+
+Evidence quote:
+{evidence_quote}
+"""
+        try:
+            model = repair_report_script._create_model(provider)
+            replacement = repair_report_script._content(model.invoke(prompt)).strip()
+        except Exception:
+            replacement = ""
+
+    if not replacement or pmid not in replacement:
+        replacement = _exact_evidence_fallback(pmid, evidence_quote)
+    if not replacement:
+        return False
+    path.write_text(text[:claim_at] + replacement + text[claim_at + len(claim) :], encoding="utf-8")
+    return True
+
+
+def repair_synthesis_report(
+    data_dir: str | Path,
+    issues: list[dict[str, str]],
+    claim_validation: list[dict[str, Any]] | None = None,
+    *,
+    provider: str | None = None,
+    deterministic_contradictions: bool = False,
+) -> int:
     data_dir = Path(data_dir).expanduser().resolve()
     changed_claims = 0
+    claim_validation = claim_validation or []
+
+    for issue in issues:
+        if issue.get("severity") != "error":
+            continue
+        if repair_report_script._repair_inline_citation_issue(
+            data_dir,
+            issue,
+            claim_validation,
+        ):
+            changed_claims += 1
+            continue
+        if _repair_explicit_inline_contradiction(
+            data_dir,
+            issue,
+            provider=provider,
+            deterministic_only=deterministic_contradictions,
+        ):
+            changed_claims += 1
 
     path = data_dir / "synthesis.md"
     current = path.read_text(encoding="utf-8")
     cursor = 0
     for issue in issues:
-        if issue.get("severity") != "error" or issue.get("code") != "unsupported_synthesis_overclaim":
+        if issue.get("severity") != "error" or issue.get("code") not in {
+            "unsupported_synthesis_overclaim",
+            "claim_rag_overclaimed",
+            "claim_rag_unsupported",
+            "inline_citation_unsupported",
+            "inline_citation_overclaimed",
+        }:
             continue
         claim = issue.get("value") or ""
         if not claim or SYNTHESIS_GUARDRAIL_SENTENCE in claim.lower():
@@ -192,7 +377,49 @@ def repair_synthesis_report(data_dir: str | Path, issues: list[dict[str, str]]) 
             continue
         if repair_report_script._repair_pmid_issue(data_dir, issue):
             changed_claims += 1
+    changed_claims += synthesis_consistency_validation.repair_synthesis_consistency(
+        data_dir, issues
+    )
     return changed_claims
+
+
+def _claim_status_counts(claims: list[dict[str, Any]]) -> dict[str, int]:
+    statuses = ("supported", "overclaimed", "unsupported", "unverifiable")
+    return {
+        status: sum(1 for claim in claims if claim.get("status") == status)
+        for status in statuses
+    }
+
+
+def _validate_synthesis_guardrails(
+    data_dir: Path,
+    *,
+    provider: str | None,
+    claim_cache: dict[str, list[dict[str, Any]]],
+) -> tuple[
+    list[dict[str, str]],
+    list[dict[str, Any]],
+    dict[str, list[dict[str, Any]]],
+    dict[str, Any] | None,
+    dict[str, Any] | None,
+]:
+    deterministic = validate_synthesis_report(data_dir)
+    if any(issue.get("code") in PAPERS_JSON_LOAD_ERROR_CODES for issue in deterministic):
+        return deterministic, [], {"issues": [], "results": []}, None, None
+    semantic = claim_rag_validation.validate_claims(
+        data_dir,
+        ("synthesis.md",),
+        provider=provider,
+        cache=claim_cache,
+    )
+    consistency = synthesis_consistency_validation.validate_synthesis_consistency(data_dir)
+    return (
+        deterministic + semantic["issues"] + consistency["issues"],
+        semantic["claims"],
+        consistency,
+        semantic.get("selection"),
+        semantic.get("inline_citation_coverage"),
+    )
 
 
 def run_report_guardrail(data_dir: str | Path, *, provider: str | None = None) -> dict[str, Any]:
@@ -204,11 +431,25 @@ def run_report_guardrail(data_dir: str | Path, *, provider: str | None = None) -
     initial_path = data_dir / "report_validation_initial.json"
     final_path = data_dir / "report_validation_final.json"
 
-    initial_issues = validate_report_script.validate_report(data_dir)
-    _write_issues(initial_path, initial_issues)
+    claim_cache: dict[str, list[dict[str, Any]]] = {}
+    initial_issues, initial_claims, initial_selection, initial_coverage = _validate_part_reports(
+        data_dir,
+        provider=provider,
+        claim_cache=claim_cache,
+    )
+    _write_issues(
+        initial_path,
+        initial_issues,
+        initial_claims,
+        claim_selection=initial_selection,
+        inline_citation_coverage=initial_coverage,
+    )
     initial_error_count = _error_count(initial_issues)
 
     current_issues = initial_issues
+    current_claims = initial_claims
+    current_selection = initial_selection
+    current_coverage = initial_coverage
     issues_path = initial_path
     changed_sections = 0
     repair_attempt_count = 0
@@ -221,17 +462,34 @@ def run_report_guardrail(data_dir: str | Path, *, provider: str | None = None) -
             data_dir,
             issues_path,
             provider=provider,
+            claim_validation=current_claims,
         )
         repair_attempt_count += 1
         changed_sections += changed
-        current_issues = validate_report_script.validate_report(data_dir)
-        _write_issues(final_path, current_issues)
+        current_issues, current_claims, current_selection, current_coverage = _validate_part_reports(
+            data_dir,
+            provider=provider,
+            claim_cache=claim_cache,
+        )
+        _write_issues(
+            final_path,
+            current_issues,
+            current_claims,
+            claim_selection=current_selection,
+            inline_citation_coverage=current_coverage,
+        )
         if changed == 0:
             break
         issues_path = final_path
 
     final_issues = current_issues
-    _write_issues(final_path, final_issues)
+    _write_issues(
+        final_path,
+        final_issues,
+        current_claims,
+        claim_selection=current_selection,
+        inline_citation_coverage=current_coverage,
+    )
     final_error_count = _error_count(final_issues)
 
     return {
@@ -246,7 +504,6 @@ def run_report_guardrail(data_dir: str | Path, *, provider: str | None = None) -
 
 
 def run_synthesis_guardrail(data_dir: str | Path, *, provider: str | None = None) -> dict[str, Any]:
-    _ = provider
     data_dir = Path(data_dir).expanduser().resolve()
     missing = _missing_synthesis_required_files(data_dir)
     if missing:
@@ -255,27 +512,108 @@ def run_synthesis_guardrail(data_dir: str | Path, *, provider: str | None = None
     initial_path = data_dir / "synthesis_guardrail_initial.json"
     final_path = data_dir / "synthesis_guardrail_final.json"
 
-    initial_issues = validate_synthesis_report(data_dir)
-    _write_issues(initial_path, initial_issues)
+    claim_cache: dict[str, list[dict[str, Any]]] = {}
+    (
+        initial_issues,
+        initial_claims,
+        initial_consistency,
+        initial_selection,
+        initial_coverage,
+    ) = _validate_synthesis_guardrails(
+        data_dir,
+        provider=provider,
+        claim_cache=claim_cache,
+    )
+    _write_issues(
+        initial_path,
+        initial_issues,
+        initial_claims,
+        initial_consistency["results"],
+        claim_selection=initial_selection,
+        inline_citation_coverage=initial_coverage,
+    )
     initial_error_count = _error_count(initial_issues)
 
     current_issues = initial_issues
+    current_claims = initial_claims
+    current_consistency = initial_consistency
+    current_selection = initial_selection
+    current_coverage = initial_coverage
     changed_claims = 0
     repair_attempt_count = 0
+    terminal_repair_count = 0
+    last_repair_error_keys: set[tuple[str, str, str]] = set()
 
     while (
         _error_count(current_issues)
         and repair_attempt_count < MAX_GUARDRAIL_REPAIR_PASSES
     ):
-        changed = repair_synthesis_report(data_dir, current_issues)
+        last_repair_error_keys = {
+            _issue_claim_key(issue)
+            for issue in current_issues
+            if issue.get("severity") == "error"
+        }
+        changed = repair_synthesis_report(
+            data_dir,
+            current_issues,
+            current_claims,
+            provider=provider,
+            deterministic_contradictions=repair_attempt_count > 0,
+        )
         repair_attempt_count += 1
         changed_claims += changed
-        current_issues = validate_synthesis_report(data_dir)
+        (
+            current_issues,
+            current_claims,
+            current_consistency,
+            current_selection,
+            current_coverage,
+        ) = _validate_synthesis_guardrails(
+            data_dir,
+            provider=provider,
+            claim_cache=claim_cache,
+        )
         if changed == 0:
             break
 
+    newly_surfaced_errors = [
+        issue
+        for issue in current_issues
+        if issue.get("severity") == "error"
+        and _issue_claim_key(issue) not in last_repair_error_keys
+    ]
+    if repair_attempt_count == MAX_GUARDRAIL_REPAIR_PASSES and newly_surfaced_errors:
+        terminal_repair_count = 1
+        terminal_changed = repair_synthesis_report(
+            data_dir,
+            newly_surfaced_errors,
+            current_claims,
+            provider=provider,
+            deterministic_contradictions=True,
+        )
+        changed_claims += terminal_changed
+        if terminal_changed:
+            (
+                current_issues,
+                current_claims,
+                current_consistency,
+                current_selection,
+                current_coverage,
+            ) = _validate_synthesis_guardrails(
+                data_dir,
+                provider=provider,
+                claim_cache=claim_cache,
+            )
+
     final_issues = current_issues
-    _write_issues(final_path, final_issues)
+    _write_issues(
+        final_path,
+        final_issues,
+        current_claims,
+        current_consistency["results"],
+        claim_selection=current_selection,
+        inline_citation_coverage=current_coverage,
+    )
     final_error_count = _error_count(final_issues)
 
     return {
@@ -284,7 +622,16 @@ def run_synthesis_guardrail(data_dir: str | Path, *, provider: str | None = None
         "initial_issue_count": len(initial_issues),
         "initial_error_count": initial_error_count,
         "repair_attempt_count": repair_attempt_count,
+        "terminal_repair_count": terminal_repair_count,
         "changed_claims": changed_claims,
         "final_issue_count": len(final_issues),
         "final_error_count": final_error_count,
+        "claims_validated": len(current_claims),
+        "claims_by_status": _claim_status_counts(current_claims),
+        "validation_results": current_claims,
+        "claim_selection": current_selection,
+        "inline_citation_coverage": current_coverage,
+        "consistency_checked": True,
+        "consistency_issue_count": len(initial_consistency["issues"]),
+        "consistency_validation": current_consistency["results"],
     }

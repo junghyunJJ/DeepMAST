@@ -323,6 +323,17 @@ def test_generate_html_report_writes_missing_reporter_artifacts_before_render(
             "changed_claims": 1,
             "final_issue_count": 2,
             "final_error_count": 0,
+            "claims_validated": 2,
+            "claims_by_status": {
+                "supported": 1,
+                "overclaimed": 1,
+                "unsupported": 0,
+                "unverifiable": 0,
+            },
+            "validation_results": [
+                {"claim": "Supported claim.", "status": "supported"},
+                {"claim": "Caveated claim.", "status": "overclaimed"},
+            ],
         }
 
     def fake_render(parts: dict, output_path: str, data_dir: str) -> str:
@@ -354,6 +365,14 @@ def test_generate_html_report_writes_missing_reporter_artifacts_before_render(
     assert "Report generated successfully" in result
     assert output.exists()
     assert seen[0]["validation"]["auto_generated"] is True
+    assert seen[0]["validation"]["claims_validated"] == 2
+    assert seen[0]["validation"]["claims_by_status"] == {
+        "supported": 1,
+        "caveated": 1,
+        "hypothesis": 0,
+        "unverifiable": 0,
+    }
+    assert len(seen[0]["validation"]["validation_results"]) == 2
     assert seen[0]["validation"]["synthesis_guardrail"]["final_error_count"] == 0
     assert seen[0]["targets"]["part4_synthesis_available"] is True
     assert seen[0]["targets"]["canonical_source"] == "part4_therapeutic_synthesis.md"

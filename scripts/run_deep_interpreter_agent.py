@@ -24,7 +24,7 @@ from typing import Any
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 ENV_FILE = REPO_ROOT / ".env"
-MAX_PART3_INVOKE_ATTEMPTS = 3
+MAX_INTERPRETER_INVOKE_ATTEMPTS = 3
 
 from dotenv import load_dotenv
 
@@ -108,20 +108,13 @@ def _missing_outputs(data_dir: Path, outputs: list[str]) -> list[str]:
     return [name for name in outputs if not (data_dir / name).exists()]
 
 
-def _should_retry_part3_save(args: argparse.Namespace, missing_outputs: list[str]) -> bool:
-    return args.subagent == "interpreter" and args.part == 3 and missing_outputs == ["part3_final.md"]
-
-
-def _build_part3_save_retry_message(data_dir: Path) -> str:
-    return f"""Retry Part 3 output creation for {data_dir}.
-
-Do not copy or save the previous chat-only response.
-Re-read /data_path.txt, /interpretation_guide.md, and /papers.json, then call load_analysis_data for the data directory.
-Run Part 3 ligand-receptor interpretation only.
-Use selected_genes and selected_lr_pairs from part4_candidate_selection.json.
-Avoid therapeutic synthesis, druggability, drug ranking, and clinical prioritization.
-Your final action MUST be write_file(file_path="/part3_final.md", content=<complete markdown Part 3 report>).
-A chat response without that tool call is incomplete."""
+def _should_retry_interpreter_save(args: argparse.Namespace, missing_outputs: list[str]) -> bool:
+    part = args.part
+    return (
+        args.subagent == "interpreter"
+        and part in {1, 2, 3}
+        and missing_outputs == [f"part{part}_final.md"]
+    )
 
 
 def _build_subagent_message(subagent: str, data_dir: Path, targets: dict[str, Any], part: int | None) -> str:
@@ -178,6 +171,27 @@ generate_html_report writes synthesis_validation.json and synthesis_targets.json
 Do not hand-author part1_html, part2_html, part3_html, summary_html, or therapeutic_html.
 Do not run planner, searcher, or interpreter."""
     raise ValueError(f"Unknown subagent: {subagent}")
+
+
+def _build_interpreter_save_retry_message(
+    data_dir: Path,
+    part: int,
+) -> str:
+    if part not in {1, 2, 3}:
+        raise ValueError("interpreter save retry requires Part 1, 2, or 3")
+    base_message = _build_subagent_message("interpreter", data_dir, {}, part)
+    return f"""Continue the existing Part {part} attempt for {data_dir}.
+
+Use the conversation and tool results above. Do not restart the analysis from scratch.
+Reuse an existing load_analysis_data result when it is already present in the conversation.
+Call load_analysis_data only if no usable result is present.
+Do not blindly save a generic or incomplete previous response.
+Correct or complete the report so it satisfies every assigned Part requirement.
+
+{base_message}
+
+Your final action MUST be write_file(file_path="/part{part}_final.md", content="complete markdown Part {part} report").
+A chat response without that tool call is incomplete."""
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -324,16 +338,17 @@ async def run(args: argparse.Namespace) -> int:
     invoke_attempt_count = 1
     retry_history: list[dict[str, Any]] = []
 
-    for retry_number in range(1, MAX_PART3_INVOKE_ATTEMPTS):
-        if not _should_retry_part3_save(args, missing_outputs):
+    retry_prefix = f"part{args.part}_save_retry"
+    for retry_number in range(1, MAX_INTERPRETER_INVOKE_ATTEMPTS):
+        if not _should_retry_interpreter_save(args, missing_outputs):
             break
 
         print(
             json.dumps(
                 {
-                    "event": "part3_save_retry_start",
+                    "event": f"{retry_prefix}_start",
                     "retry_number": retry_number,
-                    "max_invoke_attempts": MAX_PART3_INVOKE_ATTEMPTS,
+                    "max_invoke_attempts": MAX_INTERPRETER_INVOKE_ATTEMPTS,
                     "missing_outputs": missing_outputs,
                 },
                 indent=2,
@@ -344,13 +359,18 @@ async def run(args: argparse.Namespace) -> int:
         invoke_attempt_count += 1
         attempt: dict[str, Any] = {"retry_number": retry_number}
         try:
+            retry_message = {
+                "role": "user",
+                "content": _build_interpreter_save_retry_message(
+                    data_dir,
+                    args.part,
+                ),
+            }
             result = await agent.ainvoke(
                 {
                     "messages": [
-                        {
-                            "role": "user",
-                            "content": _build_part3_save_retry_message(data_dir),
-                        }
+                        *messages,
+                        retry_message,
                     ]
                 },
                 config=None,
@@ -361,9 +381,9 @@ async def run(args: argparse.Namespace) -> int:
             attempt.update(
                 {
                     "event": (
-                        "part3_save_retry_complete"
+                        f"{retry_prefix}_complete"
                         if not missing_outputs
-                        else "part3_save_retry_incomplete"
+                        else f"{retry_prefix}_incomplete"
                     ),
                     "outputs": outputs,
                     "missing_outputs": missing_outputs,
@@ -374,7 +394,7 @@ async def run(args: argparse.Namespace) -> int:
                 traceback.print_exc()
             attempt.update(
                 {
-                    "event": "part3_save_retry_error",
+                    "event": f"{retry_prefix}_error",
                     "exception_type": type(exc).__name__,
                     "exception_repr": repr(exc),
                 }
@@ -382,9 +402,9 @@ async def run(args: argparse.Namespace) -> int:
         retry_history.append(attempt)
 
     if retry_history:
-        recovery["part3_save_retry"] = {
+        recovery[retry_prefix] = {
             "retry_attempt_count": len(retry_history),
-            "max_invoke_attempts": MAX_PART3_INVOKE_ATTEMPTS,
+            "max_invoke_attempts": MAX_INTERPRETER_INVOKE_ATTEMPTS,
             "attempts": retry_history,
         }
 

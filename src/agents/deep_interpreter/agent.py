@@ -36,14 +36,14 @@ Backend Configuration:
 import json
 import uuid
 from dataclasses import dataclass, field
-from typing import Callable, Literal, Optional, Sequence
+from typing import Any, Callable, Literal, Optional, Sequence, cast
 
 from deepagents import create_deep_agent
 from deepagents.backends import CompositeBackend, FilesystemBackend, StateBackend
 from deepagents.backends.protocol import WriteResult
 from langchain.tools import ToolRuntime
 from langchain_core.language_models.chat_models import BaseChatModel
-from langchain_core.runnables import Runnable
+from langchain_core.runnables import Runnable, RunnableConfig
 from langchain_core.tools import BaseTool
 from langgraph.checkpoint.memory import MemorySaver
 
@@ -53,6 +53,10 @@ from pathlib import Path
 from src.agents.model import create_llm, load_subagent_models_from_env
 # from src.agents.deep_interpreter.middleware import SkillsMiddleware  # Replaced by subagent-level SkillActivator
 from src.agents.deep_interpreter.prompts import ORCHESTRATOR_SYSTEM_PROMPT
+from src.agents.deep_interpreter.reporter_recovery import (
+    ReporterTaskRecoveryMiddleware,
+    reporter_attempt_timeout_seconds,
+)
 from src.agents.deep_interpreter.subagents.configs import get_subagents
 from src.agents.deep_interpreter.tools import (
     load_analysis_data,
@@ -152,8 +156,11 @@ class DeepInterpreterConfig:
 
     def __post_init__(self):
         if self.subagent_models is None:
-            self.subagent_models = load_subagent_models_from_env(
-                ["planner", "searcher", "interpreter", "reporter"]
+            self.subagent_models = cast(
+                dict[str, BaseChatModel | str] | None,
+                load_subagent_models_from_env(
+                    ["planner", "searcher", "interpreter", "reporter"]
+                ),
             )
 
 
@@ -297,16 +304,21 @@ def create_deep_interpreter_agent(
     # SkillsMiddleware removed — skills now injected per-subagent via SkillActivator
     # (see get_subagents with skills_sources/skill_registry params)
 
-    # Create the agent with backend factory (no middleware needed at orchestrator level)
+    # Create the agent with backend factory.
     agent = create_deep_agent(
         model=llm,
         tools=tools,
-        subagents=subagents,
+        subagents=cast(Any, subagents),
         checkpointer=checkpointer,
         interrupt_on=interrupt_on,
         system_prompt=ORCHESTRATOR_SYSTEM_PROMPT,
         backend=backend_factory,
-        middleware=[],
+        middleware=[
+            ReporterTaskRecoveryMiddleware(
+                data_dir=resolved_data_dir,
+                timeout_seconds=reporter_attempt_timeout_seconds(),
+            )
+        ],
     )
 
     return agent
@@ -390,7 +402,7 @@ The following targets have been pre-selected (DO NOT ask for user input):
 Generate a comprehensive interpretation report to {output_path}."""
 
     # Build invoke config with thread_id if checkpointer is enabled
-    invoke_config = {}
+    invoke_config: RunnableConfig = {}
     if use_checkpointer:
         invoke_config["configurable"] = {
             "thread_id": thread_id or str(uuid.uuid4())

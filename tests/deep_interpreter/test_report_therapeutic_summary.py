@@ -79,3 +79,20 @@ def test_generate_simple_report_renders_gwas_and_multisource_summary():
         assert "Trials (CT.gov)" in html
         assert "DrugBank Match" in html
         assert "TRASTUZUMAB" in html
+
+
+def test_generate_simple_report_renders_string_tractability():
+    from src.agents.deep_interpreter.tools.report import generate_simple_report
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        out_path = Path(tmpdir) / "report.html"
+        generate_simple_report(
+            title="Test Report",
+            content={
+                "part1": {}, "part2": {}, "part3": {}, "references": [],
+                "therapeutic": {"druggable_targets": [{"gene": "ERBB2", "tractability": "approved"}]},
+            },
+            output_path=str(out_path),
+        )
+
+        assert "approved" in out_path.read_text(encoding="utf-8")
