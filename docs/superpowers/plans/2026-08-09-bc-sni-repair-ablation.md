@@ -311,6 +311,31 @@ an empty result for an agentic zero hit so the tool call completes normally.
 a no-SNI zero hit is terminal, auditable, and still cannot enter the fallback
 path.
 
+## Task 11: Audit agentic-query recurrence without recording query text
+
+**Files:**
+
+- Modify: `src/agents/deep_interpreter/tools/literature_rag.py`
+- Modify: `tests/test_rag_path_resolution.py`
+
+The stopped `pairs-rag4000-serial-run-03/pair-01/wiki-off` reached 31 valid
+agentic calls (20 `NoRelevantContext`) during Part 3 without completing the
+stage.  The current audit records no query identifier, so it cannot distinguish
+a repeated query loop from many distinct analysis topics.  Add only a stable
+one-way query fingerprint to each agentic audit record; never persist query
+text or paper content.
+
+1. Record `query_sha256`, calculated from the exact agentic question, for
+   every audit outcome in `_agentic_search_with_sni`.
+2. Preserve the audit's existing endpoint, collection, condition, success,
+   result-count, and error fields; do not change RAG behavior, prompts,
+   collection/SNI content, model, or runner schedule.
+3. Add focused test coverage for the deterministic fingerprint on a positive
+   result and a `NoRelevantContext` zero hit.
+
+**Verification:** focused tests prove a stable fingerprint is present without
+query text and all existing strict audit validation remains unchanged.
+
 **Completion criteria**
 
 - All 10 pairs are valid, balanced `4/3/3` across direct inference ports
