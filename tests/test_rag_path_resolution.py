@@ -639,11 +639,13 @@ class TestRagSniIntegration:
         assert audit == {
             "endpoint": "agentic_search",
             "collection_uuid": "collection-id",
+            "query_sha256": "4e542d55a3e8433eeb8c1f03861d4f40346f7c1ce88ecbc5fcffefc84a56bc8f",
             "use_wiki_context": False,
             "success": True,
             "result_count": 1,
             "error_type": None,
         }
+        assert "ICAM1 fibrosis" not in (tmp_path / "rag-audit.jsonl").read_text()
 
     @pytest.mark.asyncio
     async def test_search_fulltext_rag_audits_no_relevant_context_payload(
@@ -677,11 +679,13 @@ class TestRagSniIntegration:
         assert json.loads((tmp_path / "rag-audit.jsonl").read_text()) == {
             "endpoint": "agentic_search",
             "collection_uuid": "collection-id",
+            "query_sha256": "4e542d55a3e8433eeb8c1f03861d4f40346f7c1ce88ecbc5fcffefc84a56bc8f",
             "use_wiki_context": False,
             "success": False,
             "result_count": 0,
             "error_type": "NoRelevantContext",
         }
+        assert "ICAM1 fibrosis" not in (tmp_path / "rag-audit.jsonl").read_text()
 
     @pytest.mark.asyncio
     async def test_agentic_search_audits_empty_sources_as_no_relevant_context(
@@ -714,6 +718,7 @@ class TestRagSniIntegration:
         assert json.loads((tmp_path / "rag-audit.jsonl").read_text()) == {
             "endpoint": "agentic_search",
             "collection_uuid": "collection-id",
+            "query_sha256": "4e542d55a3e8433eeb8c1f03861d4f40346f7c1ce88ecbc5fcffefc84a56bc8f",
             "use_wiki_context": False,
             "success": False,
             "result_count": 0,

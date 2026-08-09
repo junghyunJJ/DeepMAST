@@ -140,6 +140,7 @@ def _env_bool(name: str, default: bool = False) -> bool:
 
 
 def _append_rag_audit(
+    query: str,
     collection_id: str,
     use_wiki_context: bool,
     result_count: int,
@@ -151,6 +152,7 @@ def _append_rag_audit(
     record = {
         "endpoint": "agentic_search",
         "collection_uuid": collection_id,
+        "query_sha256": hashlib.sha256(query.encode("utf-8")).hexdigest(),
         "use_wiki_context": use_wiki_context,
         "success": error_type is None and result_count > 0,
         "result_count": result_count,
@@ -1469,7 +1471,7 @@ async def _agentic_search_with_sni(
         None,
     )
     if agentic_tool is None:
-        _append_rag_audit(collection_id, use_wiki_context, 0, "ToolNotFound")
+        _append_rag_audit(query, collection_id, use_wiki_context, 0, "ToolNotFound")
         if require_agentic:
             raise RAGSearchError("Required agentic RAG failed: ToolNotFound")
         return []
@@ -1487,7 +1489,7 @@ async def _agentic_search_with_sni(
         )
     except Exception as e:
         logger.warning("SNI agentic search failed: %r", e, exc_info=True)
-        _append_rag_audit(collection_id, use_wiki_context, 0, type(e).__name__)
+        _append_rag_audit(query, collection_id, use_wiki_context, 0, type(e).__name__)
         if require_agentic:
             raise
         return []
@@ -1499,14 +1501,16 @@ async def _agentic_search_with_sni(
         try:
             payload = json.loads(raw)
         except json.JSONDecodeError:
-            _append_rag_audit(collection_id, use_wiki_context, 0, "JSONDecodeError")
+            _append_rag_audit(
+                query, collection_id, use_wiki_context, 0, "JSONDecodeError"
+            )
             if require_agentic:
                 raise RAGSearchError("Required agentic RAG failed: JSONDecodeError")
             return []
     elif isinstance(raw, dict):
         payload = raw
     else:
-        _append_rag_audit(collection_id, use_wiki_context, 0, type(raw).__name__)
+        _append_rag_audit(query, collection_id, use_wiki_context, 0, type(raw).__name__)
         if require_agentic:
             raise RAGSearchError(f"Required agentic RAG failed: {type(raw).__name__}")
         return []
@@ -1518,19 +1522,19 @@ async def _agentic_search_with_sni(
             if payload.get("error") == "no_relevant_context"
             else "AgenticError"
         )
-        _append_rag_audit(collection_id, use_wiki_context, 0, error_type)
+        _append_rag_audit(query, collection_id, use_wiki_context, 0, error_type)
         if require_agentic and error_type != "NoRelevantContext":
             raise RAGSearchError(f"Required agentic RAG failed: {error_type}")
         return []
 
     sources = payload.get("sources")
     if not isinstance(sources, list):
-        _append_rag_audit(collection_id, use_wiki_context, 0, "InvalidSources")
+        _append_rag_audit(query, collection_id, use_wiki_context, 0, "InvalidSources")
         if require_agentic:
             raise RAGSearchError("Required agentic RAG failed: InvalidSources")
         return []
     if not sources:
-        _append_rag_audit(collection_id, use_wiki_context, 0, "NoRelevantContext")
+        _append_rag_audit(query, collection_id, use_wiki_context, 0, "NoRelevantContext")
         return []
 
     results = []
@@ -1556,7 +1560,9 @@ async def _agentic_search_with_sni(
         )
 
     usable_results = [r for r in results if r.get("page_content")][:limit]
-    _append_rag_audit(collection_id, use_wiki_context, len(usable_results), None)
+    _append_rag_audit(
+        query, collection_id, use_wiki_context, len(usable_results), None
+    )
     return usable_results
 
 
