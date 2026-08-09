@@ -1,4 +1,5 @@
 import json
+import threading
 from email.message import Message
 from pathlib import Path
 from typing import cast
@@ -292,7 +293,17 @@ def _successful_condition_artifacts(data_dir: Path) -> None:
     for name in bc_runner.REPORT_FILES:
         (data_dir / name).write_text("ok\n", encoding="utf-8")
     (data_dir / "rag_audit.jsonl").write_text(
-        json.dumps({"endpoint": "agentic_search", "fallback_used": False}) + "\n",
+        json.dumps(
+            {
+                "endpoint": "agentic_search",
+                "collection_uuid": stack.BC_COLLECTION_ID,
+                "use_wiki_context": "wiki-on" in data_dir.parts,
+                "success": True,
+                "error_type": None,
+                "result_count": 3,
+            }
+        )
+        + "\n",
         encoding="utf-8",
     )
     (data_dir / "report_validation_initial.json").write_text(
@@ -393,6 +404,58 @@ def test_bc_runner_all_schedules_at_most_four_backend_lanes(tmp_path: Path) -> N
     assert [item["pair_id"] for item in schedule[1]] == [5, 6]
 
 
+def test_bc_runner_all_schedules_isolated_pair_processes_without_stage_state_leak(tmp_path: Path) -> None:
+    source = _minimal_source(tmp_path)
+    started: list[dict[str, object]] = []
+    lock = threading.Lock()
+    all_first_batch_started = threading.Event()
+    release = threading.Event()
+
+    def forbidden_stage(data_dir: Path, env: dict[str, str]) -> int:
+        raise AssertionError("all must not call in-process stage runner")
+
+    def fake_pair_process(pair_id: int, api: bc_runner.Api, output_root: Path, source: Path, env: dict[str, str]) -> int:
+        with lock:
+            started.append(
+                {
+                    "pair_id": pair_id,
+                    "backend": env["BC_SNI_BACKEND_PORT"],
+                    "api": env["BC_SNI_API_PORT"],
+                    "audit_root": env["BC_SNI_PAIR_AUDIT_ROOT"],
+                    "rag_binding_root": env["BC_SNI_PAIR_RAG_BINDING_ROOT"],
+                }
+            )
+            if len(started) == 4:
+                all_first_batch_started.set()
+        assert all_first_batch_started.wait(1)
+        release.wait(1)
+        return 0
+
+    def run_all() -> None:
+        rc = bc_runner.main(
+            ["--all", "--output-root", str(tmp_path / "runs"), "--source", str(source)],
+            stage_runner=forbidden_stage,
+            collection_snapshot=lambda _api_url: stack.BC_COLLECTION_SNAPSHOT,
+            pair_process_runner=fake_pair_process,
+        )
+        assert rc == 0
+
+    thread = threading.Thread(target=run_all)
+    thread.start()
+    assert all_first_batch_started.wait(1)
+    with lock:
+        first_batch = list(started)
+    release.set()
+    thread.join(2)
+
+    assert not thread.is_alive()
+    assert len(started) == 10
+    assert {entry["pair_id"] for entry in first_batch} == {1, 2, 3, 4}
+    assert {entry["backend"] for entry in first_batch} == {"4000", "5000", "6000", "7000"}
+    assert len({entry["audit_root"] for entry in started}) == 10
+    assert len({entry["rag_binding_root"] for entry in started}) == 10
+
+
 def test_bc_runner_metrics_count_terminal_synthesis_repair(tmp_path: Path) -> None:
     data_dir = tmp_path / "condition"
     data_dir.mkdir()
@@ -418,7 +481,17 @@ def test_bc_runner_fails_on_collection_drift_or_invalid_audit(tmp_path: Path) ->
     def fake_stage(data_dir: Path, env: dict[str, str]) -> int:
         _successful_condition_artifacts(data_dir)
         (data_dir / "rag_audit.jsonl").write_text(
-            json.dumps({"endpoint": "chunk_search", "fallback_used": True}) + "\n",
+            json.dumps(
+                {
+                    "endpoint": "agentic_search",
+                    "collection_uuid": stack.BC_COLLECTION_ID,
+                    "use_wiki_context": "wiki-on" in data_dir.parts,
+                    "success": False,
+                    "error_type": "RuntimeError",
+                    "result_count": 0,
+                }
+            )
+            + "\n",
             encoding="utf-8",
         )
         return 0
@@ -436,6 +509,56 @@ def test_bc_runner_fails_on_collection_drift_or_invalid_audit(tmp_path: Path) ->
 
     assert audit_rc == 1
     assert drift_rc == 1
+
+
+def test_bc_runner_rejects_output_root_inside_source_before_copy(tmp_path: Path) -> None:
+    source = _minimal_source(tmp_path)
+    output_root = source / "nested-runs"
+
+    rc = bc_runner.main(
+        ["--pair", "1", "--output-root", str(output_root), "--source", str(source)],
+        stage_runner=lambda data_dir, env: 0,
+        collection_snapshot=lambda _api_url: stack.BC_COLLECTION_SNAPSHOT,
+    )
+
+    assert rc == 1
+    assert not output_root.exists()
+
+
+def test_bc_runner_preserves_post_stage_failure_evidence_and_metrics(tmp_path: Path) -> None:
+    source = _minimal_source(tmp_path)
+
+    def fake_stage(data_dir: Path, env: dict[str, str]) -> int:
+        _successful_condition_artifacts(data_dir)
+        (data_dir / "rag_audit.jsonl").write_text(
+            json.dumps(
+                {
+                    "endpoint": "agentic_search",
+                    "collection_uuid": stack.BC_COLLECTION_ID,
+                    "use_wiki_context": "wiki-on" in data_dir.parts,
+                    "success": False,
+                    "error_type": "TimeoutError",
+                    "result_count": 0,
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        return 0
+
+    rc = bc_runner.main(
+        ["--pair", "1", "--output-root", str(tmp_path / "runs"), "--source", str(source)],
+        stage_runner=fake_stage,
+        collection_snapshot=lambda _api_url: stack.BC_COLLECTION_SNAPSHOT,
+    )
+
+    failed_dir = tmp_path / "runs" / "pair-01" / "wiki-on"
+    manifest = json.loads((failed_dir / "run_manifest.json").read_text(encoding="utf-8"))
+    assert rc == 1
+    assert (failed_dir / "after" / "part1_final.md").exists()
+    assert manifest["return_status"] == "failed"
+    assert manifest["error"]["message"].startswith("invalid RAG audit record")
+    assert manifest["metrics"]["synthesis"]["total_repair_count"] == 4
 
 
 def test_bc_runner_fails_when_audit_is_missing(tmp_path: Path) -> None:

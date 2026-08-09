@@ -8,6 +8,7 @@ import hashlib
 import json
 import os
 import shutil
+import subprocess
 import sys
 import time
 from collections.abc import Callable, Sequence
@@ -70,6 +71,7 @@ CONDITIONS = (
 StageRunner = Callable[[Path, dict[str, str]], int]
 CollectionSnapshot = Callable[[str], dict[str, Any]]
 Api = dict[str, Any]
+PairProcessRunner = Callable[[int, Api, Path, Path, dict[str, str]], int]
 
 
 def write_json(path: Path, payload: Any) -> None:
@@ -99,6 +101,12 @@ def _default_collection_snapshot(api_url: str) -> dict[str, Any]:
 
 def _api_int(api: Api, key: str) -> int:
     return int(api[key])
+
+
+def _output_root_is_inside_source(source: Path, output_root: Path) -> bool:
+    resolved_source = source.expanduser().resolve(strict=False)
+    resolved_output = output_root.expanduser().resolve(strict=False)
+    return resolved_output == resolved_source or resolved_source in resolved_output.parents
 
 
 def _run_dir(output_root: Path, pair_id: int, condition: Condition) -> Path:
@@ -223,7 +231,7 @@ def _snapshot_files(data_dir: Path, destination_name: str, names: tuple[str, ...
             shutil.copy2(source, destination / name)
 
 
-def _install_guardrail_capture(data_dir: Path) -> None:
+def _install_guardrail_capture(data_dir: Path) -> Callable[[], None]:
     from src.agents.deep_interpreter.middleware import report_guardrail as middleware_guardrail
     from src.agents.deep_interpreter.tools import report as report_tool
 
@@ -248,6 +256,12 @@ def _install_guardrail_capture(data_dir: Path) -> None:
 
     middleware_guardrail.run_report_guardrail = parts
     report_tool._run_synthesis_guardrail_before_html = synthesis
+
+    def restore() -> None:
+        middleware_guardrail.run_report_guardrail = original_parts
+        report_tool._run_synthesis_guardrail_before_html = original_synthesis
+
+    return restore
 
 
 async def _run_deep_stage(data_dir: Path, stage: str, part: int | None) -> dict[str, Any]:
@@ -302,17 +316,20 @@ def _default_stage_runner(data_dir: Path, env: dict[str, str]) -> int:
     def run() -> int:
         aliases = _bind_read_only_collection(data_dir)
         _disable_collection_preparation_tool()
-        _install_guardrail_capture(data_dir)
+        restore_guardrails = _install_guardrail_capture(data_dir)
         write_json(data_dir / "rag_binding.json", {"collection_id": BC_COLLECTION_ID, "aliases": aliases})
-        stages = []
-        for stage, part in STAGES:
-            result = asyncio.run(_run_deep_stage(data_dir, stage, part))
-            stages.append(result)
-            if result["return_code"] != 0:
-                write_json(data_dir / "timing.json", {"stages": stages})
-                return int(result["return_code"])
-        write_json(data_dir / "timing.json", {"stages": stages})
-        return 0
+        try:
+            stages = []
+            for stage, part in STAGES:
+                result = asyncio.run(_run_deep_stage(data_dir, stage, part))
+                stages.append(result)
+                if result["return_code"] != 0:
+                    write_json(data_dir / "timing.json", {"stages": stages})
+                    return int(result["return_code"])
+            write_json(data_dir / "timing.json", {"stages": stages})
+            return 0
+        finally:
+            restore_guardrails()
 
     return _with_env(env, run)
 
@@ -362,7 +379,7 @@ def extract_metrics(data_dir: Path) -> dict[str, Any]:
     }
 
 
-def _validate_rag_audit(data_dir: Path) -> None:
+def _validate_rag_audit(data_dir: Path, condition: Condition) -> None:
     path = data_dir / "rag_audit.jsonl"
     if not path.is_file():
         raise RuntimeError(f"missing RAG audit: {path}")
@@ -372,7 +389,13 @@ def _validate_rag_audit(data_dir: Path) -> None:
     bad = [
         record
         for record in records
-        if record.get("endpoint") != "agentic_search" or record.get("fallback_used") is True
+        if record.get("endpoint") != "agentic_search"
+        or record.get("collection_uuid") != BC_COLLECTION_ID
+        or record.get("use_wiki_context") is not condition.use_wiki_context
+        or record.get("success") is not True
+        or record.get("error_type") is not None
+        or not isinstance(record.get("result_count"), int)
+        or record.get("result_count", 0) <= 0
     ]
     if bad:
         raise RuntimeError(f"invalid RAG audit record: {bad[0]}")
@@ -433,15 +456,16 @@ def run_condition(
         if collection_after != collection_before:
             raise RuntimeError(f"BC collection changed during run: {collection_after}")
         _verify_source_manifest(data_dir)
-        _validate_rag_audit(data_dir)
+        _validate_rag_audit(data_dir, condition)
         _validate_final_guardrails(data_dir)
-        _write_diffs(data_dir)
         status = "passed"
         return 0
     except Exception as exc:  # noqa: BLE001
         error = {"type": type(exc).__name__, "message": str(exc)}
         return 1
     finally:
+        _write_diffs(data_dir)
+        metrics = extract_metrics(data_dir)
         write_json(
             data_dir / "run_manifest.json",
             {
@@ -457,7 +481,7 @@ def run_condition(
                 "finished_at": utc_now(),
                 "return_status": status,
                 "error": error,
-                "metrics": extract_metrics(data_dir) if status == "passed" else {},
+                "metrics": metrics,
             },
         )
 
@@ -486,6 +510,46 @@ def run_pair(
             ),
         )
     return rc
+
+
+def _pair_process_env(pair_id: int, api: Api, output_root: Path, source: Path) -> dict[str, str]:
+    pair_root = output_root / f"pair-{pair_id:02d}"
+    return {
+        "BC_SNI_PAIR_ID": str(pair_id),
+        "BC_SNI_BACKEND_PORT": str(_api_int(api, "backend_port")),
+        "BC_SNI_API_PORT": str(_api_int(api, "api_port")),
+        "BC_SNI_PAIR_ROOT": str(pair_root),
+        "BC_SNI_PAIR_AUDIT_ROOT": str(pair_root / "audit"),
+        "BC_SNI_PAIR_RAG_BINDING_ROOT": str(pair_root / "rag-bindings"),
+        "BC_SNI_SOURCE": str(source),
+    }
+
+
+def _default_pair_process_runner(
+    pair_id: int,
+    api: Api,
+    output_root: Path,
+    source: Path,
+    env: dict[str, str],
+) -> int:
+    api_index = APIS.index(api)
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(Path(__file__).resolve()),
+            "--pair",
+            str(pair_id),
+            "--api-index",
+            str(api_index),
+            "--output-root",
+            str(output_root),
+            "--source",
+            str(source),
+        ],
+        env={**os.environ, **env},
+        check=False,
+    )
+    return completed.returncode
 
 
 def build_schedule(pair_ids: Sequence[int], apis: Sequence[Api]) -> list[list[dict[str, int]]]:
@@ -532,6 +596,7 @@ def build_parser() -> argparse.ArgumentParser:
     mode.add_argument("--summarize", action="store_true", help="Write summary.json from existing manifests.")
     parser.add_argument("--output-root", type=Path, required=True)
     parser.add_argument("--source", type=Path, default=BC_SOURCE)
+    parser.add_argument("--api-index", type=int, choices=range(len(APIS)), help=argparse.SUPPRESS)
     return parser
 
 
@@ -540,14 +605,18 @@ def main(
     *,
     stage_runner: StageRunner = _default_stage_runner,
     collection_snapshot: CollectionSnapshot = _default_collection_snapshot,
+    pair_process_runner: PairProcessRunner = _default_pair_process_runner,
 ) -> int:
     args = build_parser().parse_args(argv)
+    if _output_root_is_inside_source(args.source, args.output_root):
+        print("output root must not equal or be nested under source", file=sys.stderr)
+        return 1
     args.output_root.mkdir(parents=True, exist_ok=True)
     if args.summarize:
         return summarize(args.output_root)
     if args.pair or args.smoke:
         pair_id = args.pair or 1
-        api = APIS[(pair_id - 1) % len(APIS)]
+        api = APIS[args.api_index] if args.api_index is not None else APIS[(pair_id - 1) % len(APIS)]
         return run_pair(
             pair_id,
             source=args.source,
@@ -564,13 +633,17 @@ def main(
         with ThreadPoolExecutor(max_workers=len(batch)) as pool:
             futures = [
                 pool.submit(
-                    run_pair,
+                    pair_process_runner,
                     item["pair_id"],
-                    source=args.source,
-                    output_root=args.output_root,
-                    api=api_by_backend[item["backend_port"]],
-                    stage_runner=stage_runner,
-                    collection_snapshot=collection_snapshot,
+                    api_by_backend[item["backend_port"]],
+                    args.output_root,
+                    args.source,
+                    _pair_process_env(
+                        item["pair_id"],
+                        api_by_backend[item["backend_port"]],
+                        args.output_root,
+                        args.source,
+                    ),
                 )
                 for item in batch
             ]
