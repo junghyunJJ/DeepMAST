@@ -70,23 +70,25 @@ CONDITIONS = (
 )
 CONDITION_BY_LABEL = {condition.label: condition for condition in CONDITIONS}
 EXPECTED_PAIR_ORDER = {
-    "01": ("no-SNI", "SNI", 8881, 4000),
-    "02": ("SNI", "no-SNI", 8881, 4000),
-    "03": ("no-SNI", "SNI", 8881, 4000),
-    "04": ("no-SNI", "SNI", 8882, 5000),
-    "05": ("SNI", "no-SNI", 8882, 5000),
-    "06": ("SNI", "no-SNI", 8882, 5000),
-    "07": ("no-SNI", "SNI", 8883, 6000),
-    "08": ("no-SNI", "SNI", 8883, 6000),
-    "09": ("SNI", "no-SNI", 8884, 7000),
-    "10": ("SNI", "no-SNI", 8884, 7000),
+    "01": ("no-SNI", "SNI", 8882, 5000),
+    "02": ("SNI", "no-SNI", 8883, 6000),
+    "03": ("no-SNI", "SNI", 8884, 7000),
+    "04": ("SNI", "no-SNI", 8882, 5000),
+    "05": ("no-SNI", "SNI", 8883, 6000),
+    "06": ("SNI", "no-SNI", 8884, 7000),
+    "07": ("no-SNI", "SNI", 8882, 5000),
+    "08": ("SNI", "no-SNI", 8883, 6000),
+    "09": ("no-SNI", "SNI", 8884, 7000),
+    "10": ("SNI", "no-SNI", 8882, 5000),
 }
+RAG_BACKEND_PORT = 4000
 
 
 class ManifestPair(TypedDict):
     pair_id: str
     api_port: int
     backend_port: int
+    rag_backend_port: int
     condition_order: list[str]
 
 
@@ -210,6 +212,8 @@ def _validate_api_map(manifest: dict[str, Any]) -> None:
 
 def load_experiment_manifest(path: Path) -> ExperimentManifest:
     manifest = read_json(path)
+    if manifest.get("rag_backend_port") != RAG_BACKEND_PORT:
+        raise RuntimeError(f"manifest rag_backend_port must be {RAG_BACKEND_PORT}")
     fixed = manifest.get("fixed_collection")
     if not isinstance(fixed, dict):
         raise RuntimeError("manifest fixed_collection is missing")
@@ -242,6 +246,7 @@ def load_experiment_manifest(path: Path) -> ExperimentManifest:
             or raw.get("first_condition") != first
             or raw.get("api_port") != api_port
             or raw.get("ollama_port") != backend_port
+            or raw.get("rag_backend_port") != RAG_BACKEND_PORT
         ):
             raise RuntimeError(f"manifest pair {pair_id} does not match frozen order/topology")
         parsed.append(
@@ -249,6 +254,7 @@ def load_experiment_manifest(path: Path) -> ExperimentManifest:
                 "pair_id": pair_id,
                 "api_port": api_port,
                 "backend_port": backend_port,
+                "rag_backend_port": RAG_BACKEND_PORT,
                 "condition_order": [first, second],
             }
         )
@@ -615,6 +621,7 @@ def run_condition(
                 "condition_label": condition.label,
                 "pair_condition_order": pair["condition_order"],
                 "backend_port": _api_int(api, "backend_port"),
+                "rag_backend_port": pair["rag_backend_port"],
                 "api_port": _api_int(api, "api_port"),
                 "rag_api_url": env["CCI_RAG_BASE_URL"],
                 "collection_id": BC_COLLECTION_ID,
@@ -661,6 +668,7 @@ def _pair_process_env(
     return {
         "BC_SNI_PAIR_ID": pair["pair_id"],
         "BC_SNI_BACKEND_PORT": str(pair["backend_port"]),
+        "BC_SNI_RAG_BACKEND_PORT": str(pair["rag_backend_port"]),
         "BC_SNI_API_PORT": str(pair["api_port"]),
         "BC_SNI_CONDITION_ORDER": ",".join(pair["condition_order"]),
         "BC_SNI_PAIR_ROOT": str(pair_root),
@@ -697,20 +705,7 @@ def _default_pair_process_runner(
 
 
 def build_schedule(manifest: ExperimentManifest) -> list[list[ManifestPair]]:
-    batches = []
-    lanes: dict[int, list[ManifestPair]] = {}
-    for pair in manifest["pairs"]:
-        lanes.setdefault(pair["backend_port"], []).append(pair)
-    max_lane_depth = max(len(pairs) for pairs in lanes.values())
-    for depth in range(max_lane_depth):
-        batch = []
-        for backend_port in (4000, 5000, 6000, 7000):
-            pairs = lanes.get(backend_port, [])
-            if depth < len(pairs):
-                batch.append(pairs[depth])
-        if batch:
-            batches.append(batch)
-    return batches
+    return [[pair] for pair in manifest["pairs"]]
 
 
 def summarize(output_root: Path) -> int:

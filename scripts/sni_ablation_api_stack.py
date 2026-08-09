@@ -25,9 +25,9 @@ BC_COLLECTION_SNAPSHOT: dict[str, object] = {
 }
 APIS = (
     {"service": "sgcp-sni-api-4000", "api_port": 8881, "backend_port": 4000},
-    {"service": "sgcp-sni-api-5000", "api_port": 8882, "backend_port": 5000},
-    {"service": "sgcp-sni-api-6000", "api_port": 8883, "backend_port": 6000},
-    {"service": "sgcp-sni-api-7000", "api_port": 8884, "backend_port": 7000},
+    {"service": "sgcp-sni-api-5000", "api_port": 8882, "backend_port": 4000},
+    {"service": "sgcp-sni-api-6000", "api_port": 8883, "backend_port": 4000},
+    {"service": "sgcp-sni-api-7000", "api_port": 8884, "backend_port": 4000},
 )
 
 Docker = Callable[[list[str]], object]
@@ -225,6 +225,8 @@ def _error(exc: Exception) -> dict[str, Any]:
     for attr in ("code", "reason", "url"):
         value = getattr(exc, attr, None)
         if value is not None:
+            if not isinstance(value, str | int | float | bool):
+                value = str(value)
             error[attr] = value
     return {"ok": False, "error": error}
 

@@ -3,7 +3,7 @@ import threading
 from email.message import Message
 from pathlib import Path
 from typing import cast
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 
 import pytest
 
@@ -295,7 +295,7 @@ def test_smoke_writes_machine_readable_report_without_credentials(tmp_path: Path
     assert rc == 0
     report = json.loads(report_path.read_text(encoding="utf-8"))
     assert report["ok"] is True
-    assert {api["backend_port"] for api in report["apis"]} == {4000, 5000, 6000, 7000}
+    assert {api["backend_port"] for api in report["apis"]} == {4000}
     assert all(api["model"]["ok"] for api in report["apis"])
     assert all(api["collection"]["ok"] for api in report["apis"])
     assert all(
@@ -414,6 +414,20 @@ def test_smoke_records_endpoint_errors_in_report(tmp_path: Path) -> None:
     )
 
 
+def test_smoke_serializes_connection_errors_in_report(tmp_path: Path) -> None:
+    def fake_http(method: str, url: str, payload: object | None = None) -> object:
+        raise URLError(ConnectionRefusedError(61, "Connection refused"))
+
+    report_path = tmp_path / "smoke.json"
+    rc = stack.main(_smoke_args(report_path), http=fake_http)
+
+    assert rc == 1
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    error = report["apis"][0]["health"]["error"]
+    assert error["type"] == "URLError"
+    assert error["reason"] == "[Errno 61] Connection refused"
+
+
 def test_smoke_rejects_nested_status_when_top_level_status_is_wrong(tmp_path: Path) -> None:
     def fake_http(method: str, url: str, payload: object | None = None) -> object:
         if url.endswith("/health"):
@@ -510,9 +524,12 @@ def test_compose_file_declares_reproducible_four_api_topology() -> None:
     assert "name: langconnect_mcp_langconnect-network" in text
     assert "langconnect-api" not in text
     assert "5432:5432" not in text
-    for host_port, backend_port in zip(range(8881, 8885), range(4000, 8000, 1000)):
+    for host_port in range(8881, 8885):
         assert f'"{host_port}:8080"' in text
-        assert f"http://host.docker.internal:{backend_port}" in text
+    assert text.count("http://host.docker.internal:4000") == 8
+    assert "http://host.docker.internal:5000" not in text
+    assert "http://host.docker.internal:6000" not in text
+    assert "http://host.docker.internal:7000" not in text
 
 
 def _minimal_source(root: Path) -> Path:
@@ -545,9 +562,9 @@ def _manifest_output_root(tmp_path: Path) -> tuple[Path, Path]:
     root.mkdir(parents=True)
     manifest_path = root / "experiment_manifest.json"
     manifest_path.write_text(
-        Path("res/deep_interpreter/bc/sni_repair_ablation/experiment_manifest.json").read_text(
-            encoding="utf-8"
-        ),
+        Path(
+            "res/deep_interpreter/bc/sni_repair_ablation/experiment_manifest_rag4000.json"
+        ).read_text(encoding="utf-8"),
         encoding="utf-8",
     )
     return manifest_path, root / "pairs"
@@ -648,8 +665,8 @@ def test_bc_runner_pair_uses_sequential_conditions_with_fixed_endpoint_env(tmp_p
     assert [name for _, name, _ in calls] == ["wiki-off", "wiki-on"]
     off_env = calls[0][2]
     on_env = calls[1][2]
-    assert on_env["OLLAMA_BASE_URL"] == "http://localhost:4000"
-    assert on_env["CCI_RAG_BASE_URL"] == "http://localhost:8881"
+    assert on_env["OLLAMA_BASE_URL"] == "http://localhost:5000"
+    assert on_env["CCI_RAG_BASE_URL"] == "http://localhost:8882"
     assert on_env["DEEP_INTERPRETER_USE_WIKI_CONTEXT"] == "true"
     assert on_env["DEEP_INTERPRETER_REQUIRE_AGENTIC_RAG"] == "true"
     assert on_env["DEEP_INTERPRETER_FIXED_COLLECTION_ID"] == stack.BC_COLLECTION_ID
@@ -660,26 +677,70 @@ def test_bc_runner_pair_uses_sequential_conditions_with_fixed_endpoint_env(tmp_p
         (output_root / "pair-01" / "wiki-off" / "run_manifest.json").read_text(encoding="utf-8")
     )
     assert manifest["collection"] == stack.BC_COLLECTION_SNAPSHOT
-    assert manifest["rag_api_url"] == "http://localhost:8881"
+    assert manifest["backend_port"] == 5000
+    assert manifest["rag_backend_port"] == 4000
+    assert manifest["rag_api_url"] == "http://localhost:8882"
     assert manifest["condition_label"] == "no-SNI"
     assert manifest["pair_condition_order"] == ["no-SNI", "SNI"]
     assert manifest["return_status"] == "passed"
 
 
-def test_bc_runner_all_schedules_manifest_waves_at_most_four_backend_lanes(tmp_path: Path) -> None:
+def test_bc_runner_manifest_validates_replacement_rag_port_and_frozen_schedule(tmp_path: Path) -> None:
+    manifest_path, _output_root = _manifest_output_root(tmp_path)
+    manifest = bc_runner.load_experiment_manifest(manifest_path)
+
+    assert [
+        (
+            item["pair_id"],
+            item["api_port"],
+            item["backend_port"],
+            item["rag_backend_port"],
+            item["condition_order"],
+        )
+        for item in manifest["pairs"]
+    ] == [
+        ("01", 8882, 5000, 4000, ["no-SNI", "SNI"]),
+        ("02", 8883, 6000, 4000, ["SNI", "no-SNI"]),
+        ("03", 8884, 7000, 4000, ["no-SNI", "SNI"]),
+        ("04", 8882, 5000, 4000, ["SNI", "no-SNI"]),
+        ("05", 8883, 6000, 4000, ["no-SNI", "SNI"]),
+        ("06", 8884, 7000, 4000, ["SNI", "no-SNI"]),
+        ("07", 8882, 5000, 4000, ["no-SNI", "SNI"]),
+        ("08", 8883, 6000, 4000, ["SNI", "no-SNI"]),
+        ("09", 8884, 7000, 4000, ["no-SNI", "SNI"]),
+        ("10", 8882, 5000, 4000, ["SNI", "no-SNI"]),
+    ]
+    assert [item["backend_port"] for item in manifest["pairs"]].count(5000) == 4
+    assert [item["backend_port"] for item in manifest["pairs"]].count(6000) == 3
+    assert [item["backend_port"] for item in manifest["pairs"]].count(7000) == 3
+    assert [item["condition_order"][0] for item in manifest["pairs"]].count("SNI") == 5
+
+
+def test_bc_runner_rejects_incorrect_replacement_rag_port_or_schedule(tmp_path: Path) -> None:
+    manifest_path, _output_root = _manifest_output_root(tmp_path)
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+    bad_rag = tmp_path / "bad-rag.json"
+    manifest["rag_backend_port"] = 5000
+    bad_rag.write_text(json.dumps(manifest), encoding="utf-8")
+    with pytest.raises(RuntimeError, match="rag_backend_port"):
+        bc_runner.load_experiment_manifest(bad_rag)
+
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    bad_schedule = tmp_path / "bad-schedule.json"
+    manifest["ordered_pairs"][0]["api_port"] = 8881
+    bad_schedule.write_text(json.dumps(manifest), encoding="utf-8")
+    with pytest.raises(RuntimeError, match="pair 01"):
+        bc_runner.load_experiment_manifest(bad_schedule)
+
+
+def test_bc_runner_all_schedules_one_pair_batches_in_manifest_order(tmp_path: Path) -> None:
     manifest_path, _output_root = _manifest_output_root(tmp_path)
     manifest = bc_runner.load_experiment_manifest(manifest_path)
     schedule = bc_runner.build_schedule(manifest)
 
-    assert [[item["pair_id"] for item in wave] for wave in schedule] == [
-        ["01", "04", "07", "09"],
-        ["02", "05", "08", "10"],
-        ["03", "06"],
-    ]
-    assert [[item["backend_port"] for item in wave] for wave in schedule] == [
-        [4000, 5000, 6000, 7000],
-        [4000, 5000, 6000, 7000],
-        [4000, 5000],
+    assert [[item["pair_id"] for item in batch] for batch in schedule] == [
+        [f"{idx:02d}"] for idx in range(1, 11)
     ]
 
 
@@ -724,9 +785,8 @@ def test_bc_runner_all_schedules_isolated_pair_processes_without_stage_state_lea
                     "rag_binding_root": env["BC_SNI_PAIR_RAG_BINDING_ROOT"],
                 }
             )
-            if len(started) == 4:
+            if len(started) == 1:
                 all_first_batch_started.set()
-        assert all_first_batch_started.wait(1)
         release.wait(1)
         return 0
 
@@ -757,8 +817,9 @@ def test_bc_runner_all_schedules_isolated_pair_processes_without_stage_state_lea
 
     assert not thread.is_alive()
     assert len(started) == 10
-    assert {entry["pair_id"] for entry in first_batch} == {"01", "04", "07", "09"}
-    assert {entry["backend"] for entry in first_batch} == {"4000", "5000", "6000", "7000"}
+    assert [entry["pair_id"] for entry in first_batch] == ["01"]
+    assert [entry["backend"] for entry in first_batch] == ["5000"]
+    assert [entry["api"] for entry in first_batch] == ["8882"]
     assert len({entry["audit_root"] for entry in started}) == 10
     assert len({entry["rag_binding_root"] for entry in started}) == 10
     assert next(entry for entry in started if entry["pair_id"] == "01")["condition_order"] == [
@@ -1081,7 +1142,5 @@ def test_bc_runner_smoke_is_dry_manifest_preflight(tmp_path: Path, capsys) -> No
     plan = json.loads(capsys.readouterr().out)
     assert plan["ok"] is True
     assert [[item["pair_id"] for item in wave] for wave in plan["schedule"]] == [
-        ["01", "04", "07", "09"],
-        ["02", "05", "08", "10"],
-        ["03", "06"],
+        [f"{idx:02d}"] for idx in range(1, 11)
     ]

@@ -30,8 +30,8 @@ services:
       POSTGRES_HOST: postgres
       POSTGRES_SSLMODE: disable
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:${POSTGRES_PORT}/${POSTGRES_DB}
-      AGENT_LLM_BASE_URL: http://host.docker.internal:5000
-      OLLAMA_BASE_URL: http://host.docker.internal:5000
+      AGENT_LLM_BASE_URL: http://host.docker.internal:4000
+      OLLAMA_BASE_URL: http://host.docker.internal:4000
       AGENT_LLM_MODEL: qwen3.5:122b
     ports:
       - "8882:8080"
@@ -51,8 +51,8 @@ services:
       POSTGRES_HOST: postgres
       POSTGRES_SSLMODE: disable
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:${POSTGRES_PORT}/${POSTGRES_DB}
-      AGENT_LLM_BASE_URL: http://host.docker.internal:6000
-      OLLAMA_BASE_URL: http://host.docker.internal:6000
+      AGENT_LLM_BASE_URL: http://host.docker.internal:4000
+      OLLAMA_BASE_URL: http://host.docker.internal:4000
       AGENT_LLM_MODEL: qwen3.5:122b
     ports:
       - "8883:8080"
@@ -72,8 +72,8 @@ services:
       POSTGRES_HOST: postgres
       POSTGRES_SSLMODE: disable
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:${POSTGRES_PORT}/${POSTGRES_DB}
-      AGENT_LLM_BASE_URL: http://host.docker.internal:7000
-      OLLAMA_BASE_URL: http://host.docker.internal:7000
+      AGENT_LLM_BASE_URL: http://host.docker.internal:4000
+      OLLAMA_BASE_URL: http://host.docker.internal:4000
       AGENT_LLM_MODEL: qwen3.5:122b
     ports:
       - "8884:8080"
