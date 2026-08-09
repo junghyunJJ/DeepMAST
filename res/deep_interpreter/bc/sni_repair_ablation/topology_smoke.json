@@ -12,10 +12,47 @@
       },
       "model": {
         "ok": true,
-        "expected": "qwen3.5:122b"
+        "expected": "qwen3.5:122b",
+        "observed_names": [
+          "qwen3.5:27b",
+          "qwen3.5:9b",
+          "mistral-medium-3.5:128b",
+          "qwen3.6:35b",
+          "medgemma:27b",
+          "gemma4:31b",
+          "nemotron-3-super:120b",
+          "qwen3-coder-next:q8_0",
+          "qwen3-coder-next:q4_K_M",
+          "qwen3.5:35b",
+          "qwen3.5:122b",
+          "qwen3-embedding:8b",
+          "glm-4.7-flash:bf16",
+          "gpt-oss:120b",
+          "gpt-oss:20b"
+        ]
       },
       "collection": {
-        "ok": true
+        "ok": true,
+        "expected": {
+          "uuid": "a208e916-bd32-405a-9eee-de4cd82b2a3b",
+          "name": "deep_interpreter_bc_cfd96ddb_all",
+          "metadata": {
+            "type": "literature_rag",
+            "created_by": "deep_interpreter"
+          },
+          "document_count": 100,
+          "chunk_count": 1553
+        },
+        "observed": {
+          "uuid": "a208e916-bd32-405a-9eee-de4cd82b2a3b",
+          "name": "deep_interpreter_bc_cfd96ddb_all",
+          "metadata": {
+            "type": "literature_rag",
+            "created_by": "deep_interpreter"
+          },
+          "document_count": 100,
+          "chunk_count": 1553
+        }
       },
       "agentic": {
         "wiki_on": {
@@ -41,10 +78,47 @@
       },
       "model": {
         "ok": true,
-        "expected": "qwen3.5:122b"
+        "expected": "qwen3.5:122b",
+        "observed_names": [
+          "qwen3.5:27b",
+          "qwen3.5:9b",
+          "mistral-medium-3.5:128b",
+          "qwen3.6:35b",
+          "medgemma:27b",
+          "gemma4:31b",
+          "nemotron-3-super:120b",
+          "qwen3-coder-next:q8_0",
+          "qwen3-coder-next:q4_K_M",
+          "qwen3.5:35b",
+          "qwen3.5:122b",
+          "qwen3-embedding:8b",
+          "glm-4.7-flash:bf16",
+          "gpt-oss:120b",
+          "gpt-oss:20b"
+        ]
       },
       "collection": {
-        "ok": true
+        "ok": true,
+        "expected": {
+          "uuid": "a208e916-bd32-405a-9eee-de4cd82b2a3b",
+          "name": "deep_interpreter_bc_cfd96ddb_all",
+          "metadata": {
+            "type": "literature_rag",
+            "created_by": "deep_interpreter"
+          },
+          "document_count": 100,
+          "chunk_count": 1553
+        },
+        "observed": {
+          "uuid": "a208e916-bd32-405a-9eee-de4cd82b2a3b",
+          "name": "deep_interpreter_bc_cfd96ddb_all",
+          "metadata": {
+            "type": "literature_rag",
+            "created_by": "deep_interpreter"
+          },
+          "document_count": 100,
+          "chunk_count": 1553
+        }
       },
       "agentic": {
         "wiki_on": {
@@ -70,10 +144,47 @@
       },
       "model": {
         "ok": true,
-        "expected": "qwen3.5:122b"
+        "expected": "qwen3.5:122b",
+        "observed_names": [
+          "qwen3.5:27b",
+          "qwen3.5:9b",
+          "mistral-medium-3.5:128b",
+          "qwen3.6:35b",
+          "medgemma:27b",
+          "gemma4:31b",
+          "nemotron-3-super:120b",
+          "qwen3-coder-next:q8_0",
+          "qwen3-coder-next:q4_K_M",
+          "qwen3.5:35b",
+          "qwen3.5:122b",
+          "qwen3-embedding:8b",
+          "glm-4.7-flash:bf16",
+          "gpt-oss:120b",
+          "gpt-oss:20b"
+        ]
       },
       "collection": {
-        "ok": true
+        "ok": true,
+        "expected": {
+          "uuid": "a208e916-bd32-405a-9eee-de4cd82b2a3b",
+          "name": "deep_interpreter_bc_cfd96ddb_all",
+          "metadata": {
+            "type": "literature_rag",
+            "created_by": "deep_interpreter"
+          },
+          "document_count": 100,
+          "chunk_count": 1553
+        },
+        "observed": {
+          "uuid": "a208e916-bd32-405a-9eee-de4cd82b2a3b",
+          "name": "deep_interpreter_bc_cfd96ddb_all",
+          "metadata": {
+            "type": "literature_rag",
+            "created_by": "deep_interpreter"
+          },
+          "document_count": 100,
+          "chunk_count": 1553
+        }
       },
       "agentic": {
         "wiki_on": {
@@ -99,10 +210,47 @@
       },
       "model": {
         "ok": true,
-        "expected": "qwen3.5:122b"
+        "expected": "qwen3.5:122b",
+        "observed_names": [
+          "qwen3.5:27b",
+          "qwen3.5:9b",
+          "mistral-medium-3.5:128b",
+          "qwen3.6:35b",
+          "medgemma:27b",
+          "gemma4:31b",
+          "nemotron-3-super:120b",
+          "qwen3-coder-next:q8_0",
+          "qwen3-coder-next:q4_K_M",
+          "qwen3.5:35b",
+          "qwen3.5:122b",
+          "qwen3-embedding:8b",
+          "glm-4.7-flash:bf16",
+          "gpt-oss:120b",
+          "gpt-oss:20b"
+        ]
       },
       "collection": {
-        "ok": true
+        "ok": true,
+        "expected": {
+          "uuid": "a208e916-bd32-405a-9eee-de4cd82b2a3b",
+          "name": "deep_interpreter_bc_cfd96ddb_all",
+          "metadata": {
+            "type": "literature_rag",
+            "created_by": "deep_interpreter"
+          },
+          "document_count": 100,
+          "chunk_count": 1553
+        },
+        "observed": {
+          "uuid": "a208e916-bd32-405a-9eee-de4cd82b2a3b",
+          "name": "deep_interpreter_bc_cfd96ddb_all",
+          "metadata": {
+            "type": "literature_rag",
+            "created_by": "deep_interpreter"
+          },
+          "document_count": 100,
+          "chunk_count": 1553
+        }
       },
       "agentic": {
         "wiki_on": {

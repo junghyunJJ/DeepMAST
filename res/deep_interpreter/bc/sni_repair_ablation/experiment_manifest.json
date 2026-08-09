@@ -60,7 +60,8 @@
   },
   "git": {
     "branch": "feat/bc-sni-smoke",
-    "commit": "10af2de2065262d2323704000c719a7809f0ee5f"
+    "commit": "10af2de2065262d2323704000c719a7809f0ee5f",
+    "preflight_verified_at_git_head": "982de1107ad83998ad92ab7460449191ca2877bd"
   },
   "manifest_type": "bc_sni_repair_ablation_preflight",
   "model_configuration": {
@@ -173,12 +174,15 @@
     }
   ],
   "recovery_notes": {
+    "container_health_evidence": "topology_container_health_round5.json",
     "initial_failed_smoke_preserved_as": "topology_smoke_initial_connection_reset.json",
     "initial_failure_label": "connection reset before readiness-aware recovery",
+    "preflight_verified_at_git_head": "982de1107ad83998ad92ab7460449191ca2877bd",
+    "readiness_recovery_v1_preserved_as": "topology_smoke_readiness_recovery_v1.json",
     "standard_smoke_report": "topology_smoke.json",
-    "standard_smoke_report_status": "readiness-aware recovery success",
+    "standard_smoke_report_status": "round5 expanded observed evidence success",
     "task5_full_replicates_started": false,
-    "updated_at_utc": "2026-08-09T11:23:52.214815+00:00"
+    "updated_at_utc": "2026-08-09T11:44:17.086776+00:00"
   },
   "run_settings": {
     "collection_rebuild": false,
