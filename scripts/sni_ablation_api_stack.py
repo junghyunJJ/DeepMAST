@@ -14,6 +14,14 @@ COMPOSE_FILE = Path(__file__).with_name("sgcp_rag_sni_ablation.compose.yml")
 PROJECT_NAME = "sgcp-sni-ablation"
 MODEL = "qwen3.5:122b"
 HTTP_TIMEOUT_SECONDS = 300
+BC_COLLECTION_ID = "a208e916-bd32-405a-9eee-de4cd82b2a3b"
+BC_COLLECTION_SNAPSHOT: dict[str, object] = {
+    "uuid": BC_COLLECTION_ID,
+    "name": "deep_interpreter_bc_cfd96ddb_all",
+    "metadata": {"type": "literature_rag", "created_by": "deep_interpreter"},
+    "document_count": 100,
+    "chunk_count": 1553,
+}
 APIS = (
     {"service": "sgcp-sni-api-4000", "api_port": 8881, "backend_port": 4000},
     {"service": "sgcp-sni-api-5000", "api_port": 8882, "backend_port": 5000},
@@ -83,16 +91,6 @@ def _has_model(tags: object) -> bool:
     )
 
 
-def _status_in(value: object, expected: str) -> bool:
-    if value == expected:
-        return True
-    if isinstance(value, dict):
-        return any(_status_in(item, expected) for item in value.values())
-    if isinstance(value, list):
-        return any(_status_in(item, expected) for item in value)
-    return False
-
-
 def _agentic_case(
     http: Http,
     api_port: int,
@@ -112,22 +110,64 @@ def _agentic_case(
         f"http://localhost:{api_port}/collections/{collection_id}/agentic-search",
         payload,
     )
-    ok = _status_in(result, expected_status)
-    return {"ok": ok, "status": expected_status if ok else None}
+    observed_status = result.get("wiki_context_status") if isinstance(result, dict) else None
+    return {
+        "ok": observed_status == expected_status,
+        "expected_status": expected_status,
+        "observed_status": observed_status,
+    }
 
 
 def _error(exc: Exception) -> dict[str, Any]:
-    return {"ok": False, "error": type(exc).__name__}
+    error: dict[str, Any] = {"type": type(exc).__name__, "message": str(exc)}
+    for attr in ("code", "reason", "url"):
+        value = getattr(exc, attr, None)
+        if value is not None:
+            error[attr] = value
+    return {"ok": False, "error": error}
+
+
+def _fixed_collection_error(args: argparse.Namespace) -> dict[str, Any] | None:
+    if args.collection_id != BC_COLLECTION_ID:
+        return {
+            "type": "FixedCollectionMismatch",
+            "message": f"smoke requires collection {BC_COLLECTION_ID}",
+        }
+    if args.expected_collection is None:
+        return None
+    try:
+        expected_collection = json.loads(args.expected_collection)
+    except json.JSONDecodeError as exc:
+        return {"type": type(exc).__name__, "message": str(exc)}
+    if expected_collection != BC_COLLECTION_SNAPSHOT:
+        return {
+            "type": "FixedCollectionMismatch",
+            "message": "smoke expected collection must match the fixed BC snapshot",
+        }
+    return None
 
 
 def _smoke(args: argparse.Namespace, http: Http) -> int:
-    expected_collection = json.loads(args.expected_collection)
+    report_path = Path(args.report)
+    fixed_error = _fixed_collection_error(args)
+    if fixed_error is not None:
+        report_path.write_text(
+            json.dumps({"ok": False, "error": fixed_error}, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        return 1
     report: dict[str, Any] = {"ok": True, "model": MODEL, "apis": []}
     for api in APIS:
         api_port = int(api["api_port"])
         backend_port = int(api["backend_port"])
         try:
-            health = {"ok": bool(http("GET", f"http://localhost:{api_port}/health", None))}
+            health_response = http("GET", f"http://localhost:{api_port}/health", None)
+            health_status = (
+                health_response.get("status")
+                if isinstance(health_response, dict)
+                else None
+            )
+            health = {"ok": health_status == "ok", "status": health_status}
         except Exception as exc:  # noqa: BLE001
             health = _error(exc)
         try:
@@ -139,7 +179,7 @@ def _smoke(args: argparse.Namespace, http: Http) -> int:
             collection = http(
                 "GET", f"http://localhost:{api_port}/collections/{args.collection_id}", None
             )
-            collection_check = {"ok": collection == expected_collection}
+            collection_check = {"ok": collection == BC_COLLECTION_SNAPSHOT}
         except Exception as exc:  # noqa: BLE001
             collection_check = _error(exc)
         try:
@@ -186,7 +226,7 @@ def _smoke(args: argparse.Namespace, http: Http) -> int:
         api_report["ok"] = all(checks)
         report["apis"].append(api_report)
     report["ok"] = all(api["ok"] for api in report["apis"])
-    Path(args.report).write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    report_path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     return 0 if report["ok"] else 1
 
 
@@ -208,7 +248,7 @@ def build_parser() -> argparse.ArgumentParser:
         sub.add_parser(command, parents=[common])
     smoke = sub.add_parser("smoke", parents=[common])
     smoke.add_argument("--collection-id", required=True)
-    smoke.add_argument("--expected-collection", required=True)
+    smoke.add_argument("--expected-collection")
     smoke.add_argument("--question", required=True)
     smoke.add_argument("--report", required=True)
     smoke.add_argument("--expected-wiki-on-status", default="selected")
