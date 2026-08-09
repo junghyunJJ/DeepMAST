@@ -285,6 +285,32 @@ the replacement manifest validates; a live topology smoke proves all four
 APIs still use `qwen3.5:122b`, the same fixed collection, and both SNI
 states while their observed RAG backend is 4000.
 
+## Task 10: Treat valid agentic zero hits as terminal empty retrievals
+
+**Files:**
+
+- Modify: `src/agents/deep_interpreter/tools/literature_rag.py`
+- Modify: `tests/test_rag_path_resolution.py`
+
+The serial `pairs-rag4000-serial-run-01` removed backend contention but showed
+that a valid no-SNI `NoRelevantContext` response is currently surfaced as
+`RAGSearchError` whenever `DEEP_INTERPRETER_REQUIRE_AGENTIC_RAG=true`.  The
+agent then treats this expected retrieval outcome as recoverable and repeatedly
+rewrites the same question.  Preserve the strict no-fallback rule, but return
+an empty result for an agentic zero hit so the tool call completes normally.
+
+1. In required-agentic mode, return `[]` after a valid agentic zero-hit audit;
+   do not call multi-query/chunk fallback and do not raise `RAGSearchError`.
+2. Keep infrastructure and malformed-response failures invalid and observable
+   under the existing audit contract; do not change the collection, SNI pack,
+   model, queries, or runner environment.
+3. Replace the old test that expected a required-agentic zero hit to raise with
+   coverage proving it returns `[]` and the fallback is not called.
+
+**Verification:** focused regression test fails before the change, then proves
+a no-SNI zero hit is terminal, auditable, and still cannot enter the fallback
+path.
+
 **Completion criteria**
 
 - All 10 pairs are valid, balanced `4/3/3` across direct inference ports
