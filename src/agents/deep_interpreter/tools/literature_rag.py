@@ -157,9 +157,12 @@ def _append_rag_audit(
         "error_type": error_type,
     }
     path = Path(audit_path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a") as f:
-        f.write(json.dumps(record, sort_keys=True) + "\n")
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a") as f:
+            f.write(json.dumps(record, sort_keys=True) + "\n")
+    except OSError as e:
+        logger.warning("RAG audit write failed: %r", e)
 
 
 def _repair_json(raw: str) -> Any:

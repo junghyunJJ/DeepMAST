@@ -672,6 +672,47 @@ class TestRagSniIntegration:
             await literature_rag.search_fulltext_rag("ICAM1 fibrosis", "all", limit=5)
 
     @pytest.mark.asyncio
+    async def test_search_fulltext_rag_audit_write_failure_keeps_agentic_result(
+        self, tmp_path, monkeypatch
+    ):
+        literature_rag.reset_rag_state()
+        literature_rag._RAG_STATE["collection_ids"]["all"] = "collection-id"
+        not_a_dir = tmp_path / "not-a-dir"
+        not_a_dir.write_text("file blocks audit directory creation")
+        monkeypatch.setenv("DEEP_INTERPRETER_RAG_AUDIT_PATH", str(not_a_dir / "audit.jsonl"))
+
+        class FakeTool:
+            name = "agentic_search"
+
+            async def ainvoke(self, args):
+                return {
+                    "sources": [
+                        {
+                            "content": "agentic chunk survives audit failure",
+                            "metadata": {"filename": "pmid_12345678.txt"},
+                            "score": 0.91,
+                        }
+                    ]
+                }
+
+        async def fake_tools():
+            return [FakeTool()]
+
+        async def fallback_must_not_run(query, num_queries=5):
+            raise AssertionError("multi-query fallback should not run")
+
+        monkeypatch.setattr(literature_rag, "_get_cci_rag_tools", fake_tools)
+        monkeypatch.setattr(literature_rag, "generate_multi_query", fallback_must_not_run)
+
+        result = await literature_rag.search_fulltext_rag(
+            "ICAM1 fibrosis",
+            "all",
+            limit=5,
+        )
+
+        assert result[0]["page_content"] == "agentic chunk survives audit failure"
+
+    @pytest.mark.asyncio
     async def test_search_fulltext_rag_falls_back_when_agentic_search_fails(
         self, monkeypatch
     ):
