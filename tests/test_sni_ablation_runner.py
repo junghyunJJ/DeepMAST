@@ -138,6 +138,47 @@ def test_up_times_out_with_unready_endpoint_evidence(tmp_path: Path, capsys) -> 
     assert "http://localhost:8882/health ConnectionResetError" in captured.err
 
 
+def test_up_bounds_hung_health_probe_by_remaining_ready_timeout(
+    tmp_path: Path, capsys
+) -> None:
+    now = 100.0
+    probe_timeouts: list[float] = []
+
+    def clock() -> float:
+        return now
+
+    def fake_health(url: str, timeout: float) -> object:
+        nonlocal now
+        probe_timeouts.append(timeout)
+        now += timeout
+        raise TimeoutError(f"probe timeout after {timeout:g}s")
+
+    rc = stack.main(
+        [
+            "up",
+            "--sgcp-rag-dir",
+            str(tmp_path),
+            "--env-file",
+            str(tmp_path / ".env"),
+            "--ready-timeout",
+            "10",
+            "--ready-interval",
+            "0",
+        ],
+        docker=lambda cmd: None,
+        health_http=fake_health,
+        sleep=lambda seconds: None,
+        clock=clock,
+    )
+
+    captured = capsys.readouterr()
+    assert rc == 1
+    assert probe_timeouts == [10.0]
+    assert now == 110.0
+    assert "http://localhost:8881/health TimeoutError" in captured.err
+    assert "probe timeout after 10s" in captured.err
+
+
 def test_up_readiness_checks_only_health_endpoints(tmp_path: Path) -> None:
     docker_calls: list[list[str]] = []
     http_calls: list[tuple[str, str, object | None]] = []

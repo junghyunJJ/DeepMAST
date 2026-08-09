@@ -32,19 +32,35 @@ APIS = (
 
 Docker = Callable[[list[str]], object]
 Http = Callable[[str, str, object | None], object]
+HealthHttp = Callable[[str, float], object]
 Sleep = Callable[[float], object]
+Clock = Callable[[], float]
 
 
 def _docker(cmd: list[str]) -> None:
     subprocess.check_call(cmd)
 
 
-def _http(method: str, url: str, payload: object | None = None) -> object:
+def _http_json(
+    method: str,
+    url: str,
+    payload: object | None,
+    *,
+    timeout_seconds: float,
+) -> object:
     body = None if payload is None else json.dumps(payload).encode()
     headers = {"Content-Type": "application/json"} if body else {}
     req = request.Request(url, data=body, headers=headers, method=method)
-    with request.urlopen(req, timeout=HTTP_TIMEOUT_SECONDS) as response:
+    with request.urlopen(req, timeout=timeout_seconds) as response:
         return json.loads(response.read().decode() or "{}")
+
+
+def _http(method: str, url: str, payload: object | None = None) -> object:
+    return _http_json(method, url, payload, timeout_seconds=HTTP_TIMEOUT_SECONDS)
+
+
+def _health_http(url: str, timeout_seconds: float) -> object:
+    return _http_json("GET", url, None, timeout_seconds=timeout_seconds)
 
 
 def _compose_args(action: str, env_file: Path) -> list[str]:
@@ -70,15 +86,15 @@ def _health_url(api: dict[str, object]) -> str:
     return f"http://localhost:{api['api_port']}/health"
 
 
-def _readiness_errors(http: Http) -> list[str]:
+def _readiness_errors(health_http: HealthHttp, timeout_seconds: float) -> list[str]:
     errors: list[str] = []
     for api in APIS:
         url = _health_url(api)
         try:
-            response = http("GET", url, None)
+            response = health_http(url, timeout_seconds)
         except Exception as exc:  # noqa: BLE001
             errors.append(f"{url} {type(exc).__name__}: {exc}")
-            continue
+            break
         status = response.get("status") if isinstance(response, dict) else None
         if status != "ok":
             errors.append(f"{url} status={status}")
@@ -86,18 +102,20 @@ def _readiness_errors(http: Http) -> list[str]:
 
 
 def _wait_ready(
-    http: Http,
+    health_http: HealthHttp,
     sleep: Sleep,
+    clock: Clock,
     *,
     timeout_seconds: float,
     interval_seconds: float,
 ) -> int:
-    deadline = time.monotonic() + timeout_seconds
+    deadline = clock() + timeout_seconds
     while True:
-        errors = _readiness_errors(http)
+        remaining = max(0.0, deadline - clock())
+        errors = _readiness_errors(health_http, remaining)
         if not errors:
             return 0
-        if time.monotonic() >= deadline:
+        if clock() >= deadline:
             print(
                 "unready ablation API endpoints: " + "; ".join(errors),
                 file=sys.stderr,
@@ -111,7 +129,9 @@ def _with_runtime_env(
     docker: Docker,
     action: str,
     http: Http,
+    health_http: HealthHttp,
     sleep: Sleep,
+    clock: Clock,
 ) -> int:
     previous = {
         "SGCP_RAG_DIR": os.environ.get("SGCP_RAG_DIR"),
@@ -123,8 +143,9 @@ def _with_runtime_env(
         docker(_compose_args(action, args.env_file))
         if action == "up":
             return _wait_ready(
-                http,
+                health_http,
                 sleep,
+                clock,
                 timeout_seconds=args.ready_timeout,
                 interval_seconds=args.ready_interval,
             )
@@ -319,12 +340,25 @@ def main(
     *,
     docker: Docker = _docker,
     http: Http = _http,
+    health_http: HealthHttp | None = None,
     sleep: Sleep = time.sleep,
+    clock: Clock = time.monotonic,
 ) -> int:
     args = build_parser().parse_args(argv)
     if args.command == "smoke":
         return _smoke(args, http)
-    return _with_runtime_env(args, docker, args.command, http, sleep)
+    readiness_http = health_http
+    if readiness_http is None:
+        readiness_http = _health_http if http is _http else lambda url, timeout: http("GET", url, None)
+    return _with_runtime_env(
+        args,
+        docker,
+        args.command,
+        http,
+        readiness_http,
+        sleep,
+        clock,
+    )
 
 
 if __name__ == "__main__":
