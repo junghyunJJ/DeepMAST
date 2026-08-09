@@ -826,7 +826,7 @@ class TestRagSniIntegration:
         ]
 
     @pytest.mark.asyncio
-    async def test_search_fulltext_rag_required_agentic_raises_before_fallback(
+    async def test_search_fulltext_rag_required_agentic_returns_empty_before_fallback(
         self, monkeypatch
     ):
         literature_rag.reset_rag_state()
@@ -848,8 +848,11 @@ class TestRagSniIntegration:
         monkeypatch.setattr(literature_rag, "_get_cci_rag_tools", fake_tools)
         monkeypatch.setattr(literature_rag, "generate_multi_query", fallback_must_not_run)
 
-        with pytest.raises(literature_rag.RAGSearchError):
-            await literature_rag.search_fulltext_rag("ICAM1 fibrosis", "all", limit=5)
+        result = await literature_rag.search_fulltext_rag(
+            "ICAM1 fibrosis", "all", limit=5
+        )
+
+        assert result == []
 
     @pytest.mark.asyncio
     async def test_search_fulltext_rag_audit_write_failure_keeps_agentic_result(

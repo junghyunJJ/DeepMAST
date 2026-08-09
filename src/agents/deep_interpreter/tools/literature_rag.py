@@ -1612,7 +1612,7 @@ async def search_fulltext_rag(
     if agentic_results:
         return agentic_results
     if require_agentic:
-        raise RAGSearchError("Required agentic RAG returned no usable results")
+        return []
 
     # Generate multiple search queries using LLM
     queries = await generate_multi_query(query, num_queries=5)
