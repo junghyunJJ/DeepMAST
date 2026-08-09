@@ -167,12 +167,30 @@ def _with_runtime_env(
 
 
 def _has_model(tags: object) -> bool:
+    return MODEL in _model_names(tags)
+
+
+def _model_names(tags: object) -> list[str]:
     if not isinstance(tags, dict):
-        return False
+        return []
     models = tags.get("models")
-    return isinstance(models, list) and any(
-        isinstance(model, dict) and model.get("name") == MODEL for model in models
-    )
+    if not isinstance(models, list):
+        return []
+    return [
+        model["name"]
+        for model in models
+        if isinstance(model, dict) and isinstance(model.get("name"), str)
+    ]
+
+
+def _collection_snapshot(collection: object) -> dict[str, object] | None:
+    if not isinstance(collection, dict):
+        return None
+    snapshot: dict[str, object] = {}
+    for key in ("uuid", "name", "metadata", "document_count", "chunk_count"):
+        if key in collection:
+            snapshot[key] = collection[key]
+    return snapshot
 
 
 def _agentic_case(
@@ -256,14 +274,24 @@ def _smoke(args: argparse.Namespace, http: Http) -> int:
             health = _error(exc)
         try:
             tags = http("GET", f"http://localhost:{backend_port}/api/tags", None)
-            model = {"ok": _has_model(tags), "expected": MODEL}
+            observed_names = _model_names(tags)
+            model = {
+                "ok": MODEL in observed_names,
+                "expected": MODEL,
+                "observed_names": observed_names,
+            }
         except Exception as exc:  # noqa: BLE001
             model = _error(exc) | {"expected": MODEL}
         try:
             collection = http(
                 "GET", f"http://localhost:{api_port}/collections/{args.collection_id}", None
             )
-            collection_check = {"ok": collection == BC_COLLECTION_SNAPSHOT}
+            observed_collection = _collection_snapshot(collection)
+            collection_check = {
+                "ok": observed_collection == BC_COLLECTION_SNAPSHOT,
+                "expected": BC_COLLECTION_SNAPSHOT,
+                "observed": observed_collection,
+            }
         except Exception as exc:  # noqa: BLE001
             collection_check = _error(exc)
         try:

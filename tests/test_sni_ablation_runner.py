@@ -267,7 +267,13 @@ def test_smoke_writes_machine_readable_report_without_credentials(tmp_path: Path
         if url.endswith("/health"):
             return {"status": "ok"}
         if url.endswith("/api/tags"):
-            return {"models": [{"name": "qwen3.5:122b"}]}
+            return {
+                "models": [
+                    {"name": "qwen3.5:122b", "digest": "hidden"},
+                    {"name": "qwen3.5:35b"},
+                ],
+                "opaque": {"secret": "do-not-copy"},
+            }
         if url.endswith("/agentic-search"):
             assert isinstance(payload, dict)
             use_wiki = payload["use_wiki_context"]
@@ -291,6 +297,22 @@ def test_smoke_writes_machine_readable_report_without_credentials(tmp_path: Path
     assert all(api["model"]["ok"] for api in report["apis"])
     assert all(api["collection"]["ok"] for api in report["apis"])
     assert all(
+        api["model"] == {
+            "ok": True,
+            "expected": "qwen3.5:122b",
+            "observed_names": ["qwen3.5:122b", "qwen3.5:35b"],
+        }
+        for api in report["apis"]
+    )
+    assert all(
+        api["collection"] == {
+            "ok": True,
+            "expected": stack.BC_COLLECTION_SNAPSHOT,
+            "observed": stack.BC_COLLECTION_SNAPSHOT,
+        }
+        for api in report["apis"]
+    )
+    assert all(
         api["agentic"]["wiki_on"]["observed_status"] == "selected"
         for api in report["apis"]
     )
@@ -299,6 +321,7 @@ def test_smoke_writes_machine_readable_report_without_credentials(tmp_path: Path
         for api in report["apis"]
     )
     assert "secret" not in report_path.read_text(encoding="utf-8")
+    assert "digest" not in report_path.read_text(encoding="utf-8")
     payloads = _call_payloads(calls)
     assert any(payload["use_wiki_context"] is True for payload in payloads)
     assert any(payload["use_wiki_context"] is False for payload in payloads)
@@ -322,6 +345,44 @@ def test_smoke_fails_when_collection_snapshot_changes(tmp_path: Path) -> None:
     )
 
     assert rc == 1
+
+    report = json.loads((tmp_path / "smoke.json").read_text(encoding="utf-8"))
+    assert report["apis"][0]["collection"] == {
+        "ok": False,
+        "expected": stack.BC_COLLECTION_SNAPSHOT,
+        "observed": stack.BC_COLLECTION_SNAPSHOT | {"chunk_count": 1552},
+    }
+
+
+def test_smoke_reports_observed_model_names_when_expected_model_missing(
+    tmp_path: Path,
+) -> None:
+    def fake_http(method: str, url: str, payload: object | None = None) -> object:
+        if url.endswith("/health"):
+            return {"status": "ok"}
+        if url.endswith("/api/tags"):
+            return {"models": [{"name": "qwen3.5:35b"}]}
+        if url.endswith("/agentic-search"):
+            assert isinstance(payload, dict)
+            return {
+                "wiki_context_status": "selected"
+                if payload["use_wiki_context"]
+                else "disabled"
+            }
+        if f"/collections/{stack.BC_COLLECTION_ID}" in url:
+            return stack.BC_COLLECTION_SNAPSHOT
+        raise AssertionError(url)
+
+    report_path = tmp_path / "smoke.json"
+    rc = stack.main(_smoke_args(report_path), http=fake_http)
+
+    assert rc == 1
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    assert report["apis"][0]["model"] == {
+        "ok": False,
+        "expected": "qwen3.5:122b",
+        "observed_names": ["qwen3.5:35b"],
+    }
 
 
 def test_smoke_records_endpoint_errors_in_report(tmp_path: Path) -> None:
