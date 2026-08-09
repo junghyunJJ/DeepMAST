@@ -1,0 +1,8 @@
+{
+  "body": null,
+  "curl_returncode": 0,
+  "headers": "HTTP/1.1 500 Internal Server Error\ndate: Sun, 09 Aug 2026 08:33:52 GMT\nserver: uvicorn\ncontent-length: 21\ncontent-type: text/plain; charset=utf-8\n\n",
+  "http_status": 500,
+  "raw_body": "Internal Server Error",
+  "stderr": ""
+}
