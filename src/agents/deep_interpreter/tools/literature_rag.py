@@ -1562,15 +1562,17 @@ async def search_fulltext_rag(
     query_preview = query[:50] + "..." if len(query) > 50 else query
     logger.debug(f"search_fulltext_rag: query={query_preview}, collection={collection_name}")
 
-    collection_id = _RAG_STATE["collection_ids"].get(collection_name)
+    collection_id = os.getenv("DEEP_INTERPRETER_FIXED_COLLECTION_ID", "").strip()
+    if not collection_id:
+        collection_id = _RAG_STATE["collection_ids"].get(collection_name)
 
-    # Fallback: look up from Vector DB if not in cache
-    if collection_id is None:
-        logger.debug(f"search_fulltext_rag: Collection {collection_name} not in cache, looking up from DB...")
-        collection_id = await _lookup_collection_from_db(collection_name)
-        if collection_id:
-            _RAG_STATE["collection_ids"][collection_name] = collection_id
-            logger.debug(f"search_fulltext_rag: Found collection in DB and cached: {collection_id}")
+        # Fallback: look up from Vector DB if not in cache
+        if collection_id is None:
+            logger.debug(f"search_fulltext_rag: Collection {collection_name} not in cache, looking up from DB...")
+            collection_id = await _lookup_collection_from_db(collection_name)
+            if collection_id:
+                _RAG_STATE["collection_ids"][collection_name] = collection_id
+                logger.debug(f"search_fulltext_rag: Found collection in DB and cached: {collection_id}")
 
     if collection_id is None:
         logger.debug(f"search_fulltext_rag: Collection {collection_name} not found in cache or DB")
@@ -1949,11 +1951,13 @@ async def prepare_rag_for_interpretation(
         }
 
     # Extract PMIDs
-    pmids = []
+    pmids: list[str] = []
     if isinstance(papers, list):
-        pmids = [p.get("pmid") for p in papers if isinstance(p, dict) and p.get("pmid")]
+        pmids = [
+            str(p["pmid"]) for p in papers if isinstance(p, dict) and p.get("pmid")
+        ]
     elif isinstance(papers, dict):
-        pmids = [papers.get("pmid")] if papers.get("pmid") else []
+        pmids = [str(papers["pmid"])] if papers.get("pmid") else []
 
     logger.debug(f"Extracted PMIDs: {len(pmids)}")
     if pmids:

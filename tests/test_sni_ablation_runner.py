@@ -650,8 +650,10 @@ def test_bc_runner_pair_uses_sequential_conditions_with_fixed_endpoint_env(tmp_p
     assert on_env["CCI_RAG_BASE_URL"] == "http://localhost:8881"
     assert on_env["DEEP_INTERPRETER_USE_WIKI_CONTEXT"] == "true"
     assert on_env["DEEP_INTERPRETER_REQUIRE_AGENTIC_RAG"] == "true"
+    assert on_env["DEEP_INTERPRETER_FIXED_COLLECTION_ID"] == stack.BC_COLLECTION_ID
     assert on_env["DEEP_INTERPRETER_RAG_AUDIT_PATH"].endswith("/pairs/pair-01/wiki-on/rag_audit.jsonl")
     assert off_env["DEEP_INTERPRETER_USE_WIKI_CONTEXT"] == "false"
+    assert off_env["DEEP_INTERPRETER_FIXED_COLLECTION_ID"] == stack.BC_COLLECTION_ID
     manifest = json.loads(
         (output_root / "pair-01" / "wiki-off" / "run_manifest.json").read_text(encoding="utf-8")
     )

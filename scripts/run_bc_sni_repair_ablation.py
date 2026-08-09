@@ -286,6 +286,7 @@ def _condition_env(data_dir: Path, api: Api, condition: Condition) -> dict[str, 
         "DEEP_INTERPRETER_DATA_DIR": str(data_dir),
         "DEEP_INTERPRETER_USE_WIKI_CONTEXT": str(condition.use_wiki_context).lower(),
         "DEEP_INTERPRETER_REQUIRE_AGENTIC_RAG": "true",
+        "DEEP_INTERPRETER_FIXED_COLLECTION_ID": BC_COLLECTION_ID,
         "DEEP_INTERPRETER_RAG_AUDIT_PATH": str(data_dir / "rag_audit.jsonl"),
     }
 

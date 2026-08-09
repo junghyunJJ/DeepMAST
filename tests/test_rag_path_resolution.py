@@ -646,6 +646,76 @@ class TestRagSniIntegration:
         }
 
     @pytest.mark.asyncio
+    async def test_search_fulltext_rag_fixed_collection_override_bypasses_name_resolution(
+        self, tmp_path, monkeypatch
+    ):
+        literature_rag.reset_rag_state()
+        literature_rag._RAG_STATE["collection_ids"][
+            "model supplied mismatched collection key"
+        ] = "wrong-cache-id"
+        monkeypatch.setenv("DEEP_INTERPRETER_FIXED_COLLECTION_ID", "fixed-collection-id")
+        monkeypatch.setenv(
+            "DEEP_INTERPRETER_RAG_AUDIT_PATH", str(tmp_path / "rag-audit.jsonl")
+        )
+
+        class FakeTool:
+            name = "agentic_search"
+
+            def __init__(self):
+                self.calls = []
+
+            async def ainvoke(self, args):
+                self.calls.append(args)
+                return {
+                    "sources": [
+                        {
+                            "content": "fixed collection chunk",
+                            "metadata": {"filename": "pmid_12345678.txt"},
+                            "score": 0.91,
+                        }
+                    ],
+                    "wiki_context_status": "selected",
+                }
+
+        agentic = FakeTool()
+
+        async def fake_tools():
+            return [agentic]
+
+        async def lookup_must_not_run(collection_name):
+            raise AssertionError(f"DB lookup should not run for {collection_name}")
+
+        monkeypatch.setattr(literature_rag, "_get_cci_rag_tools", fake_tools)
+        monkeypatch.setattr(literature_rag, "_lookup_collection_from_db", lookup_must_not_run)
+
+        result = await literature_rag.search_fulltext_rag(
+            "ICAM1 fibrosis",
+            "model supplied mismatched collection key",
+            limit=5,
+        )
+
+        assert agentic.calls[0]["collection_id"] == "fixed-collection-id"
+        assert result[0]["page_content"] == "fixed collection chunk"
+
+        literature_rag._RAG_STATE["collection_ids"].clear()
+        result = await literature_rag.search_fulltext_rag(
+            "ICAM1 fibrosis",
+            "uncached model supplied key",
+            limit=5,
+        )
+
+        assert agentic.calls[1]["collection_id"] == "fixed-collection-id"
+        assert result[0]["page_content"] == "fixed collection chunk"
+        audit_records = [
+            json.loads(line)
+            for line in (tmp_path / "rag-audit.jsonl").read_text().splitlines()
+        ]
+        assert [record["collection_uuid"] for record in audit_records] == [
+            "fixed-collection-id",
+            "fixed-collection-id",
+        ]
+
+    @pytest.mark.asyncio
     async def test_search_fulltext_rag_required_agentic_raises_before_fallback(
         self, monkeypatch
     ):
