@@ -1512,8 +1512,16 @@ async def _agentic_search_with_sni(
         _append_rag_audit(collection_id, use_wiki_context, 0, error_type)
         return []
 
+    sources = payload.get("sources")
+    if not isinstance(sources, list):
+        _append_rag_audit(collection_id, use_wiki_context, 0, "InvalidSources")
+        return []
+    if not sources:
+        _append_rag_audit(collection_id, use_wiki_context, 0, "NoRelevantContext")
+        return []
+
     results = []
-    for source in payload.get("sources", []):
+    for source in sources:
         metadata = dict(source.get("metadata") or {})
         metadata.update(
             {

@@ -684,6 +684,78 @@ class TestRagSniIntegration:
         }
 
     @pytest.mark.asyncio
+    async def test_agentic_search_audits_empty_sources_as_no_relevant_context(
+        self, tmp_path, monkeypatch
+    ):
+        monkeypatch.setenv("DEEP_INTERPRETER_USE_WIKI_CONTEXT", "false")
+        monkeypatch.setenv(
+            "DEEP_INTERPRETER_RAG_AUDIT_PATH", str(tmp_path / "rag-audit.jsonl")
+        )
+
+        class FakeTool:
+            name = "agentic_search"
+
+            async def ainvoke(self, args):
+                return {"sources": [], "wiki_context_status": "disabled"}
+
+        async def fake_tools():
+            return [FakeTool()]
+
+        monkeypatch.setattr(literature_rag, "_get_cci_rag_tools", fake_tools)
+
+        result = await literature_rag._agentic_search_with_sni(
+            "ICAM1 fibrosis",
+            "collection-id",
+            limit=5,
+            search_type="hybrid",
+        )
+
+        assert result == []
+        assert json.loads((tmp_path / "rag-audit.jsonl").read_text()) == {
+            "endpoint": "agentic_search",
+            "collection_uuid": "collection-id",
+            "use_wiki_context": False,
+            "success": False,
+            "result_count": 0,
+            "error_type": "NoRelevantContext",
+        }
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("payload", [{"answer": "none"}, {"sources": "none"}])
+    async def test_agentic_search_audits_invalid_sources_shape_as_payload_error(
+        self, payload, tmp_path, monkeypatch
+    ):
+        monkeypatch.setenv("DEEP_INTERPRETER_USE_WIKI_CONTEXT", "false")
+        monkeypatch.setenv(
+            "DEEP_INTERPRETER_RAG_AUDIT_PATH", str(tmp_path / "rag-audit.jsonl")
+        )
+
+        class FakeTool:
+            name = "agentic_search"
+
+            async def ainvoke(self, args):
+                return payload
+
+        async def fake_tools():
+            return [FakeTool()]
+
+        monkeypatch.setattr(literature_rag, "_get_cci_rag_tools", fake_tools)
+
+        result = await literature_rag._agentic_search_with_sni(
+            "ICAM1 fibrosis",
+            "collection-id",
+            limit=5,
+            search_type="hybrid",
+        )
+
+        assert result == []
+        audit = json.loads((tmp_path / "rag-audit.jsonl").read_text())
+        assert audit["success"] is False
+        assert audit["result_count"] == 0
+        assert audit["error_type"] == "InvalidSources"
+        assert audit["error_type"] != "NoRelevantContext"
+
+    @pytest.mark.asyncio
     async def test_search_fulltext_rag_fixed_collection_override_bypasses_name_resolution(
         self, tmp_path, monkeypatch
     ):

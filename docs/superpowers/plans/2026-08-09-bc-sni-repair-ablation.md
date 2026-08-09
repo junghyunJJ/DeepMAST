@@ -193,9 +193,10 @@ collection before/after snapshots equal `a208…2a3b`, `100`, and `1553`.
 - Modify: `tests/test_rag_path_resolution.py`
 - Modify: `tests/test_sni_ablation_runner.py`
 
-1. Map only the agentic payload error `no_relevant_context` to the explicit
-   audit type `NoRelevantContext`; preserve all other payload and transport
-   errors as invalid error types.
+1. Map an explicit agentic payload error `no_relevant_context`, or a
+   structurally valid agentic payload with an empty `sources` list, to the
+   explicit audit type `NoRelevantContext`; preserve all other payload and
+   transport errors as invalid error types.
 2. Permit the runner to accept exactly two audit outcomes: a successful
    positive-result agentic call, or `NoRelevantContext` with
    `success: false` and `result_count: 0`. It must continue rejecting missing
@@ -211,6 +212,28 @@ collection before/after snapshots equal `a208…2a3b`, `100`, and `1553`.
 
 **Verification:** targeted tests prove the new audit distinction, no fallback,
 strict rejection of all true agentic failures, and saved retrieval metrics.
+
+## Task 8: Classify empty agentic sources as a zero-hit outcome
+
+**Files:**
+
+- Modify: `src/agents/deep_interpreter/tools/literature_rag.py`
+- Modify: `tests/test_rag_path_resolution.py`
+
+1. When the agentic response is a structurally valid payload with
+   `sources: []`, audit it as `NoRelevantContext`, with `success: false` and
+   `result_count: 0`. This is the second zero-hit response shape observed in
+   the live no-SNI run.
+2. Do not treat missing or non-list `sources`, transport exceptions, JSON
+   decode errors, or other payload errors as zero hits. They must continue to
+   produce a non-`NoRelevantContext` invalid audit type.
+3. Add test-first coverage for the empty-list payload and an invalid
+   `sources` shape. Keep the existing explicit-error and runner acceptance
+   tests unchanged.
+
+**Verification:** the focused tests fail before implementation, then prove
+that only valid empty sources become `NoRelevantContext` while malformed
+payloads remain invalid.
 
 **Completion criteria**
 
