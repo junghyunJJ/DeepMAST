@@ -1,0 +1,89 @@
+services:
+  sgcp-sni-api-4000:
+    image: langconnect_mcp-api
+    container_name: sgcp-sni-api-4000
+    restart: unless-stopped
+    env_file:
+      - ${SGCP_RAG_ENV_FILE:?set SGCP_RAG_ENV_FILE to the SGCP .env path}
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_SSLMODE: disable
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:${POSTGRES_PORT}/${POSTGRES_DB}
+      AGENT_LLM_BASE_URL: http://host.docker.internal:4000
+      OLLAMA_BASE_URL: http://host.docker.internal:4000
+      AGENT_LLM_MODEL: qwen3.5:122b
+    ports:
+      - "8881:8080"
+    volumes:
+      - ${SGCP_RAG_DIR:?set SGCP_RAG_DIR to the SGCP repo path}/langconnect:/app/langconnect
+      - ${SGCP_RAG_DIR:?set SGCP_RAG_DIR to the SGCP repo path}/llm_wiki:/app/llm_wiki
+    networks:
+      - langconnect-network
+
+  sgcp-sni-api-5000:
+    image: langconnect_mcp-api
+    container_name: sgcp-sni-api-5000
+    restart: unless-stopped
+    env_file:
+      - ${SGCP_RAG_ENV_FILE:?set SGCP_RAG_ENV_FILE to the SGCP .env path}
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_SSLMODE: disable
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:${POSTGRES_PORT}/${POSTGRES_DB}
+      AGENT_LLM_BASE_URL: http://host.docker.internal:5000
+      OLLAMA_BASE_URL: http://host.docker.internal:5000
+      AGENT_LLM_MODEL: qwen3.5:122b
+    ports:
+      - "8882:8080"
+    volumes:
+      - ${SGCP_RAG_DIR:?set SGCP_RAG_DIR to the SGCP repo path}/langconnect:/app/langconnect
+      - ${SGCP_RAG_DIR:?set SGCP_RAG_DIR to the SGCP repo path}/llm_wiki:/app/llm_wiki
+    networks:
+      - langconnect-network
+
+  sgcp-sni-api-6000:
+    image: langconnect_mcp-api
+    container_name: sgcp-sni-api-6000
+    restart: unless-stopped
+    env_file:
+      - ${SGCP_RAG_ENV_FILE:?set SGCP_RAG_ENV_FILE to the SGCP .env path}
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_SSLMODE: disable
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:${POSTGRES_PORT}/${POSTGRES_DB}
+      AGENT_LLM_BASE_URL: http://host.docker.internal:6000
+      OLLAMA_BASE_URL: http://host.docker.internal:6000
+      AGENT_LLM_MODEL: qwen3.5:122b
+    ports:
+      - "8883:8080"
+    volumes:
+      - ${SGCP_RAG_DIR:?set SGCP_RAG_DIR to the SGCP repo path}/langconnect:/app/langconnect
+      - ${SGCP_RAG_DIR:?set SGCP_RAG_DIR to the SGCP repo path}/llm_wiki:/app/llm_wiki
+    networks:
+      - langconnect-network
+
+  sgcp-sni-api-7000:
+    image: langconnect_mcp-api
+    container_name: sgcp-sni-api-7000
+    restart: unless-stopped
+    env_file:
+      - ${SGCP_RAG_ENV_FILE:?set SGCP_RAG_ENV_FILE to the SGCP .env path}
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_SSLMODE: disable
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:${POSTGRES_PORT}/${POSTGRES_DB}
+      AGENT_LLM_BASE_URL: http://host.docker.internal:7000
+      OLLAMA_BASE_URL: http://host.docker.internal:7000
+      AGENT_LLM_MODEL: qwen3.5:122b
+    ports:
+      - "8884:8080"
+    volumes:
+      - ${SGCP_RAG_DIR:?set SGCP_RAG_DIR to the SGCP repo path}/langconnect:/app/langconnect
+      - ${SGCP_RAG_DIR:?set SGCP_RAG_DIR to the SGCP repo path}/llm_wiki:/app/llm_wiki
+    networks:
+      - langconnect-network
+
+networks:
+  langconnect-network:
+    external: true
+    name: langconnect_mcp_langconnect-network
