@@ -11,7 +11,8 @@ changes repair burden in the Deep Interpreter BC workflow, without changing the
 synthesis_repair_attempt_count + synthesis_terminal_repair_count`.
 
 **Secondary outcomes:** initial/final error counts, part changed sections,
-synthesis changed claims, stage duration, and agentic-RAG audit counts.
+synthesis changed claims, stage duration, and agentic-RAG audit counts,
+including valid agentic zero-hit (`no_relevant_context`) counts.
 
 **Fixed experimental constants**
 
@@ -150,9 +151,12 @@ documents, and chunks are unchanged on every API endpoint.
    and final validators, collection before/after snapshots, report diffs, and
    `rag_agentic_audit.jsonl`.
 3. Treat a failed/incomplete condition, any final guardrail error, unexpected
-   fallback, missing agentic audit event, source hash drift, or collection drift
-   as invalid. Preserve all artifacts; never retry an invalid condition in
-   place. A replacement run gets a new explicit run ID and is reported as such.
+   fallback, missing agentic audit event, source hash drift, collection drift,
+   or agentic error other than the endpoint's explicit
+   `no_relevant_context` response as invalid. Record that explicit response as
+   a valid zero-hit retrieval outcome with `result_count: 0`; preserve all
+   artifacts. Never retry an invalid condition in place. A replacement run
+   gets a new explicit run ID and is reported as such.
 4. Keep the four API containers alive only for this run and stop them after the
    final collection-invariant check.
 
@@ -179,6 +183,34 @@ collection before/after snapshots equal `a208…2a3b`, `100`, and `1553`.
    evidence using a Lore-protocol commit. Do not commit 20 bulky raw-run
    directories unless they are intentionally force-added after review; their
    reproducible local paths and checksums remain in the aggregate manifest.
+
+## Task 7: Classify agentic zero-hit outcomes without weakening invariants
+
+**Files:**
+
+- Modify: `src/agents/deep_interpreter/tools/literature_rag.py`
+- Modify: `scripts/run_bc_sni_repair_ablation.py`
+- Modify: `tests/test_rag_path_resolution.py`
+- Modify: `tests/test_sni_ablation_runner.py`
+
+1. Map only the agentic payload error `no_relevant_context` to the explicit
+   audit type `NoRelevantContext`; preserve all other payload and transport
+   errors as invalid error types.
+2. Permit the runner to accept exactly two audit outcomes: a successful
+   positive-result agentic call, or `NoRelevantContext` with
+   `success: false` and `result_count: 0`. It must continue rejecting missing
+   audits, wrong endpoint/UUID/condition, malformed counts, and every other
+   error type.
+3. Include retrieval attempt, positive-result, and zero-hit counts in each
+   condition's saved metrics so the final paired analysis can report them
+   alongside repair burden. Do not change RAG queries, collection data, SNI
+   pages, fallback behavior, model settings, or the frozen schedule.
+4. Use test-first coverage for the explicit no-context payload, accepted
+   zero-hit audit, and rejected non-no-context error. Run the focused suites
+   before committing.
+
+**Verification:** targeted tests prove the new audit distinction, no fallback,
+strict rejection of all true agentic failures, and saved retrieval metrics.
 
 **Completion criteria**
 
