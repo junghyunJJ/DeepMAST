@@ -56,7 +56,8 @@ PASS: the post-rebuild collection snapshot matches the pre-rebuild UUID, documen
 - `.superpowers/sdd/2026-08-09-bc-sni-smoke/task-3-report.md`
 
 ## Commit
-- Commit SHA: reported in the final Task 3 handoff; a tracked file cannot embed the hash of the same commit without changing that hash.
+- Evidence commit SHA: `21011a9896e90d645c9c06fc37a2d180e6dc26b5`
+- Latest report commit SHA: reported in the final Task 3 handoff; a tracked file cannot embed the hash of the same commit without changing that hash.
 
 ## Self-Review
 - Confirmed `collection_after.json` came from the live read-only collection endpoint.
