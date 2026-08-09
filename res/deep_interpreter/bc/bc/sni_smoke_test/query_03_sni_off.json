@@ -1,0 +1,56 @@
+{
+  "body": {
+    "error": null,
+    "generation": "The breast cancer microenvironment utilizes VEGF and semaphorin signaling pathways in ways that differ consistently across subtypes. Basal tumors with high proliferation markers often exhibit elevated VEGFA expression to support vasculature for rapidly dividing cells. Conversely, tumors with low growth gene expression but high EMT-associated factors show low VEGFA but high VEGFC, which may facilitate lymphatic invasion and metastasis. Additionally, specific receptors like NRP1 and NRP2 are predominantly expressed on endothelial cells, while PLXNB1 is primarily found on tumor cells, highlighting distinct cell-type-specific signaling roles.",
+    "no_context_found": false,
+    "query_rewrites": [],
+    "relevant_documents": [
+      {
+        "id": "6f57dd76-be15-4372-b77d-854ffd6376f3",
+        "metadata": {
+          "chunk_count": 20,
+          "chunk_index": 14,
+          "created_at": "2026-07-29T14:36:21.823329",
+          "file_id": "b980ea49-b17c-4a17-8999-dc982a1fb99d",
+          "filename": "pmid_23667446.txt",
+          "mime_type": "text/plain",
+          "source": "pmid_23667446.txt"
+        },
+        "page_content": "The concordance of the VEGF\u2212/Sema-based clusters that we found here with expression patterns of genes associated with the basal/luminal distinction and EMT suggests that different breast cancer subtypes utilize the VEGF and semaphorin signaling pathways in consistently different ways. In particular, basal tumors with high expression of growth-associated genes such as MKI67 and AURKB tend to have higher levels of VEGFA, presumably to provide the rapidly proliferating cells with sufficient vasculature. On the other hand, tumors with low expression of growth-associated genes but high expression of EMT-associated transcription factors such as SNAI2 and TWIST1 have low VEGFA expression and high VEGFC expression. The lymphangiogenic VEGFC may facilitate invasion by allowing tumor cells to travel through the lymphatics, a commonly used route of metastasis in breast cancer[47]. This highlights the usefulness of this study not just in targeting anti-angiogenic therapies, but in understanding tumor biology as well.\n\nOne limitation of using gene expression microarrays on tumor samples taken from biopsies or surgeries is that the samples are heterogeneous. Along with the tumor cells they also contain stromal cells, including endothelial cells, fibroblasts, and immune cells. The expression of most of the ligands considered here can be assumed to be predominantly attributable to expression in the tumor cells, but for receptor expression the analysis is less straightforward. This is particularly true for receptors whose primary function of interest is on a cell type making up a small percentage of the total, e.g. endothelial cells. Their expression may be up-regulated in those cells but down-regulated in the more numerous cell type, resulting in detection of no or opposite change in expression in the microarray measurement of the heterogeneous sample. Immunohistochemistry can address this issue by measuring the cell-type-specific protein expression. For example, studies in a wide range of breast tumors have shown that NRP1 and NRP2 are both expressed on almost all endothelial cells, but very rarely on breast tumor cells[57],[58]. Conversely, PLXNB1 has been shown to be expressed on the surface of tumor cells, but less so on neighboring endothelial cells[59]. Thus, differences in expression of NRP1 and NRP2 measured by microarray can be assumed to be primarily due to endothelial cells, and differences in PLXNB1 due to tumor cells. Laser capture microdissection or other sorting methods could also resolve cell type differences by isolating specific cell types prior to analyzing gene expression.Methodssuch as these will be particularly useful in determining the relative amount of VEGF signaling taking place in tumor and endothelial cells.",
+        "score": 0.4863125252907068
+      }
+    ],
+    "retrieved_document_ids": [
+      "6f57dd76-be15-4372-b77d-854ffd6376f3"
+    ],
+    "rewrite_count": 0,
+    "selected_wiki_pages": [],
+    "steps": [
+      "retrieve: found 1 documents",
+      "grade_documents: 1/1 relevant",
+      "generate: answer produced",
+      "grade_generation: PASSED both checks"
+    ],
+    "wiki_context_status": "disabled",
+    "wiki_promoted_document_ids": [],
+    "wiki_promotion_status": "disabled",
+    "wiki_source_refs": []
+  },
+  "completed_at": "2026-08-09T09:06:36.238364+00:00",
+  "curl_returncode": 0,
+  "headers": "HTTP/1.1 200 OK\ndate: Sun, 09 Aug 2026 09:06:27 GMT\nserver: uvicorn\ncontent-length: 4201\ncontent-type: application/json\n\n",
+  "http_status": 200,
+  "raw_body": "{\"generation\":\"The breast cancer microenvironment utilizes VEGF and semaphorin signaling pathways in ways that differ consistently across subtypes. Basal tumors with high proliferation markers often exhibit elevated VEGFA expression to support vasculature for rapidly dividing cells. Conversely, tumors with low growth gene expression but high EMT-associated factors show low VEGFA but high VEGFC, which may facilitate lymphatic invasion and metastasis. Additionally, specific receptors like NRP1 and NRP2 are predominantly expressed on endothelial cells, while PLXNB1 is primarily found on tumor cells, highlighting distinct cell-type-specific signaling roles.\",\"relevant_documents\":[{\"id\":\"6f57dd76-be15-4372-b77d-854ffd6376f3\",\"page_content\":\"The concordance of the VEGF\u2212/Sema-based clusters that we found here with expression patterns of genes associated with the basal/luminal distinction and EMT suggests that different breast cancer subtypes utilize the VEGF and semaphorin signaling pathways in consistently different ways. In particular, basal tumors with high expression of growth-associated genes such as MKI67 and AURKB tend to have higher levels of VEGFA, presumably to provide the rapidly proliferating cells with sufficient vasculature. On the other hand, tumors with low expression of growth-associated genes but high expression of EMT-associated transcription factors such as SNAI2 and TWIST1 have low VEGFA expression and high VEGFC expression. The lymphangiogenic VEGFC may facilitate invasion by allowing tumor cells to travel through the lymphatics, a commonly used route of metastasis in breast cancer[47]. This highlights the usefulness of this study not just in targeting anti-angiogenic therapies, but in understanding tumor biology as well.\\n\\nOne limitation of using gene expression microarrays on tumor samples taken from biopsies or surgeries is that the samples are heterogeneous. Along with the tumor cells they also contain stromal cells, including endothelial cells, fibroblasts, and immune cells. The expression of most of the ligands considered here can be assumed to be predominantly attributable to expression in the tumor cells, but for receptor expression the analysis is less straightforward. This is particularly true for receptors whose primary function of interest is on a cell type making up a small percentage of the total, e.g. endothelial cells. Their expression may be up-regulated in those cells but down-regulated in the more numerous cell type, resulting in detection of no or opposite change in expression in the microarray measurement of the heterogeneous sample. Immunohistochemistry can address this issue by measuring the cell-type-specific protein expression. For example, studies in a wide range of breast tumors have shown that NRP1 and NRP2 are both expressed on almost all endothelial cells, but very rarely on breast tumor cells[57],[58]. Conversely, PLXNB1 has been shown to be expressed on the surface of tumor cells, but less so on neighboring endothelial cells[59]. Thus, differences in expression of NRP1 and NRP2 measured by microarray can be assumed to be primarily due to endothelial cells, and differences in PLXNB1 due to tumor cells. Laser capture microdissection or other sorting methods could also resolve cell type differences by isolating specific cell types prior to analyzing gene expression.Methodssuch as these will be particularly useful in determining the relative amount of VEGF signaling taking place in tumor and endothelial cells.\",\"metadata\":{\"source\":\"pmid_23667446.txt\",\"file_id\":\"b980ea49-b17c-4a17-8999-dc982a1fb99d\",\"filename\":\"pmid_23667446.txt\",\"mime_type\":\"text/plain\",\"created_at\":\"2026-07-29T14:36:21.823329\",\"chunk_count\":20,\"chunk_index\":14},\"score\":0.4863125252907068}],\"steps\":[\"retrieve: found 1 documents\",\"grade_documents: 1/1 relevant\",\"generate: answer produced\",\"grade_generation: PASSED both checks\"],\"query_rewrites\":[],\"rewrite_count\":0,\"error\":null,\"no_context_found\":false,\"selected_wiki_pages\":[],\"wiki_context_status\":\"disabled\",\"wiki_source_refs\":[],\"wiki_promotion_status\":\"disabled\",\"wiki_promoted_document_ids\":[],\"retrieved_document_ids\":[\"6f57dd76-be15-4372-b77d-854ffd6376f3\"]}",
+  "request": {
+    "llm_model": "qwen3.5:122b",
+    "llm_provider": "ollama",
+    "max_rewrites": 3,
+    "question": "What stromal or vascular signaling programs are reported in the breast cancer microenvironment?",
+    "search_limit": 5,
+    "search_type": "hybrid",
+    "use_wiki_context": false
+  },
+  "started_at": "2026-08-09T09:06:27.995180+00:00",
+  "stderr": "",
+  "url": "http://localhost:8888/collections/a208e916-bd32-405a-9eee-de4cd82b2a3b/agentic-search"
+}
