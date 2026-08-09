@@ -125,3 +125,8 @@ Full pass/fail live collection and agentic checks require running SGCP API conta
 - Existing collection UUID `a208e916-bd32-405a-9eee-de4cd82b2a3b`, document/chunk counts, source dataset, and SNI semantics remain unchanged.
 - Direct Deep Interpreter inference is pinned to only `5000/8882`, `6000/8883`, and `7000/8884`.
 - The replacement manifest allocates pairs `4/3/3` across direct backend ports and has five SNI-first plus five no-SNI-first pairs.
+
+## Review Fix
+
+- Corrected the `--all` CLI help text from the old "max four backend lanes" description to "globally serial."
+- Verification: `pytest tests/test_sni_ablation_runner.py::test_bc_runner_all_schedules_one_pair_batches_in_manifest_order tests/test_sni_ablation_runner.py::test_bc_runner_smoke_is_dry_manifest_preflight` passed; `ruff check scripts/run_bc_sni_repair_ablation.py` passed; `git diff --check` passed.

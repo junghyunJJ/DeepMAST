@@ -731,7 +731,7 @@ def build_parser() -> argparse.ArgumentParser:
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--smoke", action="store_true", help="Validate manifest and print the dry run plan.")
     mode.add_argument("--pair", type=int, help="Run one ordered pair.")
-    mode.add_argument("--all", action="store_true", help="Run ordered pairs 1-10, max four backend lanes.")
+    mode.add_argument("--all", action="store_true", help="Run ordered pairs 1-10 globally serial.")
     mode.add_argument("--summarize", action="store_true", help="Write summary.json from existing manifests.")
     parser.add_argument("--output-root", type=Path, required=True)
     parser.add_argument("--source", type=Path, default=BC_SOURCE)
