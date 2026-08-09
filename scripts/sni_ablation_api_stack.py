@@ -86,15 +86,23 @@ def _health_url(api: dict[str, object]) -> str:
     return f"http://localhost:{api['api_port']}/health"
 
 
-def _readiness_errors(health_http: HealthHttp, timeout_seconds: float) -> list[str]:
+def _readiness_errors(
+    health_http: HealthHttp,
+    clock: Clock,
+    deadline: float,
+) -> list[str]:
     errors: list[str] = []
     for api in APIS:
         url = _health_url(api)
+        remaining = max(0.0, deadline - clock())
+        if remaining <= 0:
+            errors.append(f"{url} deadline exhausted")
+            continue
         try:
-            response = health_http(url, timeout_seconds)
+            response = health_http(url, remaining)
         except Exception as exc:  # noqa: BLE001
             errors.append(f"{url} {type(exc).__name__}: {exc}")
-            break
+            continue
         status = response.get("status") if isinstance(response, dict) else None
         if status != "ok":
             errors.append(f"{url} status={status}")
@@ -111,17 +119,17 @@ def _wait_ready(
 ) -> int:
     deadline = clock() + timeout_seconds
     while True:
-        remaining = max(0.0, deadline - clock())
-        errors = _readiness_errors(health_http, remaining)
+        errors = _readiness_errors(health_http, clock, deadline)
         if not errors:
             return 0
-        if clock() >= deadline:
+        remaining = max(0.0, deadline - clock())
+        if remaining <= 0:
             print(
                 "unready ablation API endpoints: " + "; ".join(errors),
                 file=sys.stderr,
             )
             return 1
-        sleep(interval_seconds)
+        sleep(min(interval_seconds, remaining))
 
 
 def _with_runtime_env(

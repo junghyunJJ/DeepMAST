@@ -134,8 +134,8 @@ def test_up_times_out_with_unready_endpoint_evidence(tmp_path: Path, capsys) -> 
     captured = capsys.readouterr()
     assert rc == 1
     assert "unready ablation API endpoints" in captured.err
-    assert "http://localhost:8881/health status=starting" in captured.err
-    assert "http://localhost:8882/health ConnectionResetError" in captured.err
+    assert "http://localhost:8881/health deadline exhausted" in captured.err
+    assert "http://localhost:8882/health deadline exhausted" in captured.err
 
 
 def test_up_bounds_hung_health_probe_by_remaining_ready_timeout(
@@ -177,6 +177,55 @@ def test_up_bounds_hung_health_probe_by_remaining_ready_timeout(
     assert now == 110.0
     assert "http://localhost:8881/health TimeoutError" in captured.err
     assert "probe timeout after 10s" in captured.err
+
+
+def test_up_recomputes_remaining_deadline_before_each_health_probe(
+    tmp_path: Path, capsys
+) -> None:
+    now = 100.0
+    calls: list[tuple[str, float]] = []
+
+    def clock() -> float:
+        return now
+
+    def fake_health(url: str, timeout: float) -> object:
+        nonlocal now
+        calls.append((url, timeout))
+        if url == "http://localhost:8881/health":
+            now += 9.0
+            return {"status": "ok"}
+        if url == "http://localhost:8882/health":
+            now += timeout
+            raise TimeoutError(f"probe timeout after {timeout:g}s")
+        raise AssertionError(f"deadline exhausted before {url}")
+
+    rc = stack.main(
+        [
+            "up",
+            "--sgcp-rag-dir",
+            str(tmp_path),
+            "--env-file",
+            str(tmp_path / ".env"),
+            "--ready-timeout",
+            "10",
+            "--ready-interval",
+            "5",
+        ],
+        docker=lambda cmd: None,
+        health_http=fake_health,
+        sleep=lambda seconds: None,
+        clock=clock,
+    )
+
+    captured = capsys.readouterr()
+    assert rc == 1
+    assert calls == [
+        ("http://localhost:8881/health", 10.0),
+        ("http://localhost:8882/health", 1.0),
+    ]
+    assert now == 110.0
+    assert "http://localhost:8882/health TimeoutError" in captured.err
+    assert "http://localhost:8883/health deadline exhausted" in captured.err
 
 
 def test_up_readiness_checks_only_health_endpoints(tmp_path: Path) -> None:
