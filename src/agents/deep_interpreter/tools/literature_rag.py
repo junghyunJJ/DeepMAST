@@ -132,6 +132,36 @@ def _rag_collection_key(part_name: str, data_dir: str = "") -> str:
     return f"{data_dir_name}_{digest}_{part}"
 
 
+def _env_bool(name: str, default: bool = False) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() not in {"0", "false", "no", "off", ""}
+
+
+def _append_rag_audit(
+    collection_id: str,
+    use_wiki_context: bool,
+    result_count: int,
+    error_type: str | None,
+) -> None:
+    audit_path = os.getenv("DEEP_INTERPRETER_RAG_AUDIT_PATH")
+    if not audit_path:
+        return
+    record = {
+        "endpoint": "agentic_search",
+        "collection_uuid": collection_id,
+        "use_wiki_context": use_wiki_context,
+        "success": error_type is None and result_count > 0,
+        "result_count": result_count,
+        "error_type": error_type,
+    }
+    path = Path(audit_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a") as f:
+        f.write(json.dumps(record, sort_keys=True) + "\n")
+
+
 def _repair_json(raw: str) -> Any:
     """Conservative JSON repair for common LLM writing errors.
 
@@ -1424,6 +1454,7 @@ async def _agentic_search_with_sni(
     limit: int,
     search_type: str,
 ) -> list[dict]:
+    use_wiki_context = _env_bool("DEEP_INTERPRETER_USE_WIKI_CONTEXT", default=True)
     tools = await _get_cci_rag_tools()
     agentic_tool = next(
         (
@@ -1434,6 +1465,7 @@ async def _agentic_search_with_sni(
         None,
     )
     if agentic_tool is None:
+        _append_rag_audit(collection_id, use_wiki_context, 0, "ToolNotFound")
         return []
 
     try:
@@ -1444,11 +1476,12 @@ async def _agentic_search_with_sni(
                 "search_type": search_type,
                 "search_limit": limit,
                 "max_rewrites": 3,
-                "use_wiki_context": True,
+                "use_wiki_context": use_wiki_context,
             }
         )
     except Exception as e:
         logger.warning("SNI agentic search failed: %r", e, exc_info=True)
+        _append_rag_audit(collection_id, use_wiki_context, 0, type(e).__name__)
         return []
 
     if isinstance(raw, list) and raw and isinstance(raw[0], dict) and "text" in raw[0]:
@@ -1458,14 +1491,17 @@ async def _agentic_search_with_sni(
         try:
             payload = json.loads(raw)
         except json.JSONDecodeError:
+            _append_rag_audit(collection_id, use_wiki_context, 0, "JSONDecodeError")
             return []
     elif isinstance(raw, dict):
         payload = raw
     else:
+        _append_rag_audit(collection_id, use_wiki_context, 0, type(raw).__name__)
         return []
 
     if payload.get("error"):
         logger.warning("SNI agentic search returned error: %s", payload.get("error"))
+        _append_rag_audit(collection_id, use_wiki_context, 0, "AgenticError")
         return []
 
     results = []
@@ -1490,7 +1526,9 @@ async def _agentic_search_with_sni(
             }
         )
 
-    return [r for r in results if r.get("page_content")][:limit]
+    usable_results = [r for r in results if r.get("page_content")][:limit]
+    _append_rag_audit(collection_id, use_wiki_context, len(usable_results), None)
+    return usable_results
 
 
 async def search_fulltext_rag(
@@ -1540,6 +1578,7 @@ async def search_fulltext_rag(
 
     logger.debug(f"search_fulltext_rag: Using collection_id: {collection_id}")
 
+    require_agentic = _env_bool("DEEP_INTERPRETER_REQUIRE_AGENTIC_RAG")
     try:
         agentic_results = await _agentic_search_with_sni(
             query=query,
@@ -1549,9 +1588,13 @@ async def search_fulltext_rag(
         )
     except Exception as e:
         logger.warning("SNI agentic search failed: %r", e, exc_info=True)
+        if require_agentic:
+            raise RAGSearchError(f"Required agentic RAG failed: {e}") from e
         agentic_results = []
     if agentic_results:
         return agentic_results
+    if require_agentic:
+        raise RAGSearchError("Required agentic RAG returned no usable results")
 
     # Generate multiple search queries using LLM
     queries = await generate_multi_query(query, num_queries=5)
