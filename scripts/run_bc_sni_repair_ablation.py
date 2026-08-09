@@ -16,7 +16,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, TypedDict
 from urllib.request import urlopen
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -61,17 +61,43 @@ STAGE_NUM_PREDICT = {"part1": "12000", "part2": "12000", "part3": "8000", "repor
 class Condition:
     name: str
     use_wiki_context: bool
+    label: str
 
 
 CONDITIONS = (
-    Condition("wiki-on", True),
-    Condition("wiki-off", False),
+    Condition("wiki-on", True, "SNI"),
+    Condition("wiki-off", False, "no-SNI"),
 )
+CONDITION_BY_LABEL = {condition.label: condition for condition in CONDITIONS}
+EXPECTED_PAIR_ORDER = {
+    "01": ("no-SNI", "SNI", 8881, 4000),
+    "02": ("SNI", "no-SNI", 8881, 4000),
+    "03": ("no-SNI", "SNI", 8881, 4000),
+    "04": ("no-SNI", "SNI", 8882, 5000),
+    "05": ("SNI", "no-SNI", 8882, 5000),
+    "06": ("SNI", "no-SNI", 8882, 5000),
+    "07": ("no-SNI", "SNI", 8883, 6000),
+    "08": ("no-SNI", "SNI", 8883, 6000),
+    "09": ("SNI", "no-SNI", 8884, 7000),
+    "10": ("SNI", "no-SNI", 8884, 7000),
+}
+
+
+class ManifestPair(TypedDict):
+    pair_id: str
+    api_port: int
+    backend_port: int
+    condition_order: list[str]
+
+
+class ExperimentManifest(TypedDict):
+    path: str
+    pairs: list[ManifestPair]
 
 StageRunner = Callable[[Path, dict[str, str]], int]
 CollectionSnapshot = Callable[[str], dict[str, Any]]
 Api = dict[str, Any]
-PairProcessRunner = Callable[[int, Api, Path, Path, dict[str, str]], int]
+PairProcessRunner = Callable[[ManifestPair, Path, Path, dict[str, str]], int]
 
 
 def write_json(path: Path, payload: Any) -> None:
@@ -109,15 +135,19 @@ def _output_root_is_inside_source(source: Path, output_root: Path) -> bool:
     return resolved_output == resolved_source or resolved_source in resolved_output.parents
 
 
-def _run_dir(output_root: Path, pair_id: int, condition: Condition) -> Path:
-    return output_root / f"pair-{pair_id:02d}" / condition.name
+def _pair_id_text(pair_id: int | str) -> str:
+    return f"{pair_id:02d}" if isinstance(pair_id, int) else pair_id
+
+
+def _run_dir(output_root: Path, pair_id: int | str, condition: Condition) -> Path:
+    return output_root / f"pair-{_pair_id_text(pair_id)}" / condition.name
 
 
 def prepare_condition_copy(
     *,
     source: Path,
     output_root: Path,
-    pair_id: int,
+    pair_id: int | str,
     condition: Condition,
 ) -> Path:
     destination = _run_dir(output_root, pair_id, condition)
@@ -150,6 +180,81 @@ def prepare_condition_copy(
         },
     )
     return destination
+
+
+def _default_manifest_path(output_root: Path) -> Path:
+    return (
+        output_root.parent / "experiment_manifest.json"
+        if output_root.name == "pairs"
+        else output_root / "experiment_manifest.json"
+    )
+
+
+def _validate_api_map(manifest: dict[str, Any]) -> None:
+    observed = manifest.get("api_ollama_map")
+    if not isinstance(observed, list) or len(observed) != len(APIS):
+        raise RuntimeError("manifest api_ollama_map must define exactly four lanes")
+    expected = [
+        {
+            "api_port": _api_int(api, "api_port"),
+            "ollama_port": _api_int(api, "backend_port"),
+            "ollama_base_url": f"http://localhost:{_api_int(api, 'backend_port')}",
+            "rag_api_url": f"http://localhost:{_api_int(api, 'api_port')}",
+            "service": api["service"],
+        }
+        for api in APIS
+    ]
+    if observed != expected:
+        raise RuntimeError("manifest api/backend mapping does not match fixed topology")
+
+
+def load_experiment_manifest(path: Path) -> ExperimentManifest:
+    manifest = read_json(path)
+    fixed = manifest.get("fixed_collection")
+    if not isinstance(fixed, dict):
+        raise RuntimeError("manifest fixed_collection is missing")
+    if (
+        fixed.get("uuid") != BC_COLLECTION_ID
+        or fixed.get("expected_document_count") != 100
+        or fixed.get("expected_chunk_count") != 1553
+        or fixed.get("snapshot") != BC_COLLECTION_SNAPSHOT
+    ):
+        raise RuntimeError("manifest fixed collection does not match BC invariant")
+    _validate_api_map(manifest)
+    if manifest.get("run_settings", {}).get("pair_count") != 10:
+        raise RuntimeError("manifest must define exactly 10 pairs")
+    pairs = manifest.get("ordered_pairs")
+    if not isinstance(pairs, list) or len(pairs) != 10:
+        raise RuntimeError("manifest ordered_pairs must contain exactly 10 pairs")
+
+    parsed: list[ManifestPair] = []
+    for raw in pairs:
+        if not isinstance(raw, dict):
+            raise RuntimeError("manifest pair must be an object")
+        pair_id = str(raw.get("pair_id"))
+        expected = EXPECTED_PAIR_ORDER.get(pair_id)
+        if expected is None:
+            raise RuntimeError(f"unexpected manifest pair id: {pair_id}")
+        first, second, api_port, backend_port = expected
+        condition_order = raw.get("condition_order")
+        if (
+            condition_order != [first, second]
+            or raw.get("first_condition") != first
+            or raw.get("api_port") != api_port
+            or raw.get("ollama_port") != backend_port
+        ):
+            raise RuntimeError(f"manifest pair {pair_id} does not match frozen order/topology")
+        parsed.append(
+            {
+                "pair_id": pair_id,
+                "api_port": api_port,
+                "backend_port": backend_port,
+                "condition_order": [first, second],
+            }
+        )
+    if [pair["pair_id"] for pair in parsed] != [f"{idx:02d}" for idx in range(1, 11)]:
+        raise RuntimeError("manifest pair order must be 01 through 10")
+    return {"path": str(path), "pairs": parsed}
 
 
 def _verify_source_manifest(data_dir: Path) -> None:
@@ -432,12 +537,13 @@ def run_condition(
     *,
     source: Path,
     output_root: Path,
-    pair_id: int,
-    api: Api,
+    pair: ManifestPair,
     condition: Condition,
     stage_runner: StageRunner,
     collection_snapshot: CollectionSnapshot,
 ) -> int:
+    api = {"api_port": pair["api_port"], "backend_port": pair["backend_port"]}
+    pair_id = pair["pair_id"]
     data_dir = prepare_condition_copy(source=source, output_root=output_root, pair_id=pair_id, condition=condition)
     env = _condition_env(data_dir, api, condition)
     status = "failed"
@@ -471,6 +577,8 @@ def run_condition(
             {
                 "pair_id": pair_id,
                 "condition": condition.name,
+                "condition_label": condition.label,
+                "pair_condition_order": pair["condition_order"],
                 "backend_port": _api_int(api, "backend_port"),
                 "api_port": _api_int(api, "api_port"),
                 "rag_api_url": env["CCI_RAG_BASE_URL"],
@@ -487,23 +595,22 @@ def run_condition(
 
 
 def run_pair(
-    pair_id: int,
+    pair: ManifestPair,
     *,
     source: Path,
     output_root: Path,
-    api: Api,
     stage_runner: StageRunner,
     collection_snapshot: CollectionSnapshot,
 ) -> int:
     rc = 0
-    for condition in CONDITIONS:
+    for label in pair["condition_order"]:
+        condition = CONDITION_BY_LABEL[label]
         rc = max(
             rc,
             run_condition(
                 source=source,
                 output_root=output_root,
-                pair_id=pair_id,
-                api=api,
+                pair=pair,
                 condition=condition,
                 stage_runner=stage_runner,
                 collection_snapshot=collection_snapshot,
@@ -512,39 +619,41 @@ def run_pair(
     return rc
 
 
-def _pair_process_env(pair_id: int, api: Api, output_root: Path, source: Path) -> dict[str, str]:
-    pair_root = output_root / f"pair-{pair_id:02d}"
+def _pair_process_env(
+    pair: ManifestPair, output_root: Path, source: Path, manifest_path: Path
+) -> dict[str, str]:
+    pair_root = output_root / f"pair-{pair['pair_id']}"
     return {
-        "BC_SNI_PAIR_ID": str(pair_id),
-        "BC_SNI_BACKEND_PORT": str(_api_int(api, "backend_port")),
-        "BC_SNI_API_PORT": str(_api_int(api, "api_port")),
+        "BC_SNI_PAIR_ID": pair["pair_id"],
+        "BC_SNI_BACKEND_PORT": str(pair["backend_port"]),
+        "BC_SNI_API_PORT": str(pair["api_port"]),
+        "BC_SNI_CONDITION_ORDER": ",".join(pair["condition_order"]),
         "BC_SNI_PAIR_ROOT": str(pair_root),
         "BC_SNI_PAIR_AUDIT_ROOT": str(pair_root / "audit"),
         "BC_SNI_PAIR_RAG_BINDING_ROOT": str(pair_root / "rag-bindings"),
         "BC_SNI_SOURCE": str(source),
+        "BC_SNI_MANIFEST_PATH": str(manifest_path),
     }
 
 
 def _default_pair_process_runner(
-    pair_id: int,
-    api: Api,
+    pair: ManifestPair,
     output_root: Path,
     source: Path,
     env: dict[str, str],
 ) -> int:
-    api_index = APIS.index(api)
     completed = subprocess.run(
         [
             sys.executable,
             str(Path(__file__).resolve()),
             "--pair",
-            str(pair_id),
-            "--api-index",
-            str(api_index),
+            str(pair["pair_id"]),
             "--output-root",
             str(output_root),
             "--source",
             str(source),
+            "--manifest",
+            env["BC_SNI_MANIFEST_PATH"],
         ],
         env={**os.environ, **env},
         check=False,
@@ -552,20 +661,20 @@ def _default_pair_process_runner(
     return completed.returncode
 
 
-def build_schedule(pair_ids: Sequence[int], apis: Sequence[Api]) -> list[list[dict[str, int]]]:
+def build_schedule(manifest: ExperimentManifest) -> list[list[ManifestPair]]:
     batches = []
-    api_count = len(apis)
-    for start in range(0, len(pair_ids), api_count):
+    lanes: dict[int, list[ManifestPair]] = {}
+    for pair in manifest["pairs"]:
+        lanes.setdefault(pair["backend_port"], []).append(pair)
+    max_lane_depth = max(len(pairs) for pairs in lanes.values())
+    for depth in range(max_lane_depth):
         batch = []
-        for pair_id, api in zip(pair_ids[start : start + api_count], apis, strict=False):
-            batch.append(
-                {
-                    "pair_id": int(pair_id),
-                    "api_port": _api_int(api, "api_port"),
-                    "backend_port": _api_int(api, "backend_port"),
-                }
-            )
-        batches.append(batch)
+        for backend_port in (4000, 5000, 6000, 7000):
+            pairs = lanes.get(backend_port, [])
+            if depth < len(pairs):
+                batch.append(pairs[depth])
+        if batch:
+            batches.append(batch)
     return batches
 
 
@@ -590,13 +699,13 @@ def summarize(output_root: Path) -> int:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run paired BC SNI repair ablation conditions.")
     mode = parser.add_mutually_exclusive_group(required=True)
-    mode.add_argument("--smoke", action="store_true", help="Run pair 1 only.")
+    mode.add_argument("--smoke", action="store_true", help="Validate manifest and print the dry run plan.")
     mode.add_argument("--pair", type=int, help="Run one ordered pair.")
     mode.add_argument("--all", action="store_true", help="Run ordered pairs 1-10, max four backend lanes.")
     mode.add_argument("--summarize", action="store_true", help="Write summary.json from existing manifests.")
     parser.add_argument("--output-root", type=Path, required=True)
     parser.add_argument("--source", type=Path, default=BC_SOURCE)
-    parser.add_argument("--api-index", type=int, choices=range(len(APIS)), help=argparse.SUPPRESS)
+    parser.add_argument("--manifest", type=Path)
     return parser
 
 
@@ -611,38 +720,48 @@ def main(
     if _output_root_is_inside_source(args.source, args.output_root):
         print("output root must not equal or be nested under source", file=sys.stderr)
         return 1
-    args.output_root.mkdir(parents=True, exist_ok=True)
+    manifest_path = args.manifest or _default_manifest_path(args.output_root)
+    try:
+        manifest = load_experiment_manifest(manifest_path)
+    except Exception as exc:  # noqa: BLE001
+        print(f"invalid experiment manifest: {exc}", file=sys.stderr)
+        return 1
+    schedule = build_schedule(manifest)
+    if args.smoke:
+        print(json.dumps({"ok": True, "manifest": str(manifest_path), "schedule": schedule}, indent=2))
+        return 0
     if args.summarize:
+        args.output_root.mkdir(parents=True, exist_ok=True)
         return summarize(args.output_root)
+    args.output_root.mkdir(parents=True, exist_ok=True)
     if args.pair or args.smoke:
-        pair_id = args.pair or 1
-        api = APIS[args.api_index] if args.api_index is not None else APIS[(pair_id - 1) % len(APIS)]
+        pair_id = f"{args.pair:02d}" if args.pair is not None else "01"
+        pair = next((item for item in manifest["pairs"] if item["pair_id"] == pair_id), None)
+        if pair is None:
+            print(f"pair {pair_id} is not in manifest", file=sys.stderr)
+            return 1
         return run_pair(
-            pair_id,
+            pair,
             source=args.source,
             output_root=args.output_root,
-            api=api,
             stage_runner=stage_runner,
             collection_snapshot=collection_snapshot,
         )
 
     rc = 0
-    pair_ids = list(range(1, 11))
-    api_by_backend = {int(api["backend_port"]): api for api in APIS}
-    for batch in build_schedule(pair_ids, APIS):
+    for batch in schedule:
         with ThreadPoolExecutor(max_workers=len(batch)) as pool:
             futures = [
                 pool.submit(
                     pair_process_runner,
-                    item["pair_id"],
-                    api_by_backend[item["backend_port"]],
+                    item,
                     args.output_root,
                     args.source,
                     _pair_process_env(
-                        item["pair_id"],
-                        api_by_backend[item["backend_port"]],
+                        item,
                         args.output_root,
                         args.source,
+                        manifest_path,
                     ),
                 )
                 for item in batch

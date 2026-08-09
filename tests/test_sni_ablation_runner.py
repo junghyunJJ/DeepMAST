@@ -538,6 +538,19 @@ def _minimal_source(root: Path) -> Path:
     return source
 
 
+def _manifest_output_root(tmp_path: Path) -> tuple[Path, Path]:
+    root = tmp_path / "manifested"
+    root.mkdir(parents=True)
+    manifest_path = root / "experiment_manifest.json"
+    manifest_path.write_text(
+        Path("res/deep_interpreter/bc/sni_repair_ablation/experiment_manifest.json").read_text(
+            encoding="utf-8"
+        ),
+        encoding="utf-8",
+    )
+    return manifest_path, root / "pairs"
+
+
 def _successful_condition_artifacts(data_dir: Path) -> None:
     for name in bc_runner.REPORT_FILES:
         (data_dir / name).write_text("ok\n", encoding="utf-8")
@@ -606,6 +619,7 @@ def test_bc_runner_copies_each_condition_without_source_mutation(tmp_path: Path)
 
 def test_bc_runner_pair_uses_sequential_conditions_with_fixed_endpoint_env(tmp_path: Path) -> None:
     source = _minimal_source(tmp_path)
+    manifest_path, output_root = _manifest_output_root(tmp_path)
     calls: list[tuple[int, str, dict[str, str]]] = []
 
     def fake_stage(data_dir: Path, env: dict[str, str]) -> int:
@@ -618,7 +632,9 @@ def test_bc_runner_pair_uses_sequential_conditions_with_fixed_endpoint_env(tmp_p
             "--pair",
             "1",
             "--output-root",
-            str(tmp_path / "runs"),
+            str(output_root),
+            "--manifest",
+            str(manifest_path),
             "--source",
             str(source),
         ],
@@ -627,34 +643,63 @@ def test_bc_runner_pair_uses_sequential_conditions_with_fixed_endpoint_env(tmp_p
     )
 
     assert rc == 0
-    assert [name for _, name, _ in calls] == ["wiki-on", "wiki-off"]
-    on_env = calls[0][2]
-    off_env = calls[1][2]
+    assert [name for _, name, _ in calls] == ["wiki-off", "wiki-on"]
+    off_env = calls[0][2]
+    on_env = calls[1][2]
     assert on_env["OLLAMA_BASE_URL"] == "http://localhost:4000"
     assert on_env["CCI_RAG_BASE_URL"] == "http://localhost:8881"
     assert on_env["DEEP_INTERPRETER_USE_WIKI_CONTEXT"] == "true"
     assert on_env["DEEP_INTERPRETER_REQUIRE_AGENTIC_RAG"] == "true"
-    assert on_env["DEEP_INTERPRETER_RAG_AUDIT_PATH"].endswith("/pair-01/wiki-on/rag_audit.jsonl")
+    assert on_env["DEEP_INTERPRETER_RAG_AUDIT_PATH"].endswith("/pairs/pair-01/wiki-on/rag_audit.jsonl")
     assert off_env["DEEP_INTERPRETER_USE_WIKI_CONTEXT"] == "false"
     manifest = json.loads(
-        (tmp_path / "runs" / "pair-01" / "wiki-on" / "run_manifest.json").read_text(encoding="utf-8")
+        (output_root / "pair-01" / "wiki-off" / "run_manifest.json").read_text(encoding="utf-8")
     )
     assert manifest["collection"] == stack.BC_COLLECTION_SNAPSHOT
     assert manifest["rag_api_url"] == "http://localhost:8881"
+    assert manifest["condition_label"] == "no-SNI"
+    assert manifest["pair_condition_order"] == ["no-SNI", "SNI"]
     assert manifest["return_status"] == "passed"
 
 
-def test_bc_runner_all_schedules_at_most_four_backend_lanes(tmp_path: Path) -> None:
-    schedule = bc_runner.build_schedule([1, 2, 3, 4, 5, 6], stack.APIS)
+def test_bc_runner_all_schedules_manifest_waves_at_most_four_backend_lanes(tmp_path: Path) -> None:
+    manifest_path, _output_root = _manifest_output_root(tmp_path)
+    manifest = bc_runner.load_experiment_manifest(manifest_path)
+    schedule = bc_runner.build_schedule(manifest)
 
-    assert len(schedule) == 2
-    assert [item["pair_id"] for item in schedule[0]] == [1, 2, 3, 4]
-    assert [item["backend_port"] for item in schedule[0]] == [4000, 5000, 6000, 7000]
-    assert [item["pair_id"] for item in schedule[1]] == [5, 6]
+    assert [[item["pair_id"] for item in wave] for wave in schedule] == [
+        ["01", "04", "07", "09"],
+        ["02", "05", "08", "10"],
+        ["03", "06"],
+    ]
+    assert [[item["backend_port"] for item in wave] for wave in schedule] == [
+        [4000, 5000, 6000, 7000],
+        [4000, 5000, 6000, 7000],
+        [4000, 5000],
+    ]
+
+
+def test_bc_runner_rejects_manifest_drift_before_copy(tmp_path: Path) -> None:
+    source = _minimal_source(tmp_path)
+    manifest_path, output_root = _manifest_output_root(tmp_path)
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["fixed_collection"]["expected_chunk_count"] = 1552
+    manifest["ordered_pairs"][0]["condition_order"] = ["SNI", "no-SNI"]
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    rc = bc_runner.main(
+        ["--pair", "1", "--output-root", str(output_root), "--manifest", str(manifest_path), "--source", str(source)],
+        stage_runner=lambda data_dir, env: 0,
+        collection_snapshot=lambda _api_url: stack.BC_COLLECTION_SNAPSHOT,
+    )
+
+    assert rc == 1
+    assert not output_root.exists()
 
 
 def test_bc_runner_all_schedules_isolated_pair_processes_without_stage_state_leak(tmp_path: Path) -> None:
     source = _minimal_source(tmp_path)
+    manifest_path, output_root = _manifest_output_root(tmp_path)
     started: list[dict[str, object]] = []
     lock = threading.Lock()
     all_first_batch_started = threading.Event()
@@ -663,11 +708,12 @@ def test_bc_runner_all_schedules_isolated_pair_processes_without_stage_state_lea
     def forbidden_stage(data_dir: Path, env: dict[str, str]) -> int:
         raise AssertionError("all must not call in-process stage runner")
 
-    def fake_pair_process(pair_id: int, api: bc_runner.Api, output_root: Path, source: Path, env: dict[str, str]) -> int:
+    def fake_pair_process(pair: bc_runner.ManifestPair, output_root: Path, source: Path, env: dict[str, str]) -> int:
         with lock:
             started.append(
                 {
-                    "pair_id": pair_id,
+                    "pair_id": pair["pair_id"],
+                    "condition_order": pair["condition_order"],
                     "backend": env["BC_SNI_BACKEND_PORT"],
                     "api": env["BC_SNI_API_PORT"],
                     "audit_root": env["BC_SNI_PAIR_AUDIT_ROOT"],
@@ -682,7 +728,15 @@ def test_bc_runner_all_schedules_isolated_pair_processes_without_stage_state_lea
 
     def run_all() -> None:
         rc = bc_runner.main(
-            ["--all", "--output-root", str(tmp_path / "runs"), "--source", str(source)],
+            [
+                "--all",
+                "--output-root",
+                str(output_root),
+                "--manifest",
+                str(manifest_path),
+                "--source",
+                str(source),
+            ],
             stage_runner=forbidden_stage,
             collection_snapshot=lambda _api_url: stack.BC_COLLECTION_SNAPSHOT,
             pair_process_runner=fake_pair_process,
@@ -699,10 +753,14 @@ def test_bc_runner_all_schedules_isolated_pair_processes_without_stage_state_lea
 
     assert not thread.is_alive()
     assert len(started) == 10
-    assert {entry["pair_id"] for entry in first_batch} == {1, 2, 3, 4}
+    assert {entry["pair_id"] for entry in first_batch} == {"01", "04", "07", "09"}
     assert {entry["backend"] for entry in first_batch} == {"4000", "5000", "6000", "7000"}
     assert len({entry["audit_root"] for entry in started}) == 10
     assert len({entry["rag_binding_root"] for entry in started}) == 10
+    assert next(entry for entry in started if entry["pair_id"] == "01")["condition_order"] == [
+        "no-SNI",
+        "SNI",
+    ]
 
 
 def test_bc_runner_metrics_count_terminal_synthesis_repair(tmp_path: Path) -> None:
@@ -726,6 +784,8 @@ def test_bc_runner_metrics_count_terminal_synthesis_repair(tmp_path: Path) -> No
 
 def test_bc_runner_fails_on_collection_drift_or_invalid_audit(tmp_path: Path) -> None:
     source = _minimal_source(tmp_path)
+    manifest_path, audit_output = _manifest_output_root(tmp_path)
+    drift_manifest, drift_output = _manifest_output_root(tmp_path / "drift-root")
 
     def fake_stage(data_dir: Path, env: dict[str, str]) -> int:
         _successful_condition_artifacts(data_dir)
@@ -746,12 +806,30 @@ def test_bc_runner_fails_on_collection_drift_or_invalid_audit(tmp_path: Path) ->
         return 0
 
     audit_rc = bc_runner.main(
-        ["--pair", "1", "--output-root", str(tmp_path / "audit"), "--source", str(source)],
+        [
+            "--pair",
+            "1",
+            "--output-root",
+            str(audit_output),
+            "--manifest",
+            str(manifest_path),
+            "--source",
+            str(source),
+        ],
         stage_runner=fake_stage,
         collection_snapshot=lambda _api_url: stack.BC_COLLECTION_SNAPSHOT,
     )
     drift_rc = bc_runner.main(
-        ["--pair", "1", "--output-root", str(tmp_path / "drift"), "--source", str(source)],
+        [
+            "--pair",
+            "1",
+            "--output-root",
+            str(drift_output),
+            "--manifest",
+            str(drift_manifest),
+            "--source",
+            str(source),
+        ],
         stage_runner=lambda data_dir, env: (_successful_condition_artifacts(data_dir) or 0),
         collection_snapshot=lambda _api_url: stack.BC_COLLECTION_SNAPSHOT | {"chunk_count": 1552},
     )
@@ -762,10 +840,20 @@ def test_bc_runner_fails_on_collection_drift_or_invalid_audit(tmp_path: Path) ->
 
 def test_bc_runner_rejects_output_root_inside_source_before_copy(tmp_path: Path) -> None:
     source = _minimal_source(tmp_path)
+    manifest_path, _output = _manifest_output_root(tmp_path)
     output_root = source / "nested-runs"
 
     rc = bc_runner.main(
-        ["--pair", "1", "--output-root", str(output_root), "--source", str(source)],
+        [
+            "--pair",
+            "1",
+            "--output-root",
+            str(output_root),
+            "--manifest",
+            str(manifest_path),
+            "--source",
+            str(source),
+        ],
         stage_runner=lambda data_dir, env: 0,
         collection_snapshot=lambda _api_url: stack.BC_COLLECTION_SNAPSHOT,
     )
@@ -776,6 +864,7 @@ def test_bc_runner_rejects_output_root_inside_source_before_copy(tmp_path: Path)
 
 def test_bc_runner_preserves_post_stage_failure_evidence_and_metrics(tmp_path: Path) -> None:
     source = _minimal_source(tmp_path)
+    manifest_path, output_root = _manifest_output_root(tmp_path)
 
     def fake_stage(data_dir: Path, env: dict[str, str]) -> int:
         _successful_condition_artifacts(data_dir)
@@ -796,12 +885,21 @@ def test_bc_runner_preserves_post_stage_failure_evidence_and_metrics(tmp_path: P
         return 0
 
     rc = bc_runner.main(
-        ["--pair", "1", "--output-root", str(tmp_path / "runs"), "--source", str(source)],
+        [
+            "--pair",
+            "1",
+            "--output-root",
+            str(output_root),
+            "--manifest",
+            str(manifest_path),
+            "--source",
+            str(source),
+        ],
         stage_runner=fake_stage,
         collection_snapshot=lambda _api_url: stack.BC_COLLECTION_SNAPSHOT,
     )
 
-    failed_dir = tmp_path / "runs" / "pair-01" / "wiki-on"
+    failed_dir = output_root / "pair-01" / "wiki-off"
     manifest = json.loads((failed_dir / "run_manifest.json").read_text(encoding="utf-8"))
     assert rc == 1
     assert (failed_dir / "after" / "part1_final.md").exists()
@@ -812,6 +910,7 @@ def test_bc_runner_preserves_post_stage_failure_evidence_and_metrics(tmp_path: P
 
 def test_bc_runner_fails_when_audit_is_missing(tmp_path: Path) -> None:
     source = _minimal_source(tmp_path)
+    manifest_path, output_root = _manifest_output_root(tmp_path)
 
     def fake_stage(data_dir: Path, env: dict[str, str]) -> int:
         _successful_condition_artifacts(data_dir)
@@ -819,7 +918,16 @@ def test_bc_runner_fails_when_audit_is_missing(tmp_path: Path) -> None:
         return 0
 
     rc = bc_runner.main(
-        ["--pair", "1", "--output-root", str(tmp_path / "runs"), "--source", str(source)],
+        [
+            "--pair",
+            "1",
+            "--output-root",
+            str(output_root),
+            "--manifest",
+            str(manifest_path),
+            "--source",
+            str(source),
+        ],
         stage_runner=fake_stage,
         collection_snapshot=lambda _api_url: stack.BC_COLLECTION_SNAPSHOT,
     )
@@ -829,6 +937,7 @@ def test_bc_runner_fails_when_audit_is_missing(tmp_path: Path) -> None:
 
 def test_bc_runner_fails_when_final_guardrail_errors_remain(tmp_path: Path) -> None:
     source = _minimal_source(tmp_path)
+    manifest_path, output_root = _manifest_output_root(tmp_path)
 
     def fake_stage(data_dir: Path, env: dict[str, str]) -> int:
         _successful_condition_artifacts(data_dir)
@@ -839,7 +948,16 @@ def test_bc_runner_fails_when_final_guardrail_errors_remain(tmp_path: Path) -> N
         return 0
 
     rc = bc_runner.main(
-        ["--pair", "1", "--output-root", str(tmp_path / "runs"), "--source", str(source)],
+        [
+            "--pair",
+            "1",
+            "--output-root",
+            str(output_root),
+            "--manifest",
+            str(manifest_path),
+            "--source",
+            str(source),
+        ],
         stage_runner=fake_stage,
         collection_snapshot=lambda _api_url: stack.BC_COLLECTION_SNAPSHOT,
     )
@@ -847,8 +965,9 @@ def test_bc_runner_fails_when_final_guardrail_errors_remain(tmp_path: Path) -> N
     assert rc == 1
 
 
-def test_bc_runner_smoke_runs_only_first_pair_with_mocked_stages(tmp_path: Path) -> None:
+def test_bc_runner_smoke_is_dry_manifest_preflight(tmp_path: Path, capsys) -> None:
     source = _minimal_source(tmp_path)
+    _manifest_path, output_root = _manifest_output_root(tmp_path)
     seen: list[str] = []
 
     def fake_stage(data_dir: Path, env: dict[str, str]) -> int:
@@ -857,10 +976,24 @@ def test_bc_runner_smoke_runs_only_first_pair_with_mocked_stages(tmp_path: Path)
         return 0
 
     rc = bc_runner.main(
-        ["--smoke", "--output-root", str(tmp_path / "runs"), "--source", str(source)],
+        [
+            "--smoke",
+            "--output-root",
+            str(output_root),
+            "--source",
+            str(source),
+        ],
         stage_runner=fake_stage,
-        collection_snapshot=lambda _api_url: stack.BC_COLLECTION_SNAPSHOT,
+        collection_snapshot=lambda _api_url: (_ for _ in ()).throw(AssertionError("no API call")),
     )
 
     assert rc == 0
-    assert seen == ["pair-01/wiki-on", "pair-01/wiki-off"]
+    assert seen == []
+    assert not output_root.exists()
+    plan = json.loads(capsys.readouterr().out)
+    assert plan["ok"] is True
+    assert [[item["pair_id"] for item in wave] for wave in plan["schedule"]] == [
+        ["01", "04", "07", "09"],
+        ["02", "05", "08", "10"],
+        ["03", "06"],
+    ]
