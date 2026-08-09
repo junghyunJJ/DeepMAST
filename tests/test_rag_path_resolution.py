@@ -855,6 +855,58 @@ class TestRagSniIntegration:
         assert result == []
 
     @pytest.mark.asyncio
+    async def test_search_fulltext_rag_required_agentic_raises_on_invalid_sources(
+        self, monkeypatch
+    ):
+        literature_rag.reset_rag_state()
+        literature_rag._RAG_STATE["collection_ids"]["all"] = "collection-id"
+        monkeypatch.setenv("DEEP_INTERPRETER_REQUIRE_AGENTIC_RAG", "true")
+
+        class InvalidAgenticTool:
+            name = "agentic_search"
+
+            async def ainvoke(self, args):
+                return {"sources": "none"}
+
+        async def fake_tools():
+            return [InvalidAgenticTool()]
+
+        async def fallback_must_not_run(query, num_queries=5):
+            raise AssertionError("multi-query fallback should not run")
+
+        monkeypatch.setattr(literature_rag, "_get_cci_rag_tools", fake_tools)
+        monkeypatch.setattr(literature_rag, "generate_multi_query", fallback_must_not_run)
+
+        with pytest.raises(literature_rag.RAGSearchError):
+            await literature_rag.search_fulltext_rag("ICAM1 fibrosis", "all", limit=5)
+
+    @pytest.mark.asyncio
+    async def test_search_fulltext_rag_required_agentic_raises_on_transport_error(
+        self, monkeypatch
+    ):
+        literature_rag.reset_rag_state()
+        literature_rag._RAG_STATE["collection_ids"]["all"] = "collection-id"
+        monkeypatch.setenv("DEEP_INTERPRETER_REQUIRE_AGENTIC_RAG", "true")
+
+        class FailingAgenticTool:
+            name = "agentic_search"
+
+            async def ainvoke(self, args):
+                raise RuntimeError("agentic unavailable")
+
+        async def fake_tools():
+            return [FailingAgenticTool()]
+
+        async def fallback_must_not_run(query, num_queries=5):
+            raise AssertionError("multi-query fallback should not run")
+
+        monkeypatch.setattr(literature_rag, "_get_cci_rag_tools", fake_tools)
+        monkeypatch.setattr(literature_rag, "generate_multi_query", fallback_must_not_run)
+
+        with pytest.raises(literature_rag.RAGSearchError):
+            await literature_rag.search_fulltext_rag("ICAM1 fibrosis", "all", limit=5)
+
+    @pytest.mark.asyncio
     async def test_search_fulltext_rag_audit_write_failure_keeps_agentic_result(
         self, tmp_path, monkeypatch
     ):

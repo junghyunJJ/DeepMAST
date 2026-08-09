@@ -1456,6 +1456,7 @@ async def _agentic_search_with_sni(
     collection_id: str,
     limit: int,
     search_type: str,
+    require_agentic: bool = False,
 ) -> list[dict]:
     use_wiki_context = _env_bool("DEEP_INTERPRETER_USE_WIKI_CONTEXT", default=True)
     tools = await _get_cci_rag_tools()
@@ -1469,6 +1470,8 @@ async def _agentic_search_with_sni(
     )
     if agentic_tool is None:
         _append_rag_audit(collection_id, use_wiki_context, 0, "ToolNotFound")
+        if require_agentic:
+            raise RAGSearchError("Required agentic RAG failed: ToolNotFound")
         return []
 
     try:
@@ -1485,6 +1488,8 @@ async def _agentic_search_with_sni(
     except Exception as e:
         logger.warning("SNI agentic search failed: %r", e, exc_info=True)
         _append_rag_audit(collection_id, use_wiki_context, 0, type(e).__name__)
+        if require_agentic:
+            raise
         return []
 
     if isinstance(raw, list) and raw and isinstance(raw[0], dict) and "text" in raw[0]:
@@ -1495,11 +1500,15 @@ async def _agentic_search_with_sni(
             payload = json.loads(raw)
         except json.JSONDecodeError:
             _append_rag_audit(collection_id, use_wiki_context, 0, "JSONDecodeError")
+            if require_agentic:
+                raise RAGSearchError("Required agentic RAG failed: JSONDecodeError")
             return []
     elif isinstance(raw, dict):
         payload = raw
     else:
         _append_rag_audit(collection_id, use_wiki_context, 0, type(raw).__name__)
+        if require_agentic:
+            raise RAGSearchError(f"Required agentic RAG failed: {type(raw).__name__}")
         return []
 
     if payload.get("error"):
@@ -1510,11 +1519,15 @@ async def _agentic_search_with_sni(
             else "AgenticError"
         )
         _append_rag_audit(collection_id, use_wiki_context, 0, error_type)
+        if require_agentic and error_type != "NoRelevantContext":
+            raise RAGSearchError(f"Required agentic RAG failed: {error_type}")
         return []
 
     sources = payload.get("sources")
     if not isinstance(sources, list):
         _append_rag_audit(collection_id, use_wiki_context, 0, "InvalidSources")
+        if require_agentic:
+            raise RAGSearchError("Required agentic RAG failed: InvalidSources")
         return []
     if not sources:
         _append_rag_audit(collection_id, use_wiki_context, 0, "NoRelevantContext")
@@ -1603,6 +1616,7 @@ async def search_fulltext_rag(
             collection_id=collection_id,
             limit=limit,
             search_type=search_type,
+            require_agentic=require_agentic,
         )
     except Exception as e:
         logger.warning("SNI agentic search failed: %r", e, exc_info=True)
