@@ -235,10 +235,61 @@ strict rejection of all true agentic failures, and saved retrieval metrics.
 that only valid empty sources become `NoRelevantContext` while malformed
 payloads remain invalid.
 
+## Task 9: Split the shared RAG lane from BC inference
+
+**Files:**
+
+- Modify: `scripts/sgcp_rag_sni_ablation.compose.yml`
+- Modify: `scripts/sni_ablation_api_stack.py`
+- Modify: `scripts/run_bc_sni_repair_ablation.py`
+- Modify: `tests/test_sni_ablation_runner.py`
+- Create: `res/deep_interpreter/bc/sni_repair_ablation/experiment_manifest_rag4000.json`
+
+The `pairs-valid-run-03` invalid root showed that launching four full
+qwen3.5:122b workflows concurrently causes two direct inference lanes to
+timeout before their first RAG event.  Keep the existing root and its
+manifest unchanged.  For the replacement run only, reserve port `4000` for
+all SGCP-RAG agentic-search LLM requests and rotate direct Deep Interpreter
+inference through ports `5000`, `6000`, and `7000`.
+
+1. Bind every ablation SGCP-RAG API container's
+   `AGENT_LLM_BASE_URL` and `OLLAMA_BASE_URL` to
+   `http://host.docker.internal:4000`.  The topology smoke must report
+   `backend_port: 4000` for all four containers.
+2. Create a new explicit manifest for the replacement root.  It contains
+   `rag_backend_port: 4000`, uses direct backend/API pairs
+   `5000/8882`, `6000/8883`, and `7000/8884`, allocates ten pairs `4/3/3`
+   across those direct ports, and counterbalances the first condition to
+   five SNI and five no-SNI.  Preserve one SNI and one no-SNI condition per
+   pair, and do not overwrite the earlier fixed manifest.
+
+   | Pair IDs | Direct backend / API | First condition |
+   | --- | --- | --- |
+   | 01, 04, 07, 10 | `5000 / 8882` | no-SNI, SNI, no-SNI, SNI |
+   | 02, 05, 08 | `6000 / 8883` | SNI, no-SNI, SNI |
+   | 03, 06, 09 | `7000 / 8884` | no-SNI, SNI, no-SNI |
+3. Validate the new manifest's dedicated RAG port, direct backend/API map,
+   counterbalance, and exact pair schedule.  Persist both the direct backend
+   and `rag_backend_port` in each condition manifest.
+4. Execute `--all` as ten globally serial pair batches in manifest order.
+   Port pinning remains fixed, but no two Deep Interpreter conditions or
+   shared-RAG requests run concurrently.
+5. Test first: prove the new topology exposes port 4000 as every RAG
+   backend, the manifest parser rejects an incorrect RAG port or schedule,
+   and `build_schedule` returns one pair per batch in frozen manifest order.
+   Preserve the old-manifest behavior only as historical artifact; it does
+   not need to be runnable under the replacement topology.
+
+**Verification:** focused tests fail before the new behavior, then pass;
+the replacement manifest validates; a live topology smoke proves all four
+APIs still use `qwen3.5:122b`, the same fixed collection, and both SNI
+states while their observed RAG backend is 4000.
+
 **Completion criteria**
 
-- All 10 pairs are valid, balanced `3/3/2/2` across ports, and contain exactly
-  one SNI-on and one no-SNI agentic condition.
+- All 10 pairs are valid, balanced `4/3/3` across direct inference ports
+  `5000/6000/7000` while port `4000` exclusively serves agentic RAG, and
+  contain exactly one SNI-on and one no-SNI agentic condition.
 - No run changes the source dataset, fixed collection, or existing SNI pack.
 - Every valid run reaches final guardrail error count `0`, with repair burden
   retained rather than hidden by that endpoint.
