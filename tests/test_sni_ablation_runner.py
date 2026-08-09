@@ -5,6 +5,8 @@ from pathlib import Path
 from typing import cast
 from urllib.error import HTTPError
 
+import pytest
+
 from scripts import sni_ablation_api_stack as stack
 from scripts import run_bc_sni_repair_ablation as bc_runner
 
@@ -769,6 +771,20 @@ def test_bc_runner_metrics_count_terminal_synthesis_repair(tmp_path: Path) -> No
     data_dir = tmp_path / "condition"
     data_dir.mkdir()
     _successful_condition_artifacts(data_dir)
+    with (data_dir / "rag_audit.jsonl").open("a", encoding="utf-8") as f:
+        f.write(
+            json.dumps(
+                {
+                    "endpoint": "agentic_search",
+                    "collection_uuid": stack.BC_COLLECTION_ID,
+                    "use_wiki_context": False,
+                    "success": False,
+                    "error_type": "NoRelevantContext",
+                    "result_count": 0,
+                }
+            )
+            + "\n"
+        )
 
     metrics = bc_runner.extract_metrics(data_dir)
 
@@ -779,9 +795,79 @@ def test_bc_runner_metrics_count_terminal_synthesis_repair(tmp_path: Path) -> No
         "total_repair_count": 4,
         "changed_claims": 4,
     }
+    assert metrics["retrieval"] == {
+        "attempt_count": 2,
+        "positive_result_count": 1,
+        "zero_hit_count": 1,
+    }
     assert metrics["artifacts"]["part1_final.md"]["initial_error_count"] == 1
     assert metrics["artifacts"]["part1_final.md"]["final_error_count"] == 0
     assert metrics["artifacts"]["synthesis.md"]["initial_error_count"] == 3
+
+
+def test_bc_runner_accepts_no_relevant_context_zero_hit_audit(tmp_path: Path) -> None:
+    data_dir = tmp_path / "condition"
+    data_dir.mkdir()
+    (data_dir / "rag_audit.jsonl").write_text(
+        json.dumps(
+            {
+                "endpoint": "agentic_search",
+                "collection_uuid": stack.BC_COLLECTION_ID,
+                "use_wiki_context": False,
+                "success": False,
+                "error_type": "NoRelevantContext",
+                "result_count": 0,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    bc_runner._validate_rag_audit(data_dir, bc_runner.CONDITION_BY_LABEL["no-SNI"])
+
+
+def test_bc_runner_rejects_non_no_relevant_context_error_audit(tmp_path: Path) -> None:
+    data_dir = tmp_path / "condition"
+    data_dir.mkdir()
+    (data_dir / "rag_audit.jsonl").write_text(
+        json.dumps(
+            {
+                "endpoint": "agentic_search",
+                "collection_uuid": stack.BC_COLLECTION_ID,
+                "use_wiki_context": False,
+                "success": False,
+                "error_type": "TimeoutError",
+                "result_count": 0,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(RuntimeError, match="invalid RAG audit record"):
+        bc_runner._validate_rag_audit(data_dir, bc_runner.CONDITION_BY_LABEL["no-SNI"])
+
+
+def test_bc_runner_rejects_malformed_zero_hit_result_count(tmp_path: Path) -> None:
+    data_dir = tmp_path / "condition"
+    data_dir.mkdir()
+    (data_dir / "rag_audit.jsonl").write_text(
+        json.dumps(
+            {
+                "endpoint": "agentic_search",
+                "collection_uuid": stack.BC_COLLECTION_ID,
+                "use_wiki_context": False,
+                "success": False,
+                "error_type": "NoRelevantContext",
+                "result_count": False,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(RuntimeError, match="invalid RAG audit record"):
+        bc_runner._validate_rag_audit(data_dir, bc_runner.CONDITION_BY_LABEL["no-SNI"])
 
 
 def test_bc_runner_fails_on_collection_drift_or_invalid_audit(tmp_path: Path) -> None:

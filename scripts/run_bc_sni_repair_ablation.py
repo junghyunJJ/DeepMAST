@@ -451,6 +451,33 @@ def _severity_counts(path: Path, artifact: str) -> dict[str, int]:
     return counts
 
 
+def _rag_retrieval_metrics(path: Path) -> dict[str, int]:
+    records = [
+        json.loads(line)
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ] if path.is_file() else []
+    return {
+        "attempt_count": len(records),
+        "positive_result_count": sum(
+            1
+            for record in records
+            if record.get("success") is True
+            and record.get("error_type") is None
+            and type(record.get("result_count")) is int
+            and record["result_count"] > 0
+        ),
+        "zero_hit_count": sum(
+            1
+            for record in records
+            if record.get("success") is False
+            and record.get("error_type") == "NoRelevantContext"
+            and type(record.get("result_count")) is int
+            and record["result_count"] == 0
+        ),
+    }
+
+
 def extract_metrics(data_dir: Path) -> dict[str, Any]:
     parts_guardrail = read_json(data_dir / "parts_guardrail_result.json")
     synthesis_guardrail = read_json(data_dir / "synthesis_validation.json").get("synthesis_guardrail", {})
@@ -481,6 +508,7 @@ def extract_metrics(data_dir: Path) -> dict[str, Any]:
             "total_repair_count": repair_attempts + terminal_repairs,
             "changed_claims": synthesis_guardrail.get("changed_claims"),
         },
+        "retrieval": _rag_retrieval_metrics(data_dir / "rag_audit.jsonl"),
         "artifacts": artifacts,
     }
 
@@ -498,10 +526,16 @@ def _validate_rag_audit(data_dir: Path, condition: Condition) -> None:
         if record.get("endpoint") != "agentic_search"
         or record.get("collection_uuid") != BC_COLLECTION_ID
         or record.get("use_wiki_context") is not condition.use_wiki_context
-        or record.get("success") is not True
-        or record.get("error_type") is not None
-        or not isinstance(record.get("result_count"), int)
-        or record.get("result_count", 0) <= 0
+        or not (
+            record.get("success") is True
+            and record.get("error_type") is None
+            and type(record.get("result_count")) is int
+            and record["result_count"] > 0
+            or record.get("success") is False
+            and record.get("error_type") == "NoRelevantContext"
+            and type(record.get("result_count")) is int
+            and record["result_count"] == 0
+        )
     ]
     if bad:
         raise RuntimeError(f"invalid RAG audit record: {bad[0]}")

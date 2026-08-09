@@ -1504,7 +1504,12 @@ async def _agentic_search_with_sni(
 
     if payload.get("error"):
         logger.warning("SNI agentic search returned error: %s", payload.get("error"))
-        _append_rag_audit(collection_id, use_wiki_context, 0, "AgenticError")
+        error_type = (
+            "NoRelevantContext"
+            if payload.get("error") == "no_relevant_context"
+            else "AgenticError"
+        )
+        _append_rag_audit(collection_id, use_wiki_context, 0, error_type)
         return []
 
     results = []

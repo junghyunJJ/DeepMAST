@@ -646,6 +646,44 @@ class TestRagSniIntegration:
         }
 
     @pytest.mark.asyncio
+    async def test_search_fulltext_rag_audits_no_relevant_context_payload(
+        self, tmp_path, monkeypatch
+    ):
+        literature_rag.reset_rag_state()
+        literature_rag._RAG_STATE["collection_ids"]["all"] = "collection-id"
+        monkeypatch.setenv("DEEP_INTERPRETER_USE_WIKI_CONTEXT", "false")
+        monkeypatch.setenv(
+            "DEEP_INTERPRETER_RAG_AUDIT_PATH", str(tmp_path / "rag-audit.jsonl")
+        )
+
+        class FakeTool:
+            name = "agentic_search"
+
+            async def ainvoke(self, args):
+                return {"error": "no_relevant_context"}
+
+        async def fake_tools():
+            return [FakeTool()]
+
+        monkeypatch.setattr(literature_rag, "_get_cci_rag_tools", fake_tools)
+
+        result = await literature_rag.search_fulltext_rag(
+            "ICAM1 fibrosis",
+            "all",
+            limit=5,
+        )
+
+        assert result == []
+        assert json.loads((tmp_path / "rag-audit.jsonl").read_text()) == {
+            "endpoint": "agentic_search",
+            "collection_uuid": "collection-id",
+            "use_wiki_context": False,
+            "success": False,
+            "result_count": 0,
+            "error_type": "NoRelevantContext",
+        }
+
+    @pytest.mark.asyncio
     async def test_search_fulltext_rag_fixed_collection_override_bypasses_name_resolution(
         self, tmp_path, monkeypatch
     ):
