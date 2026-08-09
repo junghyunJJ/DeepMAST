@@ -5,6 +5,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any
@@ -31,6 +32,7 @@ APIS = (
 
 Docker = Callable[[list[str]], object]
 Http = Callable[[str, str, object | None], object]
+Sleep = Callable[[float], object]
 
 
 def _docker(cmd: list[str]) -> None:
@@ -64,7 +66,53 @@ def _compose_args(action: str, env_file: Path) -> list[str]:
     return base + ["ps", *services]
 
 
-def _with_runtime_env(args: argparse.Namespace, docker: Docker, action: str) -> int:
+def _health_url(api: dict[str, object]) -> str:
+    return f"http://localhost:{api['api_port']}/health"
+
+
+def _readiness_errors(http: Http) -> list[str]:
+    errors: list[str] = []
+    for api in APIS:
+        url = _health_url(api)
+        try:
+            response = http("GET", url, None)
+        except Exception as exc:  # noqa: BLE001
+            errors.append(f"{url} {type(exc).__name__}: {exc}")
+            continue
+        status = response.get("status") if isinstance(response, dict) else None
+        if status != "ok":
+            errors.append(f"{url} status={status}")
+    return errors
+
+
+def _wait_ready(
+    http: Http,
+    sleep: Sleep,
+    *,
+    timeout_seconds: float,
+    interval_seconds: float,
+) -> int:
+    deadline = time.monotonic() + timeout_seconds
+    while True:
+        errors = _readiness_errors(http)
+        if not errors:
+            return 0
+        if time.monotonic() >= deadline:
+            print(
+                "unready ablation API endpoints: " + "; ".join(errors),
+                file=sys.stderr,
+            )
+            return 1
+        sleep(interval_seconds)
+
+
+def _with_runtime_env(
+    args: argparse.Namespace,
+    docker: Docker,
+    action: str,
+    http: Http,
+    sleep: Sleep,
+) -> int:
     previous = {
         "SGCP_RAG_DIR": os.environ.get("SGCP_RAG_DIR"),
         "SGCP_RAG_ENV_FILE": os.environ.get("SGCP_RAG_ENV_FILE"),
@@ -73,6 +121,13 @@ def _with_runtime_env(args: argparse.Namespace, docker: Docker, action: str) -> 
     os.environ["SGCP_RAG_ENV_FILE"] = str(args.env_file)
     try:
         docker(_compose_args(action, args.env_file))
+        if action == "up":
+            return _wait_ready(
+                http,
+                sleep,
+                timeout_seconds=args.ready_timeout,
+                interval_seconds=args.ready_interval,
+            )
     finally:
         for key, value in previous.items():
             if value is None:
@@ -244,7 +299,10 @@ def build_parser() -> argparse.ArgumentParser:
         default=Path("/Users/jungj2/Dropbox/Metadata/mcp/sgcp-rag/.env"),
     )
     sub = parser.add_subparsers(dest="command", required=True)
-    for command in ("up", "down", "status"):
+    up = sub.add_parser("up", parents=[common])
+    up.add_argument("--ready-timeout", type=float, default=600.0)
+    up.add_argument("--ready-interval", type=float, default=5.0)
+    for command in ("down", "status"):
         sub.add_parser(command, parents=[common])
     smoke = sub.add_parser("smoke", parents=[common])
     smoke.add_argument("--collection-id", required=True)
@@ -261,11 +319,12 @@ def main(
     *,
     docker: Docker = _docker,
     http: Http = _http,
+    sleep: Sleep = time.sleep,
 ) -> int:
     args = build_parser().parse_args(argv)
     if args.command == "smoke":
         return _smoke(args, http)
-    return _with_runtime_env(args, docker, args.command)
+    return _with_runtime_env(args, docker, args.command, http, sleep)
 
 
 if __name__ == "__main__":

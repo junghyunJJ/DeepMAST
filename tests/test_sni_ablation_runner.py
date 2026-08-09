@@ -44,6 +44,8 @@ def test_compose_commands_target_only_ablation_services(tmp_path: Path) -> None:
             str(tmp_path / ".env"),
         ],
         docker=calls.append,
+        http=lambda method, url, payload=None: {"status": "ok"},
+        sleep=lambda seconds: None,
     )
 
     assert rc == 0
@@ -66,6 +68,102 @@ def test_compose_commands_target_only_ablation_services(tmp_path: Path) -> None:
             "sgcp-sni-api-7000",
         ]
     ]
+
+
+def test_up_waits_for_all_api_health_before_returning(tmp_path: Path) -> None:
+    docker_calls: list[list[str]] = []
+    sleep_calls: list[float] = []
+    health_calls: dict[str, int] = {}
+
+    def fake_http(method: str, url: str, payload: object | None = None) -> object:
+        assert method == "GET"
+        assert payload is None
+        assert url.endswith("/health")
+        health_calls[url] = health_calls.get(url, 0) + 1
+        return {"status": "starting" if health_calls[url] == 1 else "ok"}
+
+    rc = stack.main(
+        [
+            "up",
+            "--sgcp-rag-dir",
+            str(tmp_path),
+            "--env-file",
+            str(tmp_path / ".env"),
+            "--ready-timeout",
+            "5",
+            "--ready-interval",
+            "0",
+        ],
+        docker=docker_calls.append,
+        http=fake_http,
+        sleep=sleep_calls.append,
+    )
+
+    assert rc == 0
+    assert len(docker_calls) == 1
+    assert set(health_calls) == {
+        f"http://localhost:{api['api_port']}/health" for api in stack.APIS
+    }
+    assert all(count == 2 for count in health_calls.values())
+    assert sleep_calls == [0.0]
+
+
+def test_up_times_out_with_unready_endpoint_evidence(tmp_path: Path, capsys) -> None:
+    def fake_http(method: str, url: str, payload: object | None = None) -> object:
+        if url == "http://localhost:8882/health":
+            raise ConnectionResetError(54, "Connection reset by peer")
+        return {"status": "starting"}
+
+    rc = stack.main(
+        [
+            "up",
+            "--sgcp-rag-dir",
+            str(tmp_path),
+            "--env-file",
+            str(tmp_path / ".env"),
+            "--ready-timeout",
+            "0",
+            "--ready-interval",
+            "0",
+        ],
+        docker=lambda cmd: None,
+        http=fake_http,
+        sleep=lambda seconds: None,
+    )
+
+    captured = capsys.readouterr()
+    assert rc == 1
+    assert "unready ablation API endpoints" in captured.err
+    assert "http://localhost:8881/health status=starting" in captured.err
+    assert "http://localhost:8882/health ConnectionResetError" in captured.err
+
+
+def test_up_readiness_checks_only_health_endpoints(tmp_path: Path) -> None:
+    docker_calls: list[list[str]] = []
+    http_calls: list[tuple[str, str, object | None]] = []
+
+    def fake_http(method: str, url: str, payload: object | None = None) -> object:
+        http_calls.append((method, url, payload))
+        return {"status": "ok"}
+
+    rc = stack.main(
+        [
+            "up",
+            "--sgcp-rag-dir",
+            str(tmp_path),
+            "--env-file",
+            str(tmp_path / ".env"),
+        ],
+        docker=docker_calls.append,
+        http=fake_http,
+        sleep=lambda seconds: None,
+    )
+
+    assert rc == 0
+    assert docker_calls[0][-4:] == [api["service"] for api in stack.APIS]
+    assert all(method == "GET" for method, _, _ in http_calls)
+    assert all(url.endswith("/health") for _, url, _ in http_calls)
+    assert all(payload is None for _, _, payload in http_calls)
 
 
 def test_smoke_writes_machine_readable_report_without_credentials(tmp_path: Path) -> None:
