@@ -1367,9 +1367,12 @@ def _generate_html_report_impl(
         therapeutic_data = parts.get("therapeutic")
         if therapeutic_data and isinstance(therapeutic_data, dict):
             # Build from structured therapeutic data
-            druggable = therapeutic_data.get("druggable_targets", [])
-            drugs = therapeutic_data.get("known_drugs", [])
-            novel = therapeutic_data.get("novel_targets", [])
+            def mapping_items(value: Any) -> list[dict[str, Any]]:
+                return [item for item in value if isinstance(item, dict)] if isinstance(value, list) else []
+
+            druggable = mapping_items(therapeutic_data.get("druggable_targets"))
+            drugs = mapping_items(therapeutic_data.get("known_drugs"))
+            novel = mapping_items(therapeutic_data.get("novel_targets"))
             summary = therapeutic_data.get("summary", {})
 
             druggable_html = ""
