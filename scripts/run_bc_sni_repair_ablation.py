@@ -634,11 +634,15 @@ def extract_metrics(data_dir: Path) -> dict[str, Any]:
             "initial_error_count": _severity_counts(data_dir / "report_validation_initial.json", artifact)["error"],
             "final_error_count": _severity_counts(data_dir / "report_validation_final.json", artifact)["error"],
         }
+    part_repair_attempts = int(parts_guardrail.get("repair_attempt_count") or 0)
+    part_terminal_repairs = int(parts_guardrail.get("terminal_repair_count") or 0)
     repair_attempts = int(synthesis_guardrail.get("repair_attempt_count") or 0)
     terminal_repairs = int(synthesis_guardrail.get("terminal_repair_count") or 0)
     return {
         "parts": {
-            "repair_attempt_count": parts_guardrail.get("repair_attempt_count"),
+            "repair_attempt_count": part_repair_attempts,
+            "terminal_repair_count": part_terminal_repairs,
+            "total_repair_count": part_repair_attempts + part_terminal_repairs,
             "changed_sections": parts_guardrail.get("changed_sections"),
         },
         "synthesis": {

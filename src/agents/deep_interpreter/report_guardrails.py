@@ -457,11 +457,18 @@ def run_report_guardrail(data_dir: str | Path, *, provider: str | None = None) -
     issues_path = initial_path
     changed_sections = 0
     repair_attempt_count = 0
+    terminal_repair_count = 0
+    last_repair_error_keys: set[tuple[str, str, str]] = set()
 
     while (
         _error_count(current_issues)
         and repair_attempt_count < MAX_GUARDRAIL_REPAIR_PASSES
     ):
+        last_repair_error_keys = {
+            _issue_claim_key(issue)
+            for issue in current_issues
+            if issue.get("severity") == "error"
+        }
         changed = repair_report_script.repair_report(
             data_dir,
             issues_path,
@@ -486,6 +493,38 @@ def run_report_guardrail(data_dir: str | Path, *, provider: str | None = None) -
             break
         issues_path = final_path
 
+    newly_surfaced_errors = [
+        issue
+        for issue in current_issues
+        if issue.get("severity") == "error"
+        and _issue_claim_key(issue) not in last_repair_error_keys
+    ]
+    if repair_attempt_count == MAX_GUARDRAIL_REPAIR_PASSES and newly_surfaced_errors:
+        terminal_repair_count = 1
+        terminal_path = data_dir / "report_validation_terminal.json"
+        _write_issues(
+            terminal_path,
+            newly_surfaced_errors,
+            current_claims,
+            claim_selection=current_selection,
+            inline_citation_coverage=current_coverage,
+        )
+        terminal_changed = repair_report_script.repair_report(
+            data_dir,
+            terminal_path,
+            provider=provider,
+            claim_validation=current_claims,
+        )
+        changed_sections += terminal_changed
+        if terminal_changed:
+            current_issues, current_claims, current_selection, current_coverage = (
+                _validate_part_reports(
+                    data_dir,
+                    provider=provider,
+                    claim_cache=claim_cache,
+                )
+            )
+
     final_issues = current_issues
     _write_issues(
         final_path,
@@ -501,6 +540,7 @@ def run_report_guardrail(data_dir: str | Path, *, provider: str | None = None) -
         "initial_issue_count": len(initial_issues),
         "initial_error_count": initial_error_count,
         "repair_attempt_count": repair_attempt_count,
+        "terminal_repair_count": terminal_repair_count,
         "changed_sections": changed_sections,
         "final_issue_count": len(final_issues),
         "final_error_count": final_error_count,

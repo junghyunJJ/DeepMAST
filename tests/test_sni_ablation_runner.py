@@ -603,7 +603,14 @@ def _successful_condition_artifacts(data_dir: Path) -> None:
         encoding="utf-8",
     )
     (data_dir / "parts_guardrail_result.json").write_text(
-        json.dumps({"status": "passed", "repair_attempt_count": 2, "changed_sections": 5}),
+        json.dumps(
+            {
+                "status": "passed",
+                "repair_attempt_count": 2,
+                "terminal_repair_count": 1,
+                "changed_sections": 5,
+            }
+        ),
         encoding="utf-8",
     )
     (data_dir / "synthesis_validation.json").write_text(
@@ -1075,7 +1082,12 @@ def test_bc_runner_metrics_count_terminal_synthesis_repair(tmp_path: Path) -> No
 
     metrics = bc_runner.extract_metrics(data_dir)
 
-    assert metrics["parts"] == {"repair_attempt_count": 2, "changed_sections": 5}
+    assert metrics["parts"] == {
+        "repair_attempt_count": 2,
+        "terminal_repair_count": 1,
+        "total_repair_count": 3,
+        "changed_sections": 5,
+    }
     assert metrics["synthesis"] == {
         "repair_attempt_count": 3,
         "terminal_repair_count": 1,
