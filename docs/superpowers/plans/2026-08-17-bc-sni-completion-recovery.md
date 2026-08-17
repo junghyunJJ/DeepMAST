@@ -196,6 +196,77 @@ Create no empty commit. Append the output root, commands, elapsed times, and com
 
 ---
 
+### Task 4: Terminally repair only a claim surfaced by the final Part pass
+
+**Files:**
+- Modify: `src/agents/deep_interpreter/report_guardrails.py`
+- Modify: `tests/agents/deep_interpreter/test_report_guardrail_middleware.py`
+- Modify: `scripts/run_bc_sni_repair_ablation.py`
+- Modify: `tests/test_sni_ablation_runner.py`
+
+**Interfaces:**
+- Extends: `run_report_guardrail(...)` returns `terminal_repair_count: int`.
+- Extends: Part repair metrics include `terminal_repair_count` and `total_repair_count`.
+- Reuses: `_issue_claim_key(...)` and the synthesis guardrail's newly surfaced error rule.
+
+- [ ] **Step 1: Write the failing bounded-terminal regressions**
+
+Add one orchestration test in which the third regular repair pass replaces the
+last error with a different claim key. Assert that one terminal repair runs,
+the subsequent validation has zero errors, `repair_attempt_count == 3`, and
+`terminal_repair_count == 1`.
+
+Add a companion test in which the same error key persists through the third
+pass. Assert that no terminal repair runs, `terminal_repair_count == 0`, and
+the guardrail remains failed.
+
+- [ ] **Step 2: Verify RED**
+
+Run both exact node IDs. Expected: `terminal_repair_count` is absent and the
+newly surfaced error remains unprocessed after pass three.
+
+- [ ] **Step 3: Implement one bounded terminal repair**
+
+Track the hard-error claim keys submitted to the last regular pass. When and
+only when three regular passes completed, select final hard errors whose keys
+were absent from that set. Run `repair_report(...)` once against those saved
+final issues, then revalidate once if the terminal call changed content.
+
+Do not raise the regular pass cap, retry persistent error keys, relax claim or
+section safety, or add another loop.
+
+- [ ] **Step 4: Expose the terminal count in runner metrics**
+
+Keep `repair_attempt_count` as the regular pass count. Add the optional
+terminal count and their sum to the existing Part repair metrics, mirroring
+the synthesis metrics shape.
+
+- [ ] **Step 5: Run verification**
+
+```bash
+OPENAI_API_KEY=test LANGCHAIN_TRACING_V2=false uv run pytest -q \
+  tests/agents/deep_interpreter/test_report_guardrail_middleware.py \
+  tests/test_sni_ablation_runner.py \
+  tests/scripts/test_repair_report.py
+uv run ruff check \
+  src/agents/deep_interpreter/report_guardrails.py \
+  tests/agents/deep_interpreter/test_report_guardrail_middleware.py \
+  scripts/run_bc_sni_repair_ablation.py \
+  tests/test_sni_ablation_runner.py
+uv run python -m py_compile \
+  src/agents/deep_interpreter/report_guardrails.py \
+  scripts/run_bc_sni_repair_ablation.py
+git diff --check
+```
+
+- [ ] **Step 6: Commit and resume Task 3**
+
+Commit only the bounded terminal behavior, metrics, and tests with Lore
+trailers. Re-run Task 3's disposable replay from a fresh temporary copy before
+starting the canonical pair.
+
+---
+
 ## Plan Self-Review
 
 - Every design requirement maps to one task.
@@ -203,4 +274,5 @@ Create no empty commit. Append the output root, commands, elapsed times, and com
 - The malformed checkpoint fix is located at the persisted-input boundary only.
 - Live completion uses the canonical source and a fresh root, not the diagnostic artifact.
 - The external four-hour cutoff is removed, while existing bounded internal attempts remain.
+- The terminal Part repair is a single bounded attempt for newly surfaced error keys; it does not retry persistent errors.
 - All production changes have explicit RED and GREEN commands and separate reviewable commits.

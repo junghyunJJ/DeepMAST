@@ -38,6 +38,10 @@ corpus identity or post-repair integrity checks.
   visible.
 - Retain whole-section repair for non-inline validation errors; do not relax
   the existing exact-heading and 50% section-retention guard.
+- If the third bounded repair pass creates a new hard-error claim key, allow
+  exactly one terminal claim-scoped repair and revalidation, matching the
+  existing synthesis-guardrail pattern. Do not terminally retry an error that
+  was already present before the third pass.
 
 ### 2. Normalize malformed retrieval checkpoint state
 
@@ -76,6 +80,8 @@ corpus identity or post-repair integrity checks.
   is written.
 - The final comparison reports repair counts, claim/RAG metrics, PMID flow, and
   elapsed time for no-SNI and SNI.
+- Part repair metrics distinguish the three regular passes from the optional
+  single terminal repair.
 
 ## Out of scope
 
