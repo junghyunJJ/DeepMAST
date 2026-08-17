@@ -109,7 +109,32 @@ def inspect_reporter_completion(
     }
 
 
-def build_reporter_recovery_message(data_dir: Path) -> str:
+def _valid_existing_synthesis(data_dir: Path) -> bool:
+    synthesis_path = data_dir / "synthesis.md"
+    if not synthesis_path.is_file() or synthesis_path.stat().st_size == 0:
+        return False
+
+    from src.agents.deep_interpreter.report_guardrails import validate_synthesis_report
+
+    issues = validate_synthesis_report(data_dir)
+    return not any(issue.get("code") == "synthesis_not_markdown" for issue in issues)
+
+
+def build_reporter_recovery_message(data_dir: Path, *, preserve_synthesis: bool) -> str:
+    if preserve_synthesis:
+        return f"""[REPORTER_RECOVERY]
+The previous REPORTER attempt for {data_dir} timed out or did not produce every downstream report artifact.
+Start from a fresh message context. Preserve /synthesis.md exactly as written.
+
+Do not rewrite, regenerate, or rebuild /synthesis.md.
+Use only the already-bound part_name="all" RAG collection.
+Do not call prepare_rag_literature.
+Do not run a new literature search, create a collection, or create reporter-specific paper artifacts.
+Call generate_html_report once with template_mode="comprehensive",
+output_path="CCI_Analysis_Report.html", and the data directory from /data_path.txt.
+Stop after generate_html_report returns.
+"""
+
     return f"""[REPORTER_RECOVERY]
 The previous REPORTER attempt for {data_dir} timed out or produced an invalid report.
 Start from a fresh message context and rebuild the final synthesis from the existing artifacts.
@@ -164,7 +189,10 @@ async def run_reporter_with_recovery(
         description = (
             initial_description
             if attempt_number == 1
-            else build_reporter_recovery_message(root)
+            else build_reporter_recovery_message(
+                root,
+                preserve_synthesis=_valid_existing_synthesis(root),
+            )
         )
         started = time.monotonic()
         attempt: dict[str, Any] = {

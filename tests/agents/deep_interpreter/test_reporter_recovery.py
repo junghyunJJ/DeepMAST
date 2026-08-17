@@ -241,6 +241,41 @@ async def test_reporter_recovery_uses_fresh_context_once(tmp_path: Path) -> None
 
 
 @pytest.mark.asyncio
+async def test_reporter_recovery_preserves_valid_synthesis_and_renders_once(
+    tmp_path: Path,
+) -> None:
+    prompts: list[str] = []
+
+    async def invoke(description: str) -> dict[str, list[dict[str, str]]]:
+        prompts.append(description)
+        if len(prompts) == 1:
+            (tmp_path / "synthesis.md").write_text(
+                "# Synthesis\n\n## Executive Summary\n\nGrounded narrative.\n",
+                encoding="utf-8",
+            )
+        else:
+            _write_reporter_outputs(tmp_path, status="passed", errors=0)
+        return {
+            "messages": [
+                {"role": "assistant", "content": f"attempt-{len(prompts)}"}
+            ]
+        }
+
+    result = await run_reporter_with_recovery(
+        invoke=invoke,
+        initial_description="normal reporter request",
+        data_dir=tmp_path,
+        timeout_seconds=1,
+    )
+
+    assert result["messages"][-1]["content"] == "attempt-2"
+    assert len(prompts) == 2
+    assert "Preserve /synthesis.md" in prompts[1]
+    assert "rebuild the final synthesis" not in prompts[1]
+    assert "generate_html_report once" in prompts[1]
+
+
+@pytest.mark.asyncio
 async def test_reporter_recovery_retries_once_after_timeout(tmp_path: Path) -> None:
     prompts: list[str] = []
     never_finishes = asyncio.Event()
