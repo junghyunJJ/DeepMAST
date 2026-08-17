@@ -528,12 +528,40 @@ def _severity_counts(path: Path, artifact: str) -> dict[str, int]:
     return counts
 
 
-def _rag_retrieval_metrics(path: Path) -> dict[str, int]:
+def _claim_selection_cache_hits(*artifacts: dict[str, Any]) -> int:
+    total = 0
+    for artifact in artifacts:
+        selection = artifact.get("claim_selection") if isinstance(artifact, dict) else None
+        hits = selection.get("retrieval_cache_hits") if isinstance(selection, dict) else None
+        if type(hits) is int:
+            total += hits
+    return total
+
+
+def _rag_retrieval_metrics(path: Path, retrieval_cache_hits: int = 0) -> dict[str, int | float]:
     records = [
         json.loads(line)
         for line in path.read_text(encoding="utf-8").splitlines()
         if line.strip()
     ] if path.is_file() else []
+    query_hashes = {
+        record["query_sha256"]
+        for record in records
+        if isinstance(record.get("query_sha256"), str)
+    }
+    hashed_attempt_count = sum(
+        1 for record in records if isinstance(record.get("query_sha256"), str)
+    )
+    result_pmids: set[str] = set()
+    for record in records:
+        pmids = record.get("result_pmids")
+        if isinstance(pmids, list):
+            result_pmids.update(pmid for pmid in pmids if isinstance(pmid, str))
+    elapsed_seconds_total = sum(
+        record["elapsed_seconds"]
+        for record in records
+        if type(record.get("elapsed_seconds")) in {int, float}
+    )
     return {
         "attempt_count": len(records),
         "positive_result_count": sum(
@@ -552,6 +580,11 @@ def _rag_retrieval_metrics(path: Path) -> dict[str, int]:
             and type(record.get("result_count")) is int
             and record["result_count"] == 0
         ),
+        "unique_query_count": len(query_hashes),
+        "duplicate_attempt_count": hashed_attempt_count - len(query_hashes),
+        "unique_result_pmid_count": len(result_pmids),
+        "retrieval_cache_hits": retrieval_cache_hits,
+        "elapsed_seconds_total": round(elapsed_seconds_total, 3),
     }
 
 
@@ -585,7 +618,10 @@ def extract_metrics(data_dir: Path) -> dict[str, Any]:
             "total_repair_count": repair_attempts + terminal_repairs,
             "changed_claims": synthesis_guardrail.get("changed_claims"),
         },
-        "retrieval": _rag_retrieval_metrics(data_dir / "rag_audit.jsonl"),
+        "retrieval": _rag_retrieval_metrics(
+            data_dir / "rag_audit.jsonl",
+            _claim_selection_cache_hits(parts_guardrail, synthesis_guardrail),
+        ),
         "artifacts": artifacts,
     }
 

@@ -4,6 +4,7 @@ import json
 import os
 import tempfile
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -636,7 +637,7 @@ class TestRagSniIntegration:
             "ICAM1 supports inflammatory fibroblast signaling."
         )
         audit = json.loads((tmp_path / "rag-audit.jsonl").read_text())
-        assert audit == {
+        expected_audit = {
             "endpoint": "agentic_search",
             "collection_uuid": "collection-id",
             "query_sha256": "4e542d55a3e8433eeb8c1f03861d4f40346f7c1ce88ecbc5fcffefc84a56bc8f",
@@ -645,7 +646,84 @@ class TestRagSniIntegration:
             "result_count": 1,
             "error_type": None,
         }
+        assert {key: audit[key] for key in expected_audit} == expected_audit
         assert "ICAM1 fibrosis" not in (tmp_path / "rag-audit.jsonl").read_text()
+
+    @pytest.mark.asyncio
+    async def test_agentic_search_audit_records_observational_payload_fields(
+        self, tmp_path, monkeypatch
+    ):
+        monkeypatch.setenv("DEEP_INTERPRETER_USE_WIKI_CONTEXT", "true")
+        monkeypatch.setenv(
+            "DEEP_INTERPRETER_RAG_AUDIT_PATH", str(tmp_path / "rag-audit.jsonl")
+        )
+        ticks = iter([100.0, 101.25])
+        monkeypatch.setattr(
+            literature_rag,
+            "time",
+            SimpleNamespace(monotonic=lambda: next(ticks)),
+            raising=False,
+        )
+
+        class FakeTool:
+            name = "agentic_search"
+
+            async def ainvoke(self, args):
+                return {
+                    "sources": [
+                        {
+                            "content": "ICAM1 supports fibroblast activation.",
+                            "metadata": {"filename": "pmid_12345678.txt"},
+                            "score": 0.91,
+                        },
+                        {
+                            "content": "VCAM1 overlaps the inflammatory program.",
+                            "metadata": {"source": "/papers/pmid_87654321.txt"},
+                            "score": 0.82,
+                        },
+                        {
+                            "content": "Duplicate ICAM1 chunk.",
+                            "metadata": {"filename": "pmid_12345678.txt"},
+                            "score": 0.7,
+                        },
+                    ],
+                    "retrieved_document_ids": ["a", "b", "c", "d"],
+                    "relevant_documents": [{"id": "a"}, {"id": "b"}],
+                    "selected_wiki_pages": [{"title": "ICAM1"}, {"title": "VCAM1"}],
+                    "rewrite_count": 2,
+                    "wiki_context_status": "selected",
+                }
+
+        async def fake_tools():
+            return [FakeTool()]
+
+        monkeypatch.setattr(literature_rag, "_get_cci_rag_tools", fake_tools)
+
+        result = await literature_rag._agentic_search_with_sni(
+            "ICAM1 fibrosis",
+            "collection-id",
+            limit=5,
+            search_type="hybrid",
+        )
+
+        assert len(result) == 3
+        audit = json.loads((tmp_path / "rag-audit.jsonl").read_text())
+        expected_audit = {
+            "endpoint": "agentic_search",
+            "collection_uuid": "collection-id",
+            "query_sha256": "4e542d55a3e8433eeb8c1f03861d4f40346f7c1ce88ecbc5fcffefc84a56bc8f",
+            "use_wiki_context": True,
+            "success": True,
+            "result_count": 3,
+            "error_type": None,
+            "elapsed_seconds": 1.25,
+            "rewrite_count": 2,
+            "retrieved_document_count": 4,
+            "relevant_document_count": 2,
+            "selected_wiki_page_count": 2,
+            "result_pmids": ["12345678", "87654321"],
+        }
+        assert audit == expected_audit
 
     @pytest.mark.asyncio
     async def test_search_fulltext_rag_audits_no_relevant_context_payload(
@@ -676,7 +754,8 @@ class TestRagSniIntegration:
         )
 
         assert result == []
-        assert json.loads((tmp_path / "rag-audit.jsonl").read_text()) == {
+        audit = json.loads((tmp_path / "rag-audit.jsonl").read_text())
+        expected_audit = {
             "endpoint": "agentic_search",
             "collection_uuid": "collection-id",
             "query_sha256": "4e542d55a3e8433eeb8c1f03861d4f40346f7c1ce88ecbc5fcffefc84a56bc8f",
@@ -685,6 +764,7 @@ class TestRagSniIntegration:
             "result_count": 0,
             "error_type": "NoRelevantContext",
         }
+        assert {key: audit[key] for key in expected_audit} == expected_audit
         assert "ICAM1 fibrosis" not in (tmp_path / "rag-audit.jsonl").read_text()
 
     @pytest.mark.asyncio
@@ -715,7 +795,8 @@ class TestRagSniIntegration:
         )
 
         assert result == []
-        assert json.loads((tmp_path / "rag-audit.jsonl").read_text()) == {
+        audit = json.loads((tmp_path / "rag-audit.jsonl").read_text())
+        expected_audit = {
             "endpoint": "agentic_search",
             "collection_uuid": "collection-id",
             "query_sha256": "4e542d55a3e8433eeb8c1f03861d4f40346f7c1ce88ecbc5fcffefc84a56bc8f",
@@ -724,6 +805,7 @@ class TestRagSniIntegration:
             "result_count": 0,
             "error_type": "NoRelevantContext",
         }
+        assert {key: audit[key] for key in expected_audit} == expected_audit
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("payload", [{"answer": "none"}, {"sources": "none"}])

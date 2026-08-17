@@ -15,6 +15,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+import time
 from html import unescape
 from html.parser import HTMLParser
 from pathlib import Path
@@ -145,6 +146,12 @@ def _append_rag_audit(
     use_wiki_context: bool,
     result_count: int,
     error_type: str | None,
+    elapsed_seconds: float | None = None,
+    rewrite_count: int | None = None,
+    retrieved_document_count: int | None = None,
+    relevant_document_count: int | None = None,
+    selected_wiki_page_count: int | None = None,
+    result_pmids: list[str] | None = None,
 ) -> None:
     audit_path = os.getenv("DEEP_INTERPRETER_RAG_AUDIT_PATH")
     if not audit_path:
@@ -158,6 +165,15 @@ def _append_rag_audit(
         "result_count": result_count,
         "error_type": error_type,
     }
+    optional = {
+        "elapsed_seconds": elapsed_seconds,
+        "rewrite_count": rewrite_count,
+        "retrieved_document_count": retrieved_document_count,
+        "relevant_document_count": relevant_document_count,
+        "selected_wiki_page_count": selected_wiki_page_count,
+        "result_pmids": result_pmids,
+    }
+    record.update({key: value for key, value in optional.items() if value is not None})
     path = Path(audit_path)
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -165,6 +181,21 @@ def _append_rag_audit(
             f.write(json.dumps(record, sort_keys=True) + "\n")
     except OSError as e:
         logger.warning("RAG audit write failed: %r", e)
+
+
+def _pmids_from_result_metadata(results: list[dict]) -> list[str]:
+    pmids: list[str] = []
+    seen: set[str] = set()
+    for result in results:
+        metadata = result.get("metadata") if isinstance(result, dict) else None
+        if not isinstance(metadata, dict):
+            continue
+        for key in ("filename", "source"):
+            match = re.search(r"pmid_(\d+)\.txt\b", str(metadata.get(key, "")))
+            if match and match.group(1) not in seen:
+                seen.add(match.group(1))
+                pmids.append(match.group(1))
+    return pmids
 
 
 def _repair_json(raw: str) -> Any:
@@ -1476,6 +1507,7 @@ async def _agentic_search_with_sni(
             raise RAGSearchError("Required agentic RAG failed: ToolNotFound")
         return []
 
+    started = time.monotonic()
     try:
         raw = await agentic_tool.ainvoke(
             {
@@ -1489,7 +1521,14 @@ async def _agentic_search_with_sni(
         )
     except Exception as e:
         logger.warning("SNI agentic search failed: %r", e, exc_info=True)
-        _append_rag_audit(query, collection_id, use_wiki_context, 0, type(e).__name__)
+        _append_rag_audit(
+            query,
+            collection_id,
+            use_wiki_context,
+            0,
+            type(e).__name__,
+            elapsed_seconds=round(time.monotonic() - started, 3),
+        )
         if require_agentic:
             raise
         return []
@@ -1502,7 +1541,12 @@ async def _agentic_search_with_sni(
             payload = json.loads(raw)
         except json.JSONDecodeError:
             _append_rag_audit(
-                query, collection_id, use_wiki_context, 0, "JSONDecodeError"
+                query,
+                collection_id,
+                use_wiki_context,
+                0,
+                "JSONDecodeError",
+                elapsed_seconds=round(time.monotonic() - started, 3),
             )
             if require_agentic:
                 raise RAGSearchError("Required agentic RAG failed: JSONDecodeError")
@@ -1510,10 +1554,31 @@ async def _agentic_search_with_sni(
     elif isinstance(raw, dict):
         payload = raw
     else:
-        _append_rag_audit(query, collection_id, use_wiki_context, 0, type(raw).__name__)
+        _append_rag_audit(
+            query,
+            collection_id,
+            use_wiki_context,
+            0,
+            type(raw).__name__,
+            elapsed_seconds=round(time.monotonic() - started, 3),
+        )
         if require_agentic:
             raise RAGSearchError(f"Required agentic RAG failed: {type(raw).__name__}")
         return []
+
+    def payload_list_count(name: str) -> int | None:
+        value = payload.get(name)
+        return len(value) if isinstance(value, list) else None
+
+    audit_payload_fields = {
+        "elapsed_seconds": round(time.monotonic() - started, 3),
+        "rewrite_count": payload.get("rewrite_count")
+        if isinstance(payload.get("rewrite_count"), int)
+        else None,
+        "retrieved_document_count": payload_list_count("retrieved_document_ids"),
+        "relevant_document_count": payload_list_count("relevant_documents"),
+        "selected_wiki_page_count": payload_list_count("selected_wiki_pages"),
+    }
 
     if payload.get("error"):
         logger.warning("SNI agentic search returned error: %s", payload.get("error"))
@@ -1522,19 +1587,40 @@ async def _agentic_search_with_sni(
             if payload.get("error") == "no_relevant_context"
             else "AgenticError"
         )
-        _append_rag_audit(query, collection_id, use_wiki_context, 0, error_type)
+        _append_rag_audit(
+            query,
+            collection_id,
+            use_wiki_context,
+            0,
+            error_type,
+            **audit_payload_fields,
+        )
         if require_agentic and error_type != "NoRelevantContext":
             raise RAGSearchError(f"Required agentic RAG failed: {error_type}")
         return []
 
     sources = payload.get("sources")
     if not isinstance(sources, list):
-        _append_rag_audit(query, collection_id, use_wiki_context, 0, "InvalidSources")
+        _append_rag_audit(
+            query,
+            collection_id,
+            use_wiki_context,
+            0,
+            "InvalidSources",
+            **audit_payload_fields,
+        )
         if require_agentic:
             raise RAGSearchError("Required agentic RAG failed: InvalidSources")
         return []
     if not sources:
-        _append_rag_audit(query, collection_id, use_wiki_context, 0, "NoRelevantContext")
+        _append_rag_audit(
+            query,
+            collection_id,
+            use_wiki_context,
+            0,
+            "NoRelevantContext",
+            **audit_payload_fields,
+        )
         return []
 
     results = []
@@ -1561,7 +1647,13 @@ async def _agentic_search_with_sni(
 
     usable_results = [r for r in results if r.get("page_content")][:limit]
     _append_rag_audit(
-        query, collection_id, use_wiki_context, len(usable_results), None
+        query,
+        collection_id,
+        use_wiki_context,
+        len(usable_results),
+        None,
+        result_pmids=_pmids_from_result_metadata(usable_results),
+        **audit_payload_fields,
     )
     return usable_results
 

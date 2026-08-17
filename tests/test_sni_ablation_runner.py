@@ -986,10 +986,95 @@ def test_bc_runner_metrics_count_terminal_synthesis_repair(tmp_path: Path) -> No
         "attempt_count": 2,
         "positive_result_count": 1,
         "zero_hit_count": 1,
+        "unique_query_count": 0,
+        "duplicate_attempt_count": 0,
+        "unique_result_pmid_count": 0,
+        "retrieval_cache_hits": 0,
+        "elapsed_seconds_total": 0,
     }
     assert metrics["artifacts"]["part1_final.md"]["initial_error_count"] == 1
     assert metrics["artifacts"]["part1_final.md"]["final_error_count"] == 0
     assert metrics["artifacts"]["synthesis.md"]["initial_error_count"] == 3
+
+
+def test_bc_runner_metrics_aggregate_rag_observability(tmp_path: Path) -> None:
+    data_dir = tmp_path / "condition"
+    data_dir.mkdir()
+    _successful_condition_artifacts(data_dir)
+    (data_dir / "rag_audit.jsonl").write_text(
+        "\n".join(
+            [
+                json.dumps(
+                    {
+                        "endpoint": "agentic_search",
+                        "collection_uuid": stack.BC_COLLECTION_ID,
+                        "use_wiki_context": False,
+                        "success": True,
+                        "error_type": None,
+                        "result_count": 2,
+                        "query_sha256": "query-a",
+                        "elapsed_seconds": 1.25,
+                        "result_pmids": ["12345678", "87654321"],
+                    }
+                ),
+                json.dumps(
+                    {
+                        "endpoint": "agentic_search",
+                        "collection_uuid": stack.BC_COLLECTION_ID,
+                        "use_wiki_context": False,
+                        "success": True,
+                        "error_type": None,
+                        "result_count": 1,
+                        "query_sha256": "query-a",
+                        "elapsed_seconds": 0.75,
+                        "result_pmids": ["87654321", "22222222"],
+                    }
+                ),
+                json.dumps(
+                    {
+                        "endpoint": "agentic_search",
+                        "collection_uuid": stack.BC_COLLECTION_ID,
+                        "use_wiki_context": False,
+                        "success": False,
+                        "error_type": "NoRelevantContext",
+                        "result_count": 0,
+                        "query_sha256": "query-b",
+                        "elapsed_seconds": 0.5,
+                        "result_pmids": [],
+                    }
+                ),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (data_dir / "parts_guardrail_result.json").write_text(
+        json.dumps({"claim_selection": {"retrieval_cache_hits": 2}}),
+        encoding="utf-8",
+    )
+    (data_dir / "synthesis_validation.json").write_text(
+        json.dumps(
+            {
+                "synthesis_guardrail": {
+                    "claim_selection": {"retrieval_cache_hits": 3}
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    metrics = bc_runner.extract_metrics(data_dir)
+
+    assert metrics["retrieval"] == {
+        "attempt_count": 3,
+        "positive_result_count": 2,
+        "zero_hit_count": 1,
+        "unique_query_count": 2,
+        "duplicate_attempt_count": 1,
+        "unique_result_pmid_count": 3,
+        "retrieval_cache_hits": 5,
+        "elapsed_seconds_total": 2.5,
+    }
 
 
 def test_bc_runner_accepts_no_relevant_context_zero_hit_audit(tmp_path: Path) -> None:
