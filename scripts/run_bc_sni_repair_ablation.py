@@ -27,6 +27,7 @@ from scripts.sni_ablation_api_stack import APIS, BC_COLLECTION_ID, BC_COLLECTION
 
 BC_SOURCE = REPO_ROOT / "res/deep_interpreter/bc/bc"
 PMID_FILENAME = re.compile(r"^pmid_(\d+)\.txt$")
+BC_PMID_COUNT = 100
 REPORT_FILES = ("part1_final.md", "part2_final.md", "part3_final.md", "synthesis.md")
 REMOVE_FILES = (
     *REPORT_FILES,
@@ -135,12 +136,13 @@ def _papers_pmids(path: Path) -> set[str]:
     payload = read_json(path)
     papers = payload.get("papers")
     if not isinstance(papers, list):
-        return set()
-    return {
-        str(paper["pmid"])
-        for paper in papers
-        if isinstance(paper, dict) and paper.get("pmid") is not None
-    }
+        raise RuntimeError(f"BC source papers file is missing papers list: {path}")
+    pmids: set[str] = set()
+    for paper in papers:
+        if not isinstance(paper, dict) or paper.get("pmid") is None:
+            raise RuntimeError(f"BC source papers file has malformed PMID entry: {path}")
+        pmids.add(str(paper["pmid"]))
+    return pmids
 
 
 def _document_rows(payload: Any) -> list[Any]:
@@ -668,6 +670,8 @@ def run_condition(
     try:
         if collection_before != BC_COLLECTION_SNAPSHOT:
             raise RuntimeError(f"BC collection snapshot drift before run: {collection_before}")
+        if len(source_pmids) != BC_PMID_COUNT or len(observed_pmids) != BC_PMID_COUNT:
+            raise RuntimeError("BC source and fixed collection must each contain exactly 100 PMIDs")
         if observed_pmids != source_pmids:
             raise RuntimeError("BC source papers PMIDs do not match fixed collection PMIDs")
         return_code = stage_runner(data_dir, env)

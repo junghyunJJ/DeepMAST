@@ -536,12 +536,15 @@ def _minimal_source(root: Path) -> Path:
     source = root / "bc_interpreter"
     source.mkdir()
     for name in (
-        "papers.json",
         "targets.json",
         "interpretation_guide.md",
         "part4_candidate_selection.json",
     ):
         (source / name).write_text("{}\n" if name.endswith(".json") else "guide\n", encoding="utf-8")
+    (source / "papers.json").write_text(
+        json.dumps({"papers": [{"pmid": str(i)} for i in range(100)]}),
+        encoding="utf-8",
+    )
     for name in (
         "part1_final.md",
         "part2_final.md",
@@ -555,6 +558,10 @@ def _minimal_source(root: Path) -> Path:
     (source / "evidence").mkdir()
     (source / "evidence" / "kept.json").write_text("{}\n", encoding="utf-8")
     return source
+
+
+def _pmids_100() -> set[str]:
+    return {str(i) for i in range(100)}
 
 
 def _manifest_output_root(tmp_path: Path) -> tuple[Path, Path]:
@@ -652,6 +659,36 @@ def test_bc_runner_rejects_collection_pmid_mismatch_before_stage(tmp_path: Path)
     assert stage_called is False
 
 
+def test_bc_runner_rejects_empty_matching_pmid_sets_before_stage(tmp_path: Path) -> None:
+    source = _minimal_source(tmp_path)
+    (source / "papers.json").write_text(json.dumps({"papers": []}), encoding="utf-8")
+    stage_called = False
+
+    def stage_runner(_data_dir: Path, _env: dict[str, str]) -> int:
+        nonlocal stage_called
+        stage_called = True
+        return 0
+
+    rc = bc_runner.run_condition(
+        source=source,
+        output_root=tmp_path / "runs",
+        pair={
+            "pair_id": "01",
+            "api_port": 8882,
+            "backend_port": 5000,
+            "rag_backend_port": 4000,
+            "condition_order": ["no-SNI", "SNI"],
+        },
+        condition=bc_runner.CONDITION_BY_LABEL["no-SNI"],
+        stage_runner=stage_runner,
+        collection_snapshot=lambda _url: stack.BC_COLLECTION_SNAPSHOT,
+        collection_pmids=lambda _url: set(),
+    )
+
+    assert rc == 1
+    assert stage_called is False
+
+
 def test_bc_runner_copies_each_condition_without_source_mutation(tmp_path: Path) -> None:
     source = _minimal_source(tmp_path)
     run_dir = bc_runner.prepare_condition_copy(
@@ -743,7 +780,7 @@ def test_bc_runner_pair_uses_sequential_conditions_with_fixed_endpoint_env(tmp_p
         ],
         stage_runner=fake_stage,
         collection_snapshot=lambda _api_url: stack.BC_COLLECTION_SNAPSHOT,
-        collection_pmids=lambda _api_url: set(),
+        collection_pmids=lambda _api_url: _pmids_100(),
     )
 
     assert rc == 0
@@ -1056,7 +1093,7 @@ def test_bc_runner_fails_on_collection_drift_or_invalid_audit(tmp_path: Path) ->
         ],
         stage_runner=fake_stage,
         collection_snapshot=lambda _api_url: stack.BC_COLLECTION_SNAPSHOT,
-        collection_pmids=lambda _api_url: set(),
+        collection_pmids=lambda _api_url: _pmids_100(),
     )
     drift_rc = bc_runner.main(
         [
@@ -1071,7 +1108,7 @@ def test_bc_runner_fails_on_collection_drift_or_invalid_audit(tmp_path: Path) ->
         ],
         stage_runner=lambda data_dir, env: (_successful_condition_artifacts(data_dir) or 0),
         collection_snapshot=lambda _api_url: stack.BC_COLLECTION_SNAPSHOT | {"chunk_count": 1552},
-        collection_pmids=lambda _api_url: set(),
+        collection_pmids=lambda _api_url: _pmids_100(),
     )
 
     assert audit_rc == 1
@@ -1137,7 +1174,7 @@ def test_bc_runner_preserves_post_stage_failure_evidence_and_metrics(tmp_path: P
         ],
         stage_runner=fake_stage,
         collection_snapshot=lambda _api_url: stack.BC_COLLECTION_SNAPSHOT,
-        collection_pmids=lambda _api_url: set(),
+        collection_pmids=lambda _api_url: _pmids_100(),
     )
 
     failed_dir = output_root / "pair-01" / "wiki-off"
@@ -1171,7 +1208,7 @@ def test_bc_runner_fails_when_audit_is_missing(tmp_path: Path) -> None:
         ],
         stage_runner=fake_stage,
         collection_snapshot=lambda _api_url: stack.BC_COLLECTION_SNAPSHOT,
-        collection_pmids=lambda _api_url: set(),
+        collection_pmids=lambda _api_url: _pmids_100(),
     )
 
     assert rc == 1
@@ -1202,7 +1239,7 @@ def test_bc_runner_fails_when_final_guardrail_errors_remain(tmp_path: Path) -> N
         ],
         stage_runner=fake_stage,
         collection_snapshot=lambda _api_url: stack.BC_COLLECTION_SNAPSHOT,
-        collection_pmids=lambda _api_url: set(),
+        collection_pmids=lambda _api_url: _pmids_100(),
     )
 
     assert rc == 1
