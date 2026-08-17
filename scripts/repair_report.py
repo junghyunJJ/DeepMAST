@@ -13,6 +13,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
 SECTION_RE = re.compile(r"(^## .+?$)(.*?)(?=^## |\Z)", re.MULTILINE | re.DOTALL)
+HEADING_RE = re.compile(r"^#{1,6}\s+.+?$", re.MULTILINE)
 REPAIRABLE_INLINE_CITATION_CODES = {
     "inline_citation_unsupported",
     "inline_citation_overclaimed",
@@ -39,6 +40,18 @@ def _find_section(text: str, heading: str) -> tuple[int, int, str] | None:
         if match.group(1).strip() == heading.strip():
             return match.start(), match.end(), match.group(0)
     return None
+
+
+def _markdown_headings(text: str) -> list[str]:
+    return [match.group(0).strip() for match in HEADING_RE.finditer(text)]
+
+
+def _safe_section_replacement(original: str, candidate: str) -> bool:
+    if _markdown_headings(candidate) != _markdown_headings(original):
+        return False
+    original_size = len(re.sub(r"\s+", "", original))
+    candidate_size = len(re.sub(r"\s+", "", candidate))
+    return candidate_size >= 0.5 * original_size
 
 
 def _known_pmids(data_dir: Path) -> set[str]:
@@ -230,6 +243,8 @@ def repair_report(
         replacement = _content(model.invoke(_build_prompt(issue_payload, section_text))).strip()
         if not replacement.startswith(section.strip()):
             replacement = section.strip() + "\n" + replacement
+        if not _safe_section_replacement(section_text, replacement):
+            continue
         path.write_text(text[:start] + replacement.rstrip() + "\n" + text[end:], encoding="utf-8")
         changed += 1
 

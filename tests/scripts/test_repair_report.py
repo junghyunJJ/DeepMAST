@@ -50,8 +50,47 @@ class CountingLLM:
             {
                 "content": (
                     "## Analysis 2-8: Pathway Factor Heatmap\n"
-                    "### Biological Interpretation\n"
                     "Factor1 may reflect pathway activity inferred from LR annotations."
+                )
+            },
+        )()
+
+
+class TruncatedSectionLLM:
+    def invoke(self, prompt: str):
+        assert "Original unsupported claim." in prompt
+        return type(
+            "Msg",
+            (),
+            {
+                "content": (
+                    "## Analysis 2-8\n"
+                    "### Figure Description\n"
+                    "Shortened description.\n"
+                    "### Quantitative Findings\n"
+                    "Measured values remain.\n"
+                )
+            },
+        )()
+
+
+class ShortSafeSectionLLM:
+    def invoke(self, prompt: str):
+        assert "Original unsupported claim." in prompt
+        return type(
+            "Msg",
+            (),
+            {
+                "content": (
+                    "## Analysis 2-8\n"
+                    "### Figure Description\n"
+                    "Full figure description.\n"
+                    "### Quantitative Findings\n"
+                    "Measured values remain.\n"
+                    "### Biological Interpretation\n"
+                    "Hedged claim.\n"
+                    "### References\n"
+                    "- PMID: 12345678\n"
                 )
             },
         )()
@@ -97,6 +136,92 @@ def test_repair_replaces_only_flagged_section(tmp_path: Path) -> None:
     assert "UNCHANGED SUMMARY" in text
     assert "Factor1 showed significant enrichment" not in text
     assert "not pathway-factor significance" in text
+
+
+def test_repair_rejects_truncated_section_and_preserves_original(tmp_path: Path) -> None:
+    original = (
+        "## Analysis 2-8\n"
+        "### Figure Description\n"
+        "Full figure description.\n"
+        "### Quantitative Findings\n"
+        "Measured values remain.\n"
+        "### Biological Interpretation\n"
+        "Original unsupported claim.\n"
+        "### References\n"
+        "- PMID: 12345678\n"
+    )
+    report = tmp_path / "part2_final.md"
+    report.write_text(original, encoding="utf-8")
+    issues_path = tmp_path / "issues.json"
+    issues_path.write_text(
+        json.dumps(
+            {
+                "issues": [
+                    {
+                        "code": "unsupported_mechanistic_interpretation",
+                        "severity": "error",
+                        "file": "part2_final.md",
+                        "section": "## Analysis 2-8",
+                        "value": "Original unsupported claim.",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    changed = repair_report.repair_report(tmp_path, issues_path, llm=TruncatedSectionLLM())
+
+    assert changed == 0
+    assert report.read_text(encoding="utf-8") == original
+
+
+def test_repair_accepts_shorter_section_with_same_headings(tmp_path: Path) -> None:
+    original = (
+        "## Analysis 2-8\n"
+        "### Figure Description\n"
+        "Full figure description.\n"
+        "### Quantitative Findings\n"
+        "Measured values remain.\n"
+        "### Biological Interpretation\n"
+        "Original unsupported claim.\n"
+        "### References\n"
+        "- PMID: 12345678\n"
+    )
+    report = tmp_path / "part2_final.md"
+    report.write_text(original, encoding="utf-8")
+    issues_path = tmp_path / "issues.json"
+    issues_path.write_text(
+        json.dumps(
+            {
+                "issues": [
+                    {
+                        "code": "unsupported_mechanistic_interpretation",
+                        "severity": "error",
+                        "file": "part2_final.md",
+                        "section": "## Analysis 2-8",
+                        "value": "Original unsupported claim.",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    changed = repair_report.repair_report(tmp_path, issues_path, llm=ShortSafeSectionLLM())
+
+    assert changed == 1
+    assert report.read_text(encoding="utf-8") == (
+        "## Analysis 2-8\n"
+        "### Figure Description\n"
+        "Full figure description.\n"
+        "### Quantitative Findings\n"
+        "Measured values remain.\n"
+        "### Biological Interpretation\n"
+        "Hedged claim.\n"
+        "### References\n"
+        "- PMID: 12345678\n"
+    )
 
 
 def test_repair_groups_multiple_issues_for_same_section(tmp_path: Path) -> None:
