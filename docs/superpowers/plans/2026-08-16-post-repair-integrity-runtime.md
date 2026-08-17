@@ -373,3 +373,40 @@ If no production fix is needed, create no empty commit. If Task 6 exposes a task
 - Function names and checkpoint/audit fields are consistent across tasks.
 - All code changes have explicit RED and GREEN commands.
 - Live execution is bounded to one pair and a four-hour hard gate.
+
+---
+
+### Task 7: Clear copied runtime scratch before retrying the canonical smoke
+
+**Files:**
+- Modify: `scripts/run_bc_sni_repair_ablation.py:20-190`
+- Modify: `tests/test_sni_ablation_runner.py`
+
+**Interfaces:**
+- `prepare_condition_copy(...)` preserves source inputs but creates empty `before/`, `after/`, `diffs/`, and `logs/` directories.
+- Prior `timing.json`, run/guardrail/recovery manifests, RAG audit/binding files, collection snapshots, reporter-attempt snapshots, and token/trace artifacts are absent from the new condition copy.
+
+- [ ] **Step 1: Write a failing stale-runtime-copy regression**
+
+Create stale files under all four runtime directories plus representative root runtime artifacts in `_minimal_source`, run `prepare_condition_copy`, and assert the source stays untouched while the destination runtime directories are empty and root artifacts are absent.
+
+- [ ] **Step 2: Verify RED**
+
+Run the exact new test. Expected: stale files currently survive `copytree` because `mkdir(exist_ok=True)` does not clear them.
+
+- [ ] **Step 3: Implement minimal cleanup**
+
+Remove copied runtime directories before recreating them, extend the existing explicit runtime-file and runtime-glob cleanup lists, and avoid broad deletion patterns that could remove scientific inputs.
+
+- [ ] **Step 4: Run runner verification**
+
+```bash
+OPENAI_API_KEY=test uv run pytest -q tests/test_sni_ablation_runner.py
+uv run ruff check scripts/run_bc_sni_repair_ablation.py tests/test_sni_ablation_runner.py
+uv run python -m py_compile scripts/run_bc_sni_repair_ablation.py tests/test_sni_ablation_runner.py
+git diff --check
+```
+
+- [ ] **Step 5: Commit and return to Task 6**
+
+Commit the runner/test fix with Lore trailers, pass task review, then rerun Task 6 against a fresh output root; do not reuse the invalid diagnostic directory.
