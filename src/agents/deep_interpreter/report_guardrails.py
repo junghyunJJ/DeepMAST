@@ -404,7 +404,11 @@ def _validate_synthesis_guardrails(
     dict[str, Any] | None,
 ]:
     deterministic = validate_synthesis_report(data_dir)
-    if any(issue.get("code") in PAPERS_JSON_LOAD_ERROR_CODES for issue in deterministic):
+    if any(
+        issue.get("code") in PAPERS_JSON_LOAD_ERROR_CODES
+        or issue.get("code") == "synthesis_not_markdown"
+        for issue in deterministic
+    ):
         return deterministic, [], {"issues": [], "results": []}, None, None
     semantic = claim_rag_validation.validate_claims(
         data_dir,

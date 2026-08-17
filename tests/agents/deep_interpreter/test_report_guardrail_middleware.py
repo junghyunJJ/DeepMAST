@@ -634,8 +634,23 @@ def test_run_synthesis_guardrail_fails_unresolved_consistency_issue(
 
 def test_run_synthesis_guardrail_rejects_html_fragment_synthesis(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from src.agents.deep_interpreter import report_guardrails
+
+    def fail_if_called(*_args: Any, **_kwargs: Any) -> Any:
+        raise AssertionError("semantic validation must wait for valid Markdown")
+
+    monkeypatch.setattr(
+        report_guardrails.claim_rag_validation,
+        "validate_claims",
+        fail_if_called,
+    )
+    monkeypatch.setattr(
+        report_guardrails.synthesis_consistency_validation,
+        "validate_synthesis_consistency",
+        fail_if_called,
+    )
 
     (tmp_path / "papers.json").write_text('{"papers": []}', encoding="utf-8")
     (tmp_path / "synthesis.md").write_text(
