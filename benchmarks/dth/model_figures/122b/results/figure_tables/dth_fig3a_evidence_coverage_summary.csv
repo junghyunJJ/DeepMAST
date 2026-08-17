@@ -1,0 +1,3 @@
+condition,condition_label,n,mean_coverage,median_coverage,sd_coverage,se_coverage,min_coverage,max_coverage
+DTH_yes,DTH-guided,20,75.001,73.53,11.589555597492438,2.5915034145006284,47.06,100
+DTH_no,Baseline,20,74.7065,76.47,6.908073289922983,1.5446921469818402,58.82,88.24

@@ -4,3 +4,5 @@ __pycache__/
 Rplots.pdf
 !/results/
 !/results/**
+!/model_figures/
+!/model_figures/**

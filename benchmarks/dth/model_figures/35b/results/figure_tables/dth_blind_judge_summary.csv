@@ -1,0 +1,3 @@
+judge_label,judge_model,total_rows,valid_judge_rows,dth_yes_wins,dth_no_wins,ties,dth_yes_win_rate,dth_no_win_rate,tie_rate,mean_score_delta_yes_minus_no,sign_test_pvalue_yes_vs_no
+GPT-5.4,gpt-5.4,20,20,14,1,5,0.7,0.05,0.25,4.1,9.765625e-4
+Sonnet 4.6,claude-sonnet-4-6,20,20,7,4,9,0.35,0.2,0.45,0.15,0.548828125

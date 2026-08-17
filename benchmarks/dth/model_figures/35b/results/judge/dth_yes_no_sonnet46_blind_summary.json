@@ -1,0 +1,77 @@
+{
+  "metadata": {
+    "summary_json": "/Users/jungj2/Dropbox/Metadata/aiagent/DeepMAST/benchmarks/dth/model_figures/35b/results/cumulative_valid_only_summary_for_20each_target.json",
+    "stem": "dth_yes_no_sonnet46_blind",
+    "status": "judged",
+    "pair_count": 20,
+    "judge_provider": "anthropic",
+    "judge_model": "claude-sonnet-4-6",
+    "base_url": null,
+    "ollama_think": null,
+    "seed": 20260621,
+    "tie_threshold": 2.0,
+    "limit_pairs": null,
+    "pricing_per_1m_usd": {
+      "input_per_1m_usd": 3.0,
+      "output_per_1m_usd": 15.0
+    }
+  },
+  "panel_count": 20,
+  "aggregate": {
+    "total_rows": 20,
+    "valid_judge_rows": 20,
+    "judge_error_count": 0,
+    "wins": {
+      "DTH_yes": 7,
+      "DTH_no": 4,
+      "tie": 9
+    },
+    "win_rates": {
+      "DTH_yes": 0.35,
+      "DTH_no": 0.2,
+      "tie": 0.45
+    },
+    "non_tie_n": 11,
+    "sign_test_pvalue_yes_vs_no": 0.548828125,
+    "mean_score_by_condition": {
+      "DTH_yes": 15.3,
+      "DTH_no": 15.15
+    },
+    "mean_score_delta_yes_minus_no": 0.15,
+    "metric_means_by_condition": {
+      "DTH_yes": {
+        "biological_plausibility": 3.05,
+        "claim_boundary_restraint": 3.9,
+        "evidence_grounding": 3.15,
+        "specificity_testability": 2.35,
+        "therapeutic_relevance": 3.05,
+        "unsupported_claim_penalty": -0.2
+      },
+      "DTH_no": {
+        "biological_plausibility": 3.45,
+        "claim_boundary_restraint": 3.0,
+        "evidence_grounding": 3.2,
+        "specificity_testability": 2.6,
+        "therapeutic_relevance": 3.3,
+        "unsupported_claim_penalty": -0.4
+      }
+    },
+    "confidence_counts": {
+      "high": 2,
+      "low": 5,
+      "medium": 13
+    },
+    "token_usage": {
+      "input_tokens": 78651,
+      "output_tokens": 17578
+    },
+    "estimated_total_cost_usd": 0.499623
+  },
+  "output_paths": {
+    "pair_panel": "/Users/jungj2/Dropbox/Metadata/aiagent/DeepMAST/benchmarks/dth/model_figures/35b/results/judge/dth_yes_no_sonnet46_blind_pair_panel.jsonl",
+    "judge_rows": "/Users/jungj2/Dropbox/Metadata/aiagent/DeepMAST/benchmarks/dth/model_figures/35b/results/judge/dth_yes_no_sonnet46_blind_judge_rows.jsonl",
+    "summary": "/Users/jungj2/Dropbox/Metadata/aiagent/DeepMAST/benchmarks/dth/model_figures/35b/results/judge/dth_yes_no_sonnet46_blind_summary.json",
+    "results_md": "/Users/jungj2/Dropbox/Metadata/aiagent/DeepMAST/benchmarks/dth/model_figures/35b/results/judge/dth_yes_no_sonnet46_blind_results.md",
+    "prompt_previews": "/Users/jungj2/Dropbox/Metadata/aiagent/DeepMAST/benchmarks/dth/model_figures/35b/results/judge/dth_yes_no_sonnet46_blind_prompt_previews"
+  }
+}

@@ -1,0 +1,3 @@
+condition,condition_label,n,mean_score,sd_score,se_score
+DTH_yes,DTH-guided,20,4.2,0.29912152080805937,0.06688560540599385
+DTH_no,Baseline,20,2.775,0.5495213227987849,0.12287670328636878

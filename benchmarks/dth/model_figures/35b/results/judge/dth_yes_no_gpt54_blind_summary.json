@@ -1,0 +1,76 @@
+{
+  "metadata": {
+    "summary_json": "/Users/jungj2/Dropbox/Metadata/aiagent/DeepMAST/benchmarks/dth/model_figures/35b/results/cumulative_valid_only_summary_for_20each_target.json",
+    "stem": "dth_yes_no_gpt54_blind",
+    "status": "judged",
+    "pair_count": 20,
+    "judge_provider": "openai",
+    "judge_model": "gpt-5.4",
+    "base_url": null,
+    "ollama_think": null,
+    "seed": 20260621,
+    "tie_threshold": 2.0,
+    "limit_pairs": null,
+    "pricing_per_1m_usd": {
+      "input_per_1m_usd": 4.0,
+      "output_per_1m_usd": 24.0
+    }
+  },
+  "panel_count": 20,
+  "aggregate": {
+    "total_rows": 20,
+    "valid_judge_rows": 20,
+    "judge_error_count": 0,
+    "wins": {
+      "DTH_yes": 14,
+      "DTH_no": 1,
+      "tie": 5
+    },
+    "win_rates": {
+      "DTH_yes": 0.7,
+      "DTH_no": 0.05,
+      "tie": 0.25
+    },
+    "non_tie_n": 15,
+    "sign_test_pvalue_yes_vs_no": 0.0009765625,
+    "mean_score_by_condition": {
+      "DTH_yes": 16.7,
+      "DTH_no": 12.6
+    },
+    "mean_score_delta_yes_minus_no": 4.1,
+    "metric_means_by_condition": {
+      "DTH_yes": {
+        "biological_plausibility": 3.5,
+        "claim_boundary_restraint": 4.5,
+        "evidence_grounding": 3.3,
+        "specificity_testability": 2.65,
+        "therapeutic_relevance": 2.95,
+        "unsupported_claim_penalty": -0.2
+      },
+      "DTH_no": {
+        "biological_plausibility": 3.4,
+        "claim_boundary_restraint": 2.55,
+        "evidence_grounding": 2.85,
+        "specificity_testability": 2.95,
+        "therapeutic_relevance": 3.05,
+        "unsupported_claim_penalty": -0.95
+      }
+    },
+    "confidence_counts": {
+      "high": 1,
+      "medium": 19
+    },
+    "token_usage": {
+      "input_tokens": 61853,
+      "output_tokens": 11566
+    },
+    "estimated_total_cost_usd": 0.524996
+  },
+  "output_paths": {
+    "pair_panel": "/Users/jungj2/Dropbox/Metadata/aiagent/DeepMAST/benchmarks/dth/model_figures/35b/results/judge/dth_yes_no_gpt54_blind_pair_panel.jsonl",
+    "judge_rows": "/Users/jungj2/Dropbox/Metadata/aiagent/DeepMAST/benchmarks/dth/model_figures/35b/results/judge/dth_yes_no_gpt54_blind_judge_rows.jsonl",
+    "summary": "/Users/jungj2/Dropbox/Metadata/aiagent/DeepMAST/benchmarks/dth/model_figures/35b/results/judge/dth_yes_no_gpt54_blind_summary.json",
+    "results_md": "/Users/jungj2/Dropbox/Metadata/aiagent/DeepMAST/benchmarks/dth/model_figures/35b/results/judge/dth_yes_no_gpt54_blind_results.md",
+    "prompt_previews": "/Users/jungj2/Dropbox/Metadata/aiagent/DeepMAST/benchmarks/dth/model_figures/35b/results/judge/dth_yes_no_gpt54_blind_prompt_previews"
+  }
+}
