@@ -1870,6 +1870,50 @@ def test_validate_claims_reuses_persisted_retrieval_across_fresh_calls(
     assert checkpoint["retrievals"]
 
 
+def test_validate_claims_normalizes_list_retrieval_checkpoint(
+    tmp_path: Path, monkeypatch
+) -> None:
+    _write_papers(tmp_path / "papers.json")
+    (tmp_path / "part1_final.md").write_text(
+        "## Analysis 1-1\n"
+        "### Biological Interpretation\n"
+        "TGFB drives fibrosis (PMID: 11111111).\n"
+        "### References\n"
+        "- PMID: 11111111\n",
+        encoding="utf-8",
+    )
+    checkpoint_path = tmp_path / claim_rag_validation.CLAIM_RAG_CHECKPOINT_FILENAME
+    checkpoint_path.write_text(
+        json.dumps({"version": 1, "batches": {}, "retrievals": []}),
+        encoding="utf-8",
+    )
+    retrieval_calls = 0
+
+    def fake_search(_args):
+        nonlocal retrieval_calls
+        retrieval_calls += 1
+        return [
+            {
+                "page_content": "TGFB is associated with fibrosis.",
+                "metadata": {"filename": "pmid_11111111.txt"},
+                "score": 0.8,
+            }
+        ]
+
+    monkeypatch.setattr(
+        claim_rag_validation.search_literature_fulltext, "invoke", fake_search
+    )
+
+    result = claim_rag_validation.validate_claims(
+        tmp_path, ("part1_final.md",), llm=FakeStructuredModel(), cache={}
+    )
+
+    assert retrieval_calls == 1
+    assert result["claims"][0]["status"] == "overclaimed"
+    checkpoint = json.loads(checkpoint_path.read_text(encoding="utf-8"))
+    assert isinstance(checkpoint["retrievals"], dict)
+
+
 def test_validate_claims_does_not_persist_transport_failure_retrievals(
     tmp_path: Path, monkeypatch
 ) -> None:

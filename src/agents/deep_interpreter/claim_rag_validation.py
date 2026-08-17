@@ -441,7 +441,8 @@ def _load_checkpoint(path: Path) -> dict[str, Any]:
         or not isinstance(checkpoint.get("batches"), dict)
     ):
         return {"version": 1, "batches": {}, "retrievals": {}}
-    checkpoint.setdefault("retrievals", {})
+    if not isinstance(checkpoint.get("retrievals"), dict):
+        checkpoint["retrievals"] = {}
     return checkpoint
 
 
