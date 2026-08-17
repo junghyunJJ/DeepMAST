@@ -636,6 +636,76 @@ def test_repair_removes_only_unsupported_inline_pmid_when_sibling_supports(
     assert "22222222" not in repaired
 
 
+def test_repair_removes_multiple_unsupported_inline_pmids_when_sibling_supports(
+    tmp_path: Path,
+) -> None:
+    claim = (
+        "TGFB is associated with fibrosis "
+        "(PMID: 11111111; PMID: 22222222; PMID: 33333333)."
+    )
+    (tmp_path / "part1_final.md").write_text(f"## Biology\n{claim}\n", encoding="utf-8")
+    issues_path = tmp_path / "issues.json"
+    issues_path.write_text(
+        json.dumps(
+            {
+                "issues": [
+                    {
+                        "severity": "error",
+                        "code": "inline_citation_unsupported",
+                        "file": "part1_final.md",
+                        "section": "## Biology",
+                        "source_claim_index": 0,
+                        "inline_pmid": "22222222",
+                        "value": claim,
+                    },
+                    {
+                        "severity": "error",
+                        "code": "inline_citation_unsupported",
+                        "file": "part1_final.md",
+                        "section": "## Biology",
+                        "source_claim_index": 0,
+                        "inline_pmid": "33333333",
+                        "value": claim,
+                    },
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    rows = [
+        {
+            "file": "part1_final.md",
+            "section": "## Biology",
+            "source_claim_index": 0,
+            "inline_pmid": "11111111",
+            "status": "supported",
+        },
+        {
+            "file": "part1_final.md",
+            "section": "## Biology",
+            "source_claim_index": 0,
+            "inline_pmid": "22222222",
+            "status": "unsupported",
+        },
+        {
+            "file": "part1_final.md",
+            "section": "## Biology",
+            "source_claim_index": 0,
+            "inline_pmid": "33333333",
+            "status": "unsupported",
+        },
+    ]
+
+    assert repair_report.repair_report(
+        tmp_path,
+        issues_path,
+        llm=FailLLM(),
+        claim_validation=rows,
+    ) == 1
+    repaired = (tmp_path / "part1_final.md").read_text(encoding="utf-8")
+    assert repaired == "## Biology\nTGFB is associated with fibrosis (PMID: 11111111).\n"
+
+
 def test_repair_handles_hedged_failed_inline_pmid_when_sibling_supports(
     tmp_path: Path,
 ) -> None:

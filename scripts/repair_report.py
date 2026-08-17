@@ -181,6 +181,59 @@ def _repair_inline_citation_issue(
     return True
 
 
+def _repair_inline_citation_issues(
+    data_dir: Path,
+    issues: list[dict[str, Any]],
+    claim_validation: list[dict[str, Any]],
+) -> bool:
+    if not issues:
+        return False
+    first = issues[0]
+    filename = first.get("file") or ""
+    section = str(first.get("section") or "")
+    value = str(first.get("value") or "")
+    path = (data_dir / filename).resolve()
+    if (
+        not section
+        or not value
+        or not path.is_relative_to(data_dir)
+        or path.suffix != ".md"
+        or not path.exists()
+    ):
+        return False
+
+    failed_pmids = {issue.get("inline_pmid") for issue in issues}
+    key = (first.get("file"), first.get("section"), first.get("source_claim_index"))
+    sibling_supported = any(
+        (row.get("file"), row.get("section"), row.get("source_claim_index")) == key
+        and row.get("status") == "supported"
+        and row.get("inline_pmid") not in failed_pmids
+        for row in claim_validation
+    )
+    if not sibling_supported:
+        return False
+
+    repaired_value = value
+    for issue in issues:
+        inline_pmid = str(issue.get("inline_pmid") or "")
+        if not inline_pmid:
+            return False
+        repaired_value = _remove_inline_pmid(repaired_value, inline_pmid)
+    if repaired_value == value:
+        return False
+
+    text = path.read_text(encoding="utf-8")
+    found = _find_section(text, section)
+    if found is None:
+        return False
+    start, end, section_text = found
+    if section_text.count(value) != 1:
+        return False
+    repaired_section = section_text.replace(value, repaired_value, 1)
+    path.write_text(text[:start] + repaired_section + text[end:], encoding="utf-8")
+    return True
+
+
 def _build_prompt(issue: dict[str, Any], section_text: str) -> str:
     return f"""Rewrite only this markdown section to fix the validation issue.
 
@@ -248,9 +301,6 @@ def repair_report(
         if _repair_pmid_issue(data_dir, issue):
             changed += 1
             continue
-        if _repair_inline_citation_issue(data_dir, issue, claim_validation):
-            changed += 1
-            continue
         if issue.get("code") in REPAIRABLE_INLINE_CITATION_CODES:
             section = issue.get("section") or ""
             filename = issue.get("file") or ""
@@ -265,6 +315,10 @@ def repair_report(
         section_issues.setdefault((filename, section), []).append(issue)
 
     for (filename, section, claim), grouped_issues in claim_issues.items():
+        if _repair_inline_citation_issues(data_dir, grouped_issues, claim_validation):
+            changed += 1
+            continue
+
         path = (data_dir / filename).resolve()
         if not path.is_relative_to(data_dir) or path.suffix != ".md" or not path.exists():
             continue
