@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 
 from scripts import validate_report as validate_report_script
 from src.agents.deep_interpreter.tools.literature_rag import (
+    _rag_collection_key,
     search_literature_fulltext as _search_literature_fulltext,
 )
 from src.agents.deep_interpreter.tools.mcp_clients import run_async
@@ -411,17 +412,36 @@ def _checkpoint_key(group: dict[str, Any], claims: list[dict[str, Any]]) -> str:
     ).hexdigest()
 
 
+def _retrieval_collection_id(data_dir: Path) -> str:
+    fixed = os.getenv("DEEP_INTERPRETER_FIXED_COLLECTION_ID", "").strip()
+    return fixed or _rag_collection_key("all", str(data_dir))
+
+
+def _retrieval_checkpoint_key(item: dict[str, Any]) -> str:
+    payload = {
+        "evidence_policy_version": CLAIM_RAG_EVIDENCE_POLICY_VERSION,
+        "claim": item["claim"],
+        "candidate_pmids": item["candidate_pmids"],
+        "collection_id": item["collection_id"],
+        "use_wiki_context": item["use_wiki_context"],
+    }
+    return hashlib.sha256(
+        json.dumps(payload, sort_keys=True, ensure_ascii=False).encode("utf-8")
+    ).hexdigest()
+
+
 def _load_checkpoint(path: Path) -> dict[str, Any]:
     try:
         checkpoint = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
-        return {"version": 1, "batches": {}}
+        return {"version": 1, "batches": {}, "retrievals": {}}
     if (
         not isinstance(checkpoint, dict)
         or checkpoint.get("version") != 1
         or not isinstance(checkpoint.get("batches"), dict)
     ):
-        return {"version": 1, "batches": {}}
+        return {"version": 1, "batches": {}, "retrievals": {}}
+    checkpoint.setdefault("retrievals", {})
     return checkpoint
 
 
@@ -627,12 +647,18 @@ def _judge_group(
     get_fallback_model: Any | None = None,
     provider: str | None = None,
 ) -> list[dict[str, Any]]:
-    checkpoint = checkpoint if checkpoint is not None else {"version": 1, "batches": {}}
+    checkpoint = (
+        checkpoint
+        if checkpoint is not None
+        else {"version": 1, "batches": {}, "retrievals": {}}
+    )
     batches = checkpoint.setdefault("batches", {})
+    retrievals = checkpoint.setdefault("retrievals", {})
     if flush_checkpoint is None:
         flush_checkpoint = lambda: None
     stats = stats if stats is not None else {
         "checkpoint_hits": 0,
+        "retrieval_cache_hits": 0,
         "judgment_batch_count": 0,
         "single_claim_fallback_count": 0,
         "judge_deadline_exhaustion_count": 0,
@@ -646,12 +672,40 @@ def _judge_group(
             evidence = item.get("evidence") if "evidence" in item else None
             unverifiable_reason = item.get("unverifiable_reason")
             if "evidence" not in item and data_dir is not None:
-                evidence, unverifiable_reason = _retrieve_evidence_status(
-                    item["claim"],
-                    item["candidate_pmids"],
-                    data_dir,
-                    include_abstract=bool(item.get("inline_pmid")),
-                )
+                retrieval_item = {
+                    "claim": item["claim"],
+                    "candidate_pmids": item["candidate_pmids"],
+                    "collection_id": _retrieval_collection_id(data_dir),
+                    "use_wiki_context": os.getenv(
+                        "DEEP_INTERPRETER_USE_WIKI_CONTEXT", "true"
+                    )
+                    .strip()
+                    .lower()
+                    not in {"0", "false", "no", "off", ""},
+                }
+                retrieval_key = _retrieval_checkpoint_key(retrieval_item)
+                saved_retrieval = retrievals.get(retrieval_key)
+                if isinstance(saved_retrieval, dict) and isinstance(
+                    saved_retrieval.get("evidence"), list
+                ):
+                    stats["retrieval_cache_hits"] += 1
+                    evidence = saved_retrieval["evidence"]
+                    unverifiable_reason = saved_retrieval.get("unverifiable_reason")
+                else:
+                    evidence, unverifiable_reason = _retrieve_evidence_status(
+                        item["claim"],
+                        item["candidate_pmids"],
+                        data_dir,
+                        include_abstract=bool(item.get("inline_pmid")),
+                    )
+                    if not str(unverifiable_reason or "").startswith(
+                        "Literature retrieval failed:"
+                    ):
+                        retrievals[retrieval_key] = {
+                            "evidence": evidence,
+                            "unverifiable_reason": unverifiable_reason,
+                        }
+                        flush_checkpoint()
             enriched.append(
                 {
                     **item,
@@ -743,6 +797,7 @@ def validate_claims(
     checkpoint = _load_checkpoint(checkpoint_path)
     stats = {
         "checkpoint_hits": 0,
+        "retrieval_cache_hits": 0,
         "judgment_batch_count": 0,
         "single_claim_fallback_count": 0,
         "judge_deadline_exhaustion_count": 0,
@@ -758,6 +813,7 @@ def validate_claims(
         "skipped_claims_truncated": False,
         "skipped_claims": [],
         "checkpoint_hits": 0,
+        "retrieval_cache_hits": 0,
         "judgment_batch_count": 0,
         "single_claim_fallback_count": 0,
         "judge_batch_size": _judge_batch_size(effective_provider),

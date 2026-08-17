@@ -1528,13 +1528,11 @@ def test_validate_claims_persists_completed_batches_before_keyboard_interrupt(
         tmp_path, ("part1_final.md",), llm=successful
     )
 
-    assert searched == [
-        "TGFB drives fibrosis (PMID: 11111111).",
-        "CXCL12 regulates immune migration (PMID: 22222222).",
-    ]
+    assert searched == []
     assert successful.batch_sizes == [1]
     assert [item["status"] for item in result["claims"]] == ["supported", "supported"]
     assert result["selection"]["checkpoint_hits"] == 1
+    assert result["selection"]["retrieval_cache_hits"] == 2
 
 
 def test_validate_claims_maps_overclaim_to_repairable_issue(
@@ -1823,6 +1821,99 @@ def test_validate_claims_does_not_fallback_to_abstract_or_cache_when_strict_sear
         tmp_path / claim_rag_validation.CLAIM_RAG_CHECKPOINT_FILENAME
     ).exists()
     assert cache == {}
+
+
+def test_validate_claims_reuses_persisted_retrieval_across_fresh_calls(
+    tmp_path: Path, monkeypatch
+) -> None:
+    _write_papers(tmp_path / "papers.json")
+    (tmp_path / "part1_final.md").write_text(
+        "## Analysis 1-1\n"
+        "### Biological Interpretation\n"
+        "TGFB drives fibrosis (PMID: 11111111).\n"
+        "### References\n"
+        "- PMID: 11111111\n",
+        encoding="utf-8",
+    )
+    retrieval_calls = 0
+
+    def fake_search(_args):
+        nonlocal retrieval_calls
+        retrieval_calls += 1
+        return [
+            {
+                "page_content": "TGFB is associated with fibrosis.",
+                "metadata": {"filename": "pmid_11111111.txt"},
+                "score": 0.8,
+            }
+        ]
+
+    monkeypatch.setattr(
+        claim_rag_validation.search_literature_fulltext, "invoke", fake_search
+    )
+
+    first = claim_rag_validation.validate_claims(
+        tmp_path, ("part1_final.md",), llm=FakeStructuredModel(), cache={}
+    )
+    second = claim_rag_validation.validate_claims(
+        tmp_path, ("part1_final.md",), llm=FakeStructuredModel(), cache={}
+    )
+
+    assert first["claims"] == second["claims"]
+    assert retrieval_calls == 1
+    assert second["selection"]["retrieval_cache_hits"] == 1
+    checkpoint = json.loads(
+        (tmp_path / claim_rag_validation.CLAIM_RAG_CHECKPOINT_FILENAME).read_text(
+            encoding="utf-8"
+        )
+    )
+    assert checkpoint["retrievals"]
+
+
+def test_validate_claims_does_not_persist_transport_failure_retrievals(
+    tmp_path: Path, monkeypatch
+) -> None:
+    (tmp_path / "papers.json").write_text(
+        json.dumps({"papers": [{"pmid": "11111111", "abstract": ""}]}),
+        encoding="utf-8",
+    )
+    (tmp_path / "part1_final.md").write_text(
+        "## Analysis 1-1\n"
+        "### Biological Interpretation\n"
+        "TGFB drives fibrosis (PMID: 11111111).\n"
+        "### References\n"
+        "- PMID: 11111111\n",
+        encoding="utf-8",
+    )
+    retrieval_calls = 0
+
+    def fail_search(_args):
+        nonlocal retrieval_calls
+        retrieval_calls += 1
+        raise RuntimeError("rag down")
+
+    monkeypatch.setattr(
+        claim_rag_validation.search_literature_fulltext, "invoke", fail_search
+    )
+
+    class FailModel:
+        def with_structured_output(self, _schema, *, method=None):
+            raise AssertionError("Retrieval failure must not invoke the judge")
+
+    first = claim_rag_validation.validate_claims(
+        tmp_path, ("part1_final.md",), llm=FailModel(), cache={}
+    )
+    second = claim_rag_validation.validate_claims(
+        tmp_path, ("part1_final.md",), llm=FailModel(), cache={}
+    )
+
+    assert retrieval_calls == 2
+    assert first["claims"][0]["reason"].startswith("Literature retrieval failed:")
+    assert second["claims"][0]["reason"].startswith("Literature retrieval failed:")
+    checkpoint_path = tmp_path / claim_rag_validation.CLAIM_RAG_CHECKPOINT_FILENAME
+    if checkpoint_path.exists():
+        checkpoint = json.loads(checkpoint_path.read_text(encoding="utf-8"))
+        assert checkpoint.get("retrievals", {}) == {}
 
 
 def test_section_cache_skips_unchanged_retrieval_and_judgment(
