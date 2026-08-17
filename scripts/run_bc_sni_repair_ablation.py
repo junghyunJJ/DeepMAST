@@ -45,11 +45,36 @@ REMOVE_FILES = (
     "report_validation_guarded.json",
     "synthesis_guardrail_initial.json",
     "synthesis_guardrail_final.json",
+    "parts_guardrail_result.json",
+    "synthesis_guardrail_result.json",
     "synthesis_raw_validation.json",
     "guardrail_before_after_summary.md",
     "claim_rag_checkpoint.json",
+    "timing.json",
+    "run_manifest.json",
+    "guardrail_manifest.json",
+    "recovery_manifest.json",
+    "reporter_recovery.json",
+    "rag_audit.jsonl",
+    "rag_binding.json",
+    "collection_snapshot.json",
+    "collection_before.json",
+    "collection_after.json",
+    "collection_after_final.json",
+    "writer.trace",
+    "reporter.trace",
+    "trace.jsonl",
+    "token_usage.json",
 )
-REMOVE_GLOBS = ("*_run.stdout.log", "*_run.stdout.jsonl", "*_run.stderr.log")
+REMOVE_GLOBS = (
+    "*_run.stdout.log",
+    "*_run.stdout.jsonl",
+    "*_run.stderr.log",
+    "reporter_attempt_*.json",
+    "repair_trace.jsonl",
+    "*_tokens.json",
+    "token_usage*.json",
+)
 INPUT_FILES = (
     "papers.json",
     "targets.json",
@@ -57,6 +82,7 @@ INPUT_FILES = (
     "part4_candidate_selection.json",
 )
 TARGET_SELECTION_KEYS = ("interest_celltypes", "interest_clusters", "sel_factor")
+RUNTIME_DIRS = ("before", "after", "diffs", "logs")
 STAGES = (("part1", 1), ("part2", 2), ("part3", 3), ("reporter", None))
 STAGE_NUM_PREDICT = {"part1": "12000", "part2": "12000", "part3": "8000", "reporter": "12000"}
 
@@ -221,8 +247,11 @@ def prepare_condition_copy(
         for path in destination.glob(pattern):
             path.unlink()
     shutil.rmtree(destination / "large_tool_results", ignore_errors=True)
-    for directory in ("before", "after", "diffs", "logs"):
-        (destination / directory).mkdir(parents=True, exist_ok=True)
+    for directory in RUNTIME_DIRS:
+        runtime_dir = destination / directory
+        if runtime_dir.exists():
+            shutil.rmtree(runtime_dir)
+        runtime_dir.mkdir(parents=True, exist_ok=True)
 
     missing = [name for name in INPUT_FILES if not (destination / name).is_file()]
     if missing:

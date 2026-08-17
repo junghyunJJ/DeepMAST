@@ -710,6 +710,74 @@ def test_bc_runner_copies_each_condition_without_source_mutation(tmp_path: Path)
     assert (run_dir / "logs").is_dir()
 
 
+def test_bc_runner_clears_copied_runtime_scratch(tmp_path: Path) -> None:
+    source = _minimal_source(tmp_path)
+    runtime_dirs = ("before", "after", "diffs", "logs")
+    root_artifacts = (
+        "timing.json",
+        "run_manifest.json",
+        "guardrail_manifest.json",
+        "recovery_manifest.json",
+        "rag_audit.jsonl",
+        "rag_binding.json",
+        "collection_snapshot.json",
+        "reporter_attempt_1.json",
+        "repair_trace.jsonl",
+        "writer.trace",
+        "token_usage.json",
+        "part1_tokens.json",
+        "part1_run.stdout.log",
+        "part2_run.stdout.jsonl",
+        "part3_run.stderr.log",
+    )
+    for directory in runtime_dirs:
+        (source / directory).mkdir()
+        (source / directory / "stale.txt").write_text("stale\n", encoding="utf-8")
+    for name in root_artifacts:
+        (source / name).write_text("stale\n", encoding="utf-8")
+
+    run_dir = bc_runner.prepare_condition_copy(
+        source=source,
+        output_root=tmp_path / "runs",
+        pair_id=2,
+        condition=bc_runner.CONDITIONS[0],
+    )
+
+    assert all((source / directory / "stale.txt").exists() for directory in runtime_dirs)
+    assert all((source / name).exists() for name in root_artifacts)
+    assert all(not any((run_dir / directory).iterdir()) for directory in runtime_dirs)
+    assert all(not (run_dir / name).exists() for name in root_artifacts)
+
+
+def test_bc_runner_propagates_runtime_scratch_cleanup_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = _minimal_source(tmp_path)
+    (source / "before").mkdir()
+    (source / "before" / "stale.txt").write_text("stale\n", encoding="utf-8")
+    real_rmtree = bc_runner.shutil.rmtree
+
+    def fail_before(path: Path, *args: object, **kwargs: object) -> None:
+        if Path(path).name == "before":
+            if kwargs.get("ignore_errors") is True:
+                return
+            raise OSError("cannot remove before")
+        real_rmtree(path, *args, **kwargs)
+
+    monkeypatch.setattr(bc_runner.shutil, "rmtree", fail_before)
+
+    with pytest.raises(OSError, match="cannot remove before"):
+        bc_runner.prepare_condition_copy(
+            source=source,
+            output_root=tmp_path / "runs",
+            pair_id=2,
+            condition=bc_runner.CONDITIONS[0],
+        )
+
+    run_dir = tmp_path / "runs" / "pair-02" / "wiki-on"
+    assert not (run_dir / "run_targets.json").exists()
+
+
 def test_bc_runner_allows_runtime_targets_data_directory_update(tmp_path: Path) -> None:
     source = _minimal_source(tmp_path)
     targets = {
