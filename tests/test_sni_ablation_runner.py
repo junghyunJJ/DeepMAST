@@ -725,6 +725,7 @@ def test_bc_runner_clears_copied_runtime_scratch(tmp_path: Path) -> None:
         "run_manifest.json",
         "guardrail_manifest.json",
         "recovery_manifest.json",
+        "report_validation_terminal.json",
         "rag_audit.jsonl",
         "rag_binding.json",
         "collection_snapshot.json",

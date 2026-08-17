@@ -41,6 +41,7 @@ REMOVE_FILES = (
     "CCI_Analysis_Report.html",
     "report_validation_initial.json",
     "report_validation_final.json",
+    "report_validation_terminal.json",
     "report_validation_raw.json",
     "report_validation_guarded.json",
     "synthesis_guardrail_initial.json",
