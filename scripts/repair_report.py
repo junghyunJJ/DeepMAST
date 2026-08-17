@@ -55,7 +55,7 @@ def _safe_section_replacement(original: str, candidate: str) -> bool:
 
 
 def _pmids(text: str) -> set[str]:
-    return set(re.findall(r"\bPMID:\s*(\d+)\b", text, flags=re.IGNORECASE))
+    return set(re.findall(r"\bPMID[:\s]*(\d{6,9})\b", text, flags=re.IGNORECASE))
 
 
 def _safe_claim_replacement(original: str, candidate: str) -> bool:

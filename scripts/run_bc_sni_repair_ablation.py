@@ -793,18 +793,17 @@ def run_pair(
     rc = 0
     for label in pair["condition_order"]:
         condition = CONDITION_BY_LABEL[label]
-        rc = max(
-            rc,
-            run_condition(
-                source=source,
-                output_root=output_root,
-                pair=pair,
-                condition=condition,
-                stage_runner=stage_runner,
-                collection_snapshot=collection_snapshot,
-                collection_pmids=collection_pmids,
-            ),
+        rc = run_condition(
+            source=source,
+            output_root=output_root,
+            pair=pair,
+            condition=condition,
+            stage_runner=stage_runner,
+            collection_snapshot=collection_snapshot,
+            collection_pmids=collection_pmids,
         )
+        if rc:
+            return rc
     return rc
 
 

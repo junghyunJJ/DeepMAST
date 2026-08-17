@@ -330,6 +330,10 @@ def test_repair_rewrites_unresolved_inline_citations_as_exact_claim(
             "ERBB2 overexpression is associated with progression (PMID: 99999999).",
             "accepting invented evidence",
         ),
+        (
+            "ERBB2 overexpression is associated with progression (PMID 99999999).",
+            "accepting colonless invented evidence",
+        ),
     ],
 )
 def test_repair_rejects_unsafe_exact_claim_replacements(

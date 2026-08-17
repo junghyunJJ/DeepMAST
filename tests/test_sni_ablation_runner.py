@@ -879,6 +879,38 @@ def test_bc_runner_pair_uses_sequential_conditions_with_fixed_endpoint_env(tmp_p
     assert manifest["return_status"] == "passed"
 
 
+def test_bc_runner_run_pair_stops_after_first_condition_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[str] = []
+
+    def fake_run_condition(**kwargs: object) -> int:
+        condition = kwargs["condition"]
+        assert isinstance(condition, bc_runner.Condition)
+        calls.append(condition.label)
+        return 1 if condition.label == "no-SNI" else 0
+
+    monkeypatch.setattr(bc_runner, "run_condition", fake_run_condition)
+
+    rc = bc_runner.run_pair(
+        {
+            "pair_id": "01",
+            "api_port": 8882,
+            "backend_port": 5000,
+            "rag_backend_port": 4000,
+            "condition_order": ["no-SNI", "SNI"],
+        },
+        source=tmp_path / "source",
+        output_root=tmp_path / "runs",
+        stage_runner=lambda _data_dir, _env: 0,
+        collection_snapshot=lambda _api_url: stack.BC_COLLECTION_SNAPSHOT,
+    )
+
+    assert rc == 1
+    assert calls == ["no-SNI"]
+
+
 def test_bc_runner_manifest_validates_replacement_rag_port_and_frozen_schedule(tmp_path: Path) -> None:
     manifest_path, _output_root = _manifest_output_root(tmp_path)
     manifest = bc_runner.load_experiment_manifest(manifest_path)
