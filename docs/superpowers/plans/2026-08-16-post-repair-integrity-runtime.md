@@ -61,7 +61,13 @@ def test_bc_runner_rejects_collection_pmid_mismatch_before_stage(tmp_path: Path)
     rc = bc_runner.run_condition(
         source=source,
         output_root=tmp_path / "runs",
-        pair=_pair("01"),
+        pair={
+            "pair_id": "01",
+            "api_port": 8882,
+            "backend_port": 5000,
+            "rag_backend_port": 4000,
+            "condition_order": ["no-SNI", "SNI"],
+        },
         condition=bc_runner.CONDITION_BY_LABEL["no-SNI"],
         stage_runner=stage_runner,
         collection_snapshot=lambda _url: stack.BC_COLLECTION_SNAPSHOT,
@@ -234,6 +240,7 @@ Commit Claim-RAG and tests with Lore trailers naming repeated reporter-process r
 **Interfaces:**
 - Extends each audit row with optional `elapsed_seconds`, `rewrite_count`, `retrieved_document_count`, `relevant_document_count`, `selected_wiki_page_count`, and `result_pmids`.
 - Extends retrieval summary with `unique_query_count`, `duplicate_attempt_count`, `unique_result_pmid_count`, `retrieval_cache_hits`, and `elapsed_seconds_total`.
+- `retrieval_cache_hits` is summed from the claim-selection metadata in the Part and synthesis validation artifacts; it is not inferred from missing RAG audit rows.
 
 - [ ] **Step 1: Write failing audit behavior tests**
 
@@ -347,7 +354,7 @@ Run Ruff on every changed Python file, `py_compile` on production modules, `git 
 
 - [ ] **Step 3: Run one serial canonical no-SNI → SNI pair**
 
-Use the configured 6000 Interpreter/Reporter lane and 4000 RAG backend with a fresh output root. Validate the canonical 100-PMID preflight before the first stage. Do not start ten pairs.
+Use manifest pair `05`, whose frozen order is no-SNI → SNI and whose Interpreter/Reporter backend is port 6000, with the 4000 RAG backend and a fresh output root. Validate the canonical 100-PMID preflight before the first stage. Do not start ten pairs.
 
 - [ ] **Step 4: Evaluate the four-hour gate**
 
