@@ -7,6 +7,7 @@ import difflib
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -24,7 +25,8 @@ sys.path.insert(0, str(REPO_ROOT))
 
 from scripts.sni_ablation_api_stack import APIS, BC_COLLECTION_ID, BC_COLLECTION_SNAPSHOT, MODEL
 
-BC_SOURCE = Path("/Users/jungj2/Dropbox/Metadata/aiagent/DeepMAST/res/bc_interpreter")
+BC_SOURCE = REPO_ROOT / "res/deep_interpreter/bc/bc"
+PMID_FILENAME = re.compile(r"^pmid_(\d+)\.txt$")
 REPORT_FILES = ("part1_final.md", "part2_final.md", "part3_final.md", "synthesis.md")
 REMOVE_FILES = (
     *REPORT_FILES,
@@ -99,6 +101,7 @@ class ExperimentManifest(TypedDict):
 
 StageRunner = Callable[[Path, dict[str, str]], int]
 CollectionSnapshot = Callable[[str], dict[str, Any]]
+CollectionPmids = Callable[[str], set[str]]
 Api = dict[str, Any]
 PairProcessRunner = Callable[[ManifestPair, Path, Path, dict[str, str]], int]
 
@@ -126,6 +129,59 @@ def _default_collection_snapshot(api_url: str) -> dict[str, Any]:
     with urlopen(f"{api_url}/collections/{BC_COLLECTION_ID}", timeout=30) as response:
         row = json.load(response)
     return {key: row.get(key) for key in BC_COLLECTION_SNAPSHOT}
+
+
+def _papers_pmids(path: Path) -> set[str]:
+    payload = read_json(path)
+    papers = payload.get("papers")
+    if not isinstance(papers, list):
+        return set()
+    return {
+        str(paper["pmid"])
+        for paper in papers
+        if isinstance(paper, dict) and paper.get("pmid") is not None
+    }
+
+
+def _document_rows(payload: Any) -> list[Any]:
+    if isinstance(payload, list):
+        return payload
+    if isinstance(payload, dict):
+        for key in ("documents", "items", "results"):
+            rows = payload.get(key)
+            if isinstance(rows, list):
+                return rows
+    return []
+
+
+def _collection_pmids(api_url: str) -> set[str]:
+    pmids: set[str] = set()
+    limit = 100
+    offset = 0
+    while True:
+        url = f"{api_url}/collections/{BC_COLLECTION_ID}/documents?limit={limit}&offset={offset}"
+        with urlopen(url, timeout=30) as response:
+            rows = _document_rows(json.load(response))
+        for row in rows:
+            metadata = row.get("metadata") if isinstance(row, dict) else None
+            filename = metadata.get("filename") if isinstance(metadata, dict) else None
+            if isinstance(filename, str) and (match := PMID_FILENAME.match(filename)):
+                pmids.add(match.group(1))
+        if len(rows) < limit:
+            return pmids
+        offset += limit
+
+
+def _pmid_identity(source_pmids: set[str], collection_pmids: set[str]) -> dict[str, Any]:
+    def digest(pmids: set[str]) -> str:
+        return hashlib.sha256("\n".join(sorted(pmids)).encode("utf-8")).hexdigest()
+
+    return {
+        "source_pmid_count": len(source_pmids),
+        "source_pmid_sha256": digest(source_pmids),
+        "collection_pmid_count": len(collection_pmids),
+        "collection_pmid_sha256": digest(collection_pmids),
+    }
 
 
 def _api_int(api: Api, key: str) -> int:
@@ -595,6 +651,7 @@ def run_condition(
     condition: Condition,
     stage_runner: StageRunner,
     collection_snapshot: CollectionSnapshot,
+    collection_pmids: CollectionPmids = _collection_pmids,
 ) -> int:
     api = {"api_port": pair["api_port"], "backend_port": pair["backend_port"]}
     pair_id = pair["pair_id"]
@@ -604,10 +661,15 @@ def run_condition(
     error = None
     started_at = utc_now()
     collection_before = collection_snapshot(env["CCI_RAG_BASE_URL"])
-    write_json(data_dir / "collection_before.json", collection_before)
+    source_pmids = _papers_pmids(data_dir / "papers.json")
+    observed_pmids = collection_pmids(env["CCI_RAG_BASE_URL"])
+    pmid_identity = _pmid_identity(source_pmids, observed_pmids)
+    write_json(data_dir / "collection_before.json", collection_before | {"pmid_identity": pmid_identity})
     try:
         if collection_before != BC_COLLECTION_SNAPSHOT:
             raise RuntimeError(f"BC collection snapshot drift before run: {collection_before}")
+        if observed_pmids != source_pmids:
+            raise RuntimeError("BC source papers PMIDs do not match fixed collection PMIDs")
         return_code = stage_runner(data_dir, env)
         if return_code != 0:
             raise RuntimeError(f"stage runner returned {return_code}")
@@ -639,6 +701,7 @@ def run_condition(
                 "rag_api_url": env["CCI_RAG_BASE_URL"],
                 "collection_id": BC_COLLECTION_ID,
                 "collection": collection_before,
+                "pmid_identity": pmid_identity,
                 "model_settings": {key: env[key] for key in env if key.startswith(("OLLAMA_", "LLM_", "DEEP_INTERPRETER_", "CCI_RAG_"))},
                 "started_at": started_at,
                 "finished_at": utc_now(),
@@ -656,6 +719,7 @@ def run_pair(
     output_root: Path,
     stage_runner: StageRunner,
     collection_snapshot: CollectionSnapshot,
+    collection_pmids: CollectionPmids = _collection_pmids,
 ) -> int:
     rc = 0
     for label in pair["condition_order"]:
@@ -669,6 +733,7 @@ def run_pair(
                 condition=condition,
                 stage_runner=stage_runner,
                 collection_snapshot=collection_snapshot,
+                collection_pmids=collection_pmids,
             ),
         )
     return rc
@@ -757,6 +822,7 @@ def main(
     *,
     stage_runner: StageRunner = _default_stage_runner,
     collection_snapshot: CollectionSnapshot = _default_collection_snapshot,
+    collection_pmids: CollectionPmids = _collection_pmids,
     pair_process_runner: PairProcessRunner = _default_pair_process_runner,
 ) -> int:
     args = build_parser().parse_args(argv)
@@ -789,6 +855,7 @@ def main(
             output_root=args.output_root,
             stage_runner=stage_runner,
             collection_snapshot=collection_snapshot,
+            collection_pmids=collection_pmids,
         )
 
     rc = 0
