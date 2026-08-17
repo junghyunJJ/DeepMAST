@@ -636,6 +636,53 @@ def test_bc_runner_copies_each_condition_without_source_mutation(tmp_path: Path)
     assert (run_dir / "logs").is_dir()
 
 
+def test_bc_runner_allows_runtime_targets_data_directory_update(tmp_path: Path) -> None:
+    source = _minimal_source(tmp_path)
+    targets = {
+        "interest_celltypes": ["B cell"],
+        "interest_clusters": ["4"],
+        "sel_factor": "CXCL13",
+        "data_directory": "/old/run",
+    }
+    (source / "targets.json").write_text(json.dumps(targets), encoding="utf-8")
+    run_dir = bc_runner.prepare_condition_copy(
+        source=source,
+        output_root=tmp_path / "runs",
+        pair_id=1,
+        condition=bc_runner.CONDITIONS[0],
+    )
+
+    rewritten_targets = targets | {"data_directory": str(run_dir.resolve())}
+    (run_dir / "targets.json").write_text(json.dumps(rewritten_targets), encoding="utf-8")
+
+    bc_runner._verify_source_manifest(run_dir)
+
+
+def test_bc_runner_rejects_runtime_targets_selection_change(tmp_path: Path) -> None:
+    source = _minimal_source(tmp_path)
+    targets = {
+        "interest_celltypes": ["B cell"],
+        "interest_clusters": ["4"],
+        "sel_factor": "CXCL13",
+        "data_directory": "/old/run",
+    }
+    (source / "targets.json").write_text(json.dumps(targets), encoding="utf-8")
+    run_dir = bc_runner.prepare_condition_copy(
+        source=source,
+        output_root=tmp_path / "runs",
+        pair_id=1,
+        condition=bc_runner.CONDITIONS[0],
+    )
+    rewritten_targets = targets | {
+        "interest_celltypes": ["Plasma cell"],
+        "data_directory": str(run_dir.resolve()),
+    }
+    (run_dir / "targets.json").write_text(json.dumps(rewritten_targets), encoding="utf-8")
+
+    with pytest.raises(RuntimeError, match="copied target selection changed during run"):
+        bc_runner._verify_source_manifest(run_dir)
+
+
 def test_bc_runner_pair_uses_sequential_conditions_with_fixed_endpoint_env(tmp_path: Path) -> None:
     source = _minimal_source(tmp_path)
     manifest_path, output_root = _manifest_output_root(tmp_path)
@@ -669,9 +716,13 @@ def test_bc_runner_pair_uses_sequential_conditions_with_fixed_endpoint_env(tmp_p
     assert on_env["CCI_RAG_BASE_URL"] == "http://localhost:8882"
     assert on_env["DEEP_INTERPRETER_USE_WIKI_CONTEXT"] == "true"
     assert on_env["DEEP_INTERPRETER_REQUIRE_AGENTIC_RAG"] == "true"
+    assert on_env["OLLAMA_REQUEST_TIMEOUT_SECONDS"] == "10800"
+    assert on_env["REPORTER_ATTEMPT_TIMEOUT_SECONDS"] == "10800"
     assert on_env["DEEP_INTERPRETER_FIXED_COLLECTION_ID"] == stack.BC_COLLECTION_ID
     assert on_env["DEEP_INTERPRETER_RAG_AUDIT_PATH"].endswith("/pairs/pair-01/wiki-on/rag_audit.jsonl")
     assert off_env["DEEP_INTERPRETER_USE_WIKI_CONTEXT"] == "false"
+    assert off_env["OLLAMA_REQUEST_TIMEOUT_SECONDS"] == "10800"
+    assert off_env["REPORTER_ATTEMPT_TIMEOUT_SECONDS"] == "10800"
     assert off_env["DEEP_INTERPRETER_FIXED_COLLECTION_ID"] == stack.BC_COLLECTION_ID
     manifest = json.loads(
         (output_root / "pair-01" / "wiki-off" / "run_manifest.json").read_text(encoding="utf-8")

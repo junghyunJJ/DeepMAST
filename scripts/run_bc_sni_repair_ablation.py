@@ -53,6 +53,7 @@ INPUT_FILES = (
     "interpretation_guide.md",
     "part4_candidate_selection.json",
 )
+TARGET_SELECTION_KEYS = ("interest_celltypes", "interest_clusters", "sel_factor")
 STAGES = (("part1", 1), ("part2", 2), ("part3", 3), ("reporter", None))
 STAGE_NUM_PREDICT = {"part1": "12000", "part2": "12000", "part3": "8000", "reporter": "12000"}
 
@@ -179,6 +180,9 @@ def prepare_condition_copy(
             "copy": str(destination.resolve()),
             "source_files": {name: sha256(source / name) for name in INPUT_FILES},
             "copied_files": {name: sha256(destination / name) for name in INPUT_FILES},
+            "target_selection": {
+                name: run_targets.get(name) for name in TARGET_SELECTION_KEYS
+            },
         },
     )
     return destination
@@ -270,8 +274,17 @@ def _verify_source_manifest(data_dir: Path) -> None:
         if sha256(source / name) != expected:
             raise RuntimeError(f"source input changed during run: {name}")
     for name, expected in dict(manifest.get("copied_files", {})).items():
+        if name == "targets.json":
+            continue
         if sha256(data_dir / name) != expected:
             raise RuntimeError(f"copied input changed during run: {name}")
+    expected_selection = dict(manifest.get("target_selection", {}))
+    observed_targets = read_json(data_dir / "targets.json")
+    observed_selection = {
+        name: observed_targets.get(name) for name in TARGET_SELECTION_KEYS
+    }
+    if observed_selection != expected_selection:
+        raise RuntimeError("copied target selection changed during run")
 
 
 def _condition_env(data_dir: Path, api: Api, condition: Condition) -> dict[str, str]:
@@ -282,8 +295,8 @@ def _condition_env(data_dir: Path, api: Api, condition: Condition) -> dict[str, 
         "OLLAMA_BASE_URL": f"http://localhost:{backend_port}",
         "OLLAMA_MODEL": MODEL,
         "OLLAMA_REASONING": "true",
-        "OLLAMA_REQUEST_TIMEOUT_SECONDS": "3600",
-        "REPORTER_ATTEMPT_TIMEOUT_SECONDS": "3600",
+        "OLLAMA_REQUEST_TIMEOUT_SECONDS": "10800",
+        "REPORTER_ATTEMPT_TIMEOUT_SECONDS": "10800",
         "CLAIM_RAG_JUDGE_NUM_PREDICT": "3000",
         "CLAIM_RAG_JUDGE_TIMEOUT_SECONDS": "300",
         "CLAIM_RAG_PRIMARY_JUDGE_TIMEOUT_SECONDS": "180",
