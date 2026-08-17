@@ -4,6 +4,8 @@ import importlib.util
 import json
 from pathlib import Path
 
+import pytest
+
 from src.agents.deep_interpreter import claim_rag_validation
 
 
@@ -94,6 +96,18 @@ class ShortSafeSectionLLM:
                 )
             },
         )()
+
+
+class ClaimReplacementLLM:
+    def __init__(self, replacement: str) -> None:
+        self.calls = 0
+        self.prompts: list[str] = []
+        self.replacement = replacement
+
+    def invoke(self, prompt: str):
+        self.calls += 1
+        self.prompts.append(prompt)
+        return type("Msg", (), {"content": self.replacement})()
 
 
 def test_repair_replaces_only_flagged_section(tmp_path: Path) -> None:
@@ -222,6 +236,148 @@ def test_repair_accepts_shorter_section_with_same_headings(tmp_path: Path) -> No
         "### References\n"
         "- PMID: 12345678\n"
     )
+
+
+def test_repair_rewrites_unresolved_inline_citations_as_exact_claim(
+    tmp_path: Path,
+) -> None:
+    original_claim = (
+        "ERBB2 overexpression drives breast-cancer progression and "
+        "NRG1-ERBB3 signaling broadly sustains circulating-tumor-cell survival "
+        "(PMID: 28174229; PMID: 39753722)."
+    )
+    replacement = (
+        "ERBB2 overexpression is associated with breast-cancer progression "
+        "(PMID: 28174229), while NRG1-ERBB3 signaling was required for "
+        "circulating-tumor-cell survival in the cited model (PMID: 39753722)."
+    )
+    original = (
+        "## Biology\n"
+        "### Context\n"
+        "Unrelated context stays put.\n"
+        "### Interpretation\n"
+        f"{original_claim}\n"
+        "A separate sentence stays unchanged.\n"
+        "### References\n"
+        "- PMID: 28174229\n"
+        "- PMID: 39753722\n"
+        "## Next\n"
+        "Tail text stays put.\n"
+    )
+    report = tmp_path / "part2_final.md"
+    report.write_text(original, encoding="utf-8")
+    issues_path = tmp_path / "issues.json"
+    issues_path.write_text(
+        json.dumps(
+            {
+                "issues": [
+                    {
+                        "severity": "error",
+                        "code": "inline_citation_unsupported",
+                        "file": "part2_final.md",
+                        "section": "## Biology",
+                        "source_claim_index": 4,
+                        "inline_pmid": "28174229",
+                        "value": original_claim,
+                        "evidence": "The cited paper supports association, not causality.",
+                    },
+                    {
+                        "severity": "error",
+                        "code": "inline_citation_overclaimed",
+                        "file": "part2_final.md",
+                        "section": "## Biology",
+                        "source_claim_index": 4,
+                        "inline_pmid": "39753722",
+                        "value": original_claim,
+                        "evidence": "The cited paper is model-specific.",
+                    },
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    llm = ClaimReplacementLLM(replacement)
+
+    changed = repair_report.repair_report(tmp_path, issues_path, llm=llm)
+
+    text = report.read_text(encoding="utf-8")
+    assert changed == 1
+    assert llm.calls == 1
+    assert original_claim not in text
+    assert replacement in text
+    assert repair_report._markdown_headings(text) == [
+        "## Biology",
+        "### Context",
+        "### Interpretation",
+        "### References",
+        "## Next",
+    ]
+    assert "Unrelated context stays put." in text
+    assert "A separate sentence stays unchanged." in text
+    assert "Tail text stays put." in text
+
+
+@pytest.mark.parametrize(
+    ("candidate", "mutation"),
+    [
+        ("", "accepting deletion"),
+        (
+            "### Nested Output\nERBB2 overexpression is associated with progression "
+            "(PMID: 28174229).",
+            "accepting nested section output",
+        ),
+        (
+            "ERBB2 overexpression is associated with progression (PMID: 99999999).",
+            "accepting invented evidence",
+        ),
+    ],
+)
+def test_repair_rejects_unsafe_exact_claim_replacements(
+    tmp_path: Path,
+    candidate: str,
+    mutation: str,
+) -> None:
+    assert mutation
+    original_claim = (
+        "ERBB2 overexpression drives breast-cancer progression "
+        "(PMID: 28174229)."
+    )
+    original = (
+        "## Biology\n"
+        "### Interpretation\n"
+        f"{original_claim}\n"
+        "Unrelated sentence stays unchanged.\n"
+    )
+    report = tmp_path / "part2_final.md"
+    report.write_text(original, encoding="utf-8")
+    issues_path = tmp_path / "issues.json"
+    issues_path.write_text(
+        json.dumps(
+            {
+                "issues": [
+                    {
+                        "severity": "error",
+                        "code": "inline_citation_unsupported",
+                        "file": "part2_final.md",
+                        "section": "## Biology",
+                        "source_claim_index": 1,
+                        "inline_pmid": "28174229",
+                        "value": original_claim,
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    changed = repair_report.repair_report(
+        tmp_path,
+        issues_path,
+        llm=ClaimReplacementLLM(candidate),
+    )
+
+    assert changed == 0
+    assert report.read_text(encoding="utf-8") == original
 
 
 def test_repair_groups_multiple_issues_for_same_section(tmp_path: Path) -> None:

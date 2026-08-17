@@ -54,6 +54,21 @@ def _safe_section_replacement(original: str, candidate: str) -> bool:
     return candidate_size >= 0.5 * original_size
 
 
+def _pmids(text: str) -> set[str]:
+    return set(re.findall(r"\bPMID:\s*(\d+)\b", text, flags=re.IGNORECASE))
+
+
+def _safe_claim_replacement(original: str, candidate: str) -> bool:
+    candidate = candidate.strip()
+    if not candidate or _markdown_headings(candidate):
+        return False
+    if not _pmids(candidate).issubset(_pmids(original)):
+        return False
+    original_size = len(re.sub(r"\s+", "", original))
+    candidate_size = len(re.sub(r"\s+", "", candidate))
+    return candidate_size >= 0.5 * original_size
+
+
 def _known_pmids(data_dir: Path) -> set[str]:
     path = data_dir / "papers.json"
     if not path.exists() or not path.is_file():
@@ -189,6 +204,22 @@ Section:
 Return only the corrected markdown section."""
 
 
+def _build_claim_prompt(issues: list[dict[str, Any]], claim: str) -> str:
+    return f"""Rewrite only this exact claim to fix unresolved inline citation validation issues.
+
+Preserve supported quantitative observations.
+Keep dataset-derived observations separate from literature-supported context.
+Do not add any new PMID or replace cited papers.
+Do not delete the claim; make the narrowest supported correction.
+Return only the corrected claim Markdown. Do not include a section heading.
+
+Validation issues:
+{json.dumps(issues, indent=2, ensure_ascii=False)}
+
+Claim:
+{claim}"""
+
+
 def _create_model(provider: str | None) -> Any:
     from src.agents.model import create_llm
 
@@ -209,6 +240,7 @@ def repair_report(
     changed = 0
     claim_validation = claim_validation or []
     section_issues: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    claim_issues: dict[tuple[str, str, str], list[dict[str, Any]]] = {}
 
     for issue in issues:
         if issue.get("severity") != "error":
@@ -219,11 +251,39 @@ def repair_report(
         if _repair_inline_citation_issue(data_dir, issue, claim_validation):
             changed += 1
             continue
+        if issue.get("code") in REPAIRABLE_INLINE_CITATION_CODES:
+            section = issue.get("section") or ""
+            filename = issue.get("file") or ""
+            value = issue.get("value") or ""
+            if section and filename and value:
+                claim_issues.setdefault((filename, section, str(value)), []).append(issue)
+            continue
         section = issue.get("section") or ""
         filename = issue.get("file") or ""
         if not section or not filename:
             continue
         section_issues.setdefault((filename, section), []).append(issue)
+
+    for (filename, section, claim), grouped_issues in claim_issues.items():
+        path = (data_dir / filename).resolve()
+        if not path.is_relative_to(data_dir) or path.suffix != ".md" or not path.exists():
+            continue
+
+        text = path.read_text(encoding="utf-8")
+        found = _find_section(text, section)
+        if found is None:
+            continue
+        start, end, section_text = found
+        if section_text.count(claim) != 1:
+            continue
+        if model is None:
+            model = _create_model(provider)
+        replacement = _content(model.invoke(_build_claim_prompt(grouped_issues, claim))).strip()
+        if replacement == claim or not _safe_claim_replacement(claim, replacement):
+            continue
+        repaired_section = section_text.replace(claim, replacement, 1)
+        path.write_text(text[:start] + repaired_section + text[end:], encoding="utf-8")
+        changed += 1
 
     for (filename, section), grouped_issues in section_issues.items():
         path = (data_dir / filename).resolve()
