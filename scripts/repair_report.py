@@ -18,6 +18,11 @@ REPAIRABLE_INLINE_CITATION_CODES = {
     "inline_citation_unsupported",
     "inline_citation_overclaimed",
 }
+REPAIRABLE_CLAIM_CODES = REPAIRABLE_INLINE_CITATION_CODES | {
+    "claim_rag_overclaimed",
+    "claim_rag_unsupported",
+    "part3_therapeutic_spillover",
+}
 
 
 def _content(message: Any) -> str:
@@ -52,6 +57,32 @@ def _safe_section_replacement(original: str, candidate: str) -> bool:
     original_size = len(re.sub(r"\s+", "", original))
     candidate_size = len(re.sub(r"\s+", "", candidate))
     return candidate_size >= 0.5 * original_size
+
+
+def _section_rejection(original: str, candidate: str) -> dict[str, Any]:
+    original_headings = _markdown_headings(original)
+    candidate_headings = _markdown_headings(candidate)
+    original_size = len(re.sub(r"\s+", "", original))
+    candidate_size = len(re.sub(r"\s+", "", candidate))
+    retention_ratio = candidate_size / original_size if original_size else 0.0
+    reasons = []
+    if candidate_headings != original_headings:
+        reasons.append("heading_mismatch")
+    if retention_ratio < 0.5:
+        reasons.append("retention_below_50_percent")
+    return {
+        "heading_match": candidate_headings == original_headings,
+        "retention_ratio": retention_ratio,
+        "reasons": reasons,
+    }
+
+
+def _append_repair_trace(data_dir: Path, row: dict[str, Any]) -> None:
+    trace_path = data_dir / "repair_trace.jsonl"
+    if not trace_path.exists() or not trace_path.is_file():
+        return
+    with trace_path.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n")
 
 
 def _pmids(text: str) -> set[str]:
@@ -258,10 +289,12 @@ Return only the corrected markdown section."""
 
 
 def _build_claim_prompt(issues: list[dict[str, Any]], claim: str) -> str:
-    return f"""Rewrite only this exact claim to fix unresolved inline citation validation issues.
+    return f"""Rewrite only this exact claim to fix unresolved claim validation issues.
 
 Preserve supported quantitative observations.
+Preserve measured/statistical content.
 Keep dataset-derived observations separate from literature-supported context.
+Remove or hedge only the unsupported interpretation.
 Do not add any new PMID or replace cited papers.
 Do not delete the claim; make the narrowest supported correction.
 Return only the corrected claim Markdown. Do not include a section heading.
@@ -301,7 +334,7 @@ def repair_report(
         if _repair_pmid_issue(data_dir, issue):
             changed += 1
             continue
-        if issue.get("code") in REPAIRABLE_INLINE_CITATION_CODES:
+        if issue.get("code") in REPAIRABLE_CLAIM_CODES:
             section = issue.get("section") or ""
             filename = issue.get("file") or ""
             value = issue.get("value") or ""
@@ -358,6 +391,18 @@ def repair_report(
         if not replacement.startswith(section.strip()):
             replacement = section.strip() + "\n" + replacement
         if not _safe_section_replacement(section_text, replacement):
+            rejection = _section_rejection(section_text, replacement)
+            _append_repair_trace(
+                data_dir,
+                {
+                    "event": "section_candidate_rejected",
+                    "file": filename,
+                    "section": section,
+                    "heading_match": rejection["heading_match"],
+                    "retention_ratio": rejection["retention_ratio"],
+                    "reasons": rejection["reasons"],
+                },
+            )
             continue
         path.write_text(text[:start] + replacement.rstrip() + "\n" + text[end:], encoding="utf-8")
         changed += 1

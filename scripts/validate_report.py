@@ -588,17 +588,18 @@ def _check_part3_scope_and_pairs(data_dir: Path, issues: list[dict[str, str]]) -
 
     for section in _sections(text):
         body = str(section["body"])
-        if THERAPEUTIC_RE.search(body):
-            issues.append(
-                _issue(
-                    code="part3_therapeutic_spillover",
-                    file=path.name,
-                    section=str(section["heading"]),
-                    value="therapeutic/druggability language",
-                    evidence="Part3 should interpret selected L-R spatial evidence only; Part4 owns therapeutic synthesis.",
-                    repair_instruction="Remove therapeutic prioritization language and keep the section to spatial/statistical LR evidence.",
+        for window in _claim_windows(body):
+            if THERAPEUTIC_RE.search(window):
+                issues.append(
+                    _issue(
+                        code="part3_therapeutic_spillover",
+                        file=path.name,
+                        section=str(section["heading"]),
+                        value=window,
+                        evidence="Part3 should interpret selected L-R spatial evidence only; Part4 owns therapeutic synthesis.",
+                        repair_instruction="Remove therapeutic prioritization language and keep the section to spatial/statistical LR evidence.",
+                    )
                 )
-            )
 
     for pair in _selected_lr_pairs(data_dir):
         if not _mentions_lr_pair(text, pair):

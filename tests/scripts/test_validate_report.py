@@ -473,16 +473,25 @@ def test_flags_negative_factor_pathway_with_enrichment_not_depletion(tmp_path: P
 
 def test_flags_part3_therapeutic_spillover(tmp_path: Path) -> None:
     _write_json(tmp_path / "papers.json", [])
+    offending = (
+        "MIF-CD74 is a high-confidence therapeutic target and should be "
+        "prioritized for druggability."
+    )
     (tmp_path / "part3_final.md").write_text(
         "## Analysis 3-10: Selected Gene L-R Spatial Evidence\n"
         "### Biological Interpretation\n"
-        "MIF-CD74 is a high-confidence therapeutic target and should be prioritized for druggability.\n",
+        "The Moran signal remains spatial evidence only.\n"
+        f"{offending}\n"
+        "MIF-CD74 remains selected for spatial follow-up.\n",
         encoding="utf-8",
     )
 
     issues = validate_report.validate_report(tmp_path)
 
-    assert any(i["code"] == "part3_therapeutic_spillover" for i in issues)
+    flagged = [i for i in issues if i["code"] == "part3_therapeutic_spillover"]
+    assert len(flagged) == 1
+    assert flagged[0]["value"] == offending
+    assert flagged[0]["section"] == "## Analysis 3-10: Selected Gene L-R Spatial Evidence"
 
 
 def test_flags_part3_missing_selected_lr_pairs(tmp_path: Path) -> None:

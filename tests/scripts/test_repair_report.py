@@ -190,6 +190,54 @@ def test_repair_rejects_truncated_section_and_preserves_original(tmp_path: Path)
     assert report.read_text(encoding="utf-8") == original
 
 
+def test_rejected_section_repair_appends_metadata_without_candidate_text(tmp_path: Path) -> None:
+    original = (
+        "## Analysis 2-8\n"
+        "### Figure Description\n"
+        "Full figure description.\n"
+        "### Quantitative Findings\n"
+        "Measured values remain.\n"
+        "### Biological Interpretation\n"
+        "Original unsupported claim.\n"
+        "### References\n"
+        "- PMID: 12345678\n"
+    )
+    report = tmp_path / "part2_final.md"
+    report.write_text(original, encoding="utf-8")
+    trace_path = tmp_path / "repair_trace.jsonl"
+    trace_path.write_text("", encoding="utf-8")
+    issues_path = tmp_path / "issues.json"
+    issues_path.write_text(
+        json.dumps(
+            {
+                "issues": [
+                    {
+                        "code": "unsupported_mechanistic_interpretation",
+                        "severity": "error",
+                        "file": "part2_final.md",
+                        "section": "## Analysis 2-8",
+                        "value": "Original unsupported claim.",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    changed = repair_report.repair_report(tmp_path, issues_path, llm=TruncatedSectionLLM())
+
+    assert changed == 0
+    rows = [json.loads(line) for line in trace_path.read_text(encoding="utf-8").splitlines()]
+    assert len(rows) == 1
+    assert rows[0]["event"] == "section_candidate_rejected"
+    assert rows[0]["file"] == "part2_final.md"
+    assert rows[0]["section"] == "## Analysis 2-8"
+    assert rows[0]["heading_match"] is False
+    assert isinstance(rows[0]["retention_ratio"], float)
+    assert rows[0]["reasons"] == ["heading_mismatch"]
+    assert "Shortened description" not in trace_path.read_text(encoding="utf-8")
+
+
 def test_repair_accepts_shorter_section_with_same_headings(tmp_path: Path) -> None:
     original = (
         "## Analysis 2-8\n"
@@ -315,6 +363,56 @@ def test_repair_rewrites_unresolved_inline_citations_as_exact_claim(
     assert "Unrelated context stays put." in text
     assert "A separate sentence stays unchanged." in text
     assert "Tail text stays put." in text
+
+
+def test_repair_routes_non_inline_claim_rag_overclaimed_to_exact_claim(
+    tmp_path: Path,
+) -> None:
+    original_claim = "TGFB drives fibrosis despite association-only evidence (PMID: 11111111)."
+    replacement = "TGFB is associated with fibrosis in the cited evidence (PMID: 11111111)."
+    original = (
+        "## Earlier\n"
+        f"{original_claim}\n"
+        "## Biology\n"
+        "### Interpretation\n"
+        f"{original_claim}\n"
+        "Unrelated section sentence stays unchanged.\n"
+        "## Later\n"
+        "Tail stays unchanged.\n"
+    )
+    report = tmp_path / "part1_final.md"
+    report.write_text(original, encoding="utf-8")
+    issues_path = tmp_path / "issues.json"
+    issues_path.write_text(
+        json.dumps(
+            {
+                "issues": [
+                    {
+                        "severity": "error",
+                        "code": "claim_rag_overclaimed",
+                        "file": "part1_final.md",
+                        "section": "## Biology",
+                        "value": original_claim,
+                        "evidence": "PMID 11111111 supports association only.",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    llm = ClaimReplacementLLM(replacement)
+
+    changed = repair_report.repair_report(tmp_path, issues_path, llm=llm)
+
+    text = report.read_text(encoding="utf-8")
+    assert changed == 1
+    assert llm.calls == 1
+    assert "Rewrite only this exact claim" in llm.prompts[0]
+    assert "Rewrite only this markdown section" not in llm.prompts[0]
+    assert f"## Earlier\n{original_claim}\n" in text
+    assert f"## Biology\n### Interpretation\n{replacement}\n" in text
+    assert "Unrelated section sentence stays unchanged." in text
+    assert "## Later\nTail stays unchanged.\n" in text
 
 
 @pytest.mark.parametrize(
