@@ -415,6 +415,107 @@ def test_repair_routes_non_inline_claim_rag_overclaimed_to_exact_claim(
     assert "## Later\nTail stays unchanged.\n" in text
 
 
+def test_repair_replaces_repeated_part3_spillover_when_issue_count_matches(
+    tmp_path: Path,
+) -> None:
+    claim = (
+        "MIF-CD74 is a high-confidence therapeutic target and should be prioritized "
+        "for druggability."
+    )
+    replacement = (
+        "MIF-CD74 remains a spatially supported ligand-receptor signal for follow-up."
+    )
+    original = (
+        "## Analysis 3-10: Selected Gene L-R Spatial Evidence\n"
+        "### Biological Interpretation\n"
+        f"{claim}\n"
+        "Unrelated spatial sentence stays unchanged.\n"
+        f"{claim}\n"
+        f"{claim}\n"
+        "## Later\n"
+        "Tail stays unchanged.\n"
+    )
+    report = tmp_path / "part3_final.md"
+    report.write_text(original, encoding="utf-8")
+    issues_path = tmp_path / "issues.json"
+    issues_path.write_text(
+        json.dumps(
+            {
+                "issues": [
+                    {
+                        "severity": "error",
+                        "code": "part3_therapeutic_spillover",
+                        "file": "part3_final.md",
+                        "section": "## Analysis 3-10: Selected Gene L-R Spatial Evidence",
+                        "value": claim,
+                    }
+                    for _ in range(3)
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    llm = ClaimReplacementLLM(replacement)
+
+    changed = repair_report.repair_report(tmp_path, issues_path, llm=llm)
+
+    text = report.read_text(encoding="utf-8")
+    assert changed == 1
+    assert llm.calls == 1
+    assert claim not in text
+    assert text.count(replacement) == 3
+    assert "Unrelated spatial sentence stays unchanged." in text
+    assert "## Later\nTail stays unchanged.\n" in text
+    assert repair_report._markdown_headings(text) == [
+        "## Analysis 3-10: Selected Gene L-R Spatial Evidence",
+        "### Biological Interpretation",
+        "## Later",
+    ]
+
+
+def test_repair_refuses_repeated_part3_spillover_when_issue_count_mismatches(
+    tmp_path: Path,
+) -> None:
+    claim = (
+        "MIF-CD74 is a high-confidence therapeutic target and should be prioritized "
+        "for druggability."
+    )
+    original = (
+        "## Analysis 3-10: Selected Gene L-R Spatial Evidence\n"
+        "### Biological Interpretation\n"
+        f"{claim}\n"
+        f"{claim}\n"
+        f"{claim}\n"
+    )
+    report = tmp_path / "part3_final.md"
+    report.write_text(original, encoding="utf-8")
+    issues_path = tmp_path / "issues.json"
+    issues_path.write_text(
+        json.dumps(
+            {
+                "issues": [
+                    {
+                        "severity": "error",
+                        "code": "part3_therapeutic_spillover",
+                        "file": "part3_final.md",
+                        "section": "## Analysis 3-10: Selected Gene L-R Spatial Evidence",
+                        "value": claim,
+                    }
+                    for _ in range(2)
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    llm = ClaimReplacementLLM("MIF-CD74 remains a spatial signal.")
+
+    changed = repair_report.repair_report(tmp_path, issues_path, llm=llm)
+
+    assert changed == 0
+    assert llm.calls == 0
+    assert report.read_text(encoding="utf-8") == original
+
+
 @pytest.mark.parametrize(
     ("candidate", "mutation"),
     [

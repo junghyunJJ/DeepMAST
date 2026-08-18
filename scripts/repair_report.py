@@ -85,6 +85,14 @@ def _append_repair_trace(data_dir: Path, row: dict[str, Any]) -> None:
         f.write(json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n")
 
 
+def _can_replace_claim_occurrences(grouped_issues: list[dict[str, Any]], count: int) -> bool:
+    if count == 1:
+        return True
+    return count == len(grouped_issues) and all(
+        issue.get("code") == "part3_therapeutic_spillover" for issue in grouped_issues
+    )
+
+
 def _pmids(text: str) -> set[str]:
     return set(re.findall(r"\bPMID[:\s]*(\d{6,9})\b", text, flags=re.IGNORECASE))
 
@@ -361,14 +369,15 @@ def repair_report(
         if found is None:
             continue
         start, end, section_text = found
-        if section_text.count(claim) != 1:
+        occurrence_count = section_text.count(claim)
+        if not _can_replace_claim_occurrences(grouped_issues, occurrence_count):
             continue
         if model is None:
             model = _create_model(provider)
         replacement = _content(model.invoke(_build_claim_prompt(grouped_issues, claim))).strip()
         if replacement == claim or not _safe_claim_replacement(claim, replacement):
             continue
-        repaired_section = section_text.replace(claim, replacement, 1)
+        repaired_section = section_text.replace(claim, replacement, occurrence_count)
         path.write_text(text[:start] + repaired_section + text[end:], encoding="utf-8")
         changed += 1
 
