@@ -494,6 +494,33 @@ def test_flags_part3_therapeutic_spillover(tmp_path: Path) -> None:
     assert flagged[0]["section"] == "## Analysis 3-10: Selected Gene L-R Spatial Evidence"
 
 
+def test_flags_soft_wrapped_part3_therapeutic_spillover_as_one_value(
+    tmp_path: Path,
+) -> None:
+    _write_json(tmp_path / "papers.json", [])
+    offending = (
+        "MIF-CD74 is a high-confidence therapeutic target and should be\n"
+        "prioritized for druggability."
+    )
+    body = (
+        "### Biological Interpretation\n"
+        "The Moran signal remains spatial evidence only.\n"
+        f"{offending}\n"
+        "MIF-CD74 remains selected for spatial follow-up.\n"
+    )
+    (tmp_path / "part3_final.md").write_text(
+        "## Analysis 3-10: Selected Gene L-R Spatial Evidence\n" + body,
+        encoding="utf-8",
+    )
+
+    issues = validate_report.validate_report(tmp_path)
+
+    flagged = [i for i in issues if i["code"] == "part3_therapeutic_spillover"]
+    assert len(flagged) == 1
+    assert flagged[0]["value"] == offending
+    assert flagged[0]["value"] in body
+
+
 def test_flags_part3_missing_selected_lr_pairs(tmp_path: Path) -> None:
     _write_json(tmp_path / "papers.json", [])
     _write_json(

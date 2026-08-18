@@ -252,7 +252,34 @@ def _known_factor_mentions(text: str, known: dict[str, str]) -> list[tuple[int, 
 
 
 def _claim_windows(text: str) -> list[str]:
-    return [part.strip() for part in re.split(r"(?<=[.!?])\s+|\n+", text) if part.strip()]
+    chunks: list[str] = []
+    paragraph: list[str] = []
+
+    def flush_paragraph() -> None:
+        if paragraph:
+            chunks.append("\n".join(paragraph).strip())
+            paragraph.clear()
+
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line:
+            flush_paragraph()
+            continue
+        if re.match(r"^(?:#{1,6}\s|[-*+]\s|\d+[.)]\s)", line):
+            flush_paragraph()
+            chunks.append(line)
+            continue
+        paragraph.append(line)
+    flush_paragraph()
+
+    windows: list[str] = []
+    for chunk in chunks:
+        windows.extend(
+            part.strip()
+            for part in re.split(r"(?<=[.!?])(?:[ \t]+|\n+)(?=\S)", chunk)
+            if part.strip()
+        )
+    return windows
 
 
 def _biological_interpretation_blocks(section_body: str) -> list[str]:
