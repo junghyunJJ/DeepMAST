@@ -104,8 +104,8 @@ def _issue_claim_key(issue: dict[str, str]) -> tuple[str, str, str]:
     )
 
 
-def _missing_required_files(data_dir: Path) -> list[str]:
-    return [name for name in REQUIRED_PART_FILES if not (data_dir / name).exists()]
+def _missing_required_files(data_dir: Path, filenames: tuple[str, ...]) -> list[str]:
+    return [name for name in filenames if not (data_dir / name).exists()]
 
 
 def _missing_synthesis_required_files(data_dir: Path) -> list[str]:
@@ -167,18 +167,23 @@ def _validate_part_reports(
     *,
     provider: str | None,
     claim_cache: dict[str, list[dict[str, Any]]],
+    filenames: tuple[str, ...],
 ) -> tuple[
     list[dict[str, str]],
     list[dict[str, Any]],
     dict[str, Any] | None,
     dict[str, Any] | None,
 ]:
-    deterministic = validate_report_script.validate_report(data_dir)
+    deterministic = [
+        issue
+        for issue in validate_report_script.validate_report(data_dir)
+        if issue.get("file") not in REQUIRED_PART_FILES or issue.get("file") in filenames
+    ]
     if any(issue.get("code") in PAPERS_JSON_LOAD_ERROR_CODES for issue in deterministic):
         return deterministic, [], None, None
     semantic = claim_rag_validation.validate_claims(
         data_dir,
-        REQUIRED_PART_FILES,
+        filenames,
         provider=provider,
         cache=claim_cache,
     )
@@ -465,9 +470,14 @@ def _validate_synthesis_guardrails(
     )
 
 
-def run_report_guardrail(data_dir: str | Path, *, provider: str | None = None) -> dict[str, Any]:
+def run_report_guardrail(
+    data_dir: str | Path,
+    *,
+    provider: str | None = None,
+    filenames: tuple[str, ...] = REQUIRED_PART_FILES,
+) -> dict[str, Any]:
     data_dir = Path(data_dir).expanduser().resolve()
-    missing = _missing_required_files(data_dir)
+    missing = _missing_required_files(data_dir, filenames)
     if missing:
         return {"status": "skipped", "missing": missing}
 
@@ -479,6 +489,7 @@ def run_report_guardrail(data_dir: str | Path, *, provider: str | None = None) -
         data_dir,
         provider=provider,
         claim_cache=claim_cache,
+        filenames=filenames,
     )
     _write_issues(
         initial_path,
@@ -520,6 +531,7 @@ def run_report_guardrail(data_dir: str | Path, *, provider: str | None = None) -
             data_dir,
             provider=provider,
             claim_cache=claim_cache,
+            filenames=filenames,
         )
         _write_issues(
             final_path,
@@ -561,6 +573,7 @@ def run_report_guardrail(data_dir: str | Path, *, provider: str | None = None) -
                     data_dir,
                     provider=provider,
                     claim_cache=claim_cache,
+                    filenames=filenames,
                 )
             )
 

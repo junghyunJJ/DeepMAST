@@ -91,6 +91,36 @@ def test_run_report_guardrail_skips_when_parts_are_incomplete(
     assert not (tmp_path / "report_validation_final.json").exists()
 
 
+def test_run_report_guardrail_accepts_explicit_part12_scope_without_part3(
+    tmp_path: Path,
+) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    (tmp_path / "papers.json").write_text('{"papers": []}', encoding="utf-8")
+    (tmp_path / "part1_final.md").write_text("## Part 1\n", encoding="utf-8")
+    (tmp_path / "part2_final.md").write_text("## Part 2\n", encoding="utf-8")
+
+    result = report_guardrails.run_report_guardrail(
+        tmp_path,
+        filenames=("part1_final.md", "part2_final.md"),
+    )
+
+    assert result["status"] == "passed"
+    assert result["final_error_count"] == 0
+
+
+def test_run_report_guardrail_default_still_requires_part3(tmp_path: Path) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    (tmp_path / "papers.json").write_text('{"papers": []}', encoding="utf-8")
+    (tmp_path / "part1_final.md").write_text("## Part 1\n", encoding="utf-8")
+    (tmp_path / "part2_final.md").write_text("## Part 2\n", encoding="utf-8")
+
+    result = report_guardrails.run_report_guardrail(tmp_path)
+
+    assert result == {"status": "skipped", "missing": ["part3_final.md"]}
+
+
 def test_run_report_guardrail_fails_when_papers_json_is_missing(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -1411,9 +1441,10 @@ def test_run_report_guardrail_terminally_repairs_new_final_error(
         *,
         provider: str | None,
         claim_cache: dict[str, list[dict[str, Any]]],
+        filenames: tuple[str, ...],
     ) -> tuple[list[dict[str, str]], list[dict[str, Any]], None, None]:
         nonlocal validate_count
-        _ = provider, claim_cache
+        _ = provider, claim_cache, filenames
         issues = validations[validate_count]
         validate_count += 1
         return issues, [], None, None
@@ -1466,9 +1497,10 @@ def test_run_report_guardrail_does_not_terminally_retry_persistent_error(
         *,
         provider: str | None,
         claim_cache: dict[str, list[dict[str, Any]]],
+        filenames: tuple[str, ...],
     ) -> tuple[list[dict[str, str]], list[dict[str, Any]], None, None]:
         nonlocal validate_count
-        _ = provider, claim_cache
+        _ = provider, claim_cache, filenames
         validate_count += 1
         return [persistent], [], None, None
 

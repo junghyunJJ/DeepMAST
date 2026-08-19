@@ -887,6 +887,100 @@ def test_bc_runner_pair_uses_sequential_conditions_with_fixed_endpoint_env(tmp_p
     assert manifest["return_status"] == "passed"
 
 
+def test_bc_runner_part12_smoke_runs_only_no_sni_part12_scope(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = _minimal_source(tmp_path)
+    manifest_path, output_root = _manifest_output_root(tmp_path)
+    stages: list[tuple[str, int | None]] = []
+    guardrail_calls: list[tuple[Path, tuple[str, ...]]] = []
+
+    async def fake_deep_stage(
+        data_dir: Path,
+        stage: str,
+        part: int | None,
+    ) -> dict[str, object]:
+        stages.append((stage, part))
+        assert stage != "part3"
+        assert stage != "reporter"
+        (data_dir / f"{stage}_final.md").write_text(f"## {stage}\n", encoding="utf-8")
+        (data_dir / "rag_audit.jsonl").write_text(
+            json.dumps(
+                {
+                    "endpoint": "agentic_search",
+                    "collection_uuid": stack.BC_COLLECTION_ID,
+                    "use_wiki_context": False,
+                    "success": True,
+                    "error_type": None,
+                    "result_count": 3,
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        return {"stage": stage, "return_code": 0, "elapsed_seconds": 0.0}
+
+    def fake_guardrail(
+        data_dir: Path | str,
+        *,
+        provider: str | None = None,
+        filenames: tuple[str, ...] = bc_runner.REPORT_FILES[:3],
+    ) -> dict[str, object]:
+        assert provider == "ollama"
+        guardrail_calls.append((Path(data_dir), filenames))
+        (Path(data_dir) / "report_validation_initial.json").write_text(
+            json.dumps({"issues": []}),
+            encoding="utf-8",
+        )
+        (Path(data_dir) / "report_validation_final.json").write_text(
+            json.dumps({"issues": []}),
+            encoding="utf-8",
+        )
+        return {
+            "status": "passed",
+            "repair_attempt_count": 0,
+            "terminal_repair_count": 0,
+            "changed_sections": 0,
+        }
+
+    monkeypatch.setattr(bc_runner, "_run_deep_stage", fake_deep_stage)
+    monkeypatch.setattr(bc_runner.middleware_guardrail, "run_report_guardrail", fake_guardrail)
+
+    rc = bc_runner.main(
+        [
+            "--part12-smoke",
+            "5",
+            "--output-root",
+            str(output_root),
+            "--manifest",
+            str(manifest_path),
+            "--source",
+            str(source),
+        ],
+        collection_snapshot=lambda _api_url: stack.BC_COLLECTION_SNAPSHOT,
+        collection_pmids=lambda _api_url: _pmids_100(),
+    )
+
+    data_dir = output_root / "pair-05" / "wiki-off"
+    manifest = json.loads((data_dir / "run_manifest.json").read_text(encoding="utf-8"))
+    timing = json.loads((data_dir / "timing.json").read_text(encoding="utf-8"))
+
+    assert rc == 0
+    assert stages == [("part1", 1), ("part2", 2)]
+    assert guardrail_calls == [
+        (data_dir.resolve(), ("part1_final.md", "part2_final.md"))
+    ]
+    assert manifest["return_status"] == "passed"
+    assert manifest["condition_label"] == "no-SNI"
+    assert timing["stages"] == [
+        {"stage": "part1", "return_code": 0, "elapsed_seconds": 0.0},
+        {"stage": "part2", "return_code": 0, "elapsed_seconds": 0.0},
+    ]
+    assert not (data_dir / "part3_final.md").exists()
+    assert not (data_dir / "synthesis.md").exists()
+
+
 def test_bc_runner_run_pair_stops_after_first_condition_failure(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

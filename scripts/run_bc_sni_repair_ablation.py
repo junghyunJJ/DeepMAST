@@ -24,6 +24,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
 from scripts.sni_ablation_api_stack import APIS, BC_COLLECTION_ID, BC_COLLECTION_SNAPSHOT, MODEL
+from src.agents.deep_interpreter.middleware import report_guardrail as middleware_guardrail
 
 BC_SOURCE = REPO_ROOT / "res/deep_interpreter/bc/bc"
 PMID_FILENAME = re.compile(r"^pmid_(\d+)\.txt$")
@@ -85,6 +86,8 @@ INPUT_FILES = (
 TARGET_SELECTION_KEYS = ("interest_celltypes", "interest_clusters", "sel_factor")
 RUNTIME_DIRS = ("before", "after", "diffs", "logs")
 STAGES = (("part1", 1), ("part2", 2), ("part3", 3), ("reporter", None))
+PART12_STAGES = STAGES[:2]
+PART12_FILES = ("part1_final.md", "part2_final.md")
 STAGE_NUM_PREDICT = {"part1": "12000", "part2": "12000", "part3": "8000", "reporter": "12000"}
 
 
@@ -445,7 +448,6 @@ def _snapshot_files(data_dir: Path, destination_name: str, names: tuple[str, ...
 
 
 def _install_guardrail_capture(data_dir: Path) -> Callable[[], None]:
-    from src.agents.deep_interpreter.middleware import report_guardrail as middleware_guardrail
     from src.agents.deep_interpreter.tools import report as report_tool
 
     original_parts = middleware_guardrail.run_report_guardrail
@@ -543,6 +545,30 @@ def _default_stage_runner(data_dir: Path, env: dict[str, str]) -> int:
             return 0
         finally:
             restore_guardrails()
+
+    return _with_env(env, run)
+
+
+def _default_part12_stage_runner(data_dir: Path, env: dict[str, str]) -> int:
+    def run() -> int:
+        aliases = _bind_read_only_collection(data_dir)
+        _disable_collection_preparation_tool()
+        write_json(data_dir / "rag_binding.json", {"collection_id": BC_COLLECTION_ID, "aliases": aliases})
+        stages = []
+        for stage, part in PART12_STAGES:
+            result = asyncio.run(_run_deep_stage(data_dir, stage, part))
+            stages.append(result)
+            if result["return_code"] != 0:
+                write_json(data_dir / "timing.json", {"stages": stages})
+                return int(result["return_code"])
+        write_json(data_dir / "timing.json", {"stages": stages})
+        result = middleware_guardrail.run_report_guardrail(
+            data_dir,
+            provider="ollama",
+            filenames=PART12_FILES,
+        )
+        write_json(data_dir / "parts_guardrail_result.json", result)
+        return 0 if result.get("status") == "passed" else 1
 
     return _with_env(env, run)
 
@@ -882,6 +908,7 @@ def build_parser() -> argparse.ArgumentParser:
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--smoke", action="store_true", help="Validate manifest and print the dry run plan.")
     mode.add_argument("--pair", type=int, help="Run one ordered pair.")
+    mode.add_argument("--part12-smoke", type=int, help="Run no-SNI Part 1/2 scoped smoke for one pair.")
     mode.add_argument("--all", action="store_true", help="Run ordered pairs 1-10 globally serial.")
     mode.add_argument("--summarize", action="store_true", help="Write summary.json from existing manifests.")
     parser.add_argument("--output-root", type=Path, required=True)
@@ -916,12 +943,22 @@ def main(
         args.output_root.mkdir(parents=True, exist_ok=True)
         return summarize(args.output_root)
     args.output_root.mkdir(parents=True, exist_ok=True)
-    if args.pair or args.smoke:
-        pair_id = f"{args.pair:02d}" if args.pair is not None else "01"
+    if args.pair or args.part12_smoke or args.smoke:
+        pair_id = f"{args.part12_smoke or args.pair:02d}" if args.pair or args.part12_smoke else "01"
         pair = next((item for item in manifest["pairs"] if item["pair_id"] == pair_id), None)
         if pair is None:
             print(f"pair {pair_id} is not in manifest", file=sys.stderr)
             return 1
+        if args.part12_smoke:
+            return run_condition(
+                source=args.source,
+                output_root=args.output_root,
+                pair=pair,
+                condition=CONDITION_BY_LABEL["no-SNI"],
+                stage_runner=_default_part12_stage_runner,
+                collection_snapshot=collection_snapshot,
+                collection_pmids=collection_pmids,
+            )
         return run_pair(
             pair,
             source=args.source,
