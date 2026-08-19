@@ -93,6 +93,8 @@ def test_flags_factor_pathway_significance_when_csv_lacks_claimed_pair(tmp_path:
     flagged = [i for i in issues if i["code"] == "unsupported_pathway_factor_significance"]
     assert len(flagged) == 1
     assert flagged[0]["value"] == "Factor2: EGFR"
+    assert flagged[0]["target_text"] == "Factor2 showed significant enrichment for NFkB and EGFR."
+    assert "replacement_text" not in flagged[0]
 
 
 def test_flags_only_unsupported_claimed_pathways_for_same_factor(tmp_path: Path) -> None:
@@ -196,6 +198,8 @@ def test_flags_factor_pathway_direction_mismatch_for_negative_estimate(tmp_path:
     flagged = [i for i in issues if i["code"] == "factor_pathway_direction_mismatch"]
     assert len(flagged) == 1
     assert flagged[0]["value"] == "Factor3: EGFR estimate=-2.897"
+    assert flagged[0]["target_text"] == "Factor3 shows EGFR enrichment and activation."
+    assert "replacement_text" not in flagged[0]
 
 
 def test_allows_multi_factor_sentence_when_local_factor_pathway_pairs_match(tmp_path: Path) -> None:
@@ -491,6 +495,8 @@ def test_flags_part3_therapeutic_spillover(tmp_path: Path) -> None:
     flagged = [i for i in issues if i["code"] == "part3_therapeutic_spillover"]
     assert len(flagged) == 1
     assert flagged[0]["value"] == offending
+    assert flagged[0]["target_text"] == offending
+    assert "replacement_text" not in flagged[0]
     assert flagged[0]["section"] == "## Analysis 3-10: Selected Gene L-R Spatial Evidence"
 
 
@@ -578,6 +584,75 @@ def test_flags_lr_metric_value_mismatch_against_sig_liana(tmp_path: Path) -> Non
     assert flagged[0]["section"] == "## Analysis 2-6: LIANA Moran's R"
     assert flagged[0]["value"] == "LAMA5^ITGB4 morans=0.7171"
     assert "sig_liana.csv has morans=0.3265" in flagged[0]["evidence"]
+
+
+def test_lr_metric_mismatch_emits_exact_target_and_deterministic_replacement(tmp_path: Path) -> None:
+    _write_json(tmp_path / "papers.json", [])
+    _write_csv(
+        tmp_path / "sig_liana.csv",
+        [
+            {
+                "interaction": "LRIG1^ERBB3",
+                "ligand": "LRIG1",
+                "receptor": "ERBB3",
+                "morans": 0.3629,
+                "genept_score": 0.7,
+                "combinedscore": 0.8,
+            }
+        ],
+    )
+    (tmp_path / "part2_final.md").write_text(
+        "## Analysis 2-6: LIANA Moran's R\n"
+        "### Biological Interpretation\n"
+        "LRIG1-ERBB3 Moran's R = 0.4213.\n",
+        encoding="utf-8",
+    )
+
+    issues = validate_report.validate_report(tmp_path)
+
+    issue = next(i for i in issues if i["code"] == "lr_metric_value_mismatch")
+    assert issue["target_text"] == "LRIG1-ERBB3 Moran's R = 0.4213."
+    assert issue["replacement_text"] == "LRIG1-ERBB3 Moran's R = 0.3629."
+
+
+def test_lr_metric_replacement_changes_only_named_pair_numeric_token(tmp_path: Path) -> None:
+    _write_json(tmp_path / "papers.json", [])
+    _write_csv(
+        tmp_path / "sig_liana.csv",
+        [
+            {
+                "interaction": "LRIG1^ERBB3",
+                "ligand": "LRIG1",
+                "receptor": "ERBB3",
+                "morans": 0.3629,
+                "genept_score": 0.7,
+                "combinedscore": 0.8,
+            },
+            {
+                "interaction": "LAMA5^ITGB4",
+                "ligand": "LAMA5",
+                "receptor": "ITGB4",
+                "morans": 0.3265,
+                "genept_score": 0.8,
+                "combinedscore": 0.7,
+            },
+        ],
+    )
+    sentence = "LRIG1-ERBB3 Moran's R = 0.4213, while LAMA5-ITGB4 Moran's R = 0.3265."
+    (tmp_path / "part2_final.md").write_text(
+        "## Analysis 2-6: LIANA Moran's R\n"
+        "### Biological Interpretation\n"
+        f"{sentence}\n",
+        encoding="utf-8",
+    )
+
+    issues = validate_report.validate_report(tmp_path)
+
+    issue = next(i for i in issues if i["code"] == "lr_metric_value_mismatch")
+    assert issue["target_text"] == sentence
+    assert issue["replacement_text"] == (
+        "LRIG1-ERBB3 Moran's R = 0.3629, while LAMA5-ITGB4 Moran's R = 0.3265."
+    )
 
 
 def test_flags_lr_metric_value_mismatch_in_part3(tmp_path: Path) -> None:
@@ -811,6 +886,11 @@ def test_flags_unhedged_mechanistic_overclaim_in_biological_interpretation(tmp_p
     assert len(flagged) == 1
     assert flagged[0]["severity"] == "error"
     assert flagged[0]["section"] == "## Analysis 1-5: MISTy"
+    assert (
+        flagged[0]["target_text"]
+        == "The MISTy association confirms that hypoxic conditions drive proliferative tumor cell behavior."
+    )
+    assert "replacement_text" not in flagged[0]
 
 
 def test_warns_on_hedged_mechanistic_interpretation(tmp_path: Path) -> None:

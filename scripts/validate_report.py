@@ -172,8 +172,10 @@ def _issue(
     severity: str = "error",
     evidence: str = "",
     repair_instruction: str = "",
+    target_text: str = "",
+    replacement_text: str = "",
 ) -> dict[str, str]:
-    return {
+    issue = {
         "code": code,
         "severity": severity,
         "file": file,
@@ -182,6 +184,11 @@ def _issue(
         "evidence": evidence,
         "repair_instruction": repair_instruction,
     }
+    if target_text:
+        issue["target_text"] = target_text
+    if replacement_text:
+        issue["replacement_text"] = replacement_text
+    return issue
 
 
 def _check_pmids(data_dir: Path, issues: list[dict[str, str]]) -> None:
@@ -313,6 +320,7 @@ def _check_mechanistic_interpretations(data_dir: Path, issues: list[dict[str, st
                                 "Rewrite as an association or hypothesis unless direct experimental evidence is cited "
                                 "for this exact report-derived claim."
                             ),
+                            target_text="" if warning else window,
                         )
                     )
 
@@ -412,6 +420,11 @@ def _check_lr_metric_claims(data_dir: Path, issues: list[dict[str, str]]) -> Non
                                 value=f"{pair} {metric}={claimed_text}",
                                 evidence=f"sig_liana.csv has {metric}={expected:.4f} for {pair}.",
                                 repair_instruction="Use the metric value from sig_liana.csv or relabel the claim to the correct LR metric.",
+                                target_text=window,
+                                replacement_text=(
+                                    f"{window[: claim.start('value')]}{expected:.4f}"
+                                    f"{window[claim.end('value') :]}"
+                                ),
                             )
                         )
 
@@ -569,6 +582,7 @@ def _check_pathway_factor_claims(data_dir: Path, issues: list[dict[str, str]]) -
                             value=", ".join(f"{factor_labels[factor]}: {pathway_labels[p]}" for p in unsupported),
                             evidence="sig_liana_pathway_factor.csv lacks the claimed factor-pathway support.",
                             repair_instruction="Rephrase as an LR-annotation-based hypothesis, not measured pathway-factor significance.",
+                            target_text=window,
                         )
                     )
                 for pathway in sorted(pathways & set(factor_pathways)):
@@ -585,6 +599,7 @@ def _check_pathway_factor_claims(data_dir: Path, issues: list[dict[str, str]]) -
                                 value=f"{factor_labels[factor]}: {pathway_labels[pathway]} estimate={estimate}",
                                 evidence="sig_liana_pathway_factor.csv estimate direction conflicts with the local factor-pathway wording.",
                                 repair_instruction="Align enrichment/depletion wording with the estimate sign for this factor-pathway pair.",
+                                target_text=window,
                             )
                         )
 
@@ -625,6 +640,7 @@ def _check_part3_scope_and_pairs(data_dir: Path, issues: list[dict[str, str]]) -
                         value=window,
                         evidence="Part3 should interpret selected L-R spatial evidence only; Part4 owns therapeutic synthesis.",
                         repair_instruction="Remove therapeutic prioritization language and keep the section to spatial/statistical LR evidence.",
+                        target_text=window,
                     )
                 )
 
