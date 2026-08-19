@@ -778,6 +778,8 @@ def _issue_for(result: dict[str, Any]) -> dict[str, Any] | None:
     if inline_pmid:
         issue["source_claim_index"] = result.get("source_claim_index")
         issue["inline_pmid"] = str(inline_pmid)
+    if severity == "error":
+        issue["target_text"] = str(result["claim"])
     return issue
 
 

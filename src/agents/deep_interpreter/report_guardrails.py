@@ -143,8 +143,10 @@ def _synthesis_issue(
     severity: str = "error",
     evidence: str = "",
     repair_instruction: str = "",
+    target_text: str = "",
+    replacement_text: str = "",
 ) -> dict[str, str]:
-    return {
+    issue = {
         "code": code,
         "severity": severity,
         "file": "synthesis.md",
@@ -153,6 +155,11 @@ def _synthesis_issue(
         "evidence": evidence,
         "repair_instruction": repair_instruction,
     }
+    if target_text:
+        issue["target_text"] = target_text
+    if replacement_text:
+        issue["replacement_text"] = replacement_text
+    return issue
 
 
 def _validate_part_reports(
@@ -239,6 +246,7 @@ def validate_synthesis_report(data_dir: str | Path) -> list[dict[str, str]]:
                 repair_instruction=(
                     "Rewrite as an association or hypothesis unless direct experimental evidence supports this exact claim."
                 ),
+                target_text="" if warning else claim,
             )
         )
     return issues
@@ -346,6 +354,32 @@ def repair_synthesis_report(
         ):
             changed_claims += 1
 
+    generic_issues: list[dict[str, str]] = []
+    for issue in issues:
+        target_text = issue.get("target_text") or ""
+        filename = issue.get("file") or ""
+        section = issue.get("section") or ""
+        path = (data_dir / filename).resolve()
+        if (
+            issue.get("severity") == "error"
+            and issue.get("code") != "unsupported_synthesis_overclaim"
+            and target_text
+            and filename
+            and section
+            and path.is_relative_to(data_dir)
+            and path.suffix == ".md"
+            and path.exists()
+            and target_text in path.read_text(encoding="utf-8")
+        ):
+            generic_issues.append(issue)
+    if generic_issues:
+        changed_claims += repair_report_script.repair_issues(
+            data_dir,
+            generic_issues,
+            provider=provider,
+            claim_validation=claim_validation,
+        )
+
     path = data_dir / "synthesis.md"
     current = path.read_text(encoding="utf-8")
     cursor = 0
@@ -357,6 +391,11 @@ def repair_synthesis_report(
             "inline_citation_unsupported",
             "inline_citation_overclaimed",
         }:
+            continue
+        if (
+            issue.get("target_text")
+            and issue.get("code") != "unsupported_synthesis_overclaim"
+        ):
             continue
         claim = issue.get("value") or ""
         if not claim or SYNTHESIS_GUARDRAIL_SENTENCE in claim.lower():

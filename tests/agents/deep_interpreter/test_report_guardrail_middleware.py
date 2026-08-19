@@ -167,6 +167,44 @@ def test_run_synthesis_guardrail_repairs_invalid_pmid_and_softens_overclaim(
     assert all(issue["severity"] != "error" for issue in final["issues"])
 
 
+def test_synthesis_hard_semantic_issue_targets_exact_claim(tmp_path: Path) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    claim = "MISTy spatial evidence drives a therapy-resistant subpopulation."
+    (tmp_path / "papers.json").write_text('{"papers": []}', encoding="utf-8")
+    (tmp_path / "synthesis.md").write_text(
+        f"## Executive Summary\n\n{claim}\n",
+        encoding="utf-8",
+    )
+
+    [issue] = report_guardrails.validate_synthesis_report(tmp_path)
+
+    assert issue["code"] == "unsupported_synthesis_overclaim"
+    assert issue["target_text"] == claim
+    assert "replacement_text" not in issue
+
+
+def test_synthesis_warning_issue_has_no_generic_repair_fields(tmp_path: Path) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    claim = (
+        "MISTy spatial evidence drives a therapy-resistant subpopulation. "
+        "This remains a hypothesis requiring validation."
+    )
+    (tmp_path / "papers.json").write_text('{"papers": []}', encoding="utf-8")
+    (tmp_path / "synthesis.md").write_text(
+        f"## Executive Summary\n\n{claim}\n",
+        encoding="utf-8",
+    )
+
+    [issue] = report_guardrails.validate_synthesis_report(tmp_path)
+
+    assert issue["code"] == "synthesis_overclaim_warning"
+    assert issue["severity"] == "warning"
+    assert "target_text" not in issue
+    assert "replacement_text" not in issue
+
+
 def test_run_synthesis_guardrail_validates_synthesis_claim_rag_artifacts(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -479,6 +517,82 @@ def test_repair_synthesis_report_falls_back_when_contradiction_rewrite_omits_pmi
     ) in text
     assert "This remains a hypothesis requiring validation." in text
     assert "worse recurrence-free survival" not in text
+
+
+def test_repair_synthesis_report_runs_generic_repair_after_trusted_handlers(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    sibling_claim = "TGFB is associated with fibrosis (PMID: 11111111; PMID: 22222222)."
+    generic_claim = "CXCL12 drives immune migration."
+    (tmp_path / "synthesis.md").write_text(
+        f"## Cross-Part Themes\n\n{sibling_claim}\n{generic_claim}\n",
+        encoding="utf-8",
+    )
+    issues = [
+        {
+            "code": "inline_citation_unsupported",
+            "severity": "error",
+            "file": "synthesis.md",
+            "section": "## Cross-Part Themes",
+            "source_claim_index": 0,
+            "inline_pmid": "22222222",
+            "value": sibling_claim,
+            "target_text": sibling_claim,
+        },
+        {
+            "code": "claim_rag_unsupported",
+            "severity": "error",
+            "file": "synthesis.md",
+            "section": "## Cross-Part Themes",
+            "value": generic_claim,
+            "target_text": generic_claim,
+        },
+    ]
+    claims = [
+        {
+            "file": "synthesis.md",
+            "section": "## Cross-Part Themes",
+            "source_claim_index": 0,
+            "inline_pmid": "11111111",
+            "status": "supported",
+        }
+    ]
+    generic_batches: list[list[dict[str, Any]]] = []
+
+    def fake_repair_issues(
+        data_dir: Path,
+        repair_issues: list[dict[str, Any]],
+        *,
+        llm: Any | None = None,
+        provider: str | None = None,
+        claim_validation: list[dict[str, Any]] | None = None,
+    ) -> int:
+        _ = llm, provider, claim_validation
+        generic_batches.append(repair_issues)
+        assert "22222222" not in (data_dir / "synthesis.md").read_text(encoding="utf-8")
+        repaired = (data_dir / "synthesis.md").read_text(encoding="utf-8").replace(
+            generic_claim,
+            "CXCL12 is associated with immune migration.",
+        )
+        (data_dir / "synthesis.md").write_text(repaired, encoding="utf-8")
+        return 1
+
+    monkeypatch.setattr(
+        report_guardrails.repair_report_script,
+        "repair_issues",
+        fake_repair_issues,
+    )
+
+    assert report_guardrails.repair_synthesis_report(tmp_path, issues, claims) == 2
+    assert [[issue["code"] for issue in batch] for batch in generic_batches] == [
+        ["claim_rag_unsupported"]
+    ]
+    text = (tmp_path / "synthesis.md").read_text(encoding="utf-8")
+    assert "11111111" in text
+    assert "22222222" not in text
+    assert "CXCL12 is associated with immune migration." in text
 
 
 def test_run_synthesis_guardrail_repairs_claim_rag_inline_contradiction(

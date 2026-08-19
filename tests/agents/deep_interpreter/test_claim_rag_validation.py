@@ -113,6 +113,7 @@ def test_claim_items_expand_each_inline_pmid_into_exact_candidate() -> None:
 
 
 def test_inline_claim_issue_retains_citation_coordinates() -> None:
+    claim = "TGFB drives fibrosis (PMID: 22222222)."
     issue = claim_rag_validation._issue_for(
         {
             "status": "unsupported",
@@ -124,7 +125,7 @@ def test_inline_claim_issue_retains_citation_coordinates() -> None:
             "section": "## Biology",
             "source_claim_index": 3,
             "inline_pmid": "22222222",
-            "claim": "TGFB drives fibrosis (PMID: 22222222).",
+            "claim": claim,
         }
     )
 
@@ -132,6 +133,8 @@ def test_inline_claim_issue_retains_citation_coordinates() -> None:
     assert issue["code"] == "inline_citation_unsupported"
     assert issue["source_claim_index"] == 3
     assert issue["inline_pmid"] == "22222222"
+    assert issue["target_text"] == claim
+    assert "replacement_text" not in issue
 
 
 @pytest.mark.parametrize(
@@ -166,6 +169,52 @@ def test_issue_severity_applies_hedged_warning_only_to_non_inline_claim_rag_issu
 
     assert issue is not None
     assert issue["severity"] == expected_severity
+
+
+def test_non_inline_hard_claim_issue_targets_exact_claim() -> None:
+    claim = "TGFB drives fibrosis in lung tissue."
+
+    issue = claim_rag_validation._issue_for(
+        {
+            "status": "overclaimed",
+            "hedged": False,
+            "supporting_pmids": ["11111111"],
+            "evidence_quote": "TGFB is associated with fibrosis.",
+            "reason": "The evidence supports association, not causation.",
+            "file": "part1_final.md",
+            "section": "## Biology",
+            "source_claim_index": 0,
+            "inline_pmid": None,
+            "claim": claim,
+        }
+    )
+
+    assert issue is not None
+    assert issue["code"] == "claim_rag_overclaimed"
+    assert issue["target_text"] == claim
+    assert "replacement_text" not in issue
+
+
+def test_warning_claim_issue_has_no_generic_repair_fields() -> None:
+    issue = claim_rag_validation._issue_for(
+        {
+            "status": "unverifiable",
+            "hedged": False,
+            "supporting_pmids": [],
+            "evidence_quote": "",
+            "reason": "No evidence was retrieved.",
+            "file": "part1_final.md",
+            "section": "## Biology",
+            "source_claim_index": 0,
+            "inline_pmid": None,
+            "claim": "TGFB may be associated with fibrosis.",
+        }
+    )
+
+    assert issue is not None
+    assert issue["severity"] == "warning"
+    assert "target_text" not in issue
+    assert "replacement_text" not in issue
 
 
 def test_reference_pmid_list_creates_no_claim_item(tmp_path: Path) -> None:
@@ -1584,6 +1633,7 @@ def test_validate_claims_maps_overclaim_to_repairable_issue(
             ),
             "source_claim_index": 0,
             "inline_pmid": "11111111",
+            "target_text": "TGFB drives fibrosis (PMID: 11111111).",
         }
     ]
 
