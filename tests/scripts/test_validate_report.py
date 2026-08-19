@@ -611,11 +611,11 @@ def test_lr_metric_mismatch_emits_exact_target_and_deterministic_replacement(tmp
     issues = validate_report.validate_report(tmp_path)
 
     issue = next(i for i in issues if i["code"] == "lr_metric_value_mismatch")
-    assert issue["target_text"] == "LRIG1-ERBB3 Moran's R = 0.4213."
-    assert issue["replacement_text"] == "LRIG1-ERBB3 Moran's R = 0.3629."
+    assert issue["target_text"] == "LRIG1-ERBB3 Moran's R = 0.4213"
+    assert issue["replacement_text"] == "LRIG1-ERBB3 Moran's R = 0.3629"
 
 
-def test_lr_metric_replacement_changes_only_named_pair_numeric_token(tmp_path: Path) -> None:
+def test_lr_metric_mismatches_in_one_sentence_emit_distinct_targets(tmp_path: Path) -> None:
     _write_json(tmp_path / "papers.json", [])
     _write_csv(
         tmp_path / "sig_liana.csv",
@@ -638,7 +638,7 @@ def test_lr_metric_replacement_changes_only_named_pair_numeric_token(tmp_path: P
             },
         ],
     )
-    sentence = "LRIG1-ERBB3 Moran's R = 0.4213, while LAMA5-ITGB4 Moran's R = 0.3265."
+    sentence = "LRIG1-ERBB3 Moran's R = 0.4213, while LAMA5-ITGB4 Moran's R = 0.7171."
     (tmp_path / "part2_final.md").write_text(
         "## Analysis 2-6: LIANA Moran's R\n"
         "### Biological Interpretation\n"
@@ -648,11 +648,17 @@ def test_lr_metric_replacement_changes_only_named_pair_numeric_token(tmp_path: P
 
     issues = validate_report.validate_report(tmp_path)
 
-    issue = next(i for i in issues if i["code"] == "lr_metric_value_mismatch")
-    assert issue["target_text"] == sentence
-    assert issue["replacement_text"] == (
-        "LRIG1-ERBB3 Moran's R = 0.3629, while LAMA5-ITGB4 Moran's R = 0.3265."
-    )
+    flagged = [i for i in issues if i["code"] == "lr_metric_value_mismatch"]
+    assert [i["target_text"] for i in flagged] == [
+        "LRIG1-ERBB3 Moran's R = 0.4213",
+        "LAMA5-ITGB4 Moran's R = 0.7171",
+    ]
+    assert [i["replacement_text"] for i in flagged] == [
+        "LRIG1-ERBB3 Moran's R = 0.3629",
+        "LAMA5-ITGB4 Moran's R = 0.3265",
+    ]
+    assert all(i["target_text"] in sentence for i in flagged)
+    assert flagged[0]["target_text"] != flagged[1]["target_text"]
 
 
 def test_flags_lr_metric_value_mismatch_in_part3(tmp_path: Path) -> None:

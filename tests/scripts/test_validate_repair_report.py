@@ -43,6 +43,11 @@ class DirectionLLM:
         return type("Msg", (), {"content": "Factor3 shows EGFR depletion."})()
 
 
+class FailLLM:
+    def invoke(self, prompt: str):
+        raise AssertionError(f"LLM should not be called: {prompt}")
+
+
 def test_one_pass_returns_zero_when_repair_clears_errors(tmp_path: Path, monkeypatch) -> None:
     calls: list[str] = []
 
@@ -166,3 +171,54 @@ def test_real_validate_repair_validate_clears_lr_and_target_only_direction_issue
     assert changed == 2
     assert not [i for i in final_issues if i["severity"] == "error"]
     assert _headings(report.read_text(encoding="utf-8")) == before_headings
+
+
+def test_real_validate_repair_validate_clears_two_lr_mismatches_in_one_sentence(tmp_path: Path) -> None:
+    _write_json(tmp_path / "papers.json", [])
+    _write_csv(
+        tmp_path / "sig_liana.csv",
+        [
+            {
+                "interaction": "LRIG1^ERBB3",
+                "ligand": "LRIG1",
+                "receptor": "ERBB3",
+                "morans": 0.3629,
+                "genept_score": 0.7,
+                "combinedscore": 0.8,
+            },
+            {
+                "interaction": "LAMA5^ITGB4",
+                "ligand": "LAMA5",
+                "receptor": "ITGB4",
+                "morans": 0.3265,
+                "genept_score": 0.8,
+                "combinedscore": 0.7,
+            },
+        ],
+    )
+    report = tmp_path / "part2_final.md"
+    report.write_text(
+        "## Analysis 2-6: LIANA Moran's R\n"
+        "### Biological Interpretation\n"
+        "Before text stays. "
+        "LRIG1-ERBB3 Moran's R = 0.4213, while LAMA5-ITGB4 Moran's R = 0.7171. "
+        "After text stays.\n",
+        encoding="utf-8",
+    )
+    before_headings = _headings(report.read_text(encoding="utf-8"))
+    issues = validate_report.validate_report(tmp_path)
+    issues_path = tmp_path / "issues.json"
+    _write_json(issues_path, {"issues": issues})
+
+    changed = repair_report.repair_report(tmp_path, issues_path, llm=FailLLM())
+
+    text = report.read_text(encoding="utf-8")
+    final_lr_issues = [i for i in validate_report.validate_report(tmp_path) if i["code"] == "lr_metric_value_mismatch"]
+    assert changed == 2
+    assert final_lr_issues == []
+    assert (
+        "Before text stays. "
+        "LRIG1-ERBB3 Moran's R = 0.3629, while LAMA5-ITGB4 Moran's R = 0.3265. "
+        "After text stays."
+    ) in text
+    assert _headings(text) == before_headings

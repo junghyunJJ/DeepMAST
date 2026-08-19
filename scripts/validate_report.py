@@ -401,7 +401,7 @@ def _check_lr_metric_claims(data_dir: Path, issues: list[dict[str, str]]) -> Non
         for section in _sections(text):
             for window in _claim_windows(str(section["body"])):
                 pair_mentions = _lr_pair_mentions(window, metrics.keys())
-                for index, (_, pair_end, pair) in enumerate(pair_mentions):
+                for index, (pair_start, pair_end, pair) in enumerate(pair_mentions):
                     phrase_end = pair_mentions[index + 1][0] if index + 1 < len(pair_mentions) else len(window)
                     for claim in LR_METRIC_CLAIM_RE.finditer(window, pair_end, phrase_end):
                         metric = _lr_metric_from_label(claim.group("label"))
@@ -412,6 +412,9 @@ def _check_lr_metric_claims(data_dir: Path, issues: list[dict[str, str]]) -> Non
                         claimed = float(claimed_text)
                         if abs(claimed - expected) <= 0.001:
                             continue
+                        target_text = window[pair_start : claim.end("value")]
+                        value_start = claim.start("value") - pair_start
+                        value_end = claim.end("value") - pair_start
                         issues.append(
                             _issue(
                                 code="lr_metric_value_mismatch",
@@ -420,10 +423,10 @@ def _check_lr_metric_claims(data_dir: Path, issues: list[dict[str, str]]) -> Non
                                 value=f"{pair} {metric}={claimed_text}",
                                 evidence=f"sig_liana.csv has {metric}={expected:.4f} for {pair}.",
                                 repair_instruction="Use the metric value from sig_liana.csv or relabel the claim to the correct LR metric.",
-                                target_text=window,
+                                target_text=target_text,
                                 replacement_text=(
-                                    f"{window[: claim.start('value')]}{expected:.4f}"
-                                    f"{window[claim.end('value') :]}"
+                                    f"{target_text[:value_start]}{expected:.4f}"
+                                    f"{target_text[value_end:]}"
                                 ),
                             )
                         )
