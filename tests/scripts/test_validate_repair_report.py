@@ -5,6 +5,8 @@ import importlib.util
 import json
 from pathlib import Path
 
+import pytest
+
 
 SCRIPTS_DIR = Path(__file__).resolve().parents[2] / "scripts"
 
@@ -37,19 +39,109 @@ def _headings(text: str) -> list[str]:
     return [line for line in text.splitlines() if line.startswith("#")]
 
 
-class DirectionLLM:
+class StructuredDecisionLLM:
+    def __init__(self, *, action: str, replacement_text: str) -> None:
+        self.action = action
+        self.replacement_text = replacement_text
+        self.schema = None
+
     def with_structured_output(self, schema, **_kwargs):
         self.schema = schema
         return self
 
-    def invoke(self, prompt: str):
-        assert "Factor3 shows EGFR enrichment and activation." in prompt
-        return self.schema(action="replace", replacement_text="Factor3 shows EGFR depletion.")
+    def invoke(self, _prompt: str):
+        assert self.schema is not None
+        return self.schema(
+            action=self.action,
+            replacement_text=self.replacement_text,
+        )
+
+
+class DirectionLLM(StructuredDecisionLLM):
+    def __init__(self) -> None:
+        super().__init__(
+            action="replace",
+            replacement_text="Factor3 shows EGFR depletion.",
+        )
 
 
 class FailLLM:
     def invoke(self, prompt: str):
         raise AssertionError(f"LLM should not be called: {prompt}")
+
+
+@pytest.mark.parametrize(
+    "code",
+    ["claim_rag_unsupported", "inline_citation_unsupported"],
+)
+def test_unsupported_claim_shapes_delete_only_the_exact_target(
+    tmp_path: Path,
+    code: str,
+) -> None:
+    target = "p53 directly drives invasion (PMID: 12345678)."
+    original = f"## Biology\nKeep before.\n{target}\nKeep after.\n"
+    report = tmp_path / "part1_final.md"
+    report.write_text(original, encoding="utf-8")
+    issue = {
+        "severity": "error",
+        "code": code,
+        "file": report.name,
+        "section": "## Biology",
+        "value": target,
+        "target_text": target,
+        "evidence": "The supplied evidence does not support this assertion.",
+        "repair_instruction": "Remove the unsupported assertion.",
+    }
+    if code == "inline_citation_unsupported":
+        issue["inline_pmid"] = "12345678"
+        issue["source_claim_index"] = 0
+    issues_path = tmp_path / "issues.json"
+    _write_json(issues_path, {"issues": [issue]})
+
+    changed = repair_report.repair_report(
+        tmp_path,
+        issues_path,
+        llm=StructuredDecisionLLM(action="delete", replacement_text=""),
+        claim_validation=[],
+    )
+
+    repaired = report.read_text(encoding="utf-8")
+    assert changed == 1
+    assert target not in repaired
+    assert "Keep before." in repaired
+    assert "Keep after." in repaired
+    assert _headings(repaired) == _headings(original)
+    assert repair_report._pmids(repaired).issubset(repair_report._pmids(original))
+
+
+def test_real_validate_repair_validate_deletes_unsupported_part3_spillover(
+    tmp_path: Path,
+) -> None:
+    _write_json(tmp_path / "papers.json", [])
+    report = tmp_path / "part3_final.md"
+    report.write_text(
+        "## Analysis 3-10\n"
+        "### Biological Interpretation\n"
+        "NECTIN4 is an underexplored therapeutic target.\n"
+        "Spatial evidence remains unchanged.\n",
+        encoding="utf-8",
+    )
+    before = _headings(report.read_text(encoding="utf-8"))
+    issues = validate_report.validate_report(tmp_path)
+    issues_path = tmp_path / "issues.json"
+    _write_json(issues_path, {"issues": issues})
+
+    changed = repair_report.repair_report(
+        tmp_path,
+        issues_path,
+        llm=StructuredDecisionLLM(action="delete", replacement_text=""),
+    )
+
+    final = validate_report.validate_report(tmp_path)
+    assert changed == 1
+    assert not [issue for issue in final if issue["severity"] == "error"]
+    assert _headings(report.read_text(encoding="utf-8")) == before
+    assert "Spatial evidence remains unchanged." in report.read_text(encoding="utf-8")
 
 
 def test_one_pass_returns_zero_when_repair_clears_errors(tmp_path: Path, monkeypatch) -> None:

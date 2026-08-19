@@ -475,6 +475,45 @@ def test_flags_negative_factor_pathway_with_enrichment_not_depletion(tmp_path: P
     assert flagged[0]["value"] == "Factor3: EGFR estimate=-2.897"
 
 
+def test_allows_negatively_associated_factor_pathways_with_negative_estimates(
+    tmp_path: Path,
+) -> None:
+    _write_json(tmp_path / "papers.json", [])
+    _write_csv(
+        tmp_path / "sig_liana_pathway_factor.csv",
+        [
+            {
+                "factor": "Factor3",
+                "pathway": "Estrogen",
+                "estimate": -5.4798,
+                "p": 4.98e-08,
+                "adj_p": 1.0e-06,
+            },
+            {
+                "factor": "Factor3",
+                "pathway": "EGFR",
+                "estimate": -2.8971,
+                "p": 0.0038,
+                "adj_p": 0.02,
+            },
+        ],
+    )
+    (tmp_path / "part2_final.md").write_text(
+        "## Analysis 2-8\n"
+        "The pathway enrichment analysis shows Factor3 is negatively associated "
+        "with Estrogen and EGFR.\n",
+        encoding="utf-8",
+    )
+
+    issues = validate_report.validate_report(tmp_path)
+
+    assert not [
+        issue
+        for issue in issues
+        if issue["code"] == "factor_pathway_direction_mismatch"
+    ]
+
+
 def test_flags_part3_therapeutic_spillover(tmp_path: Path) -> None:
     _write_json(tmp_path / "papers.json", [])
     offending = (

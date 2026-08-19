@@ -693,6 +693,57 @@ def test_repair_synthesis_report_routes_targeted_overclaim_to_generic_repair(
     )
 
 
+def test_repair_synthesis_report_uses_structured_delete_for_targeted_issue(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    target = "CXCL12 directly drives immune migration."
+    original = f"## Cross-Part Themes\n\nKeep before.\n{target}\nKeep after.\n"
+    synthesis = tmp_path / "synthesis.md"
+    synthesis.write_text(original, encoding="utf-8")
+    issues = [{
+        "severity": "error",
+        "code": "claim_rag_unsupported",
+        "file": synthesis.name,
+        "section": "## Cross-Part Themes",
+        "value": target,
+        "target_text": target,
+        "evidence": "No retrieved evidence supports the causal assertion.",
+        "repair_instruction": "Remove the unsupported assertion.",
+    }]
+
+    class DeleteDecisionLLM:
+        def with_structured_output(self, schema, **_kwargs):
+            self.schema = schema
+            return self
+
+        def invoke(self, _prompt: str):
+            return self.schema(action="delete", replacement_text="")
+
+    monkeypatch.setattr(
+        report_guardrails.repair_report_script,
+        "_create_model",
+        lambda _provider: DeleteDecisionLLM(),
+    )
+
+    changed = report_guardrails.repair_synthesis_report(
+        tmp_path,
+        issues,
+        provider="ollama",
+    )
+
+    repaired = synthesis.read_text(encoding="utf-8")
+    assert changed == 1
+    assert target not in repaired
+    assert "Keep before." in repaired
+    assert "Keep after." in repaired
+    assert [line for line in repaired.splitlines() if line.startswith("#")] == [
+        line for line in original.splitlines() if line.startswith("#")
+    ]
+
+
 def test_run_synthesis_guardrail_repairs_claim_rag_inline_contradiction(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

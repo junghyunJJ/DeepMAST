@@ -38,22 +38,22 @@ MECHANISTIC_HEDGE_RE = re.compile(
     re.IGNORECASE,
 )
 FACTOR_PATHWAY_POSITIVE_RE = re.compile(
-    r"\b(enriched|enrichment|activation|activated|active|higher|increased|positive)\b",
+    r"\b(enriched|enrichment|activation|activated|active|higher|increased|positive(?:ly)?)\b",
     re.IGNORECASE,
 )
 FACTOR_PATHWAY_NEGATIVE_RE = re.compile(
-    r"\b(depleted|depletion|negative|lower|reduced|attenuated|suppressed)\b",
+    r"\b(depleted|depletion|negative(?:ly)?|inverse(?:ly)?|lower|reduced|attenuated|suppressed)\b",
     re.IGNORECASE,
 )
 FACTOR_PATHWAY_NEGATED_DIRECTION_RE = re.compile(
     r"\b(?:no|not|without|lack|lacks|lacked|absent)\b(?:\s+\w+){0,2}\s+"
-    r"\b(?:enriched|enrichment|activation|activated|active|higher|increased|positive|"
-    r"depleted|depletion|negative|lower|reduced|attenuated|suppressed)\b",
+    r"\b(?:enriched|enrichment|activation|activated|active|higher|increased|positive(?:ly)?|"
+    r"depleted|depletion|negative(?:ly)?|inverse(?:ly)?|lower|reduced|attenuated|suppressed)\b",
     re.IGNORECASE,
 )
 FACTOR_PATHWAY_CLAIM_RE = re.compile(
-    r"\b(significant|significantly|enriched|enrichment|activation|activated|active|higher|increased|positive|"
-    r"depleted|depletion|negative|lower|reduced|attenuated|suppressed)\b",
+    r"\b(significant|significantly|enriched|enrichment|activation|activated|active|higher|increased|positive(?:ly)?|"
+    r"depleted|depletion|negative(?:ly)?|inverse(?:ly)?|lower|reduced|attenuated|suppressed)\b",
     re.IGNORECASE,
 )
 FACTOR_PATHWAY_CONNECTOR_RE = re.compile(r"\b(?:and|but|while|whereas)\b", re.IGNORECASE)
