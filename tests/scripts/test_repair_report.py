@@ -41,20 +41,23 @@ class FailLLM:
 class CountingLLM:
     def __init__(self) -> None:
         self.calls = 0
+        self.schema = None
+
+    def with_structured_output(self, schema, **_kwargs):
+        self.schema = schema
+        return self
 
     def invoke(self, prompt: str):
         self.calls += 1
         assert "first issue" in prompt
         assert "second issue" in prompt
-        return type(
-            "Msg",
-            (),
-            {
-                "content": (
-                    "Factor1 may reflect pathway activity inferred from LR annotations."
-                )
-            },
-        )()
+        assert self.schema is not None
+        return self.schema(
+            action="replace",
+            replacement_text=(
+                "Factor1 may reflect pathway activity inferred from LR annotations."
+            ),
+        )
 
 
 class TruncatedSectionLLM:
@@ -75,38 +78,34 @@ class TruncatedSectionLLM:
         )()
 
 
-class ShortSafeSectionLLM:
-    def invoke(self, prompt: str):
-        assert "Original unsupported claim." in prompt
-        return type(
-            "Msg",
-            (),
-            {
-                "content": (
-                    "## Analysis 2-8\n"
-                    "### Figure Description\n"
-                    "Full figure description.\n"
-                    "### Quantitative Findings\n"
-                    "Measured values remain.\n"
-                    "### Biological Interpretation\n"
-                    "Hedged claim.\n"
-                    "### References\n"
-                    "- PMID: 12345678\n"
-                )
-            },
-        )()
-
-
-class ClaimReplacementLLM:
-    def __init__(self, replacement: str) -> None:
+class RepairDecisionLLM:
+    def __init__(self, *, action: str = "replace", replacement_text: str = "") -> None:
+        self.action = action
+        self.replacement_text = replacement_text
         self.calls = 0
         self.prompts: list[str] = []
-        self.replacement = replacement
+        self.schema = None
+
+    def with_structured_output(self, schema, **_kwargs):
+        self.schema = schema
+        return self
 
     def invoke(self, prompt: str):
         self.calls += 1
         self.prompts.append(prompt)
-        return type("Msg", (), {"content": self.replacement})()
+        assert self.schema is not None
+        return self.schema(
+            action=self.action,
+            replacement_text=self.replacement_text,
+        )
+
+
+class MalformedDecisionLLM:
+    def with_structured_output(self, _schema, **_kwargs):
+        return self
+
+    def invoke(self, _prompt: str):
+        return {"action": "rewrite", "replacement_text": "x"}
 
 
 def _write_issues(path: Path, issues: list[dict[str, object]]) -> Path:
@@ -169,7 +168,7 @@ def test_repair_rewrites_target_text_and_preserves_surrounding_markdown(tmp_path
             }
         ],
     )
-    llm = ClaimReplacementLLM(replacement)
+    llm = RepairDecisionLLM(replacement_text=replacement)
 
     changed = repair_report.repair_report(tmp_path, issues_path, llm=llm)
 
@@ -183,6 +182,68 @@ def test_repair_rewrites_target_text_and_preserves_surrounding_markdown(tmp_path
         "## Later\n"
         "UNCHANGED LATER\n"
     )
+
+
+def test_repair_accepts_structured_replace_below_old_half_length_limit(tmp_path: Path) -> None:
+    target = "NECTIN4 is an underexplored therapeutic target that warrants drug development."
+    report = tmp_path / "part3_final.md"
+    report.write_text(f"## Biology\nBefore.\n{target}\nAfter.\n", encoding="utf-8")
+    issues = _write_issues(tmp_path, [{
+        "severity": "error",
+        "code": "part3_therapeutic_spillover",
+        "file": report.name,
+        "section": "## Biology",
+        "target_text": target,
+        "evidence": "Part3 contains spatial evidence only.",
+        "repair_instruction": "Remove therapeutic framing.",
+    }])
+
+    changed = repair_report.repair_report(
+        tmp_path,
+        issues,
+        llm=RepairDecisionLLM(
+            action="replace",
+            replacement_text="NECTIN4 remains a selected spatial signal.",
+        ),
+    )
+
+    assert changed == 1
+    assert report.read_text(encoding="utf-8") == (
+        "## Biology\nBefore.\nNECTIN4 remains a selected spatial signal.\nAfter.\n"
+    )
+
+
+def test_repair_accepts_structured_delete_for_only_the_exact_target(tmp_path: Path) -> None:
+    target = "NECTIN4 is an underexplored therapeutic target."
+    original = f"## Biology\nKeep before.\n{target}\nKeep after.\n## Later\nKeep later.\n"
+    report = tmp_path / "part3_final.md"
+    report.write_text(original, encoding="utf-8")
+    trace = tmp_path / "repair_trace.jsonl"
+    trace.write_text("", encoding="utf-8")
+    issues = _write_issues(tmp_path, [{
+        "severity": "error",
+        "code": "part3_therapeutic_spillover",
+        "file": report.name,
+        "section": "## Biology",
+        "target_text": target,
+        "evidence": "No supported spatial statement remains in this sentence.",
+        "repair_instruction": "Delete the unsupported target only.",
+    }])
+
+    changed = repair_report.repair_report(
+        tmp_path,
+        issues,
+        llm=RepairDecisionLLM(action="delete", replacement_text=""),
+    )
+
+    repaired = report.read_text(encoding="utf-8")
+    assert changed == 1
+    assert target not in repaired
+    assert "Keep before." in repaired
+    assert "Keep after." in repaired
+    assert "## Later\nKeep later.\n" in repaired
+    assert repair_report._markdown_headings(repaired) == repair_report._markdown_headings(original)
+    assert _trace_rows(trace)[-1]["path"] == "llm_delete"
 
 
 def test_target_spans_finds_exact_and_soft_wrapped_matches() -> None:
@@ -338,7 +399,6 @@ def test_repair_rejects_unresolved_targets_and_preserves_file(
         ("", "unsafe_replacement"),
         ("### New Heading\nLRIG1 remains supported.", "unsafe_replacement"),
         ("LRIG1 remains supported (PMID: 99999999).", "unsafe_replacement"),
-        ("LRIG1.", "unsafe_replacement"),
     ],
 )
 def test_repair_rejects_unsafe_target_replacements_and_preserves_file(
@@ -368,7 +428,7 @@ def test_repair_rejects_unsafe_target_replacements_and_preserves_file(
     changed = repair_report.repair_report(
         tmp_path,
         issues_path,
-        llm=ClaimReplacementLLM(candidate),
+        llm=RepairDecisionLLM(replacement_text=candidate),
     )
 
     assert changed == 0
@@ -377,6 +437,72 @@ def test_repair_rejects_unsafe_target_replacements_and_preserves_file(
     assert rows[-1]["event"] == "target_repair_rejected"
     assert rows[-1]["reason"] == reason
     assert "New Heading" not in trace_path.read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize(
+    ("action", "candidate", "reason"),
+    [
+        ("replace", "", "unsafe_replacement"),
+        ("delete", "text must be empty", "unsafe_replacement"),
+        ("replace", "### New Heading", "unsafe_replacement"),
+        ("replace", "Claim (PMID: 99999999).", "unsafe_replacement"),
+    ],
+)
+def test_repair_rejects_unsafe_structured_decisions_and_preserves_file(
+    tmp_path: Path,
+    action: str,
+    candidate: str,
+    reason: str,
+) -> None:
+    target = "Original supported context with an unsupported conclusion (PMID: 12345678)."
+    original = f"## Biology\n{target}\n"
+    report = tmp_path / "part2_final.md"
+    report.write_text(original, encoding="utf-8")
+    trace = tmp_path / "repair_trace.jsonl"
+    trace.write_text("", encoding="utf-8")
+    issues = _write_issues(tmp_path, [{
+        "severity": "error",
+        "code": "claim_rag_overclaimed",
+        "file": report.name,
+        "section": "## Biology",
+        "target_text": target,
+    }])
+
+    changed = repair_report.repair_report(
+        tmp_path,
+        issues,
+        llm=RepairDecisionLLM(action=action, replacement_text=candidate),
+    )
+
+    assert changed == 0
+    assert report.read_text(encoding="utf-8") == original
+    assert _trace_rows(trace)[-1]["reason"] == reason
+
+
+def test_repair_rejects_malformed_structured_decision(tmp_path: Path) -> None:
+    target = "Unsupported claim."
+    original = f"## Biology\n{target}\n"
+    report = tmp_path / "part2_final.md"
+    report.write_text(original, encoding="utf-8")
+    trace = tmp_path / "repair_trace.jsonl"
+    trace.write_text("", encoding="utf-8")
+    issues = _write_issues(tmp_path, [{
+        "severity": "error",
+        "code": "claim_rag_unsupported",
+        "file": report.name,
+        "section": "## Biology",
+        "target_text": target,
+    }])
+
+    changed = repair_report.repair_report(
+        tmp_path,
+        issues,
+        llm=MalformedDecisionLLM(),
+    )
+
+    assert changed == 0
+    assert report.read_text(encoding="utf-8") == original
+    assert _trace_rows(trace)[-1]["reason"] == "invalid_repair_decision"
 
 
 def test_repair_rejects_error_issue_without_supported_target(tmp_path: Path) -> None:
@@ -443,9 +569,11 @@ def test_repair_replaces_only_flagged_section(tmp_path: Path) -> None:
     changed = repair_report.repair_report(
         tmp_path,
         issues_path,
-        llm=ClaimReplacementLLM(
-            "Factor1 may reflect TGFb/MAPK activity inferred from LR annotations, "
-            "not pathway-factor significance."
+        llm=RepairDecisionLLM(
+            replacement_text=(
+                "Factor1 may reflect TGFb/MAPK activity inferred from LR annotations, "
+                "not pathway-factor significance."
+            )
         ),
     )
 
@@ -574,7 +702,23 @@ def test_repair_rejects_section_shaped_target_replacement(tmp_path: Path) -> Non
         encoding="utf-8",
     )
 
-    changed = repair_report.repair_report(tmp_path, issues_path, llm=ShortSafeSectionLLM())
+    changed = repair_report.repair_report(
+        tmp_path,
+        issues_path,
+        llm=RepairDecisionLLM(
+            replacement_text=(
+                "## Analysis 2-8\n"
+                "### Figure Description\n"
+                "Full figure description.\n"
+                "### Quantitative Findings\n"
+                "Measured values remain.\n"
+                "### Biological Interpretation\n"
+                "Hedged claim.\n"
+                "### References\n"
+                "- PMID: 12345678\n"
+            )
+        ),
+    )
 
     assert changed == 0
     assert report.read_text(encoding="utf-8") == original
@@ -640,7 +784,7 @@ def test_repair_rewrites_unresolved_inline_citations_as_exact_claim(
         ),
         encoding="utf-8",
     )
-    llm = ClaimReplacementLLM(replacement)
+    llm = RepairDecisionLLM(replacement_text=replacement)
 
     changed = repair_report.repair_report(tmp_path, issues_path, llm=llm)
 
@@ -697,14 +841,14 @@ def test_repair_routes_non_inline_claim_rag_overclaimed_to_exact_claim(
         ),
         encoding="utf-8",
     )
-    llm = ClaimReplacementLLM(replacement)
+    llm = RepairDecisionLLM(replacement_text=replacement)
 
     changed = repair_report.repair_report(tmp_path, issues_path, llm=llm)
 
     text = report.read_text(encoding="utf-8")
     assert changed == 1
     assert llm.calls == 1
-    assert "Rewrite only this exact claim" in llm.prompts[0]
+    assert "Decide how to repair only this exact claim" in llm.prompts[0]
     assert "Rewrite only this markdown section" not in llm.prompts[0]
     assert f"## Earlier\n{original_claim}\n" in text
     assert f"## Biology\n### Interpretation\n{replacement}\n" in text
@@ -753,7 +897,7 @@ def test_repair_replaces_repeated_part3_spillover_when_issue_count_matches(
         ),
         encoding="utf-8",
     )
-    llm = ClaimReplacementLLM(replacement)
+    llm = RepairDecisionLLM(replacement_text=replacement)
 
     changed = repair_report.repair_report(tmp_path, issues_path, llm=llm)
 
@@ -805,7 +949,7 @@ def test_repair_refuses_repeated_part3_spillover_when_issue_count_mismatches(
         ),
         encoding="utf-8",
     )
-    llm = ClaimReplacementLLM("MIF-CD74 remains a spatial signal.")
+    llm = RepairDecisionLLM(replacement_text="MIF-CD74 remains a spatial signal.")
 
     changed = repair_report.repair_report(tmp_path, issues_path, llm=llm)
 
@@ -874,7 +1018,7 @@ def test_repair_rejects_unsafe_exact_claim_replacements(
     changed = repair_report.repair_report(
         tmp_path,
         issues_path,
-        llm=ClaimReplacementLLM(candidate),
+        llm=RepairDecisionLLM(replacement_text=candidate),
     )
 
     assert changed == 0

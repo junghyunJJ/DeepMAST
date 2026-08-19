@@ -38,9 +38,13 @@ def _headings(text: str) -> list[str]:
 
 
 class DirectionLLM:
+    def with_structured_output(self, schema, **_kwargs):
+        self.schema = schema
+        return self
+
     def invoke(self, prompt: str):
         assert "Factor3 shows EGFR enrichment and activation." in prompt
-        return type("Msg", (), {"content": "Factor3 shows EGFR depletion."})()
+        return self.schema(action="replace", replacement_text="Factor3 shows EGFR depletion.")
 
 
 class FailLLM:

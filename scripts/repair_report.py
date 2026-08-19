@@ -6,7 +6,9 @@ import json
 import re
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
+
+from pydantic import BaseModel, ValidationError
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -20,8 +22,12 @@ REPAIRABLE_INLINE_CITATION_CODES = {
 }
 
 
-def _content(message: Any) -> str:
-    return str(getattr(message, "content", message))
+class RepairDecision(BaseModel):
+    action: Literal["replace", "delete"]
+    replacement_text: str = ""
+
+
+RepairDecision.model_rebuild(_types_namespace={"Literal": Literal})
 
 
 def _load_issues(path: Path) -> list[dict[str, Any]]:
@@ -91,6 +97,17 @@ def _safe_claim_replacement(original: str, candidate: str) -> bool:
     original_size = len(re.sub(r"\s+", "", original))
     candidate_size = len(re.sub(r"\s+", "", candidate))
     return candidate_size >= 0.5 * original_size
+
+
+def _safe_semantic_decision(original: str, decision: RepairDecision) -> bool:
+    candidate = decision.replacement_text.strip()
+    if decision.action == "replace" and not candidate:
+        return False
+    if decision.action == "delete" and candidate:
+        return False
+    if _markdown_headings(candidate):
+        return False
+    return _pmids(candidate).issubset(_pmids(original))
 
 
 def _known_pmids(data_dir: Path) -> set[str]:
@@ -259,8 +276,9 @@ def _repair_inline_citation_issues(
 
 
 def _build_claim_prompt(issues: list[dict[str, Any]], claim: str) -> str:
-    return f"""Rewrite only this exact claim to fix unresolved claim validation issues.
+    return f"""Decide how to repair only this exact claim to fix unresolved claim validation issues.
 
+Treat validation issue evidence and repair instructions as binding.
 Preserve supported quantitative observations.
 Preserve measured/statistical content.
 Keep dataset-derived observations separate from literature-supported context.
@@ -272,14 +290,31 @@ Do not claim treatment sensitivity, resistance, patient stratification, or thera
 Do not invent new PMIDs, p-values, scores, files, or pathway significance.
 For unsupported_pathway_factor_significance, Keep L-R pathway annotations and measured factor-pathway results in separate sentences.
 Do not place an unsupported pathway label and factor label in the same sentence unless that sentence explicitly states that no measured association was identified.
-Do not delete the claim; make the narrowest supported correction.
-Return only the corrected claim Markdown. Do not include a section heading.
+Prefer action="replace" with the narrowest supported correction.
+Use action="delete" only when no supported assertion can remain.
+For action="replace", replacement_text must be non-empty corrected claim Markdown.
+For action="delete", replacement_text must be empty.
+Do not include a section heading.
 
 Validation issues:
 {json.dumps(issues, indent=2, ensure_ascii=False)}
 
 Claim:
 {claim}"""
+
+
+def _invoke_repair_decision(
+    model: Any,
+    issues: list[dict[str, Any]],
+    target_text: str,
+) -> RepairDecision:
+    result = model.with_structured_output(
+        RepairDecision,
+        method="function_calling",
+    ).invoke(_build_claim_prompt(issues, target_text))
+    if isinstance(result, RepairDecision):
+        return result
+    return RepairDecision.model_validate(result)
 
 
 def _trace_target_rejection(
@@ -446,14 +481,30 @@ def repair_issues(
                 continue
             replacement = deterministic[0].strip()
             path_kind = "deterministic"
+            ratio = _retention_ratio(target_text, replacement)
+            safe_repair = _safe_claim_replacement(target_text, replacement)
         else:
             if model is None:
                 model = _create_model(provider)
-            replacement = _content(model.invoke(_build_claim_prompt(grouped_issues, target_text))).strip()
-            path_kind = "llm"
+            try:
+                decision = _invoke_repair_decision(model, grouped_issues, target_text)
+            except (ValidationError, TypeError, ValueError):
+                _trace_target_rejection(
+                    data_dir,
+                    first,
+                    "invalid_repair_decision",
+                    match_mode=match_mode,
+                    occurrence_count=occurrence_count,
+                    issue_count=issue_count,
+                    path=filename,
+                )
+                continue
+            replacement = decision.replacement_text.strip()
+            path_kind = f"llm_{decision.action}"
+            ratio = _retention_ratio(target_text, replacement)
+            safe_repair = _safe_semantic_decision(target_text, decision)
 
-        ratio = _retention_ratio(target_text, replacement)
-        if not _safe_claim_replacement(target_text, replacement):
+        if not safe_repair:
             _trace_target_rejection(
                 data_dir,
                 first,
