@@ -18,11 +18,6 @@ REPAIRABLE_INLINE_CITATION_CODES = {
     "inline_citation_unsupported",
     "inline_citation_overclaimed",
 }
-REPAIRABLE_CLAIM_CODES = REPAIRABLE_INLINE_CITATION_CODES | {
-    "claim_rag_overclaimed",
-    "claim_rag_unsupported",
-    "part3_therapeutic_spillover",
-}
 
 
 def _content(message: Any) -> str:
@@ -51,32 +46,6 @@ def _markdown_headings(text: str) -> list[str]:
     return [match.group(0).strip() for match in HEADING_RE.finditer(text)]
 
 
-def _safe_section_replacement(original: str, candidate: str) -> bool:
-    if _markdown_headings(candidate) != _markdown_headings(original):
-        return False
-    original_size = len(re.sub(r"\s+", "", original))
-    candidate_size = len(re.sub(r"\s+", "", candidate))
-    return candidate_size >= 0.5 * original_size
-
-
-def _section_rejection(original: str, candidate: str) -> dict[str, Any]:
-    original_headings = _markdown_headings(original)
-    candidate_headings = _markdown_headings(candidate)
-    original_size = len(re.sub(r"\s+", "", original))
-    candidate_size = len(re.sub(r"\s+", "", candidate))
-    retention_ratio = candidate_size / original_size if original_size else 0.0
-    reasons = []
-    if candidate_headings != original_headings:
-        reasons.append("heading_mismatch")
-    if retention_ratio < 0.5:
-        reasons.append("retention_below_50_percent")
-    return {
-        "heading_match": candidate_headings == original_headings,
-        "retention_ratio": retention_ratio,
-        "reasons": reasons,
-    }
-
-
 def _append_repair_trace(data_dir: Path, row: dict[str, Any]) -> None:
     trace_path = data_dir / "repair_trace.jsonl"
     if not trace_path.exists() or not trace_path.is_file():
@@ -85,12 +54,27 @@ def _append_repair_trace(data_dir: Path, row: dict[str, Any]) -> None:
         f.write(json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n")
 
 
-def _can_replace_claim_occurrences(grouped_issues: list[dict[str, Any]], count: int) -> bool:
-    if count == 1:
-        return True
-    return count == len(grouped_issues) and all(
-        issue.get("code") == "part3_therapeutic_spillover" for issue in grouped_issues
-    )
+def _target_spans(section_text: str, target_text: str) -> tuple[str, list[tuple[int, int]]]:
+    if not target_text:
+        return "missing", []
+
+    spans: list[tuple[int, int]] = []
+    start = 0
+    while True:
+        found = section_text.find(target_text, start)
+        if found < 0:
+            break
+        spans.append((found, found + len(target_text)))
+        start = found + len(target_text)
+    if spans:
+        return "exact", spans
+
+    tokens = [re.escape(token) for token in re.split(r"\s+", target_text.strip()) if token]
+    if not tokens:
+        return "missing", []
+    pattern = r"\s+".join(tokens)
+    spans = [match.span() for match in re.finditer(pattern, section_text)]
+    return ("whitespace_normalized", spans) if spans else ("missing", [])
 
 
 def _pmids(text: str) -> set[str]:
@@ -314,10 +298,226 @@ Claim:
 {claim}"""
 
 
+def _trace_target_rejection(
+    data_dir: Path,
+    issue: dict[str, Any],
+    reason: str,
+    *,
+    match_mode: str | None = None,
+    occurrence_count: int | None = None,
+    issue_count: int | None = None,
+    path: str | None = None,
+    retention_ratio: float | None = None,
+) -> None:
+    row: dict[str, Any] = {
+        "event": "target_repair_rejected",
+        "file": path or issue.get("file"),
+        "section": issue.get("section"),
+        "code": issue.get("code"),
+        "reason": reason,
+    }
+    if match_mode is not None:
+        row["match_mode"] = match_mode
+    if occurrence_count is not None:
+        row["occurrence_count"] = occurrence_count
+    if issue_count is not None:
+        row["issue_count"] = issue_count
+    if retention_ratio is not None:
+        row["retention_ratio"] = retention_ratio
+    _append_repair_trace(data_dir, row)
+
+
+def _retention_ratio(original: str, candidate: str) -> float:
+    original_size = len(re.sub(r"\s+", "", original))
+    candidate_size = len(re.sub(r"\s+", "", candidate))
+    return candidate_size / original_size if original_size else 0.0
+
+
 def _create_model(provider: str | None) -> Any:
     from src.agents.model import create_llm
 
     return create_llm(provider)
+
+
+def repair_issues(
+    data_dir: Path,
+    issues: list[dict[str, Any]],
+    *,
+    llm: Any | None = None,
+    provider: str | None = None,
+    claim_validation: list[dict[str, Any]] | None = None,
+) -> int:
+    data_dir = data_dir.resolve()
+    model = llm
+    changed = 0
+    claim_validation = claim_validation or []
+    target_issues: dict[tuple[str, str, str], list[dict[str, Any]]] = {}
+    inline_issues: dict[tuple[str, str, str, Any], list[dict[str, Any]]] = {}
+
+    for issue in issues:
+        if issue.get("severity") != "error":
+            continue
+        if _repair_pmid_issue(data_dir, issue):
+            changed += 1
+            continue
+        if issue.get("code") in REPAIRABLE_INLINE_CITATION_CODES:
+            key = (
+                str(issue.get("file") or ""),
+                str(issue.get("section") or ""),
+                str(issue.get("value") or ""),
+                issue.get("source_claim_index"),
+            )
+            inline_issues.setdefault(key, []).append(issue)
+            continue
+        target_text = str(issue.get("target_text") or "")
+        if target_text:
+            filename = str(issue.get("file") or "")
+            section = str(issue.get("section") or "")
+            if filename and section:
+                target_issues.setdefault((filename, section, target_text), []).append(issue)
+            else:
+                _trace_target_rejection(data_dir, issue, "unhandled_repair_target")
+            continue
+        _trace_target_rejection(data_dir, issue, "unhandled_repair_target")
+
+    for grouped_issues in inline_issues.values():
+        if _repair_inline_citation_issues(data_dir, grouped_issues, claim_validation):
+            changed += 1
+            continue
+        for issue in grouped_issues:
+            target_text = str(issue.get("target_text") or "")
+            if target_text:
+                filename = str(issue.get("file") or "")
+                section = str(issue.get("section") or "")
+                if filename and section:
+                    target_issues.setdefault((filename, section, target_text), []).append(issue)
+                else:
+                    _trace_target_rejection(data_dir, issue, "unhandled_repair_target")
+            else:
+                _trace_target_rejection(data_dir, issue, "unhandled_repair_target")
+
+    for (filename, section, target_text), grouped_issues in target_issues.items():
+        first = grouped_issues[0]
+        path = (data_dir / filename).resolve()
+        if not path.is_relative_to(data_dir) or path.suffix != ".md" or not path.exists():
+            _trace_target_rejection(data_dir, first, "unhandled_repair_target", path=filename)
+            continue
+
+        text = path.read_text(encoding="utf-8")
+        found = _find_section(text, section)
+        if found is None:
+            _trace_target_rejection(data_dir, first, "target_missing", path=filename)
+            continue
+        start, end, section_text = found
+        match_mode, spans = _target_spans(section_text, target_text)
+        occurrence_count = len(spans)
+        issue_count = len(grouped_issues)
+        if occurrence_count == 0:
+            _trace_target_rejection(
+                data_dir,
+                first,
+                "target_missing",
+                match_mode=match_mode,
+                occurrence_count=occurrence_count,
+                issue_count=issue_count,
+                path=filename,
+            )
+            continue
+        if match_mode == "whitespace_normalized" and occurrence_count != 1:
+            _trace_target_rejection(
+                data_dir,
+                first,
+                "ambiguous_target",
+                match_mode=match_mode,
+                occurrence_count=occurrence_count,
+                issue_count=issue_count,
+                path=filename,
+            )
+            continue
+        if occurrence_count > 1 and occurrence_count != issue_count:
+            _trace_target_rejection(
+                data_dir,
+                first,
+                "target_count_mismatch",
+                match_mode=match_mode,
+                occurrence_count=occurrence_count,
+                issue_count=issue_count,
+                path=filename,
+            )
+            continue
+
+        deterministic = [issue.get("replacement_text") for issue in grouped_issues]
+        deterministic = [value for value in deterministic if isinstance(value, str)]
+        if deterministic:
+            if len(set(deterministic)) != 1 or len(deterministic) != issue_count:
+                _trace_target_rejection(
+                    data_dir,
+                    first,
+                    "replacement_mismatch",
+                    match_mode=match_mode,
+                    occurrence_count=occurrence_count,
+                    issue_count=issue_count,
+                    path=filename,
+                )
+                continue
+            replacement = deterministic[0].strip()
+            path_kind = "deterministic"
+        else:
+            if model is None:
+                model = _create_model(provider)
+            replacement = _content(model.invoke(_build_claim_prompt(grouped_issues, target_text))).strip()
+            path_kind = "llm"
+
+        ratio = _retention_ratio(target_text, replacement)
+        if not _safe_claim_replacement(target_text, replacement):
+            _trace_target_rejection(
+                data_dir,
+                first,
+                "unsafe_replacement",
+                match_mode=match_mode,
+                occurrence_count=occurrence_count,
+                issue_count=issue_count,
+                path=filename,
+                retention_ratio=ratio,
+            )
+            continue
+
+        repaired_section = section_text
+        for span_start, span_end in reversed(spans):
+            repaired_section = (
+                repaired_section[:span_start] + replacement + repaired_section[span_end:]
+            )
+        repaired_text = text[:start] + repaired_section + text[end:]
+        if _markdown_headings(repaired_text) != _markdown_headings(text):
+            _trace_target_rejection(
+                data_dir,
+                first,
+                "heading_mismatch",
+                match_mode=match_mode,
+                occurrence_count=occurrence_count,
+                issue_count=issue_count,
+                path=filename,
+                retention_ratio=ratio,
+            )
+            continue
+        path.write_text(repaired_text, encoding="utf-8")
+        _append_repair_trace(
+            data_dir,
+            {
+                "event": "target_repair_applied",
+                "file": filename,
+                "section": section,
+                "code": first.get("code"),
+                "match_mode": "repeated_exact" if match_mode == "exact" and occurrence_count > 1 else match_mode,
+                "occurrence_count": occurrence_count,
+                "issue_count": issue_count,
+                "path": path_kind,
+                "retention_ratio": ratio,
+            },
+        )
+        changed += 1
+
+    return changed
 
 
 def repair_report(
@@ -328,95 +528,13 @@ def repair_report(
     provider: str | None = None,
     claim_validation: list[dict[str, Any]] | None = None,
 ) -> int:
-    data_dir = data_dir.resolve()
-    issues = _load_issues(issues_path)
-    model = llm
-    changed = 0
-    claim_validation = claim_validation or []
-    section_issues: dict[tuple[str, str], list[dict[str, Any]]] = {}
-    claim_issues: dict[tuple[str, str, str], list[dict[str, Any]]] = {}
-
-    for issue in issues:
-        if issue.get("severity") != "error":
-            continue
-        if _repair_pmid_issue(data_dir, issue):
-            changed += 1
-            continue
-        if issue.get("code") in REPAIRABLE_CLAIM_CODES:
-            section = issue.get("section") or ""
-            filename = issue.get("file") or ""
-            value = issue.get("value") or ""
-            if section and filename and value:
-                claim_issues.setdefault((filename, section, str(value)), []).append(issue)
-            continue
-        section = issue.get("section") or ""
-        filename = issue.get("file") or ""
-        if not section or not filename:
-            continue
-        section_issues.setdefault((filename, section), []).append(issue)
-
-    for (filename, section, claim), grouped_issues in claim_issues.items():
-        if _repair_inline_citation_issues(data_dir, grouped_issues, claim_validation):
-            changed += 1
-            continue
-
-        path = (data_dir / filename).resolve()
-        if not path.is_relative_to(data_dir) or path.suffix != ".md" or not path.exists():
-            continue
-
-        text = path.read_text(encoding="utf-8")
-        found = _find_section(text, section)
-        if found is None:
-            continue
-        start, end, section_text = found
-        occurrence_count = section_text.count(claim)
-        if not _can_replace_claim_occurrences(grouped_issues, occurrence_count):
-            continue
-        if model is None:
-            model = _create_model(provider)
-        replacement = _content(model.invoke(_build_claim_prompt(grouped_issues, claim))).strip()
-        if replacement == claim or not _safe_claim_replacement(claim, replacement):
-            continue
-        repaired_section = section_text.replace(claim, replacement, occurrence_count)
-        path.write_text(text[:start] + repaired_section + text[end:], encoding="utf-8")
-        changed += 1
-
-    for (filename, section), grouped_issues in section_issues.items():
-        path = (data_dir / filename).resolve()
-        if not path.is_relative_to(data_dir) or path.suffix != ".md" or not path.exists():
-            continue
-
-        text = path.read_text(encoding="utf-8")
-        found = _find_section(text, section)
-        if found is None:
-            continue
-        start, end, section_text = found
-        if model is None:
-            model = _create_model(provider)
-        issue_payload: dict[str, Any] = (
-            grouped_issues[0] if len(grouped_issues) == 1 else {"issues": grouped_issues}
-        )
-        replacement = _content(model.invoke(_build_prompt(issue_payload, section_text))).strip()
-        if not replacement.startswith(section.strip()):
-            replacement = section.strip() + "\n" + replacement
-        if not _safe_section_replacement(section_text, replacement):
-            rejection = _section_rejection(section_text, replacement)
-            _append_repair_trace(
-                data_dir,
-                {
-                    "event": "section_candidate_rejected",
-                    "file": filename,
-                    "section": section,
-                    "heading_match": rejection["heading_match"],
-                    "retention_ratio": rejection["retention_ratio"],
-                    "reasons": rejection["reasons"],
-                },
-            )
-            continue
-        path.write_text(text[:start] + replacement.rstrip() + "\n" + text[end:], encoding="utf-8")
-        changed += 1
-
-    return changed
+    return repair_issues(
+        data_dir,
+        _load_issues(issues_path),
+        llm=llm,
+        provider=provider,
+        claim_validation=claim_validation,
+    )
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -51,7 +51,6 @@ class CountingLLM:
             (),
             {
                 "content": (
-                    "## Analysis 2-8: Pathway Factor Heatmap\n"
                     "Factor1 may reflect pathway activity inferred from LR annotations."
                 )
             },
@@ -110,6 +109,275 @@ class ClaimReplacementLLM:
         return type("Msg", (), {"content": self.replacement})()
 
 
+def _write_issues(path: Path, issues: list[dict[str, object]]) -> Path:
+    issues_path = path / "issues.json"
+    issues_path.write_text(json.dumps({"issues": issues}), encoding="utf-8")
+    return issues_path
+
+
+def _trace_rows(path: Path) -> list[dict[str, object]]:
+    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+
+
+def test_repair_uses_validator_replacement_text_without_llm(tmp_path: Path) -> None:
+    report = tmp_path / "part2_final.md"
+    report.write_text("## Results\nLRIG1-ERBB3 Moran's R = 0.4213.\n", encoding="utf-8")
+    issues_path = _write_issues(
+        tmp_path,
+        [
+            {
+                "code": "lr_metric_value_mismatch",
+                "severity": "error",
+                "file": "part2_final.md",
+                "section": "## Results",
+                "value": "legacy diagnostic label",
+                "target_text": "LRIG1-ERBB3 Moran's R = 0.4213.",
+                "replacement_text": "LRIG1-ERBB3 Moran's R = 0.3629.",
+            }
+        ],
+    )
+
+    changed = repair_report.repair_report(tmp_path, issues_path, llm=FailLLM())
+
+    assert changed == 1
+    assert report.read_text(encoding="utf-8") == "## Results\nLRIG1-ERBB3 Moran's R = 0.3629.\n"
+
+
+def test_repair_rewrites_target_text_and_preserves_surrounding_markdown(tmp_path: Path) -> None:
+    original = (
+        "## Biology\n"
+        "UNCHANGED INTRO\n"
+        "LRIG1-ERBB3 proves treatment vulnerability (PMID: 12345678).\n"
+        "UNCHANGED TAIL\n"
+        "## Later\n"
+        "UNCHANGED LATER\n"
+    )
+    replacement = "LRIG1-ERBB3 is a nominated interaction for follow-up (PMID: 12345678)."
+    report = tmp_path / "part3_final.md"
+    report.write_text(original, encoding="utf-8")
+    issues_path = _write_issues(
+        tmp_path,
+        [
+            {
+                "code": "part3_therapeutic_spillover",
+                "severity": "error",
+                "file": "part3_final.md",
+                "section": "## Biology",
+                "target_text": "LRIG1-ERBB3 proves treatment vulnerability (PMID: 12345678).",
+                "evidence": "No therapeutic validation was provided.",
+                "repair_instruction": "Remove therapeutic framing.",
+            }
+        ],
+    )
+    llm = ClaimReplacementLLM(replacement)
+
+    changed = repair_report.repair_report(tmp_path, issues_path, llm=llm)
+
+    assert changed == 1
+    assert llm.calls == 1
+    assert report.read_text(encoding="utf-8") == (
+        "## Biology\n"
+        "UNCHANGED INTRO\n"
+        f"{replacement}\n"
+        "UNCHANGED TAIL\n"
+        "## Later\n"
+        "UNCHANGED LATER\n"
+    )
+
+
+def test_target_spans_finds_exact_and_soft_wrapped_matches() -> None:
+    assert repair_report._target_spans("Alpha beta.\n", "Alpha beta.") == (
+        "exact",
+        [(0, 11)],
+    )
+    assert repair_report._target_spans("Alpha\nbeta.\n", "Alpha beta.") == (
+        "whitespace_normalized",
+        [(0, 11)],
+    )
+
+
+def test_repair_replaces_repeated_target_when_issue_count_matches(tmp_path: Path) -> None:
+    target = "LRIG1-ERBB3 Moran's R = 0.4213."
+    replacement = "LRIG1-ERBB3 Moran's R = 0.3629."
+    original = f"## Results\n{target}\nMiddle stays.\n{target}\n"
+    report = tmp_path / "part2_final.md"
+    report.write_text(original, encoding="utf-8")
+    issues_path = _write_issues(
+        tmp_path,
+        [
+            {
+                "code": "lr_metric_value_mismatch",
+                "severity": "error",
+                "file": "part2_final.md",
+                "section": "## Results",
+                "target_text": target,
+                "replacement_text": replacement,
+            },
+            {
+                "code": "lr_metric_value_mismatch",
+                "severity": "error",
+                "file": "part2_final.md",
+                "section": "## Results",
+                "target_text": target,
+                "replacement_text": replacement,
+            },
+        ],
+    )
+
+    changed = repair_report.repair_report(tmp_path, issues_path, llm=FailLLM())
+
+    assert changed == 1
+    assert report.read_text(encoding="utf-8") == f"## Results\n{replacement}\nMiddle stays.\n{replacement}\n"
+
+
+def test_repair_rejects_repeated_target_when_issue_count_mismatches(tmp_path: Path) -> None:
+    target = "LRIG1-ERBB3 Moran's R = 0.4213."
+    original = f"## Results\n{target}\n{target}\n"
+    report = tmp_path / "part2_final.md"
+    report.write_text(original, encoding="utf-8")
+    trace_path = tmp_path / "repair_trace.jsonl"
+    trace_path.write_text("", encoding="utf-8")
+    issues_path = _write_issues(
+        tmp_path,
+        [
+            {
+                "code": "lr_metric_value_mismatch",
+                "severity": "error",
+                "file": "part2_final.md",
+                "section": "## Results",
+                "target_text": target,
+                "replacement_text": "LRIG1-ERBB3 Moran's R = 0.3629.",
+            }
+        ],
+    )
+
+    changed = repair_report.repair_report(tmp_path, issues_path, llm=FailLLM())
+
+    assert changed == 0
+    assert report.read_text(encoding="utf-8") == original
+    rows = _trace_rows(trace_path)
+    assert rows[-1]["event"] == "target_repair_rejected"
+    assert rows[-1]["reason"] == "target_count_mismatch"
+    assert rows[-1]["occurrence_count"] == 2
+    assert rows[-1]["issue_count"] == 1
+
+
+@pytest.mark.parametrize(
+    ("body", "target", "reason"),
+    [
+        ("Alpha\nbeta.\nAlpha \t beta.\n", "Alpha beta.", "ambiguous_target"),
+        ("Different sentence.\n", "Missing sentence.", "target_missing"),
+    ],
+)
+def test_repair_rejects_unresolved_targets_and_preserves_file(
+    tmp_path: Path,
+    body: str,
+    target: str,
+    reason: str,
+) -> None:
+    original = f"## Results\n{body}"
+    report = tmp_path / "part2_final.md"
+    report.write_text(original, encoding="utf-8")
+    trace_path = tmp_path / "repair_trace.jsonl"
+    trace_path.write_text("", encoding="utf-8")
+    issues_path = _write_issues(
+        tmp_path,
+        [
+            {
+                "code": "semantic_issue",
+                "severity": "error",
+                "file": "part2_final.md",
+                "section": "## Results",
+                "target_text": target,
+                "replacement_text": "Alpha gamma.",
+            }
+        ],
+    )
+
+    changed = repair_report.repair_report(tmp_path, issues_path, llm=FailLLM())
+
+    assert changed == 0
+    assert report.read_text(encoding="utf-8") == original
+    rows = _trace_rows(trace_path)
+    assert rows[-1]["event"] == "target_repair_rejected"
+    assert rows[-1]["reason"] == reason
+
+
+@pytest.mark.parametrize(
+    ("candidate", "reason"),
+    [
+        ("", "unsafe_replacement"),
+        ("### New Heading\nLRIG1 remains supported.", "unsafe_replacement"),
+        ("LRIG1 remains supported (PMID: 99999999).", "unsafe_replacement"),
+        ("LRIG1.", "unsafe_replacement"),
+    ],
+)
+def test_repair_rejects_unsafe_target_replacements_and_preserves_file(
+    tmp_path: Path,
+    candidate: str,
+    reason: str,
+) -> None:
+    target = "LRIG1-ERBB3 drives tumor survival in the cited model (PMID: 12345678)."
+    original = f"## Biology\n{target}\n"
+    report = tmp_path / "part2_final.md"
+    report.write_text(original, encoding="utf-8")
+    trace_path = tmp_path / "repair_trace.jsonl"
+    trace_path.write_text("", encoding="utf-8")
+    issues_path = _write_issues(
+        tmp_path,
+        [
+            {
+                "code": "claim_rag_overclaimed",
+                "severity": "error",
+                "file": "part2_final.md",
+                "section": "## Biology",
+                "target_text": target,
+            }
+        ],
+    )
+
+    changed = repair_report.repair_report(
+        tmp_path,
+        issues_path,
+        llm=ClaimReplacementLLM(candidate),
+    )
+
+    assert changed == 0
+    assert report.read_text(encoding="utf-8") == original
+    rows = _trace_rows(trace_path)
+    assert rows[-1]["event"] == "target_repair_rejected"
+    assert rows[-1]["reason"] == reason
+    assert "New Heading" not in trace_path.read_text(encoding="utf-8")
+
+
+def test_repair_rejects_error_issue_without_supported_target(tmp_path: Path) -> None:
+    original = "## Results\nUnsupported sentence stays.\n"
+    report = tmp_path / "part2_final.md"
+    report.write_text(original, encoding="utf-8")
+    trace_path = tmp_path / "repair_trace.jsonl"
+    trace_path.write_text("", encoding="utf-8")
+    issues_path = _write_issues(
+        tmp_path,
+        [
+            {
+                "code": "new_validator_error",
+                "severity": "error",
+                "file": "part2_final.md",
+                "section": "## Results",
+                "value": "Unsupported sentence stays.",
+            }
+        ],
+    )
+
+    changed = repair_report.repair_report(tmp_path, issues_path, llm=FailLLM())
+
+    assert changed == 0
+    assert report.read_text(encoding="utf-8") == original
+    rows = _trace_rows(trace_path)
+    assert rows[-1]["event"] == "target_repair_rejected"
+    assert rows[-1]["reason"] == "unhandled_repair_target"
+
+
 def test_repair_replaces_only_flagged_section(tmp_path: Path) -> None:
     report = tmp_path / "part2_final.md"
     report.write_text(
@@ -133,6 +401,7 @@ def test_repair_replaces_only_flagged_section(tmp_path: Path) -> None:
                         "file": "part2_final.md",
                         "section": "## Analysis 2-8: Pathway Factor Heatmap",
                         "value": "Factor1 pathway significance",
+                        "target_text": "Factor1 showed significant enrichment for TGFb/MAPK.",
                         "evidence": "No Factor1 row in sig_liana_pathway_factor.csv.",
                         "repair_instruction": "Rephrase as hypothesis.",
                     }
@@ -142,7 +411,14 @@ def test_repair_replaces_only_flagged_section(tmp_path: Path) -> None:
         encoding="utf-8",
     )
 
-    changed = repair_report.repair_report(tmp_path, issues_path, llm=FakeLLM())
+    changed = repair_report.repair_report(
+        tmp_path,
+        issues_path,
+        llm=ClaimReplacementLLM(
+            "Factor1 may reflect TGFb/MAPK activity inferred from LR annotations, "
+            "not pathway-factor significance."
+        ),
+    )
 
     text = report.read_text(encoding="utf-8")
     assert changed == 1
@@ -229,16 +505,14 @@ def test_rejected_section_repair_appends_metadata_without_candidate_text(tmp_pat
     assert changed == 0
     rows = [json.loads(line) for line in trace_path.read_text(encoding="utf-8").splitlines()]
     assert len(rows) == 1
-    assert rows[0]["event"] == "section_candidate_rejected"
+    assert rows[0]["event"] == "target_repair_rejected"
     assert rows[0]["file"] == "part2_final.md"
     assert rows[0]["section"] == "## Analysis 2-8"
-    assert rows[0]["heading_match"] is False
-    assert isinstance(rows[0]["retention_ratio"], float)
-    assert rows[0]["reasons"] == ["heading_mismatch"]
+    assert rows[0]["reason"] == "unhandled_repair_target"
     assert "Shortened description" not in trace_path.read_text(encoding="utf-8")
 
 
-def test_repair_accepts_shorter_section_with_same_headings(tmp_path: Path) -> None:
+def test_repair_rejects_section_shaped_target_replacement(tmp_path: Path) -> None:
     original = (
         "## Analysis 2-8\n"
         "### Figure Description\n"
@@ -263,6 +537,7 @@ def test_repair_accepts_shorter_section_with_same_headings(tmp_path: Path) -> No
                         "file": "part2_final.md",
                         "section": "## Analysis 2-8",
                         "value": "Original unsupported claim.",
+                        "target_text": "Original unsupported claim.",
                     }
                 ]
             }
@@ -272,18 +547,8 @@ def test_repair_accepts_shorter_section_with_same_headings(tmp_path: Path) -> No
 
     changed = repair_report.repair_report(tmp_path, issues_path, llm=ShortSafeSectionLLM())
 
-    assert changed == 1
-    assert report.read_text(encoding="utf-8") == (
-        "## Analysis 2-8\n"
-        "### Figure Description\n"
-        "Full figure description.\n"
-        "### Quantitative Findings\n"
-        "Measured values remain.\n"
-        "### Biological Interpretation\n"
-        "Hedged claim.\n"
-        "### References\n"
-        "- PMID: 12345678\n"
-    )
+    assert changed == 0
+    assert report.read_text(encoding="utf-8") == original
 
 
 def test_repair_rewrites_unresolved_inline_citations_as_exact_claim(
@@ -327,6 +592,7 @@ def test_repair_rewrites_unresolved_inline_citations_as_exact_claim(
                         "source_claim_index": 4,
                         "inline_pmid": "28174229",
                         "value": original_claim,
+                        "target_text": original_claim,
                         "evidence": "The cited paper supports association, not causality.",
                     },
                     {
@@ -337,6 +603,7 @@ def test_repair_rewrites_unresolved_inline_citations_as_exact_claim(
                         "source_claim_index": 4,
                         "inline_pmid": "39753722",
                         "value": original_claim,
+                        "target_text": original_claim,
                         "evidence": "The cited paper is model-specific.",
                     },
                 ]
@@ -393,6 +660,7 @@ def test_repair_routes_non_inline_claim_rag_overclaimed_to_exact_claim(
                         "file": "part1_final.md",
                         "section": "## Biology",
                         "value": original_claim,
+                        "target_text": original_claim,
                         "evidence": "PMID 11111111 supports association only.",
                     }
                 ]
@@ -448,6 +716,7 @@ def test_repair_replaces_repeated_part3_spillover_when_issue_count_matches(
                         "file": "part3_final.md",
                         "section": "## Analysis 3-10: Selected Gene L-R Spatial Evidence",
                         "value": claim,
+                        "target_text": claim,
                     }
                     for _ in range(3)
                 ]
@@ -601,6 +870,7 @@ def test_repair_groups_multiple_issues_for_same_section(tmp_path: Path) -> None:
                         "file": "part2_final.md",
                         "section": "## Analysis 2-8: Pathway Factor Heatmap",
                         "value": "first issue",
+                        "target_text": "Factor1 showed significant enrichment for MAPK and EGFR.",
                     },
                     {
                         "code": "unsupported_pathway_factor_significance",
@@ -608,6 +878,7 @@ def test_repair_groups_multiple_issues_for_same_section(tmp_path: Path) -> None:
                         "file": "part2_final.md",
                         "section": "## Analysis 2-8: Pathway Factor Heatmap",
                         "value": "second issue",
+                        "target_text": "Factor1 showed significant enrichment for MAPK and EGFR.",
                     },
                 ]
             }
