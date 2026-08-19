@@ -453,10 +453,15 @@ def _install_guardrail_capture(data_dir: Path) -> Callable[[], None]:
     original_parts = middleware_guardrail.run_report_guardrail
     original_synthesis = report_tool._run_synthesis_guardrail_before_html
 
-    def parts(path: str | Path, *, provider: str | None = None) -> dict[str, Any]:
+    def parts(
+        path: str | Path,
+        *,
+        provider: str | None = None,
+        filenames: tuple[str, ...] = REPORT_FILES[:3],
+    ) -> dict[str, Any]:
         resolved = Path(path).resolve()
-        _snapshot_files(resolved, "before", REPORT_FILES[:3])
-        result = original_parts(path, provider=provider)
+        _snapshot_files(resolved, "before", filenames)
+        result = original_parts(path, provider=provider, filenames=filenames)
         if result.get("status") != "skipped":
             write_json(resolved / "parts_guardrail_result.json", result)
         return result
@@ -943,13 +948,17 @@ def main(
         args.output_root.mkdir(parents=True, exist_ok=True)
         return summarize(args.output_root)
     args.output_root.mkdir(parents=True, exist_ok=True)
-    if args.pair or args.part12_smoke or args.smoke:
-        pair_id = f"{args.part12_smoke or args.pair:02d}" if args.pair or args.part12_smoke else "01"
+    if args.pair is not None or args.part12_smoke is not None or args.smoke:
+        pair_id = (
+            f"{args.part12_smoke if args.part12_smoke is not None else args.pair:02d}"
+            if args.pair is not None or args.part12_smoke is not None
+            else "01"
+        )
         pair = next((item for item in manifest["pairs"] if item["pair_id"] == pair_id), None)
         if pair is None:
             print(f"pair {pair_id} is not in manifest", file=sys.stderr)
             return 1
-        if args.part12_smoke:
+        if args.part12_smoke is not None:
             return run_condition(
                 source=args.source,
                 output_root=args.output_root,

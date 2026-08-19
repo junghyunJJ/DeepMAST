@@ -981,6 +981,80 @@ def test_bc_runner_part12_smoke_runs_only_no_sni_part12_scope(
     assert not (data_dir / "synthesis.md").exists()
 
 
+@pytest.mark.parametrize("mode", ["--pair", "--part12-smoke"])
+def test_bc_runner_zero_pair_id_does_not_fall_through_to_all(
+    tmp_path: Path,
+    mode: str,
+) -> None:
+    source = _minimal_source(tmp_path)
+    manifest_path, output_root = _manifest_output_root(tmp_path)
+    pair_process_calls: list[str] = []
+
+    def fake_pair_process(
+        pair: bc_runner.ManifestPair,
+        _output_root: Path,
+        _source: Path,
+        _env: dict[str, str],
+    ) -> int:
+        pair_process_calls.append(pair["pair_id"])
+        return 0
+
+    rc = bc_runner.main(
+        [
+            mode,
+            "0",
+            "--output-root",
+            str(output_root),
+            "--manifest",
+            str(manifest_path),
+            "--source",
+            str(source),
+        ],
+        pair_process_runner=fake_pair_process,
+    )
+
+    assert rc != 0
+    assert pair_process_calls == []
+
+
+def test_bc_runner_guardrail_capture_forwards_explicit_filename_scope(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    forwarded: list[tuple[str | None, tuple[str, ...]]] = []
+
+    for name in bc_runner.REPORT_FILES[:3]:
+        (tmp_path / name).write_text("generated\n", encoding="utf-8")
+
+    def fake_guardrail(
+        _path: str | Path,
+        *,
+        provider: str | None = None,
+        filenames: tuple[str, ...] = bc_runner.REPORT_FILES[:3],
+    ) -> dict[str, object]:
+        forwarded.append((provider, filenames))
+        return {"status": "passed", "scope": list(filenames)}
+
+    monkeypatch.setattr(bc_runner.middleware_guardrail, "run_report_guardrail", fake_guardrail)
+    restore = bc_runner._install_guardrail_capture(tmp_path)
+    try:
+        result = bc_runner.middleware_guardrail.run_report_guardrail(
+            tmp_path,
+            provider="ollama",
+            filenames=("part1_final.md", "part2_final.md"),
+        )
+    finally:
+        restore()
+
+    captured = json.loads((tmp_path / "parts_guardrail_result.json").read_text(encoding="utf-8"))
+    assert result == {
+        "status": "passed",
+        "scope": ["part1_final.md", "part2_final.md"],
+    }
+    assert captured == result
+    assert forwarded == [("ollama", ("part1_final.md", "part2_final.md"))]
+
+
 def test_bc_runner_run_pair_stops_after_first_condition_failure(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
