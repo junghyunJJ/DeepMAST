@@ -172,11 +172,22 @@ def test_run_synthesis_guardrail_skips_until_synthesis_ready(
 
 
 def test_run_synthesis_guardrail_repairs_invalid_pmid_and_softens_overclaim(
-    tmp_path: Path,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from src.agents.deep_interpreter import report_guardrails
 
     _write_synthesis_required_files(tmp_path)
+    repair_model = SimpleNamespace(
+        invoke=lambda _prompt: (
+            "MISTy spatial evidence is associated with a candidate subpopulation "
+            "(PMID: 87654321). This remains a hypothesis requiring validation."
+        )
+    )
+    monkeypatch.setattr(
+        report_guardrails.repair_report_script,
+        "_create_model",
+        lambda *_: repair_model,
+    )
 
     result = report_guardrails.run_synthesis_guardrail(tmp_path)
 
@@ -625,6 +636,63 @@ def test_repair_synthesis_report_runs_generic_repair_after_trusted_handlers(
     assert "CXCL12 is associated with immune migration." in text
 
 
+def test_repair_synthesis_report_routes_targeted_overclaim_to_generic_repair(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    claim = "MISTy spatial evidence drives a therapy-resistant subpopulation."
+    replacement = "MISTy spatial evidence is associated with a candidate subpopulation."
+    (tmp_path / "synthesis.md").write_text(
+        f"## Executive Summary\n\n{claim}\n",
+        encoding="utf-8",
+    )
+    issues = [
+        {
+            "code": "unsupported_synthesis_overclaim",
+            "severity": "error",
+            "file": "synthesis.md",
+            "section": "## Executive Summary",
+            "value": claim,
+            "target_text": claim,
+            "evidence": "No direct therapeutic validation was provided.",
+            "repair_instruction": "Rewrite as association or hypothesis.",
+        }
+    ]
+    generic_batches: list[list[dict[str, Any]]] = []
+
+    def fake_repair_issues(
+        data_dir: Path,
+        repair_issues: list[dict[str, Any]],
+        *,
+        llm: Any | None = None,
+        provider: str | None = None,
+        claim_validation: list[dict[str, Any]] | None = None,
+    ) -> int:
+        _ = llm, provider, claim_validation
+        generic_batches.append(repair_issues)
+        text = (data_dir / "synthesis.md").read_text(encoding="utf-8")
+        (data_dir / "synthesis.md").write_text(
+            text.replace(claim, replacement),
+            encoding="utf-8",
+        )
+        return 1
+
+    monkeypatch.setattr(
+        report_guardrails.repair_report_script,
+        "repair_issues",
+        fake_repair_issues,
+    )
+
+    assert report_guardrails.repair_synthesis_report(tmp_path, issues) == 1
+    assert [[issue["code"] for issue in batch] for batch in generic_batches] == [
+        ["unsupported_synthesis_overclaim"]
+    ]
+    assert (tmp_path / "synthesis.md").read_text(encoding="utf-8") == (
+        f"## Executive Summary\n\n{replacement}\n"
+    )
+
+
 def test_run_synthesis_guardrail_repairs_claim_rag_inline_contradiction(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -838,7 +906,7 @@ def test_run_synthesis_guardrail_allows_neutral_clinical_context(
 
 
 def test_run_synthesis_guardrail_repairs_duplicate_overclaims_once_each(
-    tmp_path: Path,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from src.agents.deep_interpreter import report_guardrails
 
@@ -850,6 +918,17 @@ def test_run_synthesis_guardrail_repairs_duplicate_overclaims_once_each(
     (tmp_path / "synthesis.md").write_text(
         f"## Executive Summary\n\n{claim}\n\n{claim}\n",
         encoding="utf-8",
+    )
+    repair_model = SimpleNamespace(
+        invoke=lambda _prompt: (
+            "MISTy spatial evidence is associated with a candidate subpopulation "
+            "(PMID: 12345678). This remains a hypothesis requiring validation."
+        )
+    )
+    monkeypatch.setattr(
+        report_guardrails.repair_report_script,
+        "_create_model",
+        lambda *_: repair_model,
     )
 
     result = report_guardrails.run_synthesis_guardrail(tmp_path)

@@ -196,6 +196,35 @@ def test_target_spans_finds_exact_and_soft_wrapped_matches() -> None:
     )
 
 
+def test_repair_does_not_match_target_across_paragraph_break(tmp_path: Path) -> None:
+    original = "## Results\nAlpha\n\nbeta.\n"
+    report = tmp_path / "part2_final.md"
+    report.write_text(original, encoding="utf-8")
+    trace_path = tmp_path / "repair_trace.jsonl"
+    trace_path.write_text("", encoding="utf-8")
+    issues_path = _write_issues(
+        tmp_path,
+        [
+            {
+                "code": "semantic_issue",
+                "severity": "error",
+                "file": "part2_final.md",
+                "section": "## Results",
+                "target_text": "Alpha beta.",
+                "replacement_text": "Alpha gamma.",
+            }
+        ],
+    )
+
+    changed = repair_report.repair_report(tmp_path, issues_path, llm=FailLLM())
+
+    assert changed == 0
+    assert report.read_text(encoding="utf-8") == original
+    rows = _trace_rows(trace_path)
+    assert rows[-1]["event"] == "target_repair_rejected"
+    assert rows[-1]["reason"] == "target_missing"
+
+
 def test_repair_replaces_repeated_target_when_issue_count_matches(tmp_path: Path) -> None:
     target = "LRIG1-ERBB3 Moran's R = 0.4213."
     replacement = "LRIG1-ERBB3 Moran's R = 0.3629."
@@ -1026,7 +1055,7 @@ def test_repair_skips_issue_file_outside_data_dir(tmp_path: Path) -> None:
     assert "significant enrichment" in outside.read_text(encoding="utf-8")
 
 
-def test_repair_prompt_requires_association_language_for_mechanistic_issues(tmp_path: Path) -> None:
+def test_repair_prompt_requires_association_language_for_mechanistic_issues() -> None:
     issue = {
         "code": "unsupported_mechanistic_interpretation",
         "severity": "error",
@@ -1034,11 +1063,9 @@ def test_repair_prompt_requires_association_language_for_mechanistic_issues(tmp_
         "section": "## Analysis 1-5: MISTy",
         "value": "drives",
     }
-    prompt = repair_report._build_prompt(
-        issue,
-        "## Analysis 1-5: MISTy\n"
-        "### Biological Interpretation\n"
-        "The MISTy association confirms that hypoxia drives tumor behavior.\n",
+    prompt = repair_report._build_claim_prompt(
+        [issue],
+        "The MISTy association confirms that hypoxia drives tumor behavior.",
     )
 
     assert "Rewrite causal or mechanistic report-derived claims as associations or hypotheses." in prompt
@@ -1046,17 +1073,19 @@ def test_repair_prompt_requires_association_language_for_mechanistic_issues(tmp_
 
 
 def test_claim_rag_repair_prompt_forbids_new_evidence() -> None:
-    prompt = repair_report._build_prompt(
-        {
-            "code": "claim_rag_overclaimed",
-            "severity": "error",
-            "file": "part1_final.md",
-            "section": "## Analysis 1-1",
-            "value": "TGFB drives fibrosis.",
-            "evidence": "PMID 11111111 supports association only.",
-            "repair_instruction": "Rewrite as association.",
-        },
-        "## Analysis 1-1\nTGFB drives fibrosis.\n",
+    prompt = repair_report._build_claim_prompt(
+        [
+            {
+                "code": "claim_rag_overclaimed",
+                "severity": "error",
+                "file": "part1_final.md",
+                "section": "## Analysis 1-1",
+                "value": "TGFB drives fibrosis.",
+                "evidence": "PMID 11111111 supports association only.",
+                "repair_instruction": "Rewrite as association.",
+            }
+        ],
+        "TGFB drives fibrosis.",
     )
 
     assert "use only the evidence in the validation issue" in prompt.lower()
@@ -1318,23 +1347,22 @@ def test_inline_pmid_repair_ignores_unverifiable_and_unknown_codes(tmp_path: Pat
 
 
 def test_pathway_factor_repair_prompt_separates_annotations_from_measurements() -> None:
-    prompt = repair_report._build_prompt(
-        {
-            "code": "unsupported_pathway_factor_significance",
-            "severity": "error",
-            "file": "part2_final.md",
-            "section": "## Analysis 2-8: Pathway-Factor Enrichment",
-            "value": "Factor2: TNFa",
-            "evidence": "sig_liana_pathway_factor.csv lacks the claimed factor-pathway support.",
-            "repair_instruction": (
-                "Rephrase as an LR-annotation-based hypothesis, "
-                "not measured pathway-factor significance."
-            ),
-        },
-        (
-            "## Analysis 2-8: Pathway-Factor Enrichment\n"
-            "TNFa annotation may provide context for Factor2 regions."
-        ),
+    prompt = repair_report._build_claim_prompt(
+        [
+            {
+                "code": "unsupported_pathway_factor_significance",
+                "severity": "error",
+                "file": "part2_final.md",
+                "section": "## Analysis 2-8: Pathway-Factor Enrichment",
+                "value": "Factor2: TNFa",
+                "evidence": "sig_liana_pathway_factor.csv lacks the claimed factor-pathway support.",
+                "repair_instruction": (
+                    "Rephrase as an LR-annotation-based hypothesis, "
+                    "not measured pathway-factor significance."
+                ),
+            }
+        ],
+        "TNFa annotation may provide context for Factor2 regions.",
     )
 
     assert (

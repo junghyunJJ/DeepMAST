@@ -72,7 +72,8 @@ def _target_spans(section_text: str, target_text: str) -> tuple[str, list[tuple[
     tokens = [re.escape(token) for token in re.split(r"\s+", target_text.strip()) if token]
     if not tokens:
         return "missing", []
-    pattern = r"\s+".join(tokens)
+    soft_gap = r"(?:[^\S\r\n]+|[^\S\r\n]*\r?\n[^\S\r\n]*)"
+    pattern = soft_gap.join(tokens)
     spans = [match.span() for match in re.finditer(pattern, section_text)]
     return ("whitespace_normalized", spans) if spans else ("missing", [])
 
@@ -257,37 +258,20 @@ def _repair_inline_citation_issues(
     return True
 
 
-def _build_prompt(issue: dict[str, Any], section_text: str) -> str:
-    return f"""Rewrite only this markdown section to fix the validation issue.
-
-Keep the same section heading. Keep evidence-grounded scientific tone.
-For claim_rag_* issues, use only the evidence in the validation issue.
-Do not replace the cited paper or add a new PMID to rescue a claim.
-Rewrite causal or mechanistic report-derived claims as associations or hypotheses.
-Do not claim treatment sensitivity, resistance, patient stratification, or therapeutic vulnerability unless the validation issue provides direct support for that exact claim.
-Do not invent new PMIDs, p-values, scores, files, or pathway significance.
-For unsupported_pathway_factor_significance, Keep L-R pathway annotations and measured factor-pathway results in separate sentences.
-Do not place an unsupported pathway label and factor label in the same sentence unless that sentence explicitly states that no measured association was identified.
-State which factor-pathway relationship is measured, which pathway is annotation-only, and that annotation-only involvement remains a hypothesis.
-Do not add therapeutic/druggability conclusions to Part3.
-
-Validation issue:
-{json.dumps(issue, indent=2, ensure_ascii=False)}
-
-Section:
-{section_text}
-
-Return only the corrected markdown section."""
-
-
 def _build_claim_prompt(issues: list[dict[str, Any]], claim: str) -> str:
     return f"""Rewrite only this exact claim to fix unresolved claim validation issues.
 
 Preserve supported quantitative observations.
 Preserve measured/statistical content.
 Keep dataset-derived observations separate from literature-supported context.
+For claim_rag_* issues, use only the evidence in the validation issue.
+Rewrite causal or mechanistic report-derived claims as associations or hypotheses.
 Remove or hedge only the unsupported interpretation.
-Do not add any new PMID or replace cited papers.
+Do not replace the cited paper or add any new PMID.
+Do not claim treatment sensitivity, resistance, patient stratification, or therapeutic vulnerability unless the validation issue provides direct support for that exact claim.
+Do not invent new PMIDs, p-values, scores, files, or pathway significance.
+For unsupported_pathway_factor_significance, Keep L-R pathway annotations and measured factor-pathway results in separate sentences.
+Do not place an unsupported pathway label and factor label in the same sentence unless that sentence explicitly states that no measured association was identified.
 Do not delete the claim; make the narrowest supported correction.
 Return only the corrected claim Markdown. Do not include a section heading.
 

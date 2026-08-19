@@ -340,6 +340,7 @@ def repair_synthesis_report(
     data_dir = Path(data_dir).expanduser().resolve()
     changed_claims = 0
     claim_validation = claim_validation or []
+    handled_issue_ids: set[int] = set()
 
     for issue in issues:
         if issue.get("severity") != "error":
@@ -350,6 +351,7 @@ def repair_synthesis_report(
             claim_validation,
         ):
             changed_claims += 1
+            handled_issue_ids.add(id(issue))
             continue
         if _repair_explicit_inline_contradiction(
             data_dir,
@@ -358,32 +360,45 @@ def repair_synthesis_report(
             deterministic_only=deterministic_contradictions,
         ):
             changed_claims += 1
+            handled_issue_ids.add(id(issue))
 
     generic_issues: list[dict[str, str]] = []
     for issue in issues:
+        if id(issue) in handled_issue_ids:
+            continue
         target_text = issue.get("target_text") or ""
         filename = issue.get("file") or ""
         section = issue.get("section") or ""
         path = (data_dir / filename).resolve()
         if (
             issue.get("severity") == "error"
-            and issue.get("code") != "unsupported_synthesis_overclaim"
             and target_text
             and filename
             and section
             and path.is_relative_to(data_dir)
             and path.suffix == ".md"
             and path.exists()
-            and target_text in path.read_text(encoding="utf-8")
         ):
             generic_issues.append(issue)
-    if generic_issues:
-        changed_claims += repair_report_script.repair_issues(
+    generic_groups: dict[tuple[str, str, str], list[dict[str, str]]] = {}
+    for issue in generic_issues:
+        generic_groups.setdefault(
+            (
+                str(issue.get("file") or ""),
+                str(issue.get("section") or ""),
+                str(issue.get("target_text") or ""),
+            ),
+            [],
+        ).append(issue)
+    for grouped_issues in generic_groups.values():
+        changed = repair_report_script.repair_issues(
             data_dir,
-            generic_issues,
+            grouped_issues,
             provider=provider,
             claim_validation=claim_validation,
         )
+        if changed:
+            changed_claims += len(grouped_issues)
 
     path = data_dir / "synthesis.md"
     current = path.read_text(encoding="utf-8")
@@ -397,10 +412,7 @@ def repair_synthesis_report(
             "inline_citation_overclaimed",
         }:
             continue
-        if (
-            issue.get("target_text")
-            and issue.get("code") != "unsupported_synthesis_overclaim"
-        ):
+        if issue.get("target_text"):
             continue
         claim = issue.get("value") or ""
         if not claim or SYNTHESIS_GUARDRAIL_SENTENCE in claim.lower():
