@@ -70,6 +70,20 @@ def _write_consistency_guardrail_fixture(data_dir: Path, synthesis: str) -> None
     (data_dir / "synthesis.md").write_text(synthesis, encoding="utf-8")
 
 
+class StructuredRepairModel:
+    def __init__(self, replacement_text: str) -> None:
+        self.replacement_text = replacement_text
+        self.schema = None
+
+    def with_structured_output(self, schema: Any, **_kwargs: Any) -> "StructuredRepairModel":
+        self.schema = schema
+        return self
+
+    def invoke(self, _prompt: str) -> Any:
+        assert self.schema is not None
+        return self.schema(action="replace", replacement_text=self.replacement_text)
+
+
 def test_run_report_guardrail_skips_when_parts_are_incomplete(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -177,11 +191,9 @@ def test_run_synthesis_guardrail_repairs_invalid_pmid_and_softens_overclaim(
     from src.agents.deep_interpreter import report_guardrails
 
     _write_synthesis_required_files(tmp_path)
-    repair_model = SimpleNamespace(
-        invoke=lambda _prompt: (
-            "MISTy spatial evidence is associated with a candidate subpopulation "
-            "(PMID: 87654321). This remains a hypothesis requiring validation."
-        )
+    repair_model = StructuredRepairModel(
+        "MISTy spatial evidence is associated with a candidate subpopulation "
+        "(PMID: 87654321). This remains a hypothesis requiring validation."
     )
     monkeypatch.setattr(
         report_guardrails.repair_report_script,
@@ -840,10 +852,10 @@ def test_run_synthesis_guardrail_repairs_claim_rag_inline_contradiction(
         (tmp_path / "synthesis_guardrail_initial.json").read_text(encoding="utf-8")
     )
     text = (tmp_path / "synthesis.md").read_text(encoding="utf-8")
-    assert repair_model_call_count == 1
+    assert repair_model_call_count == 0
     assert repair_model_providers == ["ollama"]
     assert result["status"] == "passed"
-    assert result["repair_attempt_count"] == 2
+    assert result["repair_attempt_count"] == 1
     assert initial["issues"][0]["reason"].startswith("The claim incorrectly states")
     assert initial["issues"][0]["evidence_quote"] == evidence_quote
     assert "better recurrence-free survival (PMID: 40694271)" in text
@@ -970,11 +982,9 @@ def test_run_synthesis_guardrail_repairs_duplicate_overclaims_once_each(
         f"## Executive Summary\n\n{claim}\n\n{claim}\n",
         encoding="utf-8",
     )
-    repair_model = SimpleNamespace(
-        invoke=lambda _prompt: (
-            "MISTy spatial evidence is associated with a candidate subpopulation "
-            "(PMID: 12345678). This remains a hypothesis requiring validation."
-        )
+    repair_model = StructuredRepairModel(
+        "MISTy spatial evidence is associated with a candidate subpopulation "
+        "(PMID: 12345678). This remains a hypothesis requiring validation."
     )
     monkeypatch.setattr(
         report_guardrails.repair_report_script,
