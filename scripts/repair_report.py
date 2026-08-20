@@ -290,6 +290,12 @@ Do not claim treatment sensitivity, resistance, patient stratification, or thera
 Do not invent new PMIDs, p-values, scores, files, or pathway significance.
 For unsupported_pathway_factor_significance, Keep L-R pathway annotations and measured factor-pathway results in separate sentences.
 Do not place an unsupported pathway label and factor label in the same sentence unless that sentence explicitly states that no measured association was identified.
+For inline citation issues whose evidence reports no supporting PMID:
+- never retain the flagged inline PMID;
+- Preserve measured values and pair names as observations from the current analysis;
+- Remove unsupported literature attribution, causal interpretation, and mechanistic extension;
+- do not present dataset-derived measurements as literature-supported findings;
+- Choose delete only when no supported dataset-derived observation remains.
 Prefer action="replace" with the narrowest supported correction.
 Use action="delete" only when no supported assertion can remain.
 For action="replace", replacement_text must be non-empty corrected claim Markdown.

@@ -1236,6 +1236,39 @@ def test_claim_rag_repair_prompt_forbids_new_evidence() -> None:
     assert "do not replace the cited paper" in prompt.lower()
 
 
+def test_inline_unsupported_prompt_removes_pmid_and_preserves_dataset_observation() -> None:
+    target = (
+        "CDH1-ERBB3 emerges as the dominant spatial communication network "
+        "(Moran's R = 0.4767, combined score = 0.8141) "
+        "(PMID: 28174229)"
+    )
+    prompt = repair_report._build_claim_prompt(
+        [
+            {
+                "code": "inline_citation_unsupported",
+                "severity": "error",
+                "file": "part2_final.md",
+                "section": "## Part 2 Summary",
+                "value": target,
+                "target_text": target,
+                "inline_pmid": "28174229",
+                "evidence": "The claim is unsupported. PMIDs: none.",
+                "repair_instruction": (
+                    "Remove the unsupported assertion or mark it as a hypothesis; "
+                    "do not add a new PMID."
+                ),
+            }
+        ],
+        target,
+    )
+
+    assert "never retain the flagged inline PMID" in prompt
+    assert "current analysis" in prompt
+    assert "Preserve measured values and pair names" in prompt
+    assert "Remove unsupported literature attribution" in prompt
+    assert "Choose delete only when no supported dataset-derived observation remains" in prompt
+
+
 def test_repair_removes_only_unsupported_inline_pmid_when_sibling_supports(
     tmp_path: Path,
 ) -> None:
