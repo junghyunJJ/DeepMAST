@@ -80,7 +80,7 @@ def test_reporter_think_tool_is_available_not_runtime_enforced():
 
 def _extract_phase47_block() -> str:
     match = re.search(
-        r"### Phase 4\.7:.*?(?=### Phase 5\.0:)",
+        r"### Phase 4\.7:.*?(?=### Phase 5(?:\.0)?:)",
         REPORTER_PROMPT,
         flags=re.DOTALL,
     )
@@ -90,11 +90,11 @@ def _extract_phase47_block() -> str:
 
 def _extract_phase5_block() -> str:
     match = re.search(
-        r"### Phase 5\.0:.*?(?=### Phase 6:)",
+        r"### Phase 5(?:\.0)?:.*?(?=### Phase 6:)",
         REPORTER_PROMPT,
         flags=re.DOTALL,
     )
-    assert match, "Could not locate Phase 5.0 block in REPORTER prompt"
+    assert match, "Could not locate Phase 5 block in REPORTER prompt"
     return match.group(0)
 
 
@@ -178,6 +178,18 @@ def test_reporter_phase5_delegates_bookkeeping_artifacts_to_report_tool():
     assert "writes `/synthesis_validation.json` and `/synthesis_targets.json`" in block
     assert 'write_file("/synthesis_validation.json"' not in block
     assert 'write_file("/synthesis_targets.json"' not in block
+
+
+def test_reporter_phase5_omits_manual_html_authoring_policy():
+    block = _extract_phase5_block()
+
+    assert "generate_html_report" in block
+    assert block.count("parts={") == 1
+    assert "```html" not in block
+    assert "Blueprint" not in block
+    assert "Citation Conversion Rules" not in block
+    assert "Semantic Highlighting Rules" not in block
+    assert "Table Formatting Rules" not in block
 
 
 def test_reporter_never_hand_writes_reporter_bookkeeping_artifacts():

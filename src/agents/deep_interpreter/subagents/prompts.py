@@ -1014,110 +1014,11 @@ think_tool(
 when creating `/synthesis_targets.json`. If both are missing, proceed to Phase 5 with
 "No therapeutic analysis available".
 
-### Phase 5.0: HTML Structure Blueprint
-
-Before generating the report, internalize these structural patterns:
-
-**Executive Summary Blueprint:**
-```html
-<p>Overview paragraph describing the analysis.</p>
-<div class="key-findings">
-    <h4>Key Findings:</h4>
-    <ul>
-        <li><strong>Category:</strong> Detail with <span class="highlight-pathway">pathway</span> and metrics</li>
-        <!-- 6-8 bullet points total -->
-    </ul>
-</div>
-```
-
-**Per-Analysis Section Blueprint:**
-```html
-<div class="analysis-section">
-    <h3>N. Analysis Name</h3>
-    <div class="figure-container">
-        <img src="{figure_path}" alt="Description">
-        <p class="figure-caption">Figure N: Caption.</p>
-    </div>
-    <!-- Optional: pathway-box for pathway descriptions -->
-    <div class="pathway-box"><h4>Pathway Descriptions:</h4><ul>...</ul></div>
-    <!-- Optional: key-findings table with rowspan and FDR -->
-    <div class="key-findings"><h4>Key Findings:</h4><table>...</table></div>
-    <!-- Required: interpretation with inline citations -->
-    <div class="interpretation">
-        <h4>Biological Interpretation:</h4>
-        <p><strong>Sub-heading:</strong> Text with highlights and <a href="..." class="reference" target="_blank">(PMID: ...)</a>.</p>
-    </div>
-</div>
-```
-
-**Part Summary Box Blueprint (end of each Part):**
-```html
-<div class="summary-box">
-    <h4>Part N Summary: Title</h4>
-    <p><strong>Key Point:</strong> Description</p>
-    <ul style="margin-left: 40px; margin-top: 10px;">
-        <li><span class="highlight-pathway">Pathway</span> - Role</li>
-    </ul>
-    <p style="margin-top: 10px;"><strong>Key Insight:</strong> Concluding observation.</p>
-</div>
-```
-
-**L-R Pagination Blueprint (Part 3 only, 5 rows per page):**
-```html
-<div class="pagination">
-    <button class="page-button active" onclick="showPage(1)">1-5</button>
-    <button class="page-button" onclick="showPage(2)">6-10</button>
-</div>
-<div id="interactions-page-1" class="interactions-page active">
-    <table><!-- headers + 5 rows --></table>
-</div>
-<div id="interactions-page-2" class="interactions-page">
-    <table><!-- headers + next 5 rows --></table>
-</div>
-```
-
-**Summary Tab Blueprint:**
-```
-summary-box (Overall Biological Model)
-  → analysis-section (Integrated Findings with numbered H4s)
-  → analysis-section (Clinical Implications with <ul>)
-  → summary-box (Conclusions with vulnerabilities list)
-  → analysis-section (References with linked list)
-```
-
 ### Phase 5: Generate HTML Report (Deterministic Template Mode)
 
 Use deterministic template mode for reproducible report structure. The renderer
 reads final markdown, JSON/CSV tables, and figures from `data_dir` and renders
 the fixed Part 1, Part 2, Part 3, Summary, and Therapeutic Implications tabs.
-
-#### Citation Conversion Rules
-
-Convert EVERY PMID reference to a clickable link:
-```html
-<a href="https://pubmed.ncbi.nlm.nih.gov/{PMID}/" class="reference" target="_blank">(PMID: {PMID})</a>
-```
-Do NOT leave plain-text PMIDs in the output.
-
-#### Semantic Highlighting Rules
-
-Apply these CSS classes to ALL occurrences of biological entities:
-- Cluster names → `<span class="highlight-cluster">Cluster 4</span>`
-- Pathway names → `<span class="highlight-pathway">MAPK</span>`
-- Cell type names → `<span class="highlight-celltype">Macrophages</span>`
-
-#### Table Formatting Rules
-
-- Use `rowspan` for grouped clusters (one cluster spanning multiple cell type rows)
-- Format FDR as `N × 10<sup>-X</sup>` (e.g., `2.47 × 10<sup>-244</sup>`)
-- Highlight key rows: `style="background: rgba(100, 255, 218, 0.15);"`
-- Always include `<thead>` with `<th>` headers
-
-#### Figure Embedding
-
-Reference figures by their file path (e.g., `src="1.spatial.png"`).
-The tool will automatically convert file paths to base64 data URIs.
-You do NOT need to base64-encode figures yourself.
 
 #### Synthesis Guardrail Checkpoint
 
