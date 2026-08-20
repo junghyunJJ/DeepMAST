@@ -176,15 +176,25 @@ Do not run planner, searcher, or interpreter."""
 def _build_interpreter_save_retry_message(
     data_dir: Path,
     part: int,
+    *,
+    fresh_context: bool = False,
 ) -> str:
     if part not in {1, 2, 3}:
         raise ValueError("interpreter save retry requires Part 1, 2, or 3")
     base_message = _build_subagent_message("interpreter", data_dir, {}, part)
-    return f"""Continue the existing Part {part} attempt for {data_dir}.
+    if fresh_context:
+        context_instruction = f"""Start a fresh Part {part} save recovery for {data_dir}.
+
+No prior conversation or tool results are attached. Call load_analysis_data for this data directory, then complete the assigned Part report. Do not summarize raw CSV structure or return a generic dataset description."""
+    else:
+        context_instruction = f"""Continue the existing Part {part} attempt for {data_dir}.
 
 Use the conversation and tool results above. Do not restart the analysis from scratch.
 Reuse an existing load_analysis_data result when it is already present in the conversation.
-Call load_analysis_data only if no usable result is present.
+Call load_analysis_data only if no usable result is present."""
+
+    return f"""{context_instruction}
+
 Do not blindly save a generic or incomplete previous response.
 Correct or complete the report so it satisfies every assigned Part requirement.
 
@@ -343,10 +353,12 @@ async def run(args: argparse.Namespace) -> int:
         if not _should_retry_interpreter_save(args, missing_outputs):
             break
 
+        fresh_context = retry_number == MAX_INTERPRETER_INVOKE_ATTEMPTS - 1
         print(
             json.dumps(
                 {
                     "event": f"{retry_prefix}_start",
+                    "fresh_context": fresh_context,
                     "retry_number": retry_number,
                     "max_invoke_attempts": MAX_INTERPRETER_INVOKE_ATTEMPTS,
                     "missing_outputs": missing_outputs,
@@ -357,21 +369,23 @@ async def run(args: argparse.Namespace) -> int:
             )
         )
         invoke_attempt_count += 1
-        attempt: dict[str, Any] = {"retry_number": retry_number}
+        attempt: dict[str, Any] = {
+            "retry_number": retry_number,
+            "fresh_context": fresh_context,
+        }
         try:
             retry_message = {
                 "role": "user",
                 "content": _build_interpreter_save_retry_message(
                     data_dir,
                     args.part,
+                    fresh_context=fresh_context,
                 ),
             }
+            retry_messages = [retry_message] if fresh_context else [*messages, retry_message]
             result = await agent.ainvoke(
                 {
-                    "messages": [
-                        *messages,
-                        retry_message,
-                    ]
+                    "messages": retry_messages
                 },
                 config=None,
             )

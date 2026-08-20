@@ -113,6 +113,23 @@ def test_interpreter_save_retry_message_continues_prior_context(tmp_path, part):
     assert "A chat response without that tool call is incomplete." in message
 
 
+@pytest.mark.parametrize("part", [1, 2, 3])
+def test_interpreter_final_save_retry_message_starts_fresh(tmp_path, part):
+    message = run_script._build_interpreter_save_retry_message(
+        tmp_path,
+        part,
+        fresh_context=True,
+    )
+
+    assert f"Start a fresh Part {part} save recovery" in message
+    assert "No prior conversation or tool results are attached" in message
+    assert "Call load_analysis_data" in message
+    assert "conversation and tool results above" not in message
+    assert "Do not restart the analysis from scratch" not in message
+    assert f"Part {part} ONLY" in message
+    assert f'write_file(file_path="/part{part}_final.md"' in message
+
+
 def test_part3_retry_message_keeps_selected_pair_and_therapeutic_boundaries(tmp_path):
     message = run_script._build_interpreter_save_retry_message(tmp_path, 3)
 
@@ -240,9 +257,10 @@ def test_run_stops_each_part_after_three_attempts_when_output_is_missing(
     assert "invoke_incomplete" in stdout
 
 
-def test_run_carries_message_history_into_each_save_retry(
+def test_run_carries_history_once_then_uses_fresh_final_retry(
     tmp_path,
     monkeypatch,
+    capsys,
 ):
     fake_agent = _InterpreterRetryAgent(
         tmp_path,
@@ -257,12 +275,13 @@ def test_run_carries_message_history_into_each_save_retry(
 
     exit_code = asyncio.run(run_script.run(_args(tmp_path, 3)))
 
+    stdout = capsys.readouterr().out
     assert exit_code == 1
     assert len(fake_agent.payloads) == 3
 
     initial_messages = fake_agent.payloads[0]["messages"]
     first_retry_messages = fake_agent.payloads[1]["messages"]
-    second_retry_messages = fake_agent.payloads[2]["messages"]
+    final_retry_messages = fake_agent.payloads[2]["messages"]
 
     assert first_retry_messages[:-1] == [
         *initial_messages,
@@ -273,20 +292,15 @@ def test_run_carries_message_history_into_each_save_retry(
             "tool_call_id": "tool-call-1",
         },
     ]
-    assert first_retry_messages[-1]["role"] == "user"
     assert "Continue the existing Part 3 attempt" in first_retry_messages[-1]["content"]
 
-    assert second_retry_messages[:-1] == [
-        *first_retry_messages,
-        {"role": "assistant", "content": "attempt-2"},
-        {
-            "role": "tool",
-            "content": "tool-result-2",
-            "tool_call_id": "tool-call-2",
-        },
-    ]
-    assert second_retry_messages[-1]["role"] == "user"
-    assert "Continue the existing Part 3 attempt" in second_retry_messages[-1]["content"]
+    assert len(final_retry_messages) == 1
+    assert final_retry_messages[0]["role"] == "user"
+    assert "Start a fresh Part 3 save recovery" in final_retry_messages[0]["content"]
+    assert "attempt-1" not in final_retry_messages[0]["content"]
+    assert "tool-result-1" not in final_retry_messages[0]["content"]
+    assert stdout.count('"fresh_context": false') >= 1
+    assert stdout.count('"fresh_context": true') >= 1
 
 
 @pytest.mark.parametrize("part", [1, 2, 3])
