@@ -433,4 +433,3 @@ flow for each condition.
 - Performance: the Part 3 smoke gates the expensive fresh pair.
 - Placeholder scan: every code change, test, command, expected result, and stop
   condition is explicit.
-

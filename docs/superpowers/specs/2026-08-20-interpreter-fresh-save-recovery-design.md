@@ -105,4 +105,3 @@ Verification proceeds in increasing cost:
 - Changing the Part 3 selected genes or selected LR pairs.
 - Reusing partially generated condition directories in the final comparison.
 - Replicated experiments before one canonical pair completes.
-
