@@ -202,6 +202,52 @@ def test_flags_factor_pathway_direction_mismatch_for_negative_estimate(tmp_path:
     assert "replacement_text" not in flagged[0]
 
 
+def test_allows_cluster_enrichment_with_negative_pathway_depletion(tmp_path: Path) -> None:
+    _write_json(tmp_path / "papers.json", [])
+    _write_csv(
+        tmp_path / "sig_liana_pathway_factor.csv",
+        [
+            {"factor": "Factor3", "pathway": "Estrogen", "estimate": -5.4798, "pval": 0.004, "adj_pval": 0.028},
+            {"factor": "Factor3", "pathway": "EGFR", "estimate": -2.8971, "pval": 0.004, "adj_pval": 0.028},
+            {"factor": "Factor3", "pathway": "NFkB", "estimate": -1.5, "pval": 0.004, "adj_pval": 0.028},
+        ],
+    )
+    (tmp_path / "part2_final.md").write_text(
+        "## Analysis 2-8: Pathway-Factor\n"
+        "### Biological Interpretation\n"
+        "**Factor3 Signature**: Factor3 is enriched in clusters 17, 4, and 14 "
+        "(loadings 0.538-0.601) and shows a unique pathway signature with depletion of "
+        "Estrogen, EGFR, and NFkB, suggesting a distinct regulatory state in Prolif "
+        "Invasive Tumor cells.\n",
+        encoding="utf-8",
+    )
+
+    issues = validate_report.validate_report(tmp_path)
+
+    assert not any(i["code"] == "factor_pathway_direction_mismatch" for i in issues)
+
+
+def test_flags_positive_pathway_estimate_after_cluster_enrichment_written_as_depletion(tmp_path: Path) -> None:
+    _write_json(tmp_path / "papers.json", [])
+    _write_csv(
+        tmp_path / "sig_liana_pathway_factor.csv",
+        [{"factor": "Factor3", "pathway": "EGFR", "estimate": 2.8971, "pval": 0.004, "adj_pval": 0.028}],
+    )
+    (tmp_path / "part2_final.md").write_text(
+        "## Analysis 2-8: Pathway-Factor\n"
+        "### Biological Interpretation\n"
+        "**Factor3 Signature**: Factor3 is enriched in clusters 17, 4, and 14 "
+        "(loadings 0.538-0.601) and shows a unique pathway signature with depletion of EGFR.\n",
+        encoding="utf-8",
+    )
+
+    issues = validate_report.validate_report(tmp_path)
+
+    flagged = [i for i in issues if i["code"] == "factor_pathway_direction_mismatch"]
+    assert len(flagged) == 1
+    assert flagged[0]["value"] == "Factor3: EGFR estimate=2.8971"
+
+
 def test_allows_multi_factor_sentence_when_local_factor_pathway_pairs_match(tmp_path: Path) -> None:
     _write_json(tmp_path / "papers.json", [])
     _write_csv(

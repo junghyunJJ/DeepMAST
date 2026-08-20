@@ -51,6 +51,11 @@ FACTOR_PATHWAY_NEGATED_DIRECTION_RE = re.compile(
     r"depleted|depletion|negative(?:ly)?|inverse(?:ly)?|lower|reduced|attenuated|suppressed)\b",
     re.IGNORECASE,
 )
+FACTOR_CLUSTER_STATUS_RE = re.compile(
+    r"\bFactor\s*\d+\s+(?:is\s+)?(?:enriched|higher|increased|active)\s+"
+    r"in\s+clusters?\b(?:\s+\d+)*(?:\s+and\s+\d+)?(?:\s+\([^)]*loadings[^)]*\))?",
+    re.IGNORECASE,
+)
 FACTOR_PATHWAY_CLAIM_RE = re.compile(
     r"\b(significant|significantly|enriched|enrichment|activation|activated|active|higher|increased|positive(?:ly)?|"
     r"depleted|depletion|negative(?:ly)?|inverse(?:ly)?|lower|reduced|attenuated|suppressed)\b",
@@ -461,6 +466,7 @@ def _supported_factor_pathways(data_dir: Path) -> tuple[dict[str, dict[str, floa
 
 
 def _direction_flags(text: str) -> tuple[bool, bool]:
+    text = FACTOR_CLUSTER_STATUS_RE.sub("", text)
     text = FACTOR_PATHWAY_NEGATED_DIRECTION_RE.sub("", text)
     return bool(FACTOR_PATHWAY_POSITIVE_RE.search(text)), bool(FACTOR_PATHWAY_NEGATIVE_RE.search(text))
 
