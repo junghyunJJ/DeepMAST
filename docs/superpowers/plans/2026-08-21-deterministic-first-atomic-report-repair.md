@@ -14,7 +14,7 @@
 
 - Apply deterministic-first ordering to both Parts and synthesis.
 - Keep exact target splicing and structured `RepairDecision(action="replace"|"delete")` unchanged.
-- Accept same-phase repair candidates only when retained hard-error count strictly decreases; accept deterministic-to-semantic phase transition and reject semantic-to-deterministic regression.
+- Accept deterministic same-phase repair candidates only when retained hard-error count strictly decreases; accept semantic same-phase candidates when the count decreases or when equal-count old and candidate error-key sets are non-empty and disjoint; accept deterministic-to-semantic phase transition and reject semantic-to-deterministic regression.
 - Restore every scoped Markdown file after a no-progress candidate.
 - Count only retained mutations in `changed_sections` and `changed_claims`.
 - Record deterministic and semantic initial hard-error counts separately and keep their sum as `initial_error_count`.
@@ -749,17 +749,17 @@ Add above `run_report_guardrail()`:
 def _snapshot_markdown_files(
     data_dir: Path,
     filenames: tuple[str, ...],
-) -> dict[str, str]:
+) -> dict[str, bytes]:
     return {
-        filename: (data_dir / filename).read_text(encoding="utf-8")
+        filename: (data_dir / filename).read_bytes()
         for filename in filenames
         if (data_dir / filename).is_file()
     }
 
 
-def _restore_markdown_files(data_dir: Path, snapshot: dict[str, str]) -> None:
-    for filename, text in snapshot.items():
-        (data_dir / filename).write_text(text, encoding="utf-8")
+def _restore_markdown_files(data_dir: Path, snapshot: dict[str, bytes]) -> None:
+    for filename, content in snapshot.items():
+        (data_dir / filename).write_bytes(content)
 
 
 def _strict_phase_progress(
@@ -772,7 +772,23 @@ def _strict_phase_progress(
         return True
     if before_phase != after_phase:
         return False
-    return _error_count(after) < _error_count(before)
+    before_count = _error_count(before)
+    after_count = _error_count(after)
+    if after_count < before_count:
+        return True
+    if before_phase != "semantic" or after_count != before_count:
+        return False
+    before_keys = {
+        _issue_claim_key(issue)
+        for issue in before
+        if issue.get("severity") == "error"
+    }
+    after_keys = {
+        _issue_claim_key(issue)
+        for issue in after
+        if issue.get("severity") == "error"
+    }
+    return bool(before_keys) and before_keys.isdisjoint(after_keys)
 ```
 
 - [ ] **Step 7: Make regular Parts repair tentative**

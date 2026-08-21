@@ -643,6 +643,83 @@ def test_strict_phase_progress_accepts_only_safe_phase_transitions() -> None:
         "semantic",
     )
 
+    old_a = {
+        "severity": "error",
+        "code": "claim_rag_unsupported",
+        "file": "part1_final.md",
+        "section": "## Old",
+        "value": "Old A",
+    }
+    old_b = {**old_a, "value": "Old B"}
+    new_a = {**old_a, "section": "## New", "value": "New A"}
+    new_b = {**new_a, "value": "New B"}
+    assert report_guardrails._strict_phase_progress(
+        [old_a, old_b],
+        "semantic",
+        [new_a, new_b],
+        "semantic",
+    )
+    assert not report_guardrails._strict_phase_progress(
+        [old_a, old_b],
+        "semantic",
+        [old_a, new_b],
+        "semantic",
+    )
+
+
+def test_report_guardrail_retains_equal_count_disjoint_semantic_frontier(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    _write_required_files(tmp_path)
+    old_a = {
+        "severity": "error",
+        "code": "claim_rag_unsupported",
+        "file": "part1_final.md",
+        "section": "## Old",
+        "value": "Old A",
+    }
+    old_b = {**old_a, "value": "Old B"}
+    new_a = {**old_a, "section": "## New", "value": "New A"}
+    new_b = {**new_a, "value": "New B"}
+    validations = [
+        ([old_a, old_b], [], None, None, "semantic"),
+        ([new_a, new_b], [], None, None, "semantic"),
+        ([], [], None, None, "semantic"),
+    ]
+    repaired_batches: list[list[dict[str, str]]] = []
+
+    def fake_validate(*_args: Any, **_kwargs: Any) -> tuple[
+        list[dict[str, str]],
+        list[dict[str, Any]],
+        None,
+        None,
+        str,
+    ]:
+        return validations.pop(0)
+
+    def fake_repair(
+        _data_dir: Path,
+        issues_path: Path,
+        **_kwargs: Any,
+    ) -> int:
+        repaired_batches.append(
+            json.loads(issues_path.read_text(encoding="utf-8"))["issues"]
+        )
+        return 1
+
+    monkeypatch.setattr(report_guardrails, "_validate_part_reports", fake_validate)
+    monkeypatch.setattr(report_guardrails.repair_report_script, "repair_report", fake_repair)
+
+    result = report_guardrails.run_report_guardrail(tmp_path, provider="ollama")
+
+    assert result["status"] == "passed"
+    assert result["repair_attempt_count"] == 2
+    assert result["changed_sections"] == 2
+    assert repaired_batches == [[old_a, old_b], [new_a, new_b]]
+
 
 def test_synthesis_warning_issue_has_no_generic_repair_fields(tmp_path: Path) -> None:
     from src.agents.deep_interpreter import report_guardrails

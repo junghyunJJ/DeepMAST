@@ -32,6 +32,41 @@ Final verification:
 Concern:
 - Existing LangGraph deprecation warning remains pre-existing: `config_schema` is deprecated in `src/base/base_agent.py:129`.
 
+## Fix round 2
+
+Status: implemented and verified.
+
+Reviewer finding:
+- Count-only semantic progress rolled back valid frontier movement when all exact old semantic targets disappeared but new semantic targets surfaced at the same hard-error count.
+
+Covering tests:
+- Extended `test_strict_phase_progress_accepts_only_safe_phase_transitions` with equal-count disjoint semantic acceptance and equal-count persistent-key rejection.
+- Added `test_report_guardrail_retains_equal_count_disjoint_semantic_frontier` to prove the accepted disjoint candidate is retained and becomes the next repair frontier.
+
+RED evidence:
+- `OPENAI_API_KEY=test LANGCHAIN_TRACING_V2=false uv run pytest -q tests/agents/deep_interpreter/test_report_guardrail_middleware.py::test_strict_phase_progress_accepts_only_safe_phase_transitions tests/agents/deep_interpreter/test_report_guardrail_middleware.py::test_report_guardrail_retains_equal_count_disjoint_semantic_frontier tests/agents/deep_interpreter/test_report_guardrail_middleware.py::test_synthesis_guardrail_rolls_back_caveat_only_table_repair tests/agents/deep_interpreter/test_report_guardrail_middleware.py::test_parts_guardrail_restores_all_files_after_no_progress_repair tests/agents/deep_interpreter/test_report_guardrail_middleware.py::test_parts_guardrail_rolls_back_no_progress_repair_byte_exact tests/agents/deep_interpreter/test_report_guardrail_middleware.py::test_synthesis_atomic_table_repair_is_idempotent`
+- Output before implementation: `2 failed, 4 passed, 1 warning`.
+- Failures: equal-count disjoint semantic progress returned false, and controller retained only one changed section because the first semantic frontier was restored.
+
+Change:
+- Deterministic same-phase still requires strict hard-error decrease.
+- `semantic -> deterministic` still rejects.
+- Semantic same-phase accepts strict decrease or equal count when prior error-key set is non-empty and disjoint from candidate error-key set.
+- Count increases still reject.
+- Updated the tracked design spec and implementation plan atomic-progress wording to match the target-aware semantic frontier rule.
+
+Focused verification:
+- `OPENAI_API_KEY=test LANGCHAIN_TRACING_V2=false uv run pytest -q tests/agents/deep_interpreter/test_report_guardrail_middleware.py::test_strict_phase_progress_accepts_only_safe_phase_transitions tests/agents/deep_interpreter/test_report_guardrail_middleware.py::test_report_guardrail_retains_equal_count_disjoint_semantic_frontier tests/agents/deep_interpreter/test_report_guardrail_middleware.py::test_synthesis_guardrail_rolls_back_caveat_only_table_repair tests/agents/deep_interpreter/test_report_guardrail_middleware.py::test_parts_guardrail_restores_all_files_after_no_progress_repair tests/agents/deep_interpreter/test_report_guardrail_middleware.py::test_parts_guardrail_rolls_back_no_progress_repair_byte_exact tests/agents/deep_interpreter/test_report_guardrail_middleware.py::test_synthesis_atomic_table_repair_is_idempotent` -> `6 passed, 1 warning`.
+
+Final verification:
+- `OPENAI_API_KEY=test LANGCHAIN_TRACING_V2=false uv run pytest -q tests/agents/deep_interpreter/test_report_guardrail_middleware.py tests/agents/deep_interpreter/test_claim_rag_validation.py tests/scripts/test_validate_report.py tests/scripts/test_validate_repair_report.py tests/scripts/test_repair_report.py tests/deep_interpreter/test_comprehensive_template_report` -> `224 passed, 1 warning`.
+- `uv run ruff check src/agents/deep_interpreter/report_guardrails.py tests/agents/deep_interpreter/test_report_guardrail_middleware.py` -> `All checks passed!`
+- `uv run python -m py_compile src/agents/deep_interpreter/report_guardrails.py tests/agents/deep_interpreter/test_report_guardrail_middleware.py` -> exit 0.
+- `git diff --check` -> exit 0.
+
+Concern:
+- Existing LangGraph deprecation warning remains pre-existing: `config_schema` is deprecated in `src/base/base_agent.py:129`.
+
 ## Fix round 1
 
 Status: implemented and verified.

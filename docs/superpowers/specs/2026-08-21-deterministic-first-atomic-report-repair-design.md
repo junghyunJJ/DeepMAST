@@ -70,14 +70,18 @@ Before each regular or terminal repair attempt, the controller snapshots the
 Markdown files in scope. Validation carries an explicit active phase:
 `deterministic` or `semantic`.
 
-- Within the same phase, retain a candidate only when its hard-error count
-  strictly decreases.
+- Within the deterministic phase, retain a candidate only when its hard-error
+  count strictly decreases.
+- Within the semantic phase, retain a candidate when its hard-error count
+  strictly decreases, or when the count is unchanged and the complete prior
+  error-key set is non-empty and disjoint from the complete candidate
+  error-key set. Equal-count semantic candidates with any persistent old target
+  are rolled back.
 - A `deterministic → semantic` transition is progress even when newly visible
   semantic errors outnumber the resolved deterministic errors.
 - A `semantic → deterministic` transition is regression and is rolled back.
-- Same-phase `after_errors >= before_errors` restores the snapshot, does not
-  count the mutation, and retries from the same original text within the
-  existing cap.
+- Count increases restore the snapshot, do not count the mutation, and retry
+  from the same original text within the existing cap.
 - `changed == 0`: stop immediately with the original text preserved.
 
 Regular retries remain capped at three. Terminal repair remains limited to

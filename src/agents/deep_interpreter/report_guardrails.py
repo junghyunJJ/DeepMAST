@@ -144,7 +144,23 @@ def _strict_phase_progress(
         return True
     if before_phase != after_phase:
         return False
-    return _error_count(after) < _error_count(before)
+    before_count = _error_count(before)
+    after_count = _error_count(after)
+    if after_count < before_count:
+        return True
+    if before_phase != "semantic" or after_count != before_count:
+        return False
+    before_keys = {
+        _issue_claim_key(issue)
+        for issue in before
+        if issue.get("severity") == "error"
+    }
+    after_keys = {
+        _issue_claim_key(issue)
+        for issue in after
+        if issue.get("severity") == "error"
+    }
+    return bool(before_keys) and before_keys.isdisjoint(after_keys)
 
 
 def _section_for_claim(text: str, claim: str) -> str:
