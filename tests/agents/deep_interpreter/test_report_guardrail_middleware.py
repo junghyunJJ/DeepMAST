@@ -532,6 +532,42 @@ def test_parts_guardrail_restores_all_files_after_no_progress_repair(
     } == originals
 
 
+def test_parts_guardrail_rolls_back_no_progress_repair_byte_exact(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    _write_required_files(tmp_path)
+    original = b"## Part 1\r\n\r\nCRLF report body.\r\n"
+    (tmp_path / "part1_final.md").write_bytes(original)
+
+    monkeypatch.setattr(
+        report_guardrails.validate_report_script,
+        "validate_report",
+        lambda _data_dir: [
+            {"severity": "error", "code": "persistent", "file": "part1_final.md"}
+        ],
+    )
+
+    def append_without_progress(data_dir: Path, *_args: Any, **_kwargs: Any) -> int:
+        path = data_dir / "part1_final.md"
+        path.write_bytes(path.read_bytes() + b"Unhelpful caveat.\n")
+        return 1
+
+    monkeypatch.setattr(
+        report_guardrails.repair_report_script,
+        "repair_report",
+        append_without_progress,
+    )
+
+    result = report_guardrails.run_report_guardrail(tmp_path, provider="ollama")
+
+    assert result["status"] == "failed"
+    assert result["changed_sections"] == 0
+    assert (tmp_path / "part1_final.md").read_bytes() == original
+
+
 def test_synthesis_atomic_table_repair_is_idempotent(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

@@ -121,17 +121,17 @@ def _missing_synthesis_required_files(data_dir: Path) -> list[str]:
 def _snapshot_markdown_files(
     data_dir: Path,
     filenames: tuple[str, ...],
-) -> dict[str, str]:
+) -> dict[str, bytes]:
     return {
-        filename: (data_dir / filename).read_text(encoding="utf-8")
+        filename: (data_dir / filename).read_bytes()
         for filename in filenames
         if (data_dir / filename).is_file()
     }
 
 
-def _restore_markdown_files(data_dir: Path, snapshot: dict[str, str]) -> None:
-    for filename, text in snapshot.items():
-        (data_dir / filename).write_text(text, encoding="utf-8")
+def _restore_markdown_files(data_dir: Path, snapshot: dict[str, bytes]) -> None:
+    for filename, content in snapshot.items():
+        (data_dir / filename).write_bytes(content)
 
 
 def _strict_phase_progress(
