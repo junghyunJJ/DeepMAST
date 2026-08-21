@@ -118,6 +118,35 @@ def _missing_synthesis_required_files(data_dir: Path) -> list[str]:
     return [name for name in SYNTHESIS_REQUIRED_FILES if not (data_dir / name).exists()]
 
 
+def _snapshot_markdown_files(
+    data_dir: Path,
+    filenames: tuple[str, ...],
+) -> dict[str, str]:
+    return {
+        filename: (data_dir / filename).read_text(encoding="utf-8")
+        for filename in filenames
+        if (data_dir / filename).is_file()
+    }
+
+
+def _restore_markdown_files(data_dir: Path, snapshot: dict[str, str]) -> None:
+    for filename, text in snapshot.items():
+        (data_dir / filename).write_text(text, encoding="utf-8")
+
+
+def _strict_phase_progress(
+    before: list[dict[str, Any]],
+    before_phase: ValidationPhase,
+    after: list[dict[str, Any]],
+    after_phase: ValidationPhase,
+) -> bool:
+    if before_phase == "deterministic" and after_phase == "semantic":
+        return True
+    if before_phase != after_phase:
+        return False
+    return _error_count(after) < _error_count(before)
+
+
 def _section_for_claim(text: str, claim: str) -> str:
     claim_at = text.find(claim)
     if claim_at < 0:
@@ -559,6 +588,7 @@ def run_report_guardrail(
             for issue in current_issues
             if issue.get("severity") == "error"
         }
+        snapshot = _snapshot_markdown_files(data_dir, filenames)
         changed = repair_report_script.repair_report(
             data_dir,
             issues_path,
@@ -566,13 +596,35 @@ def run_report_guardrail(
             claim_validation=current_claims,
         )
         repair_attempt_count += 1
-        changed_sections += changed
-        current_issues, current_claims, current_selection, current_coverage, current_phase = _validate_part_reports(
+        if changed == 0:
+            _restore_markdown_files(data_dir, snapshot)
+            break
+        (
+            candidate_issues,
+            candidate_claims,
+            candidate_selection,
+            candidate_coverage,
+            candidate_phase,
+        ) = _validate_part_reports(
             data_dir,
             provider=provider,
             claim_cache=claim_cache,
             filenames=filenames,
         )
+        if not _strict_phase_progress(
+            current_issues,
+            current_phase,
+            candidate_issues,
+            candidate_phase,
+        ):
+            _restore_markdown_files(data_dir, snapshot)
+            continue
+        changed_sections += changed
+        current_issues = candidate_issues
+        current_claims = candidate_claims
+        current_selection = candidate_selection
+        current_coverage = candidate_coverage
+        current_phase = candidate_phase
         if current_phase == "semantic" and semantic_initial_error_count is None:
             semantic_initial_error_count = _error_count(current_issues)
             _write_issues(
@@ -591,8 +643,6 @@ def run_report_guardrail(
             inline_citation_coverage=current_coverage,
             phase=current_phase,
         )
-        if changed == 0:
-            break
         issues_path = final_path
 
     newly_surfaced_errors = [
@@ -612,32 +662,47 @@ def run_report_guardrail(
             inline_citation_coverage=current_coverage,
             phase=current_phase,
         )
+        snapshot = _snapshot_markdown_files(data_dir, filenames)
         terminal_changed = repair_report_script.repair_report(
             data_dir,
             terminal_path,
             provider=provider,
             claim_validation=current_claims,
         )
-        changed_sections += terminal_changed
         if terminal_changed:
-            current_issues, current_claims, current_selection, current_coverage, current_phase = (
-                _validate_part_reports(
-                    data_dir,
-                    provider=provider,
-                    claim_cache=claim_cache,
-                    filenames=filenames,
-                )
+            (
+                candidate_issues,
+                candidate_claims,
+                candidate_selection,
+                candidate_coverage,
+                candidate_phase,
+            ) = _validate_part_reports(
+                data_dir,
+                provider=provider,
+                claim_cache=claim_cache,
+                filenames=filenames,
             )
-            if current_phase == "semantic" and semantic_initial_error_count is None:
-                semantic_initial_error_count = _error_count(current_issues)
-                _write_issues(
-                    data_dir / "report_validation_semantic_initial.json",
-                    current_issues,
-                    current_claims,
-                    claim_selection=current_selection,
-                    inline_citation_coverage=current_coverage,
-                    phase=current_phase,
-                )
+            if _error_count(candidate_issues) < _error_count(current_issues):
+                changed_sections += terminal_changed
+                current_issues = candidate_issues
+                current_claims = candidate_claims
+                current_selection = candidate_selection
+                current_coverage = candidate_coverage
+                current_phase = candidate_phase
+            else:
+                _restore_markdown_files(data_dir, snapshot)
+        else:
+            _restore_markdown_files(data_dir, snapshot)
+        if current_phase == "semantic" and semantic_initial_error_count is None:
+            semantic_initial_error_count = _error_count(current_issues)
+            _write_issues(
+                data_dir / "report_validation_semantic_initial.json",
+                current_issues,
+                current_claims,
+                claim_selection=current_selection,
+                inline_citation_coverage=current_coverage,
+                phase=current_phase,
+            )
 
     final_issues = current_issues
     _write_issues(
@@ -732,6 +797,7 @@ def run_synthesis_guardrail(data_dir: str | Path, *, provider: str | None = None
             for issue in current_issues
             if issue.get("severity") == "error"
         }
+        snapshot = _snapshot_markdown_files(data_dir, ("synthesis.md",))
         changed = repair_synthesis_report(
             data_dir,
             current_issues,
@@ -740,19 +806,36 @@ def run_synthesis_guardrail(data_dir: str | Path, *, provider: str | None = None
             deterministic_contradictions=repair_attempt_count > 0,
         )
         repair_attempt_count += 1
-        changed_claims += changed
+        if changed == 0:
+            _restore_markdown_files(data_dir, snapshot)
+            break
         (
-            current_issues,
-            current_claims,
-            current_consistency,
-            current_selection,
-            current_coverage,
-            current_phase,
+            candidate_issues,
+            candidate_claims,
+            candidate_consistency,
+            candidate_selection,
+            candidate_coverage,
+            candidate_phase,
         ) = _validate_synthesis_guardrails(
             data_dir,
             provider=provider,
             claim_cache=claim_cache,
         )
+        if not _strict_phase_progress(
+            current_issues,
+            current_phase,
+            candidate_issues,
+            candidate_phase,
+        ):
+            _restore_markdown_files(data_dir, snapshot)
+            continue
+        changed_claims += changed
+        current_issues = candidate_issues
+        current_claims = candidate_claims
+        current_consistency = candidate_consistency
+        current_selection = candidate_selection
+        current_coverage = candidate_coverage
+        current_phase = candidate_phase
         if current_phase == "semantic" and semantic_initial_error_count is None:
             semantic_initial_error_count = _error_count(current_issues)
             _write_issues(
@@ -764,8 +847,6 @@ def run_synthesis_guardrail(data_dir: str | Path, *, provider: str | None = None
                 inline_citation_coverage=current_coverage,
                 phase=current_phase,
             )
-        if changed == 0:
-            break
 
     newly_surfaced_errors = [
         issue
@@ -775,6 +856,7 @@ def run_synthesis_guardrail(data_dir: str | Path, *, provider: str | None = None
     ]
     if repair_attempt_count == MAX_GUARDRAIL_REPAIR_PASSES and newly_surfaced_errors:
         terminal_repair_count = 1
+        snapshot = _snapshot_markdown_files(data_dir, ("synthesis.md",))
         terminal_changed = repair_synthesis_report(
             data_dir,
             newly_surfaced_errors,
@@ -782,31 +864,42 @@ def run_synthesis_guardrail(data_dir: str | Path, *, provider: str | None = None
             provider=provider,
             deterministic_contradictions=True,
         )
-        changed_claims += terminal_changed
         if terminal_changed:
             (
-                current_issues,
-                current_claims,
-                current_consistency,
-                current_selection,
-                current_coverage,
-                current_phase,
+                candidate_issues,
+                candidate_claims,
+                candidate_consistency,
+                candidate_selection,
+                candidate_coverage,
+                candidate_phase,
             ) = _validate_synthesis_guardrails(
                 data_dir,
                 provider=provider,
                 claim_cache=claim_cache,
             )
-            if current_phase == "semantic" and semantic_initial_error_count is None:
-                semantic_initial_error_count = _error_count(current_issues)
-                _write_issues(
-                    data_dir / "synthesis_guardrail_semantic_initial.json",
-                    current_issues,
-                    current_claims,
-                    current_consistency["results"],
-                    claim_selection=current_selection,
-                    inline_citation_coverage=current_coverage,
-                    phase=current_phase,
-                )
+            if _error_count(candidate_issues) < _error_count(current_issues):
+                changed_claims += terminal_changed
+                current_issues = candidate_issues
+                current_claims = candidate_claims
+                current_consistency = candidate_consistency
+                current_selection = candidate_selection
+                current_coverage = candidate_coverage
+                current_phase = candidate_phase
+            else:
+                _restore_markdown_files(data_dir, snapshot)
+        else:
+            _restore_markdown_files(data_dir, snapshot)
+        if current_phase == "semantic" and semantic_initial_error_count is None:
+            semantic_initial_error_count = _error_count(current_issues)
+            _write_issues(
+                data_dir / "synthesis_guardrail_semantic_initial.json",
+                current_issues,
+                current_claims,
+                current_consistency["results"],
+                claim_selection=current_selection,
+                inline_citation_coverage=current_coverage,
+                phase=current_phase,
+            )
 
     final_issues = current_issues
     _write_issues(

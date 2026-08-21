@@ -454,6 +454,160 @@ def test_synthesis_table_overclaim_targets_only_the_offending_row(tmp_path: Path
     assert safe_row not in errors[0]["target_text"]
 
 
+def test_synthesis_guardrail_rolls_back_caveat_only_table_repair(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    unsafe_row = (
+        "| Tumor-Vascular Spatial Association | Strong | "
+        "Spatial plots confirm epithelial-vascular co-localization |"
+    )
+    original = (
+        "## Emergent Themes Summary\n\n"
+        "| Theme | Strength | Supporting Evidence |\n"
+        "|---|---|---|\n"
+        f"{unsafe_row}\n"
+    )
+    (tmp_path / "papers.json").write_text('{"papers": []}', encoding="utf-8")
+    (tmp_path / "synthesis.md").write_text(original, encoding="utf-8")
+    caveat_only = (
+        f"{unsafe_row}\n\n"
+        "*Note: All themes are dataset-derived associations, not established mechanisms.*"
+    )
+    model = StructuredRepairModel(caveat_only)
+    monkeypatch.setattr(report_guardrails.repair_report_script, "_create_model", lambda *_: model)
+
+    result = report_guardrails.run_synthesis_guardrail(tmp_path, provider="ollama")
+
+    assert result["status"] == "failed"
+    assert result["repair_attempt_count"] == 3
+    assert result["changed_claims"] == 0
+    assert result["final_error_count"] == 1
+    retained = (tmp_path / "synthesis.md").read_text(encoding="utf-8")
+    assert retained == original
+    assert "*Note:" not in retained
+
+
+def test_parts_guardrail_restores_all_files_after_no_progress_repair(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    _write_required_files(tmp_path)
+    originals = {
+        name: (tmp_path / name).read_text(encoding="utf-8")
+        for name in ("part1_final.md", "part2_final.md", "part3_final.md")
+    }
+
+    monkeypatch.setattr(
+        report_guardrails.validate_report_script,
+        "validate_report",
+        lambda _data_dir: [
+            {"severity": "error", "code": "persistent", "file": "part1_final.md"}
+        ],
+    )
+
+    def append_without_progress(data_dir: Path, *_args: Any, **_kwargs: Any) -> int:
+        path = data_dir / "part1_final.md"
+        path.write_text(path.read_text(encoding="utf-8") + "Unhelpful caveat.\n", encoding="utf-8")
+        return 1
+
+    monkeypatch.setattr(
+        report_guardrails.repair_report_script,
+        "repair_report",
+        append_without_progress,
+    )
+
+    result = report_guardrails.run_report_guardrail(tmp_path, provider="ollama")
+
+    assert result["status"] == "failed"
+    assert result["repair_attempt_count"] == 3
+    assert result["changed_sections"] == 0
+    assert {
+        name: (tmp_path / name).read_text(encoding="utf-8")
+        for name in originals
+    } == originals
+
+
+def test_synthesis_atomic_table_repair_is_idempotent(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    unsafe_row = (
+        "| Tumor-Vascular Spatial Association | Strong | "
+        "Spatial plots confirm epithelial-vascular co-localization |"
+    )
+    safe_row = (
+        "| Tumor-Vascular Spatial Association | Strong | "
+        "Spatial plots show epithelial-vascular co-localization |"
+    )
+    (tmp_path / "papers.json").write_text('{"papers": []}', encoding="utf-8")
+    (tmp_path / "synthesis.md").write_text(
+        "## Emergent Themes Summary\n\n"
+        "| Theme | Strength | Supporting Evidence |\n"
+        "|---|---|---|\n"
+        f"{unsafe_row}\n",
+        encoding="utf-8",
+    )
+    model = StructuredRepairModel(safe_row)
+    monkeypatch.setattr(report_guardrails.repair_report_script, "_create_model", lambda *_: model)
+
+    first = report_guardrails.run_synthesis_guardrail(tmp_path, provider="ollama")
+    after_first = (tmp_path / "synthesis.md").read_bytes()
+    second = report_guardrails.run_synthesis_guardrail(tmp_path, provider="ollama")
+
+    assert first["status"] == "passed"
+    assert first["initial_error_count"] == 1
+    assert first["final_error_count"] == 0
+    assert first["changed_claims"] == 1
+    assert second["status"] == "passed"
+    assert second["initial_error_count"] == 0
+    assert second["repair_attempt_count"] == 0
+    assert second["changed_claims"] == 0
+    assert (tmp_path / "synthesis.md").read_bytes() == after_first
+    assert safe_row in after_first.decode("utf-8")
+
+
+def test_strict_phase_progress_accepts_only_safe_phase_transitions() -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    deterministic_error = [{"severity": "error", "code": "local"}]
+    semantic_errors = [
+        {"severity": "error", "code": "claim_rag_unsupported"},
+        {"severity": "error", "code": "claim_rag_overclaimed"},
+    ]
+
+    assert report_guardrails._strict_phase_progress(
+        deterministic_error,
+        "deterministic",
+        semantic_errors,
+        "semantic",
+    )
+    assert not report_guardrails._strict_phase_progress(
+        semantic_errors,
+        "semantic",
+        deterministic_error,
+        "deterministic",
+    )
+    assert report_guardrails._strict_phase_progress(
+        semantic_errors,
+        "semantic",
+        semantic_errors[:1],
+        "semantic",
+    )
+    assert not report_guardrails._strict_phase_progress(
+        semantic_errors,
+        "semantic",
+        semantic_errors,
+        "semantic",
+    )
+
+
 def test_synthesis_warning_issue_has_no_generic_repair_fields(tmp_path: Path) -> None:
     from src.agents.deep_interpreter import report_guardrails
 
@@ -1311,7 +1465,7 @@ def test_run_synthesis_guardrail_retries_up_to_three_repairs(
     assert repair_count == 3
     assert result["status"] == "passed"
     assert result["repair_attempt_count"] == 3
-    assert result["changed_claims"] == 3
+    assert result["changed_claims"] == 1
     assert result["final_error_count"] == 0
 
 
@@ -1322,19 +1476,21 @@ def test_run_synthesis_guardrail_terminally_repairs_new_final_error(
     from src.agents.deep_interpreter import report_guardrails
 
     _write_synthesis_required_files(tmp_path)
-    persistent = {
+    old_a = {
         "severity": "error",
-        "code": "existing_error",
+        "code": "old_a",
         "file": "synthesis.md",
-        "section": "## Existing",
-        "value": "Existing error",
+        "section": "## Summary",
+        "value": "Old A",
     }
+    old_b = {**old_a, "code": "old_b", "value": "Old B"}
+    old_c = {**old_a, "code": "old_c", "value": "Old C"}
     latent = {
         "severity": "warning",
         "code": "claim_rag_unverifiable",
         "file": "synthesis.md",
-        "section": "## Clinical/Biological Implications",
-        "value": "Analysis-derived claim",
+        "section": "## Summary",
+        "value": "New semantic claim",
     }
     promoted = {
         **latent,
@@ -1346,9 +1502,9 @@ def test_run_synthesis_guardrail_terminally_repairs_new_final_error(
         "code": "claim_rag_hypothesis_warning",
     }
     validations = [
-        [persistent, latent],
-        [persistent, latent],
-        [persistent, latent],
+        [old_a, old_b, old_c, latent],
+        [old_a, old_b, latent],
+        [old_a, old_b, latent],
         [promoted],
         [repaired],
     ]
@@ -1460,6 +1616,7 @@ def test_run_synthesis_guardrail_does_not_terminally_retry_persistent_error(
     assert result["status"] == "failed"
     assert result["repair_attempt_count"] == 3
     assert result["terminal_repair_count"] == 0
+    assert result["changed_claims"] == 0
     assert result["final_error_count"] == 1
 
 
@@ -1763,7 +1920,7 @@ def test_run_report_guardrail_retries_up_to_three_repairs(
     ]
     assert result["status"] == "passed"
     assert result["repair_attempt_count"] == 3
-    assert result["changed_sections"] == 3
+    assert result["changed_sections"] == 1
     assert result["final_error_count"] == 0
 
 
@@ -1773,13 +1930,15 @@ def test_run_report_guardrail_terminally_repairs_new_final_error(
     from src.agents.deep_interpreter import report_guardrails
 
     _write_required_files(tmp_path)
-    persistent = {
+    old_a = {
         "severity": "error",
-        "code": "existing_error",
+        "code": "old_a",
         "file": "part2_final.md",
         "section": "## Existing",
-        "value": "Existing error",
+        "value": "Old A",
     }
+    old_b = {**old_a, "code": "old_b", "value": "Old B"}
+    old_c = {**old_a, "code": "old_c", "value": "Old C"}
     latent = {
         "severity": "warning",
         "code": "claim_rag_unverifiable",
@@ -1792,12 +1951,16 @@ def test_run_report_guardrail_terminally_repairs_new_final_error(
         "severity": "error",
         "code": "claim_rag_unsupported",
     }
+    repaired = {
+        **latent,
+        "code": "claim_rag_hypothesis_warning",
+    }
     validations = [
-        [persistent, latent],
-        [persistent, latent],
-        [persistent, latent],
+        [old_a, old_b, old_c, latent],
+        [old_a, old_b, latent],
+        [old_a, old_b, latent],
         [promoted],
-        [],
+        [repaired],
     ]
     validate_count = 0
     repaired_issue_batches: list[list[dict[str, str]]] = []
@@ -1897,6 +2060,7 @@ def test_run_report_guardrail_does_not_terminally_retry_persistent_error(
     assert result["status"] == "failed"
     assert result["repair_attempt_count"] == 3
     assert result["terminal_repair_count"] == 0
+    assert result["changed_sections"] == 0
     assert result["final_error_count"] == 1
 
 
@@ -1932,7 +2096,7 @@ def test_run_report_guardrail_records_remaining_errors_without_raising(
 
     result = report_guardrails.run_report_guardrail(tmp_path)
 
-    assert validate_count == 2
+    assert validate_count == 1
     assert repair_count == 1
     assert result["status"] == "failed"
     assert result["repair_attempt_count"] == 1
