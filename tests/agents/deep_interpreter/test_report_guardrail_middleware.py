@@ -40,6 +40,7 @@ def _write_synthesis_required_files(data_dir: Path) -> None:
         encoding="utf-8",
     )
     (data_dir / "synthesis.md").write_text(
+        "# Synthesis Report\n\n"
         "## Executive Summary\n\n"
         "MISTy spatial evidence drives a therapy-resistant subpopulation (PMID: 87654321).\n",
         encoding="utf-8",
@@ -67,7 +68,10 @@ def _write_consistency_guardrail_fixture(data_dir: Path, synthesis: str) -> None
         "- Score profile: combined 16 = validated 10 + exploratory 6.\n",
         encoding="utf-8",
     )
-    (data_dir / "synthesis.md").write_text(synthesis, encoding="utf-8")
+    (data_dir / "synthesis.md").write_text(
+        f"# Synthesis Report\n\n{synthesis}",
+        encoding="utf-8",
+    )
 
 
 class StructuredRepairModel:
@@ -412,7 +416,7 @@ def test_synthesis_hard_semantic_issue_targets_exact_claim(tmp_path: Path) -> No
     claim = "MISTy spatial evidence drives a therapy-resistant subpopulation."
     (tmp_path / "papers.json").write_text('{"papers": []}', encoding="utf-8")
     (tmp_path / "synthesis.md").write_text(
-        f"## Executive Summary\n\n{claim}\n",
+        f"# Synthesis Report\n\n## Executive Summary\n\n{claim}\n",
         encoding="utf-8",
     )
 
@@ -421,6 +425,60 @@ def test_synthesis_hard_semantic_issue_targets_exact_claim(tmp_path: Path) -> No
     assert issue["code"] == "unsupported_synthesis_overclaim"
     assert issue["target_text"] == claim
     assert "replacement_text" not in issue
+
+
+def test_synthesis_requires_first_non_empty_line_h1_title(tmp_path: Path) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    title = "## Integrated Biological Narrative"
+    (tmp_path / "papers.json").write_text('{"papers": []}', encoding="utf-8")
+    (tmp_path / "synthesis.md").write_text(
+        f"\n{title}\n\nStable association summary.\n",
+        encoding="utf-8",
+    )
+
+    [issue] = report_guardrails.validate_synthesis_report(tmp_path)
+
+    assert issue["severity"] == "error"
+    assert issue["code"] == "synthesis_title_not_h1"
+    assert issue["target_text"] == title
+    assert issue["replacement_text"] == "# Integrated Biological Narrative"
+
+
+def test_synthesis_guardrail_promotes_first_heading_to_h1_idempotently(
+    tmp_path: Path,
+) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    original = (
+        "\n## Integrated Biological Narrative\n\n"
+        "Stable association summary.\n\n"
+        "### Preserved Subheading\n\n"
+        "No mechanistic claim here.\n"
+    )
+    expected = original.replace(
+        "## Integrated Biological Narrative",
+        "# Integrated Biological Narrative",
+        1,
+    )
+    (tmp_path / "papers.json").write_text('{"papers": []}', encoding="utf-8")
+    (tmp_path / "synthesis.md").write_text(original, encoding="utf-8")
+
+    first = report_guardrails.run_synthesis_guardrail(tmp_path, provider="ollama")
+    after_first = (tmp_path / "synthesis.md").read_bytes()
+    second = report_guardrails.run_synthesis_guardrail(tmp_path, provider="ollama")
+
+    assert first["status"] == "passed"
+    assert first["initial_error_count"] == 1
+    assert first["final_error_count"] == 0
+    assert first["changed_claims"] == 1
+    assert after_first == expected.encode("utf-8")
+    assert "### Preserved Subheading" in after_first.decode("utf-8")
+    assert second["status"] == "passed"
+    assert second["initial_error_count"] == 0
+    assert second["repair_attempt_count"] == 0
+    assert second["changed_claims"] == 0
+    assert (tmp_path / "synthesis.md").read_bytes() == after_first
 
 
 def test_synthesis_table_overclaim_targets_only_the_offending_row(tmp_path: Path) -> None:
@@ -434,6 +492,7 @@ def test_synthesis_table_overclaim_targets_only_the_offending_row(tmp_path: Path
     )
     (tmp_path / "papers.json").write_text('{"papers": []}', encoding="utf-8")
     (tmp_path / "synthesis.md").write_text(
+        "# Synthesis Report\n\n"
         "## Emergent Themes Summary\n\n"
         "| Theme | Strength | Supporting Evidence |\n"
         "|---|---|---|\n"
@@ -465,6 +524,7 @@ def test_synthesis_guardrail_rolls_back_caveat_only_table_repair(
         "Spatial plots confirm epithelial-vascular co-localization |"
     )
     original = (
+        "# Synthesis Report\n\n"
         "## Emergent Themes Summary\n\n"
         "| Theme | Strength | Supporting Evidence |\n"
         "|---|---|---|\n"
@@ -584,6 +644,7 @@ def test_synthesis_atomic_table_repair_is_idempotent(
     )
     (tmp_path / "papers.json").write_text('{"papers": []}', encoding="utf-8")
     (tmp_path / "synthesis.md").write_text(
+        "# Synthesis Report\n\n"
         "## Emergent Themes Summary\n\n"
         "| Theme | Strength | Supporting Evidence |\n"
         "|---|---|---|\n"
@@ -730,7 +791,7 @@ def test_synthesis_warning_issue_has_no_generic_repair_fields(tmp_path: Path) ->
     )
     (tmp_path / "papers.json").write_text('{"papers": []}', encoding="utf-8")
     (tmp_path / "synthesis.md").write_text(
-        f"## Executive Summary\n\n{claim}\n",
+        f"# Synthesis Report\n\n## Executive Summary\n\n{claim}\n",
         encoding="utf-8",
     )
 
@@ -753,7 +814,7 @@ def test_run_synthesis_guardrail_validates_synthesis_claim_rag_artifacts(
     )
     claim = "MISTy spatial evidence is associated with fibrosis (PMID: 11111111)."
     (tmp_path / "synthesis.md").write_text(
-        f"## Cross-Part Themes\n\n{claim}\n",
+        f"# Synthesis Report\n\n## Cross-Part Themes\n\n{claim}\n",
         encoding="utf-8",
     )
     called_filenames: list[tuple[str, ...]] = []
@@ -837,7 +898,7 @@ def test_run_synthesis_guardrail_removes_only_unsupported_sibling_citation(
     )
     claim = "TGFB is associated with fibrosis (PMID: 11111111; PMID: 22222222)."
     (tmp_path / "synthesis.md").write_text(
-        f"## Cross-Part Themes\n\n{claim}\n",
+        f"# Synthesis Report\n\n## Cross-Part Themes\n\n{claim}\n",
         encoding="utf-8",
     )
 
@@ -928,7 +989,7 @@ def test_run_synthesis_guardrail_hedges_sole_unsupported_inline_citation(
     )
     claim = "TGFB drives fibrosis (PMID: 22222222)."
     (tmp_path / "synthesis.md").write_text(
-        f"## Cross-Part Themes\n\n{claim}\n",
+        f"# Synthesis Report\n\n## Cross-Part Themes\n\n{claim}\n",
         encoding="utf-8",
     )
 
@@ -1258,7 +1319,7 @@ def test_run_synthesis_guardrail_repairs_claim_rag_inline_contradiction(
         encoding="utf-8",
     )
     (tmp_path / "synthesis.md").write_text(
-        f"## Integrated Biological Narrative\n\n{claim}\n",
+        f"# Synthesis Report\n\n## Integrated Biological Narrative\n\n{claim}\n",
         encoding="utf-8",
     )
 
@@ -1383,6 +1444,7 @@ def test_run_synthesis_guardrail_fails_unresolved_consistency_issue(
     from src.agents.deep_interpreter import report_guardrails
 
     synthesis = "### 1. EGFR (Combined Score: 15)\n"
+    expected = f"# Synthesis Report\n\n{synthesis}"
     _write_consistency_guardrail_fixture(tmp_path, synthesis)
 
     result = report_guardrails.run_synthesis_guardrail(tmp_path)
@@ -1390,7 +1452,7 @@ def test_run_synthesis_guardrail_fails_unresolved_consistency_issue(
     final = json.loads(
         (tmp_path / "synthesis_guardrail_final.json").read_text(encoding="utf-8")
     )
-    assert (tmp_path / "synthesis.md").read_text(encoding="utf-8") == synthesis
+    assert (tmp_path / "synthesis.md").read_text(encoding="utf-8") == expected
     assert result["status"] == "failed"
     assert result["repair_attempt_count"] == 1
     assert final["issues"][-1]["code"] == "synthesis_consistency_unresolved"
@@ -1441,6 +1503,7 @@ def test_run_synthesis_guardrail_allows_neutral_clinical_context(
         encoding="utf-8",
     )
     synthesis = (
+        "# Synthesis Report\n\n"
         "## Executive Summary\n\n"
         "MISTy spatial analysis used clinical metadata from the treatment cohort "
         "(PMID: 12345678).\n"
@@ -1468,7 +1531,7 @@ def test_run_synthesis_guardrail_repairs_duplicate_overclaims_once_each(
     )
     claim = "MISTy spatial evidence drives a therapy-resistant subpopulation (PMID: 12345678)."
     (tmp_path / "synthesis.md").write_text(
-        f"## Executive Summary\n\n{claim}\n\n{claim}\n",
+        f"# Synthesis Report\n\n## Executive Summary\n\n{claim}\n\n{claim}\n",
         encoding="utf-8",
     )
     repair_model = StructuredRepairModel(
@@ -1500,6 +1563,7 @@ def test_run_synthesis_guardrail_allows_negated_therapeutic_limitation(
         encoding="utf-8",
     )
     synthesis = (
+        "# Synthesis Report\n\n"
         "## Limitations\n\n"
         "MISTy spatial evidence does not establish a therapeutic vulnerability "
         "(PMID: 12345678).\n"
@@ -1525,6 +1589,7 @@ def test_run_synthesis_guardrail_allows_negated_therapeutic_proof_limitation(
         encoding="utf-8",
     )
     synthesis = (
+        "# Synthesis Report\n\n"
         "## Limitations\n\n"
         "MISTy spatial evidence does not prove therapeutic vulnerability "
         "(PMID: 12345678).\n"

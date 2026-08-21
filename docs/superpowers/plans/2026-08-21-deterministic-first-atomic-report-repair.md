@@ -21,7 +21,7 @@
 - Preserve the three regular repair attempts and the bounded newly-surfaced terminal repair.
 - Do not weaken validators, hard-code phrase replacements, or skip Claim-RAG.
 - Add no dependency, Markdown framework, repair framework, or runner resume subsystem.
-- Preserve Markdown headings, existing PMIDs, unrelated table rows, and source artifacts.
+- Preserve Markdown headings, existing PMIDs, unrelated table rows, and source artifacts, except for validator-owned synthesis title repair that promotes only the first H2-H6 heading marker to H1 while preserving heading text and all remaining headings.
 - Use ports 4000/6000, API 8883, model `qwen3.5:122b`, fixed collection UUID `a208e916-bd32-405a-9eee-de4cd82b2a3b`, 100 documents, and 1,553 chunks for live verification.
 - Run pair 05 globally serial, no-SNI first; SNI starts only after no-SNI passes.
 - Follow RED → GREEN TDD and Lore commit trailers.

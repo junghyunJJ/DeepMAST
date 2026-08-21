@@ -129,7 +129,10 @@ order no-SNI → SNI.
 ## Safety Invariants
 
 - Exact `target_text` splicing remains mandatory.
-- Markdown heading sequence is unchanged by repair.
+- Markdown heading sequence is unchanged by repair except for the validator-owned
+  synthesis title rule: when the first non-empty line is an H2-H6 heading, the
+  deterministic repair may promote only that heading marker to H1 while
+  preserving its text. All remaining headings and heading text stay unchanged.
 - No new PMID may appear.
 - Existing table row count is preserved unless the validator explicitly owns a
   complete-row deletion target.

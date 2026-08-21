@@ -36,6 +36,8 @@ SYNTHESIS_HTML_FRAGMENT_RE = re.compile(
     r"</(?:article|div|h[1-6]|li|ol|p|section|table|ul)>",
     re.IGNORECASE | re.MULTILINE,
 )
+SYNTHESIS_H1_RE = re.compile(r"^#\s+\S.*$")
+SYNTHESIS_H2_H6_RE = re.compile(r"^(#{2,6})(\s+\S.*)$")
 EXPLICIT_INLINE_CONTRADICTION_RE = re.compile(
     r"\b(contradict|incorrectly states)\b",
     re.IGNORECASE,
@@ -175,6 +177,17 @@ def _section_for_claim(text: str, claim: str) -> str:
     return heading
 
 
+def _first_non_empty_line(text: str) -> tuple[int, int, str] | None:
+    cursor = 0
+    for line in text.splitlines(keepends=True):
+        end = cursor + len(line)
+        stripped_newline = line.rstrip("\r\n")
+        if stripped_newline.strip():
+            return cursor, cursor + len(stripped_newline), stripped_newline
+        cursor = end
+    return None
+
+
 def _is_hedged_claim(claim: str, following: str = "") -> bool:
     return bool(
         validate_report_script.MECHANISTIC_HEDGE_RE.search(claim)
@@ -253,7 +266,8 @@ def validate_synthesis_report(data_dir: str | Path) -> list[dict[str, str]]:
     text = (data_dir / "synthesis.md").read_text(encoding="utf-8")
     issues: list[dict[str, str]] = []
 
-    if SYNTHESIS_HTML_FRAGMENT_RE.search(text):
+    is_html = bool(SYNTHESIS_HTML_FRAGMENT_RE.search(text))
+    if is_html:
         issues.append(
             _synthesis_issue(
                 code="synthesis_not_markdown",
@@ -263,6 +277,31 @@ def validate_synthesis_report(data_dir: str | Path) -> list[dict[str, str]]:
                 repair_instruction="Rewrite synthesis.md as Markdown before generating HTML.",
             )
         )
+    else:
+        first_line = _first_non_empty_line(text)
+        if first_line is None:
+            issues.append(
+                _synthesis_issue(
+                    code="synthesis_title_not_h1",
+                    section="",
+                    value="synthesis.md has no Markdown H1 title.",
+                    evidence="REPORTER must start synthesis.md with a Markdown H1 title.",
+                    repair_instruction="Add a first-line Markdown H1 title before synthesis validation can pass.",
+                )
+            )
+        elif not SYNTHESIS_H1_RE.match(first_line[2]):
+            match = SYNTHESIS_H2_H6_RE.match(first_line[2])
+            issues.append(
+                _synthesis_issue(
+                    code="synthesis_title_not_h1",
+                    section="",
+                    value=first_line[2],
+                    evidence="REPORTER must start synthesis.md with a Markdown H1 title.",
+                    repair_instruction="Promote the first Markdown heading to H1 without changing its text.",
+                    target_text=first_line[2] if match else "",
+                    replacement_text=f"#{match.group(2)}" if match else "",
+                )
+            )
 
     known_pmids = validate_report_script._papers_pmids(data_dir, issues)
     if known_pmids is not None:
@@ -382,6 +421,23 @@ Evidence quote:
     return True
 
 
+def _repair_synthesis_title(data_dir: Path, issue: dict[str, str]) -> bool:
+    if issue.get("code") != "synthesis_title_not_h1":
+        return False
+    target = issue.get("target_text") or ""
+    replacement = issue.get("replacement_text") or ""
+    if not target or not replacement:
+        return False
+    path = data_dir / "synthesis.md"
+    text = path.read_text(encoding="utf-8")
+    first_line = _first_non_empty_line(text)
+    if first_line is None or first_line[2] != target:
+        return False
+    start, end, _line = first_line
+    path.write_text(text[:start] + replacement + text[end:], encoding="utf-8")
+    return True
+
+
 def repair_synthesis_report(
     data_dir: str | Path,
     issues: list[dict[str, str]],
@@ -397,6 +453,10 @@ def repair_synthesis_report(
 
     for issue in issues:
         if issue.get("severity") != "error":
+            continue
+        if _repair_synthesis_title(data_dir, issue):
+            changed_claims += 1
+            handled_issue_ids.add(id(issue))
             continue
         if repair_report_script._repair_inline_citation_issue(
             data_dir,
