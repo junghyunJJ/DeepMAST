@@ -165,6 +165,95 @@ def test_run_report_guardrail_fails_when_papers_json_is_missing(
     assert final["claim_validation"] == []
 
 
+def test_parts_guardrail_defers_claim_rag_until_deterministic_errors_clear(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    _write_required_files(tmp_path)
+    events: list[str] = []
+    deterministic_calls = 0
+
+    def fake_deterministic(_data_dir: Path) -> list[dict[str, str]]:
+        nonlocal deterministic_calls
+        deterministic_calls += 1
+        events.append("deterministic")
+        if deterministic_calls == 1:
+            return [{"severity": "error", "code": "local_error", "file": "part1_final.md"}]
+        return []
+
+    def fake_rag(*_args: Any, **_kwargs: Any) -> dict[str, Any]:
+        events.append("rag")
+        return {"claims": [], "issues": []}
+
+    def fake_repair(*_args: Any, **_kwargs: Any) -> int:
+        events.append("repair")
+        return 1
+
+    monkeypatch.setattr(report_guardrails.validate_report_script, "validate_report", fake_deterministic)
+    monkeypatch.setattr(report_guardrails.claim_rag_validation, "validate_claims", fake_rag)
+    monkeypatch.setattr(report_guardrails.repair_report_script, "repair_report", fake_repair)
+
+    result = report_guardrails.run_report_guardrail(tmp_path, provider="ollama")
+
+    assert result["status"] == "passed"
+    assert events == ["deterministic", "repair", "deterministic", "rag"]
+
+
+def test_report_guardrail_preserves_deterministic_and_semantic_initial_error_counts(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    _write_required_files(tmp_path)
+    deterministic = {
+        "severity": "error",
+        "code": "local_error",
+        "file": "part1_final.md",
+    }
+    semantic = [
+        {
+            "severity": "error",
+            "code": "claim_rag_unsupported",
+            "file": "part1_final.md",
+        },
+        {
+            "severity": "error",
+            "code": "claim_rag_overclaimed",
+            "file": "part2_final.md",
+        },
+    ]
+    validations = [
+        ([deterministic], [], None, None, "deterministic"),
+        (semantic, [{"status": "unsupported"}], None, None, "semantic"),
+        ([], [], None, None, "semantic"),
+    ]
+
+    monkeypatch.setattr(
+        report_guardrails,
+        "_validate_part_reports",
+        lambda *_args, **_kwargs: validations.pop(0),
+    )
+    monkeypatch.setattr(
+        report_guardrails.repair_report_script,
+        "repair_report",
+        lambda *_args, **_kwargs: 1,
+    )
+
+    result = report_guardrails.run_report_guardrail(tmp_path, provider="ollama")
+
+    assert result["status"] == "passed"
+    assert result["deterministic_initial_error_count"] == 1
+    assert result["semantic_initial_error_count"] == 2
+    assert result["initial_error_count"] == 3
+    semantic_initial = json.loads(
+        (tmp_path / "report_validation_semantic_initial.json").read_text(encoding="utf-8")
+    )
+    assert len([issue for issue in semantic_initial["issues"] if issue["severity"] == "error"]) == 2
+
+
 def test_run_synthesis_guardrail_skips_until_synthesis_ready(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -183,6 +272,103 @@ def test_run_synthesis_guardrail_skips_until_synthesis_ready(
     assert result == {"status": "skipped", "missing": ["synthesis.md"]}
     assert not (tmp_path / "synthesis_guardrail_initial.json").exists()
     assert not (tmp_path / "synthesis_guardrail_final.json").exists()
+
+
+def test_synthesis_guardrail_defers_claim_rag_until_deterministic_errors_clear(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    (tmp_path / "papers.json").write_text('{"papers": []}', encoding="utf-8")
+    (tmp_path / "synthesis.md").write_text(
+        "## Summary\n\nSpatial plots confirm a mechanism.\n",
+        encoding="utf-8",
+    )
+    events: list[str] = []
+    deterministic_calls = 0
+
+    def fake_deterministic(_data_dir: Path) -> list[dict[str, str]]:
+        nonlocal deterministic_calls
+        deterministic_calls += 1
+        events.append("deterministic")
+        if deterministic_calls == 1:
+            return [{"severity": "error", "code": "local_error", "file": "synthesis.md"}]
+        return []
+
+    def fake_consistency(_data_dir: Path) -> dict[str, list[dict[str, Any]]]:
+        events.append("consistency")
+        return {"issues": [], "results": []}
+
+    def fake_rag(*_args: Any, **_kwargs: Any) -> dict[str, Any]:
+        events.append("rag")
+        return {"claims": [], "issues": []}
+
+    def fake_repair(*_args: Any, **_kwargs: Any) -> int:
+        events.append("repair")
+        return 1
+
+    monkeypatch.setattr(report_guardrails, "validate_synthesis_report", fake_deterministic)
+    monkeypatch.setattr(
+        report_guardrails.synthesis_consistency_validation,
+        "validate_synthesis_consistency",
+        fake_consistency,
+    )
+    monkeypatch.setattr(report_guardrails.claim_rag_validation, "validate_claims", fake_rag)
+    monkeypatch.setattr(report_guardrails, "repair_synthesis_report", fake_repair)
+
+    result = report_guardrails.run_synthesis_guardrail(tmp_path, provider="ollama")
+
+    assert result["status"] == "passed"
+    assert events == [
+        "deterministic",
+        "consistency",
+        "repair",
+        "deterministic",
+        "consistency",
+        "rag",
+    ]
+
+
+def test_synthesis_guardrail_preserves_deterministic_and_semantic_initial_error_counts(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    (tmp_path / "papers.json").write_text('{"papers": []}', encoding="utf-8")
+    (tmp_path / "synthesis.md").write_text("## Summary\n\nClaim.\n", encoding="utf-8")
+    deterministic = {"severity": "error", "code": "local", "file": "synthesis.md"}
+    semantic = {
+        "severity": "error",
+        "code": "claim_rag_unsupported",
+        "file": "synthesis.md",
+    }
+    empty_consistency = {"issues": [], "results": []}
+    validations = [
+        ([deterministic], [], empty_consistency, None, None, "deterministic"),
+        ([semantic], [{"status": "unsupported"}], empty_consistency, None, None, "semantic"),
+        ([], [], empty_consistency, None, None, "semantic"),
+    ]
+
+    monkeypatch.setattr(
+        report_guardrails,
+        "_validate_synthesis_guardrails",
+        lambda *_args, **_kwargs: validations.pop(0),
+    )
+    monkeypatch.setattr(
+        report_guardrails,
+        "repair_synthesis_report",
+        lambda *_args, **_kwargs: 1,
+    )
+
+    result = report_guardrails.run_synthesis_guardrail(tmp_path, provider="ollama")
+
+    assert result["status"] == "passed"
+    assert result["deterministic_initial_error_count"] == 1
+    assert result["semantic_initial_error_count"] == 1
+    assert result["initial_error_count"] == 2
+    assert (tmp_path / "synthesis_guardrail_semantic_initial.json").is_file()
 
 
 def test_run_synthesis_guardrail_repairs_invalid_pmid_and_softens_overclaim(
@@ -879,16 +1065,21 @@ def test_run_synthesis_guardrail_repairs_claim_rag_inline_contradiction(
 
     result = report_guardrails.run_synthesis_guardrail(tmp_path, provider="ollama")
 
-    initial = json.loads(
-        (tmp_path / "synthesis_guardrail_initial.json").read_text(encoding="utf-8")
+    semantic_initial = json.loads(
+        (tmp_path / "synthesis_guardrail_semantic_initial.json").read_text(
+            encoding="utf-8"
+        )
     )
     text = (tmp_path / "synthesis.md").read_text(encoding="utf-8")
     assert repair_model_call_count == 0
     assert repair_model_providers == ["ollama"]
     assert result["status"] == "passed"
     assert result["repair_attempt_count"] == 1
-    assert initial["issues"][0]["reason"].startswith("The claim incorrectly states")
-    assert initial["issues"][0]["evidence_quote"] == evidence_quote
+    contradiction = next(
+        issue for issue in semantic_initial["issues"] if issue["code"] == "inline_citation_overclaimed"
+    )
+    assert contradiction["reason"].startswith("The claim incorrectly states")
+    assert contradiction["evidence_quote"] == evidence_quote
     assert "better recurrence-free survival (PMID: 40694271)" in text
     assert "worse recurrence-free survival" not in text
 
@@ -1175,12 +1366,13 @@ def test_run_synthesis_guardrail_terminally_repairs_new_final_error(
         dict[str, list[dict[str, Any]]],
         None,
         None,
+        str,
     ]:
         nonlocal validate_count
         _ = provider, claim_cache
         issues = validations[validate_count]
         validate_count += 1
-        return issues, [], {"issues": [], "results": []}, None, None
+        return issues, [], {"issues": [], "results": []}, None, None, "semantic"
 
     def fake_repair(
         _data_dir: Path,
@@ -1238,11 +1430,12 @@ def test_run_synthesis_guardrail_does_not_terminally_retry_persistent_error(
         dict[str, list[dict[str, Any]]],
         None,
         None,
+        str,
     ]:
         nonlocal validate_count
         _ = provider, claim_cache
         validate_count += 1
-        return [persistent], [], {"issues": [], "results": []}, None, None
+        return [persistent], [], {"issues": [], "results": []}, None, None, "semantic"
 
     def fake_repair(
         _data_dir: Path,
@@ -1325,6 +1518,8 @@ def test_run_report_guardrail_stops_after_first_successful_repair(
     assert result == {
         "status": "passed",
         "initial_issue_count": 1,
+        "deterministic_initial_error_count": 1,
+        "semantic_initial_error_count": 0,
         "initial_error_count": 1,
         "repair_attempt_count": 1,
         "terminal_repair_count": 0,
@@ -1518,8 +1713,8 @@ def test_run_report_guardrail_preserves_claim_selection_after_repair(
     )
     assert result["status"] == "passed"
     assert result["repair_attempt_count"] == 1
-    assert claim_calls == 2
-    assert final["claim_selection"] == selections[1]
+    assert claim_calls == 1
+    assert final["claim_selection"] == selections[0]
 
 
 def test_run_report_guardrail_retries_up_to_three_repairs(
@@ -1613,12 +1808,12 @@ def test_run_report_guardrail_terminally_repairs_new_final_error(
         provider: str | None,
         claim_cache: dict[str, list[dict[str, Any]]],
         filenames: tuple[str, ...],
-    ) -> tuple[list[dict[str, str]], list[dict[str, Any]], None, None]:
+    ) -> tuple[list[dict[str, str]], list[dict[str, Any]], None, None, str]:
         nonlocal validate_count
         _ = provider, claim_cache, filenames
         issues = validations[validate_count]
         validate_count += 1
-        return issues, [], None, None
+        return issues, [], None, None, "semantic"
 
     def fake_repair(
         _data_dir: Path,
@@ -1669,11 +1864,11 @@ def test_run_report_guardrail_does_not_terminally_retry_persistent_error(
         provider: str | None,
         claim_cache: dict[str, list[dict[str, Any]]],
         filenames: tuple[str, ...],
-    ) -> tuple[list[dict[str, str]], list[dict[str, Any]], None, None]:
+    ) -> tuple[list[dict[str, str]], list[dict[str, Any]], None, None, str]:
         nonlocal validate_count
         _ = provider, claim_cache, filenames
         validate_count += 1
-        return [persistent], [], None, None
+        return [persistent], [], None, None, "semantic"
 
     def fake_repair(
         _data_dir: Path,
