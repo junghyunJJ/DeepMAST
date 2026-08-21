@@ -52,8 +52,11 @@ FACTOR_PATHWAY_NEGATED_DIRECTION_RE = re.compile(
     re.IGNORECASE,
 )
 FACTOR_CLUSTER_STATUS_RE = re.compile(
-    r"\bFactor\s*\d+\s+(?:is\s+)?(?:enriched|higher|increased|active)\s+"
-    r"in\s+clusters?\b(?:\s+\d+)*(?:\s+and\s+\d+)?(?:\s+\([^)]*loadings[^)]*\))?",
+    r"\bFactor\s*\d+\b(?:\s+[A-Za-z][\w-]*){0,4}\*{0,2}\s+(?:is\s+)?(?:specifically\s+)?"
+    r"(?:enriched|higher|increased|active)\s+in\s+(?:[A-Za-z][\w-]*\s+){0,6}clusters?\b"
+    r"(?:\s+\d+)*(?:\s*,\s*\d+)*(?:\s*,?\s+and\s+\d+)?"
+    r"(?:\s+\([^)]*(?:loadings|scores|\d)[^)]*\))?"
+    r"(?:\s+with\s+(?:scores?|loadings)\s+[0-9.]+(?:\s*-\s*\d+(?:\.\d+)?)?)?",
     re.IGNORECASE,
 )
 FACTOR_PATHWAY_CLAIM_RE = re.compile(

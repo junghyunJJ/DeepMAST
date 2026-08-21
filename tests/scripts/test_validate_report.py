@@ -227,6 +227,31 @@ def test_allows_cluster_enrichment_with_negative_pathway_depletion(tmp_path: Pat
     assert not any(i["code"] == "factor_pathway_direction_mismatch" for i in issues)
 
 
+def test_allows_descriptor_cluster_enrichment_with_negative_pathway_depletion(tmp_path: Path) -> None:
+    _write_json(tmp_path / "papers.json", [])
+    _write_csv(
+        tmp_path / "sig_liana_pathway_factor.csv",
+        [
+            {"factor": "Factor3", "pathway": "Estrogen", "estimate": -5.48, "pval": 4.98e-08, "adj_pval": 0.001},
+            {"factor": "Factor3", "pathway": "EGFR", "estimate": -2.90, "pval": 0.0038, "adj_pval": 0.028},
+            {"factor": "Factor3", "pathway": "NFkB", "estimate": -2.59, "pval": 0.0097, "adj_pval": 0.04},
+        ],
+    )
+    (tmp_path / "part2_final.md").write_text(
+        "## Analysis 2-8: Pathway-Factor\n"
+        "### Biological Interpretation\n"
+        "**Factor3 transcriptional program** is specifically enriched in proliferative invasive tumor clusters "
+        "(4, 17, 14) with scores 0.51-0.60, showing depletion for Estrogen "
+        "(estimate = -5.48, p = 4.98e-08), EGFR (estimate = -2.90, p = 0.0038), "
+        "and NFkB (estimate = -2.59, p = 0.0097) pathways\n",
+        encoding="utf-8",
+    )
+
+    issues = validate_report.validate_report(tmp_path)
+
+    assert not any(i["code"] == "factor_pathway_direction_mismatch" for i in issues)
+
+
 def test_flags_positive_pathway_estimate_after_cluster_enrichment_written_as_depletion(tmp_path: Path) -> None:
     _write_json(tmp_path / "papers.json", [])
     _write_csv(
