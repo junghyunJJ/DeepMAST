@@ -24,6 +24,34 @@ def _write_csv(path: Path, rows: list[dict[str, object]]) -> None:
         writer.writerows(rows)
 
 
+def test_claim_windows_treats_markdown_table_rows_as_atomic_claims() -> None:
+    header = "| Theme | Strength | Supporting Evidence |"
+    safe_row = "| Spatial Association | Strong | Factor3 loadings exceed 0.5 |"
+    unsafe_row = (
+        "| Tumor-Vascular Spatial Association | Strong | "
+        "Spatial plots confirm epithelial-vascular co-localization. "
+        "Moran's R = 0.4767 |"
+    )
+    text = "\n".join(
+        [
+            "## Emergent Themes Summary",
+            "",
+            header,
+            "|---|---|---|",
+            safe_row,
+            unsafe_row,
+        ]
+    )
+
+    windows = validate_report._claim_windows(text)
+
+    assert header in windows
+    assert safe_row in windows
+    assert unsafe_row in windows
+    assert "|---|---|---|" not in windows
+    assert not any(safe_row in window and unsafe_row in window for window in windows)
+
+
 def test_flags_pmid_not_in_papers_json(tmp_path: Path) -> None:
     _write_json(tmp_path / "papers.json", [{"pmid": "11111111", "title": "known"}])
     (tmp_path / "part1_final.md").write_text(

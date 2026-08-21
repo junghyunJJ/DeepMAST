@@ -237,6 +237,37 @@ def test_synthesis_hard_semantic_issue_targets_exact_claim(tmp_path: Path) -> No
     assert "replacement_text" not in issue
 
 
+def test_synthesis_table_overclaim_targets_only_the_offending_row(tmp_path: Path) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    safe_row = "| Spatial Association | Strong | Factor3 loadings exceed 0.5 |"
+    unsafe_row = (
+        "| Tumor-Vascular Spatial Association | Strong | "
+        "Spatial plots confirm epithelial-vascular co-localization. "
+        "Moran's R = 0.4767 |"
+    )
+    (tmp_path / "papers.json").write_text('{"papers": []}', encoding="utf-8")
+    (tmp_path / "synthesis.md").write_text(
+        "## Emergent Themes Summary\n\n"
+        "| Theme | Strength | Supporting Evidence |\n"
+        "|---|---|---|\n"
+        f"{safe_row}\n"
+        f"{unsafe_row}\n",
+        encoding="utf-8",
+    )
+
+    errors = [
+        issue
+        for issue in report_guardrails.validate_synthesis_report(tmp_path)
+        if issue["severity"] == "error"
+    ]
+
+    assert len(errors) == 1
+    assert errors[0]["code"] == "unsupported_synthesis_overclaim"
+    assert errors[0]["target_text"] == unsafe_row
+    assert safe_row not in errors[0]["target_text"]
+
+
 def test_synthesis_warning_issue_has_no_generic_repair_fields(tmp_path: Path) -> None:
     from src.agents.deep_interpreter import report_guardrails
 

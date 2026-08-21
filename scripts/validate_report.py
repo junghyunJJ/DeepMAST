@@ -80,6 +80,7 @@ NEGATED_SIGNIFICANCE_RE = re.compile(
     r"lacks|lacked|absent)\b",
     re.IGNORECASE,
 )
+MARKDOWN_TABLE_SEPARATOR_RE = re.compile(r"^\|(?:\s*:?-+:?\s*\|)+$")
 LR_METRIC_CLAIM_RE = re.compile(
     r"\b(?P<label>Moran(?:'s|s)?\s*[RI]|combined\s*score|combinedscore|GenePT\s*score)\b"
     r"(?:\s+(?:score|value))?"
@@ -267,12 +268,12 @@ def _known_factor_mentions(text: str, known: dict[str, str]) -> list[tuple[int, 
 
 
 def _claim_windows(text: str) -> list[str]:
-    chunks: list[str] = []
+    chunks: list[tuple[str, bool]] = []
     paragraph: list[str] = []
 
     def flush_paragraph() -> None:
         if paragraph:
-            chunks.append("\n".join(paragraph).strip())
+            chunks.append(("\n".join(paragraph).strip(), False))
             paragraph.clear()
 
     for raw_line in text.splitlines():
@@ -280,15 +281,23 @@ def _claim_windows(text: str) -> list[str]:
         if not line:
             flush_paragraph()
             continue
+        if line.startswith("|") and line.endswith("|"):
+            flush_paragraph()
+            if not MARKDOWN_TABLE_SEPARATOR_RE.fullmatch(line):
+                chunks.append((line, True))
+            continue
         if re.match(r"^(?:#{1,6}\s|[-*+]\s|\d+[.)]\s)", line):
             flush_paragraph()
-            chunks.append(line)
+            chunks.append((line, False))
             continue
         paragraph.append(line)
     flush_paragraph()
 
     windows: list[str] = []
-    for chunk in chunks:
+    for chunk, atomic in chunks:
+        if atomic:
+            windows.append(chunk)
+            continue
         windows.extend(
             part.strip()
             for part in re.split(r"(?<=[.!?])(?:[ \t]+|\n+)(?=\S)", chunk)
