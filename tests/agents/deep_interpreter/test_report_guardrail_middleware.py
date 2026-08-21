@@ -1832,10 +1832,14 @@ def test_run_report_guardrail_terminally_repairs_new_final_error(
     monkeypatch.setattr(report_guardrails.repair_report_script, "repair_report", fake_repair)
 
     result = report_guardrails.run_report_guardrail(tmp_path, provider="ollama")
+    terminal = json.loads(
+        (tmp_path / "report_validation_terminal.json").read_text(encoding="utf-8")
+    )
 
     assert validate_count == 5
     assert len(repaired_issue_batches) == 4
     assert repaired_issue_batches[-1] == [promoted]
+    assert terminal["phase"] == "semantic"
     assert result["status"] == "passed"
     assert result["repair_attempt_count"] == 3
     assert result["terminal_repair_count"] == 1

@@ -610,6 +610,7 @@ def run_report_guardrail(
             current_claims,
             claim_selection=current_selection,
             inline_citation_coverage=current_coverage,
+            phase=current_phase,
         )
         terminal_changed = repair_report_script.repair_report(
             data_dir,
