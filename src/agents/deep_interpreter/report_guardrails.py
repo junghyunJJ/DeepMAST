@@ -148,21 +148,7 @@ def _strict_phase_progress(
         return False
     before_count = _error_count(before)
     after_count = _error_count(after)
-    if after_count < before_count:
-        return True
-    if before_phase != "semantic" or after_count != before_count:
-        return False
-    before_keys = {
-        _issue_claim_key(issue)
-        for issue in before
-        if issue.get("severity") == "error"
-    }
-    after_keys = {
-        _issue_claim_key(issue)
-        for issue in after
-        if issue.get("severity") == "error"
-    }
-    return bool(before_keys) and before_keys.isdisjoint(after_keys)
+    return after_count < before_count
 
 
 def _section_for_claim(text: str, claim: str) -> str:
@@ -327,23 +313,16 @@ def validate_synthesis_report(data_dir: str | Path) -> list[dict[str, str]]:
         therapeutic_overclaim = SYNTHESIS_THERAPEUTIC_OVERCLAIM_RE.search(claim)
         if not (mechanistic_overclaim or therapeutic_overclaim):
             continue
-        following = claims[index + 1].lower() if index + 1 < len(claims) else ""
-        warning = _is_hedged_claim(claim, following)
         issues.append(
             _synthesis_issue(
-                code=(
-                    "synthesis_overclaim_warning"
-                    if warning
-                    else "unsupported_synthesis_overclaim"
-                ),
+                code="synthesis_overclaim_warning",
                 section=_section_for_claim(text, claim),
                 value=claim,
-                severity="warning" if warning else "error",
+                severity="warning",
                 evidence="Synthesis report-derived spatial/statistical evidence was written as a mechanistic or therapeutic claim.",
                 repair_instruction=(
                     "Rewrite as an association or hypothesis unless direct experimental evidence supports this exact claim."
                 ),
-                target_text="" if warning else claim,
             )
         )
     return issues
@@ -438,51 +417,6 @@ def _repair_synthesis_title(data_dir: Path, issue: dict[str, str]) -> bool:
     return True
 
 
-def _repair_synthesis_semantic_heading(
-    data_dir: Path,
-    issue: dict[str, str],
-    *,
-    provider: str | None,
-) -> bool | None:
-    target = issue.get("target_text") or ""
-    match = SYNTHESIS_H2_H6_RE.fullmatch(target)
-    if (
-        issue.get("code") != "unsupported_synthesis_overclaim"
-        or issue.get("file") != "synthesis.md"
-        or match is None
-    ):
-        return None
-
-    path = data_dir / "synthesis.md"
-    text = path.read_text(encoding="utf-8")
-    spans = [
-        found.span()
-        for found in re.finditer(rf"(?m)^{re.escape(target)}(?=\r?$)", text)
-    ]
-    if len(spans) != 1:
-        return False
-
-    body = match.group(3).strip()
-    model = repair_report_script._create_model(provider)
-    try:
-        decision = repair_report_script._invoke_repair_decision(model, [issue], body)
-    except (repair_report_script.ValidationError, TypeError, ValueError):
-        return False
-    replacement = decision.replacement_text.strip()
-    if (
-        decision.action != "replace"
-        or "\n" in replacement
-        or "\r" in replacement
-        or not repair_report_script._safe_semantic_decision(body, decision)
-    ):
-        return False
-
-    start, end = spans[0]
-    repaired_heading = f"{match.group(1)}{match.group(2)}{replacement}"
-    path.write_text(text[:start] + repaired_heading + text[end:], encoding="utf-8")
-    return True
-
-
 def repair_synthesis_report(
     data_dir: str | Path,
     issues: list[dict[str, str]],
@@ -501,15 +435,6 @@ def repair_synthesis_report(
             continue
         if _repair_synthesis_title(data_dir, issue):
             changed_claims += 1
-            handled_issue_ids.add(id(issue))
-            continue
-        heading_changed = _repair_synthesis_semantic_heading(
-            data_dir,
-            issue,
-            provider=provider,
-        )
-        if heading_changed is not None:
-            changed_claims += int(heading_changed)
             handled_issue_ids.add(id(issue))
             continue
         if repair_report_script._repair_inline_citation_issue(
@@ -566,34 +491,6 @@ def repair_synthesis_report(
         )
         if changed:
             changed_claims += len(grouped_issues)
-
-    path = data_dir / "synthesis.md"
-    current = path.read_text(encoding="utf-8")
-    cursor = 0
-    for issue in issues:
-        if issue.get("severity") != "error" or issue.get("code") not in {
-            "unsupported_synthesis_overclaim",
-            "claim_rag_overclaimed",
-            "claim_rag_unsupported",
-            "inline_citation_unsupported",
-            "inline_citation_overclaimed",
-        }:
-            continue
-        if issue.get("target_text"):
-            continue
-        claim = issue.get("value") or ""
-        if not claim or SYNTHESIS_GUARDRAIL_SENTENCE in claim.lower():
-            continue
-        claim_at = current.find(claim, cursor)
-        if claim_at < 0:
-            continue
-        replacement = f"{claim} {SYNTHESIS_GUARDRAIL_SENTENCE}"
-        current = current[:claim_at] + replacement + current[claim_at + len(claim) :]
-        cursor = claim_at + len(replacement)
-        changed_claims += 1
-
-    if changed_claims:
-        path.write_text(current, encoding="utf-8")
 
     for issue in issues:
         if issue.get("severity") != "error":

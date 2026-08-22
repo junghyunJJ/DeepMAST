@@ -320,24 +320,18 @@ def _check_mechanistic_interpretations(data_dir: Path, issues: list[dict[str, st
                 for window in _claim_windows(block):
                     if not (REPORT_EVIDENCE_RE.search(window) and MECHANISTIC_TRIGGER_RE.search(window)):
                         continue
-                    warning = bool(MECHANISTIC_HEDGE_RE.search(window))
                     issues.append(
                         _issue(
-                            code=(
-                                "mechanistic_interpretation_warning"
-                                if warning
-                                else "unsupported_mechanistic_interpretation"
-                            ),
+                            code="mechanistic_interpretation_warning",
                             file=path.name,
                             section=str(section["heading"]),
                             value=window,
-                            severity="warning" if warning else "error",
+                            severity="warning",
                             evidence="Report-derived spatial/statistical evidence was written as a mechanistic or causal claim.",
                             repair_instruction=(
                                 "Rewrite as an association or hypothesis unless direct experimental evidence is cited "
                                 "for this exact report-derived claim."
                             ),
-                            target_text="" if warning else window,
                         )
                     )
 

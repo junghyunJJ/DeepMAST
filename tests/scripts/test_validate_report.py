@@ -1015,7 +1015,7 @@ def test_flags_lr_metric_value_mismatch_with_morans_r_value_of(tmp_path: Path) -
     assert flagged[0]["value"] == "LAMA5^ITGB4 morans=0.7171"
 
 
-def test_flags_unhedged_mechanistic_overclaim_in_biological_interpretation(tmp_path: Path) -> None:
+def test_unhedged_mechanistic_overclaim_is_warning_without_repair_target(tmp_path: Path) -> None:
     _write_json(tmp_path / "papers.json", [])
     (tmp_path / "part1_final.md").write_text(
         "## Analysis 1-5: MISTy\n"
@@ -1026,14 +1026,11 @@ def test_flags_unhedged_mechanistic_overclaim_in_biological_interpretation(tmp_p
 
     issues = validate_report.validate_report(tmp_path)
 
-    flagged = [i for i in issues if i["code"] == "unsupported_mechanistic_interpretation"]
+    flagged = [i for i in issues if i["code"] == "mechanistic_interpretation_warning"]
     assert len(flagged) == 1
-    assert flagged[0]["severity"] == "error"
+    assert flagged[0]["severity"] == "warning"
     assert flagged[0]["section"] == "## Analysis 1-5: MISTy"
-    assert (
-        flagged[0]["target_text"]
-        == "The MISTy association confirms that hypoxic conditions drive proliferative tumor cell behavior."
-    )
+    assert "target_text" not in flagged[0]
     assert "replacement_text" not in flagged[0]
 
 
@@ -1051,10 +1048,13 @@ def test_warns_on_hedged_mechanistic_interpretation(tmp_path: Path) -> None:
     flagged = [i for i in issues if i["code"] == "mechanistic_interpretation_warning"]
     assert len(flagged) == 1
     assert flagged[0]["severity"] == "warning"
+    assert "target_text" not in flagged[0]
     assert not any(i["code"] == "unsupported_mechanistic_interpretation" for i in issues)
 
 
-def test_flags_unhedged_mechanistic_overclaim_even_when_inferred_is_present(tmp_path: Path) -> None:
+def test_warns_on_unhedged_mechanistic_overclaim_even_when_inferred_is_present(
+    tmp_path: Path,
+) -> None:
     _write_json(tmp_path / "papers.json", [])
     (tmp_path / "part1_final.md").write_text(
         "## Analysis 1-5: MISTy\n"
@@ -1065,10 +1065,10 @@ def test_flags_unhedged_mechanistic_overclaim_even_when_inferred_is_present(tmp_
 
     issues = validate_report.validate_report(tmp_path)
 
-    flagged = [i for i in issues if i["code"] == "unsupported_mechanistic_interpretation"]
+    flagged = [i for i in issues if i["code"] == "mechanistic_interpretation_warning"]
     assert len(flagged) == 1
-    assert flagged[0]["severity"] == "error"
-    assert not any(i["code"] == "mechanistic_interpretation_warning" for i in issues)
+    assert flagged[0]["severity"] == "warning"
+    assert "target_text" not in flagged[0]
 
 
 def test_ignores_mechanistic_trigger_outside_biological_interpretation(tmp_path: Path) -> None:

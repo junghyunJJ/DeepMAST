@@ -172,8 +172,6 @@ def test_issue_severity_applies_hedged_warning_only_to_non_inline_claim_rag_issu
 
 
 def test_non_inline_hard_claim_issue_targets_exact_claim() -> None:
-    claim = "TGFB drives fibrosis in lung tissue."
-
     issue = claim_rag_validation._issue_for(
         {
             "status": "overclaimed",
@@ -185,14 +183,36 @@ def test_non_inline_hard_claim_issue_targets_exact_claim() -> None:
             "section": "## Biology",
             "source_claim_index": 0,
             "inline_pmid": None,
-            "claim": claim,
+            "claim": "TGFB drives fibrosis.",
         }
     )
 
     assert issue is not None
     assert issue["code"] == "claim_rag_overclaimed"
-    assert issue["target_text"] == claim
-    assert "replacement_text" not in issue
+    assert issue["severity"] == "warning"
+    assert "target_text" not in issue
+
+
+def test_inline_overclaim_remains_hard_and_targeted() -> None:
+    issue = claim_rag_validation._issue_for(
+        {
+            "status": "overclaimed",
+            "hedged": True,
+            "supporting_pmids": ["11111111"],
+            "evidence_quote": "Association only.",
+            "reason": "Citation does not support causality.",
+            "file": "part1_final.md",
+            "section": "## Biology",
+            "source_claim_index": 0,
+            "inline_pmid": "11111111",
+            "claim": "TGFB drives fibrosis (PMID: 11111111).",
+        }
+    )
+
+    assert issue is not None
+    assert issue["code"] == "inline_citation_overclaimed"
+    assert issue["severity"] == "error"
+    assert issue["target_text"] == issue["value"]
 
 
 def test_warning_claim_issue_has_no_generic_repair_fields() -> None:

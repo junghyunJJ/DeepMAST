@@ -744,7 +744,8 @@ def _issue_for(result: dict[str, Any]) -> dict[str, Any] | None:
         return None
     hedged = bool(result["hedged"])
     inline_pmid = result.get("inline_pmid")
-    severity = "warning" if status == "unverifiable" or (hedged and not inline_pmid) else "error"
+    hard_inline = bool(inline_pmid) and status in {"unsupported", "overclaimed"}
+    severity = "error" if hard_inline else "warning"
     code = (
         f"inline_citation_{status}"
         if inline_pmid
@@ -778,7 +779,7 @@ def _issue_for(result: dict[str, Any]) -> dict[str, Any] | None:
     if inline_pmid:
         issue["source_claim_index"] = result.get("source_claim_index")
         issue["inline_pmid"] = str(inline_pmid)
-    if severity == "error":
+    if hard_inline:
         issue["target_text"] = str(result["claim"])
     return issue
 
