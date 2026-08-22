@@ -108,6 +108,14 @@ class MalformedDecisionLLM:
         return {"action": "rewrite", "replacement_text": "x"}
 
 
+class RaisingDecisionLLM:
+    def with_structured_output(self, _schema, **_kwargs):
+        return self
+
+    def invoke(self, prompt: str):
+        raise AssertionError(f"LLM should not be called: {prompt}")
+
+
 def _write_issues(path: Path, issues: list[dict[str, object]]) -> Path:
     issues_path = path / "issues.json"
     issues_path.write_text(json.dumps({"issues": issues}), encoding="utf-8")
@@ -803,6 +811,50 @@ def test_repair_rewrites_unresolved_inline_citations_as_exact_claim(
     assert "Unrelated context stays put." in text
     assert "A separate sentence stays unchanged." in text
     assert "Tail text stays put." in text
+
+
+def test_repair_deletes_unsupported_reference_only_inline_target_without_llm(
+    tmp_path: Path,
+) -> None:
+    first_reference = (
+        "PMID: 39491279 - Direct L-R evidence for LRIG1-ERBB3, LRIG1-ERBB2, EGF-ERBB2"
+    )
+    second_reference = (
+        "PMID: 32448168 - Direct L-R evidence for LRIG1-ERBB3, LRIG1-ERBB2, EGF-ERBB2"
+    )
+    report = tmp_path / "part2_final.md"
+    report.write_text(
+        "## Conclusion\n"
+        "**References**\n"
+        f"- {first_reference}\n"
+        f"- {second_reference}\n",
+        encoding="utf-8",
+    )
+    trace = tmp_path / "repair_trace.jsonl"
+    trace.write_text("", encoding="utf-8")
+    issues_path = _write_issues(tmp_path, [{
+        "severity": "error",
+        "code": "inline_citation_unsupported",
+        "file": report.name,
+        "section": "## Conclusion",
+        "source_claim_index": 1,
+        "inline_pmid": "39491279",
+        "value": first_reference,
+        "target_text": first_reference,
+    }])
+
+    changed = repair_report.repair_report(
+        tmp_path,
+        issues_path,
+        llm=RaisingDecisionLLM(),
+    )
+
+    text = report.read_text(encoding="utf-8")
+    assert changed == 1
+    assert first_reference not in text
+    assert f"- {second_reference}\n" in text
+    assert "- \n" not in text
+    assert _trace_rows(trace)[-1]["path"] == "deterministic_reference_delete"
 
 
 def test_repair_routes_non_inline_claim_rag_overclaimed_to_exact_claim(

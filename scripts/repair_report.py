@@ -171,6 +171,63 @@ def _remove_inline_pmid(value: str, pmid: str) -> str:
     return value
 
 
+def _reference_only_body(value: str) -> str | None:
+    body = re.sub(r"^\s*[-*]\s+", "", value.strip())
+    return body if re.match(r"(?i)^PMID:\s*\d{6,9}\b", body) else None
+
+
+def _delete_reference_only_inline_target(data_dir: Path, issue: dict[str, Any]) -> bool:
+    filename = str(issue.get("file") or "")
+    section = str(issue.get("section") or "")
+    target = str(issue.get("target_text") or issue.get("value") or "")
+    body = _reference_only_body(target)
+    path = (data_dir / filename).resolve()
+    if (
+        not section
+        or body is None
+        or not path.is_relative_to(data_dir)
+        or path.suffix != ".md"
+        or not path.exists()
+    ):
+        return False
+
+    text = path.read_text(encoding="utf-8")
+    found = _find_section(text, section)
+    if found is None:
+        return False
+    start, end, section_text = found
+
+    matches: list[tuple[int, int]] = []
+    line_start = 0
+    for line in section_text.splitlines(keepends=True):
+        line_end = line_start + len(line)
+        line_body = re.sub(r"^\s*[-*]\s+", "", line.rstrip("\r\n")).strip()
+        if line_body == body:
+            matches.append((line_start, line_end))
+        line_start = line_end
+    if len(matches) != 1:
+        return False
+
+    match_start, match_end = matches[0]
+    repaired_section = section_text[:match_start] + section_text[match_end:]
+    path.write_text(text[:start] + repaired_section + text[end:], encoding="utf-8")
+    _append_repair_trace(
+        data_dir,
+        {
+            "event": "target_repair_applied",
+            "file": filename,
+            "section": section,
+            "code": issue.get("code"),
+            "match_mode": "exact",
+            "occurrence_count": 1,
+            "issue_count": 1,
+            "path": "deterministic_reference_delete",
+            "retention_ratio": 0.0,
+        },
+    )
+    return True
+
+
 def _repair_inline_citation_issue(
     data_dir: Path,
     issue: dict[str, Any],
@@ -252,7 +309,7 @@ def _repair_inline_citation_issues(
         for row in claim_validation
     )
     if not sibling_supported:
-        return False
+        return _delete_reference_only_inline_target(data_dir, first)
 
     repaired_value = value
     for issue in issues:
