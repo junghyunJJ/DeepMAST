@@ -253,6 +253,10 @@ def test_allows_cluster_enrichment_with_negative_pathway_depletion(tmp_path: Pat
     issues = validate_report.validate_report(tmp_path)
 
     assert not any(i["code"] == "factor_pathway_direction_mismatch" for i in issues)
+    flagged = [i for i in issues if i["code"] == "factor_pathway_direction_ambiguous"]
+    assert flagged
+    assert all(i["severity"] == "warning" for i in flagged)
+    assert all("target_text" not in i for i in flagged)
 
 
 def test_allows_descriptor_cluster_enrichment_with_negative_pathway_depletion(tmp_path: Path) -> None:
@@ -278,9 +282,13 @@ def test_allows_descriptor_cluster_enrichment_with_negative_pathway_depletion(tm
     issues = validate_report.validate_report(tmp_path)
 
     assert not any(i["code"] == "factor_pathway_direction_mismatch" for i in issues)
+    flagged = [i for i in issues if i["code"] == "factor_pathway_direction_ambiguous"]
+    assert flagged
+    assert all(i["severity"] == "warning" for i in flagged)
+    assert all("target_text" not in i for i in flagged)
 
 
-def test_flags_positive_pathway_estimate_after_cluster_enrichment_written_as_depletion(tmp_path: Path) -> None:
+def test_warns_for_mixed_cluster_pathway_direction_without_hard_error(tmp_path: Path) -> None:
     _write_json(tmp_path / "papers.json", [])
     _write_csv(
         tmp_path / "sig_liana_pathway_factor.csv",
@@ -296,9 +304,10 @@ def test_flags_positive_pathway_estimate_after_cluster_enrichment_written_as_dep
 
     issues = validate_report.validate_report(tmp_path)
 
-    flagged = [i for i in issues if i["code"] == "factor_pathway_direction_mismatch"]
-    assert len(flagged) == 1
-    assert flagged[0]["value"] == "Factor3: EGFR estimate=2.8971"
+    assert not [issue for issue in issues if issue["code"] == "factor_pathway_direction_mismatch"]
+    flagged = [issue for issue in issues if issue["code"] == "factor_pathway_direction_ambiguous"]
+    assert flagged
+    assert all("target_text" not in issue for issue in flagged)
 
 
 def test_allows_multi_factor_sentence_when_local_factor_pathway_pairs_match(tmp_path: Path) -> None:
@@ -421,7 +430,7 @@ def test_flags_factor_pathway_direction_mismatch_for_positive_estimate_written_a
     (tmp_path / "part2_final.md").write_text(
         "## Analysis 2-8: Pathway-Factor\n"
         "### Biological Interpretation\n"
-        "Factor3 shows EGFR depletion and reduced activity.\n",
+        "Factor3 shows EGFR depletion.\n",
         encoding="utf-8",
     )
 
@@ -430,6 +439,26 @@ def test_flags_factor_pathway_direction_mismatch_for_positive_estimate_written_a
     flagged = [i for i in issues if i["code"] == "factor_pathway_direction_mismatch"]
     assert len(flagged) == 1
     assert flagged[0]["value"] == "Factor3: EGFR estimate=2.897"
+
+
+def test_flags_plural_factor_pathway_direction_mismatch(tmp_path: Path) -> None:
+    _write_json(tmp_path / "papers.json", [])
+    _write_csv(
+        tmp_path / "sig_liana_pathway_factor.csv",
+        [{"factor": "Factor3", "pathway": "EGFR", "estimate": -2.897, "pval": 0.004, "adj_pval": 0.028}],
+    )
+    (tmp_path / "part2_final.md").write_text(
+        "## Analysis 2-8: Pathway-Factor\n"
+        "### Biological Interpretation\n"
+        "Factor3 shows EGFR enrichments.\n",
+        encoding="utf-8",
+    )
+
+    issues = validate_report.validate_report(tmp_path)
+
+    flagged = [i for i in issues if i["code"] == "factor_pathway_direction_mismatch"]
+    assert len(flagged) == 1
+    assert flagged[0]["value"] == "Factor3: EGFR estimate=-2.897"
 
 
 def test_allows_negative_factor_pathway_when_written_as_depletion(tmp_path: Path) -> None:
@@ -528,7 +557,8 @@ def test_flags_coordinated_factor_pathway_depletion_before_pathways(tmp_path: Pa
 
     issues = validate_report.validate_report(tmp_path)
 
-    flagged = {i["value"] for i in issues if i["code"] == "factor_pathway_direction_mismatch"}
+    assert not [i for i in issues if i["code"] == "factor_pathway_direction_mismatch"]
+    flagged = {i["value"] for i in issues if i["code"] == "factor_pathway_direction_ambiguous"}
     assert flagged == {"Factor3: EGFR estimate=2.897", "Factor3: MAPK estimate=1.5"}
 
 
@@ -550,7 +580,8 @@ def test_flags_coordinated_factor_pathway_depletion_after_pathways(tmp_path: Pat
 
     issues = validate_report.validate_report(tmp_path)
 
-    flagged = {i["value"] for i in issues if i["code"] == "factor_pathway_direction_mismatch"}
+    assert not [i for i in issues if i["code"] == "factor_pathway_direction_mismatch"]
+    flagged = {i["value"] for i in issues if i["code"] == "factor_pathway_direction_ambiguous"}
     assert flagged == {"Factor3: EGFR estimate=2.897", "Factor3: MAPK estimate=1.5"}
 
 
@@ -636,6 +667,20 @@ def test_flags_part3_therapeutic_spillover(tmp_path: Path) -> None:
     assert flagged[0]["target_text"] == offending
     assert "replacement_text" not in flagged[0]
     assert flagged[0]["section"] == "## Analysis 3-10: Selected Gene L-R Spatial Evidence"
+
+
+def test_allows_part3_part4_boundary_sentence(tmp_path: Path) -> None:
+    _write_json(tmp_path / "papers.json", [])
+    (tmp_path / "part3_final.md").write_text(
+        "## Analysis 3-10: Selected Gene L-R Spatial Evidence\n"
+        "### Biological Interpretation\n"
+        "therapeutic synthesis and clinical prioritization are reserved for Part 4\n",
+        encoding="utf-8",
+    )
+
+    issues = validate_report.validate_report(tmp_path)
+
+    assert not [i for i in issues if i["code"] == "part3_therapeutic_spillover"]
 
 
 def test_flags_soft_wrapped_part3_therapeutic_spillover_as_one_value(

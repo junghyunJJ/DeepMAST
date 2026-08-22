@@ -21,6 +21,10 @@ THERAPEUTIC_RE = re.compile(
     r"\b(therapeutic|druggability|drug ranking|clinical prioritization|high-confidence therapeutic target)\b",
     re.IGNORECASE,
 )
+PART4_BOUNDARY_RE = re.compile(
+    r"(?=.*\bPart\s*4\b)(?=.*\b(?:reserv\w*|defer\w*|belong\w*|own\w*|exclud\w*|avoid\w*)\b)",
+    re.IGNORECASE | re.DOTALL,
+)
 REPORT_EVIDENCE_RE = re.compile(
     r"\b(MISTy|Moran|co[-\s]?locali[zs]ation|spatial|Factor\s*\d+|FactorN|clusters?|importance|"
     r"z[-\s]?score|FDR|enrichment|NMF|LIANA|Decoupler|regions?)\b",
@@ -38,17 +42,17 @@ MECHANISTIC_HEDGE_RE = re.compile(
     re.IGNORECASE,
 )
 FACTOR_PATHWAY_POSITIVE_RE = re.compile(
-    r"\b(enriched|enrichment|activation|activated|active|higher|increased|positive(?:ly)?)\b",
+    r"\b(enriched|enrichments?|activations?|activated|active|higher|increased|positive(?:ly)?)\b",
     re.IGNORECASE,
 )
 FACTOR_PATHWAY_NEGATIVE_RE = re.compile(
-    r"\b(depleted|depletion|negative(?:ly)?|inverse(?:ly)?|lower|reduced|attenuated|suppressed)\b",
+    r"\b(depleted|depletions?|negative(?:ly)?|inverse(?:ly)?|lower|reduced|attenuated|suppressed)\b",
     re.IGNORECASE,
 )
 FACTOR_PATHWAY_NEGATED_DIRECTION_RE = re.compile(
     r"\b(?:no|not|without|lack|lacks|lacked|absent)\b(?:\s+\w+){0,2}\s+"
-    r"\b(?:enriched|enrichment|activation|activated|active|higher|increased|positive(?:ly)?|"
-    r"depleted|depletion|negative(?:ly)?|inverse(?:ly)?|lower|reduced|attenuated|suppressed)\b",
+    r"\b(?:enriched|enrichments?|activations?|activated|active|higher|increased|positive(?:ly)?|"
+    r"depleted|depletions?|negative(?:ly)?|inverse(?:ly)?|lower|reduced|attenuated|suppressed)\b",
     re.IGNORECASE,
 )
 FACTOR_CLUSTER_STATUS_RE = re.compile(
@@ -60,8 +64,8 @@ FACTOR_CLUSTER_STATUS_RE = re.compile(
     re.IGNORECASE,
 )
 FACTOR_PATHWAY_CLAIM_RE = re.compile(
-    r"\b(significant|significantly|enriched|enrichment|activation|activated|active|higher|increased|positive(?:ly)?|"
-    r"depleted|depletion|negative(?:ly)?|inverse(?:ly)?|lower|reduced|attenuated|suppressed)\b",
+    r"\b(significant|significantly|enriched|enrichments?|activations?|activated|active|higher|increased|positive(?:ly)?|"
+    r"depleted|depletions?|negative(?:ly)?|inverse(?:ly)?|lower|reduced|attenuated|suppressed)\b",
     re.IGNORECASE,
 )
 FACTOR_PATHWAY_CONNECTOR_RE = re.compile(r"\b(?:and|but|while|whereas)\b", re.IGNORECASE)
@@ -477,6 +481,11 @@ def _direction_flags(text: str) -> tuple[bool, bool]:
     return bool(FACTOR_PATHWAY_POSITIVE_RE.search(text)), bool(FACTOR_PATHWAY_NEGATIVE_RE.search(text))
 
 
+def _raw_direction_flags(text: str) -> tuple[bool, bool]:
+    text = FACTOR_PATHWAY_NEGATED_DIRECTION_RE.sub("", text)
+    return bool(FACTOR_PATHWAY_POSITIVE_RE.search(text)), bool(FACTOR_PATHWAY_NEGATIVE_RE.search(text))
+
+
 def _split_direction_gap(text: str) -> tuple[str, str]:
     matches = list(FACTOR_PATHWAY_CONNECTOR_RE.finditer(text))
     if not matches:
@@ -605,7 +614,26 @@ def _check_pathway_factor_claims(data_dir: Path, issues: list[dict[str, str]]) -
                     positive, negative = pathway_directions.get(pathway, (False, False))
                     if estimate is None:
                         continue
-                    if (estimate < 0 and positive and not negative) or (estimate > 0 and negative and not positive):
+                    mismatch = (estimate < 0 and positive) or (estimate > 0 and negative)
+                    raw_positive, raw_negative = _raw_direction_flags(local_window)
+                    ambiguous = (raw_positive and raw_negative) or len(pathways) > 1
+                    if not mismatch:
+                        mismatch = ambiguous and ((estimate < 0 and raw_positive) or (estimate > 0 and raw_negative))
+                    if not mismatch:
+                        continue
+                    if ambiguous:
+                        issues.append(
+                            _issue(
+                                code="factor_pathway_direction_ambiguous",
+                                severity="warning",
+                                file=path.name,
+                                section=str(section["heading"]),
+                                value=f"{factor_labels[factor]}: {pathway_labels[pathway]} estimate={estimate}",
+                                evidence="Mixed or multi-pathway wording prevents a high-confidence direction verdict.",
+                                repair_instruction="Leave unchanged and retain as an audit warning.",
+                            )
+                        )
+                    else:
                         issues.append(
                             _issue(
                                 code="factor_pathway_direction_mismatch",
@@ -646,7 +674,7 @@ def _check_part3_scope_and_pairs(data_dir: Path, issues: list[dict[str, str]]) -
     for section in _sections(text):
         body = str(section["body"])
         for window in _claim_windows(body):
-            if THERAPEUTIC_RE.search(window):
+            if THERAPEUTIC_RE.search(window) and not PART4_BOUNDARY_RE.search(window):
                 issues.append(
                     _issue(
                         code="part3_therapeutic_spillover",
