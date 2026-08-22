@@ -732,18 +732,13 @@ def test_repair_rejects_section_shaped_target_replacement(tmp_path: Path) -> Non
     assert report.read_text(encoding="utf-8") == original
 
 
-def test_repair_rewrites_unresolved_inline_citations_as_exact_claim(
+def test_repair_removes_grouped_failed_inline_pmids_without_llm(
     tmp_path: Path,
 ) -> None:
     original_claim = (
         "ERBB2 overexpression drives breast-cancer progression and "
         "NRG1-ERBB3 signaling broadly sustains circulating-tumor-cell survival "
         "(PMID: 28174229; PMID: 39753722)."
-    )
-    replacement = (
-        "ERBB2 overexpression is associated with breast-cancer progression "
-        "(PMID: 28174229), while NRG1-ERBB3 signaling was required for "
-        "circulating-tumor-cell survival in the cited model (PMID: 39753722)."
     )
     original = (
         "## Biology\n"
@@ -792,15 +787,18 @@ def test_repair_rewrites_unresolved_inline_citations_as_exact_claim(
         ),
         encoding="utf-8",
     )
-    llm = RepairDecisionLLM(replacement_text=replacement)
 
-    changed = repair_report.repair_report(tmp_path, issues_path, llm=llm)
+    changed = repair_report.repair_report(tmp_path, issues_path, llm=FailLLM())
 
     text = report.read_text(encoding="utf-8")
     assert changed == 1
-    assert llm.calls == 1
     assert original_claim not in text
-    assert replacement in text
+    assert "ERBB2 overexpression drives breast-cancer progression" in text
+    assert "NRG1-ERBB3 signaling broadly sustains circulating-tumor-cell survival" in text
+    interpretation = text.split("### References", maxsplit=1)[0]
+    assert "28174229" not in interpretation
+    assert "39753722" not in interpretation
+    assert "()" not in interpretation
     assert repair_report._markdown_headings(text) == [
         "## Biology",
         "### Context",
@@ -1054,12 +1052,12 @@ def test_repair_rejects_unsafe_exact_claim_replacements(
                 "issues": [
                     {
                         "severity": "error",
-                        "code": "inline_citation_unsupported",
+                        "code": "claim_rag_unsupported",
                         "file": "part2_final.md",
                         "section": "## Biology",
                         "source_claim_index": 1,
-                        "inline_pmid": "28174229",
                         "value": original_claim,
+                        "target_text": original_claim,
                     }
                 ]
             }
@@ -1436,6 +1434,53 @@ def test_repair_removes_multiple_unsupported_inline_pmids_when_sibling_supports(
     ) == 1
     repaired = (tmp_path / "part1_final.md").read_text(encoding="utf-8")
     assert repaired == "## Biology\nTGFB is associated with fibrosis (PMID: 11111111).\n"
+
+
+def test_repair_removes_sole_failed_prose_inline_pmid_without_llm(
+    tmp_path: Path,
+) -> None:
+    claim = "TGFB drives fibrosis (PMID: 22222222)."
+    (tmp_path / "part1_final.md").write_text(f"## Biology\n{claim}\n", encoding="utf-8")
+    issues_path = tmp_path / "issues.json"
+    issues_path.write_text(
+        json.dumps(
+            {
+                "issues": [
+                    {
+                        "severity": "error",
+                        "code": "inline_citation_overclaimed",
+                        "file": "part1_final.md",
+                        "section": "## Biology",
+                        "source_claim_index": 0,
+                        "inline_pmid": "22222222",
+                        "value": claim,
+                        "target_text": claim,
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    rows = [
+        {
+            "file": "part1_final.md",
+            "section": "## Biology",
+            "source_claim_index": 0,
+            "inline_pmid": "22222222",
+            "status": "overclaimed",
+        }
+    ]
+
+    assert repair_report.repair_report(
+        tmp_path,
+        issues_path,
+        llm=FailLLM(),
+        claim_validation=rows,
+    ) == 1
+    repaired = (tmp_path / "part1_final.md").read_text(encoding="utf-8")
+    assert "TGFB drives fibrosis" in repaired
+    assert "22222222" not in repaired
+    assert "()" not in repaired
 
 
 def test_repair_handles_hedged_failed_inline_pmid_when_sibling_supports(

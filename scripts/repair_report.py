@@ -308,8 +308,8 @@ def _repair_inline_citation_issues(
         and row.get("inline_pmid") not in failed_pmids
         for row in claim_validation
     )
-    if not sibling_supported:
-        return _delete_reference_only_inline_target(data_dir, first)
+    if not sibling_supported and _delete_reference_only_inline_target(data_dir, first):
+        return True
 
     repaired_value = value
     for issue in issues:

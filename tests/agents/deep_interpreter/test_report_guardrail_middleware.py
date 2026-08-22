@@ -924,7 +924,7 @@ def test_run_synthesis_guardrail_removes_only_unsupported_sibling_citation(
     assert final["inline_citation_coverage"]["coverage_complete"] is True
 
 
-def test_run_synthesis_guardrail_hedges_sole_unsupported_inline_citation(
+def test_run_synthesis_guardrail_removes_sole_failed_inline_pmid_without_model(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from src.agents.deep_interpreter import report_guardrails
@@ -946,22 +946,32 @@ def test_run_synthesis_guardrail_hedges_sole_unsupported_inline_citation(
     ) -> dict[str, Any]:
         assert filenames == ("synthesis.md",)
         text = (tmp_path / "synthesis.md").read_text(encoding="utf-8")
-        hedged = "hypothesis requiring validation" in text.lower()
+        has_failed_pmid = "PMID: 22222222" in text
         citation = {
             "file": "synthesis.md",
             "section": "## Cross-Part Themes",
             "source_claim_index": 0,
-            "inline_pmid": "22222222",
-            "claim": claim,
-            "status": "overclaimed" if not hedged else "supported",
+            "inline_pmid": "22222222" if has_failed_pmid else "",
+            "claim": claim if has_failed_pmid else "TGFB drives fibrosis.",
+            "status": "overclaimed",
             "supporting_pmids": [],
             "evidence_quote": "association only",
             "reason": "paper supports association only",
         }
         return {
             "claims": [citation],
-            "issues": []
-            if hedged
+            "issues": [
+                {
+                    "code": "claim_rag_overclaimed",
+                    "severity": "warning",
+                    "file": "synthesis.md",
+                    "section": "## Cross-Part Themes",
+                    "source_claim_index": 0,
+                    "value": "TGFB drives fibrosis.",
+                    "target_text": "TGFB drives fibrosis.",
+                }
+            ]
+            if not has_failed_pmid
             else [
                 {
                     "code": "inline_citation_overclaimed",
@@ -978,8 +988,8 @@ def test_run_synthesis_guardrail_hedges_sole_unsupported_inline_citation(
             "inline_citation_coverage": {
                 "expected_count": 1,
                 "evaluated_count": 1,
-                "supported_count": 1 if hedged else 0,
-                "coverage_complete": hedged,
+                "supported_count": 0,
+                "coverage_complete": not has_failed_pmid,
                 "citations": [citation],
             },
         }
@@ -990,18 +1000,22 @@ def test_run_synthesis_guardrail_hedges_sole_unsupported_inline_citation(
     monkeypatch.setattr(
         report_guardrails.repair_report_script,
         "_create_model",
-        lambda *_: StructuredRepairModel(
-            "TGFB is associated with fibrosis (PMID: 22222222). "
-            "This remains a hypothesis requiring validation."
-        ),
+        lambda *_: (_ for _ in ()).throw(AssertionError("model should not be called")),
     )
 
     result = report_guardrails.run_synthesis_guardrail(tmp_path, provider="ollama")
 
     synthesis = (tmp_path / "synthesis.md").read_text(encoding="utf-8")
+    final = json.loads(
+        (tmp_path / "synthesis_guardrail_final.json").read_text(encoding="utf-8")
+    )
     assert result["status"] == "passed"
-    assert "PMID: 22222222" in synthesis
-    assert "hypothesis requiring validation" in synthesis.lower()
+    assert result["final_error_count"] == 0
+    assert "TGFB drives fibrosis" in synthesis
+    assert "22222222" not in synthesis
+    assert "()" not in synthesis
+    assert not [issue for issue in final["issues"] if issue["severity"] == "error"]
+    assert any(issue["code"] == "claim_rag_overclaimed" for issue in final["issues"])
 
 
 def test_repair_synthesis_report_rewrites_explicit_inline_contradiction(
