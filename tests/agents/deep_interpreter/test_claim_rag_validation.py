@@ -171,7 +171,7 @@ def test_issue_severity_applies_hedged_warning_only_to_non_inline_claim_rag_issu
     assert issue["severity"] == expected_severity
 
 
-def test_non_inline_hard_claim_issue_targets_exact_claim() -> None:
+def test_non_inline_overclaim_is_warning_without_repair_target() -> None:
     issue = claim_rag_validation._issue_for(
         {
             "status": "overclaimed",

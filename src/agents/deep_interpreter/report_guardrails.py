@@ -18,7 +18,6 @@ REQUIRED_PART_FILES = (
 )
 SYNTHESIS_REQUIRED_FILES = ("papers.json", "synthesis.md")
 MAX_GUARDRAIL_REPAIR_PASSES = 3
-SYNTHESIS_GUARDRAIL_SENTENCE = "this remains a hypothesis requiring validation."
 SYNTHESIS_THERAPEUTIC_OVERCLAIM_RE = re.compile(
     r"\b(high-confidence therapeutic target|clinical prioritization|most effective|"
     r"would be particularly sensitive to|therapy[-\s]+resistant|treatment[-\s]+sensitive|"
@@ -172,13 +171,6 @@ def _first_non_empty_line(text: str) -> tuple[int, int, str] | None:
             return cursor, cursor + len(stripped_newline), stripped_newline
         cursor = end
     return None
-
-
-def _is_hedged_claim(claim: str, following: str = "") -> bool:
-    return bool(
-        validate_report_script.MECHANISTIC_HEDGE_RE.search(claim)
-        or SYNTHESIS_GUARDRAIL_SENTENCE in following.lower()
-    )
 
 
 def _is_negated_therapeutic_claim(claim: str) -> bool:
