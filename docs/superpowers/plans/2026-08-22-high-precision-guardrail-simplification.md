@@ -255,11 +255,15 @@ to replay/pristine temp directories. Run scoped Parts guardrail.
 Require:
 
 - hard errors 0;
-- repair attempts 0;
-- changed sections 0;
-- all three Part files byte-identical;
-- three direction cases retained as warnings;
+- accepted changes limited to exact validator-owned targets for explicit inline
+  citation unsupported/overclaimed errors;
+- all false-positive direction sentences byte-identical;
+- the Part4 boundary sentence byte-identical;
+- three unique direction warning values retained, allowing repeated occurrences
+  in different sections;
 - Part4 boundary sentence retained without spillover.
+- immediate second guardrail run: hard errors 0, repair attempts 0, changed
+  sections 0, and byte-identical to the first retained result.
 
 - [ ] **Step 2: Replay the historical corpus**
 

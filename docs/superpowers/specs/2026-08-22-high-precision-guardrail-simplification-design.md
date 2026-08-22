@@ -99,8 +99,9 @@ deterministic remains a rollback.
 
 ## Validation Strategy
 
-1. Exact current four false-positive claims become warnings/no-issues with zero
-   document changes.
+1. Exact current four false-positive claims become warnings/no-issues and remain
+   byte-identical; explicit inline citation hard errors may repair their own
+   exact targets.
 2. Injected opposite-sign claims remain hard errors.
 3. Explicit Part3 therapeutic recommendation remains hard while Part4 boundary
    meta-language passes.
@@ -120,7 +121,12 @@ deterministic remains a rollback.
 
 ## Acceptance
 
-- current failed no-SNI artifact: hard errors 0, repairs 0, byte-identical Parts;
+- current failed no-SNI artifact: final hard errors 0; accepted changes are
+  limited to exact validator-owned targets for explicit inline citation
+  unsupported/overclaimed errors; false-positive direction and Part4-boundary
+  claims remain byte-identical; three unique direction warning values are
+  retained; immediate second run has hard errors 0, repairs 0, changed sections
+  0, and is byte-identical;
 - metamorphic paraphrase set: false-positive hard errors 0;
 - injected contradiction set: all expected hard errors retained;
 - soft issues present in audit with severity warning and no repair target;
