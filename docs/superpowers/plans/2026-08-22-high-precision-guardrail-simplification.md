@@ -267,9 +267,22 @@ Require:
 
 - [ ] **Step 2: Replay the historical corpus**
 
-Run the existing inline/direction/table/HTML corpus. Require final hard errors 0,
+Run the existing inline/direction/table corpus. Require final hard errors 0,
 idempotence, and immutable sources. General semantic warnings may remain; explicit
 inline citation hard errors must still repair to zero.
+
+For the historical raw-HTML `synthesis.md` fixture, call
+`run_synthesis_guardrail` directly and require deterministic fail-closed
+evidence instead of repair success:
+
+- final hard error is exactly `synthesis_not_markdown`;
+- `synthesis.md` bytes are unchanged;
+- claim RAG validation and synthesis consistency validation do not run;
+- immediate second call returns the same hard rejection with identical bytes;
+- `changed_claims` is 0.
+
+Do not require repair attempts 0 if the controller records a bounded no-op
+attempt. HTML in `synthesis.md` remains blocked from runtime publication.
 
 - [ ] **Step 3: Run one fresh Part2/Part3-only smoke**
 

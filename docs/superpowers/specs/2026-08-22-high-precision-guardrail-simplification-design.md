@@ -106,9 +106,16 @@ deterministic remains a rollback.
 3. Explicit Part3 therapeutic recommendation remains hard while Part4 boundary
    meta-language passes.
 4. Explicit inline citation contradiction remains hard and repairable.
-5. Historical corpus remains final hard-error zero and idempotent.
-6. One fresh Part2/Part3 smoke yields zero false-positive hard errors.
-7. Only then run one fresh no-SNI → SNI pair.
+5. Historical inline/direction/table corpus remains final hard-error zero and
+   idempotent.
+6. Historical raw-HTML `synthesis.md` fixture fails closed through
+   `run_synthesis_guardrail`: the only final hard error is
+   `synthesis_not_markdown`; bytes are unchanged; claim RAG and synthesis
+   consistency validation do not run; an immediate second call returns the same
+   hard rejection with identical bytes; `changed_claims` is 0. A bounded no-op
+   repair attempt may be recorded.
+7. One fresh Part2/Part3 smoke yields zero false-positive hard errors.
+8. Only then run one fresh no-SNI → SNI pair.
 
 ## Non-Goals
 
@@ -130,5 +137,8 @@ deterministic remains a rollback.
 - metamorphic paraphrase set: false-positive hard errors 0;
 - injected contradiction set: all expected hard errors retained;
 - soft issues present in audit with severity warning and no repair target;
-- historical replay and fresh Part smoke pass;
+- historical inline/direction/table replay and fresh Part smoke pass;
+- historical raw-HTML synthesis replay stays blocked with exactly
+  `synthesis_not_markdown`, unchanged bytes, skipped claim/semantic validation,
+  repeatable second-call rejection, and `changed_claims` 0;
 - final no-SNI and SNI manifests pass under one reviewed HEAD.
