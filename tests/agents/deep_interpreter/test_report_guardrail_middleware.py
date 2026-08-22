@@ -968,7 +968,6 @@ def test_run_synthesis_guardrail_removes_sole_failed_inline_pmid_without_model(
                     "section": "## Cross-Part Themes",
                     "source_claim_index": 0,
                     "value": "TGFB drives fibrosis.",
-                    "target_text": "TGFB drives fibrosis.",
                 }
             ]
             if not has_failed_pmid
@@ -1015,7 +1014,9 @@ def test_run_synthesis_guardrail_removes_sole_failed_inline_pmid_without_model(
     assert "22222222" not in synthesis
     assert "()" not in synthesis
     assert not [issue for issue in final["issues"] if issue["severity"] == "error"]
-    assert any(issue["code"] == "claim_rag_overclaimed" for issue in final["issues"])
+    warnings = [issue for issue in final["issues"] if issue["code"] == "claim_rag_overclaimed"]
+    assert warnings
+    assert all("target_text" not in issue for issue in warnings)
 
 
 def test_repair_synthesis_report_rewrites_explicit_inline_contradiction(
