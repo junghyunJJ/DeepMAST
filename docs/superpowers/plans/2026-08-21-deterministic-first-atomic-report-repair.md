@@ -21,7 +21,7 @@
 - Preserve the three regular repair attempts and the bounded newly-surfaced terminal repair.
 - Do not weaken validators, hard-code phrase replacements, or skip Claim-RAG.
 - Add no dependency, Markdown framework, repair framework, or runner resume subsystem.
-- Preserve Markdown headings, existing PMIDs, unrelated table rows, and source artifacts, except for validator-owned synthesis title repair that promotes only the first H2-H6 heading marker to H1 while preserving heading text and all remaining headings.
+- Preserve Markdown heading level and position, existing PMIDs, unrelated table rows, and source artifacts. Validator-owned semantic heading repair may change only exact targeted H2-H6 heading text; validator-owned synthesis title repair remains the sole level change and may promote only the first H2-H6 marker to H1 without changing its text.
 - Use ports 4000/6000, API 8883, model `qwen3.5:122b`, fixed collection UUID `a208e916-bd32-405a-9eee-de4cd82b2a3b`, 100 documents, and 1,553 chunks for live verification.
 - Run pair 05 globally serial, no-SNI first; SNI starts only after no-SNI passes.
 - Follow RED → GREEN TDD and Lore commit trailers.
@@ -1046,13 +1046,27 @@ def content_manifest(directory: Path) -> dict[str, str]:
     }
 
 
-def headings(paths: list[Path]) -> list[str]:
+def heading_layout(paths: list[Path]) -> list[tuple[str, int, str]]:
     return [
-        line.strip()
+        (path.name, line_number, match.group(1))
         for path in paths
-        for line in path.read_text(encoding="utf-8").splitlines()
-        if line.startswith("#")
+        for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines())
+        if (match := re.match(r"^(#{1,6})\s+", line))
     ]
+
+
+def safe_heading_layout(
+    before: list[tuple[str, int, str]],
+    after: list[tuple[str, int, str]],
+) -> bool:
+    if len(before) != len(after):
+        return False
+    for index, (old, new) in enumerate(zip(before, after)):
+        if old[:2] != new[:2]:
+            return False
+        if old[2] != new[2] and not (index == 0 and 2 <= len(old[2]) <= 6 and new[2] == "#"):
+            return False
+    return True
 
 
 def pmids(paths: list[Path]) -> set[str]:
@@ -1109,7 +1123,7 @@ for label, (source, lane) in cases.items():
     for filename in stale:
         (replay / filename).unlink(missing_ok=True)
 
-    heading_before = headings(target_paths)
+    heading_layout_before = heading_layout(target_paths)
     pmids_before = pmids(target_paths)
     table_rows_before = sum(
         line.strip().startswith("|")
@@ -1133,7 +1147,7 @@ for label, (source, lane) in cases.items():
     assert second["repair_attempt_count"] == 0, (label, second)
     assert second[changed_key] == 0, (label, second)
     assert retained == {path.name: path.read_bytes() for path in target_paths}
-    assert headings(target_paths) == heading_before
+    assert safe_heading_layout(heading_layout_before, heading_layout(target_paths))
     assert pmids(target_paths).issubset(pmids_before)
     if lane == "synthesis":
         table_rows_after = sum(
@@ -1256,7 +1270,8 @@ diff -qr "$html_source" "$html_pristine_dir"
 
 For every replay:
 
-- compare heading sequences before/after;
+- compare heading levels and positions before/after while allowing validator-owned
+  exact heading text replacement;
 - assert repaired PMID set is a subset of the original PMID set;
 - compare table row count before/after for the table case;
 - assert no repeated identical caveat lines;
@@ -1348,7 +1363,8 @@ For no-SNI and SNI require:
 - Parts final hard errors 0;
 - synthesis final hard errors 0;
 - second offline guardrail invocation changes 0;
-- Markdown headings preserved and no HTML fragments in `synthesis.md`;
+- Markdown heading levels/positions preserved, validator-owned targeted heading
+  text changes allowed, and no HTML fragments in `synthesis.md`;
 - no new PMID;
 - fixed collection/source identity;
 - safe repair metrics and audit;

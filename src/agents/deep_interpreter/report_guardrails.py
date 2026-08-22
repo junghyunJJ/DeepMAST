@@ -438,6 +438,51 @@ def _repair_synthesis_title(data_dir: Path, issue: dict[str, str]) -> bool:
     return True
 
 
+def _repair_synthesis_semantic_heading(
+    data_dir: Path,
+    issue: dict[str, str],
+    *,
+    provider: str | None,
+) -> bool | None:
+    target = issue.get("target_text") or ""
+    match = SYNTHESIS_H2_H6_RE.fullmatch(target)
+    if (
+        issue.get("code") != "unsupported_synthesis_overclaim"
+        or issue.get("file") != "synthesis.md"
+        or match is None
+    ):
+        return None
+
+    path = data_dir / "synthesis.md"
+    text = path.read_text(encoding="utf-8")
+    spans = [
+        found.span()
+        for found in re.finditer(rf"(?m)^{re.escape(target)}(?=\r?$)", text)
+    ]
+    if len(spans) != 1:
+        return False
+
+    body = match.group(2).strip()
+    model = repair_report_script._create_model(provider)
+    try:
+        decision = repair_report_script._invoke_repair_decision(model, [issue], body)
+    except (repair_report_script.ValidationError, TypeError, ValueError):
+        return False
+    replacement = decision.replacement_text.strip()
+    if (
+        decision.action != "replace"
+        or "\n" in replacement
+        or "\r" in replacement
+        or not repair_report_script._safe_semantic_decision(body, decision)
+    ):
+        return False
+
+    start, end = spans[0]
+    repaired_heading = f"{match.group(1)} {replacement}"
+    path.write_text(text[:start] + repaired_heading + text[end:], encoding="utf-8")
+    return True
+
+
 def repair_synthesis_report(
     data_dir: str | Path,
     issues: list[dict[str, str]],
@@ -456,6 +501,15 @@ def repair_synthesis_report(
             continue
         if _repair_synthesis_title(data_dir, issue):
             changed_claims += 1
+            handled_issue_ids.add(id(issue))
+            continue
+        heading_changed = _repair_synthesis_semantic_heading(
+            data_dir,
+            issue,
+            provider=provider,
+        )
+        if heading_changed is not None:
+            changed_claims += int(heading_changed)
             handled_issue_ids.add(id(issue))
             continue
         if repair_report_script._repair_inline_citation_issue(

@@ -75,17 +75,20 @@ def _write_consistency_guardrail_fixture(data_dir: Path, synthesis: str) -> None
 
 
 class StructuredRepairModel:
-    def __init__(self, replacement_text: str) -> None:
+    def __init__(self, replacement_text: str, action: str = "replace") -> None:
         self.replacement_text = replacement_text
+        self.action = action
         self.schema = None
+        self.prompts: list[str] = []
 
     def with_structured_output(self, schema: Any, **_kwargs: Any) -> "StructuredRepairModel":
         self.schema = schema
         return self
 
-    def invoke(self, _prompt: str) -> Any:
+    def invoke(self, prompt: str) -> Any:
         assert self.schema is not None
-        return self.schema(action="replace", replacement_text=self.replacement_text)
+        self.prompts.append(prompt)
+        return self.schema(action=self.action, replacement_text=self.replacement_text)
 
 
 def test_run_report_guardrail_skips_when_parts_are_incomplete(
@@ -479,6 +482,121 @@ def test_synthesis_guardrail_promotes_first_heading_to_h1_idempotently(
     assert second["repair_attempt_count"] == 0
     assert second["changed_claims"] == 0
     assert (tmp_path / "synthesis.md").read_bytes() == after_first
+
+
+def test_synthesis_guardrail_repairs_targeted_semantic_heading_idempotently(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    heading = "### Theme 4: Therapeutic Target Prioritization Based on Spatial and Molecular Evidence"
+    replacement = "Theme 4: Spatial and Molecular Associations"
+    original = (
+        "# Integrated Biological Narrative\n\n"
+        "## Overview\n\n"
+        "Stable context.\n\n"
+        f"{heading}\n\n"
+        "Evidence remains observational.\n\n"
+        "## Limitations\n\n"
+        "No direct mechanism was established.\n"
+    )
+    expected = original.replace(heading, f"### {replacement}", 1)
+    (tmp_path / "papers.json").write_text('{"papers": []}', encoding="utf-8")
+    (tmp_path / "synthesis.md").write_text(original, encoding="utf-8")
+    model = StructuredRepairModel(replacement)
+    monkeypatch.setattr(report_guardrails.repair_report_script, "_create_model", lambda *_: model)
+
+    first = report_guardrails.run_synthesis_guardrail(tmp_path, provider="ollama")
+    first_initial = json.loads(
+        (tmp_path / "synthesis_guardrail_initial.json").read_text(encoding="utf-8")
+    )
+    after_first = (tmp_path / "synthesis.md").read_bytes()
+    second = report_guardrails.run_synthesis_guardrail(tmp_path, provider="ollama")
+
+    assert first["status"] == "passed"
+    assert first["initial_error_count"] == 1
+    assert first["final_error_count"] == 0
+    assert first["changed_claims"] == 1
+    assert first_initial["phase"] == "deterministic"
+    assert first_initial["issues"][0]["target_text"] == heading
+    assert after_first == expected.encode("utf-8")
+    assert expected.splitlines().index(f"### {replacement}") == original.splitlines().index(heading)
+    assert [line for line in expected.splitlines() if line.startswith("#")] == [
+        "# Integrated Biological Narrative",
+        "## Overview",
+        f"### {replacement}",
+        "## Limitations",
+    ]
+    assert model.prompts[0].endswith(f"Claim:\n{heading.removeprefix('### ').strip()}")
+    assert second["status"] == "passed"
+    assert second["initial_error_count"] == 0
+    assert second["repair_attempt_count"] == 0
+    assert second["changed_claims"] == 0
+    assert (tmp_path / "synthesis.md").read_bytes() == after_first
+
+
+def test_synthesis_guardrail_rejects_targeted_semantic_heading_delete(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    heading = "### Therapeutic Target Prioritization from Spatial Evidence"
+    original = f"# Integrated Biological Narrative\n\n{heading}\n\nStable context.\n"
+    (tmp_path / "papers.json").write_text('{"papers": []}', encoding="utf-8")
+    (tmp_path / "synthesis.md").write_bytes(original.encode("utf-8"))
+    model = StructuredRepairModel("", action="delete")
+    monkeypatch.setattr(report_guardrails.repair_report_script, "_create_model", lambda *_: model)
+
+    result = report_guardrails.run_synthesis_guardrail(tmp_path, provider="ollama")
+
+    assert result["status"] == "failed"
+    assert result["repair_attempt_count"] == 1
+    assert result["changed_claims"] == 0
+    assert result["final_error_count"] == 1
+    assert (tmp_path / "synthesis.md").read_bytes() == original.encode("utf-8")
+    assert len(model.prompts) == 1
+    assert model.prompts[0].endswith(
+        "Claim:\nTherapeutic Target Prioritization from Spatial Evidence"
+    )
+
+
+@pytest.mark.parametrize(
+    "replacement",
+    [
+        "",
+        "Spatial association\nAdditional interpretation",
+        "#### Spatial Association",
+        "Spatial association (PMID: 12345678)",
+    ],
+)
+def test_repair_synthesis_report_rejects_unsafe_semantic_heading_replacement(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    replacement: str,
+) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    heading = "### Therapeutic Target Prioritization from Spatial Evidence"
+    original = f"# Integrated Biological Narrative\n\n{heading}\n\nStable context.\n"
+    synthesis = tmp_path / "synthesis.md"
+    synthesis.write_bytes(original.encode("utf-8"))
+    issue = {
+        "code": "unsupported_synthesis_overclaim",
+        "severity": "error",
+        "file": "synthesis.md",
+        "section": "",
+        "value": heading,
+        "target_text": heading,
+        "evidence": "No direct therapeutic validation was provided.",
+        "repair_instruction": "Rewrite as association or hypothesis.",
+    }
+    model = StructuredRepairModel(replacement)
+    monkeypatch.setattr(report_guardrails.repair_report_script, "_create_model", lambda *_: model)
+
+    assert report_guardrails.repair_synthesis_report(tmp_path, [issue], provider="ollama") == 0
+    assert synthesis.read_bytes() == original.encode("utf-8")
 
 
 def test_synthesis_table_overclaim_targets_only_the_offending_row(tmp_path: Path) -> None:

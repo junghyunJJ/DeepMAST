@@ -129,10 +129,11 @@ order no-SNI → SNI.
 ## Safety Invariants
 
 - Exact `target_text` splicing remains mandatory.
-- Markdown heading sequence is unchanged by repair except for the validator-owned
-  synthesis title rule: when the first non-empty line is an H2-H6 heading, the
-  deterministic repair may promote only that heading marker to H1 while
-  preserving its text. All remaining headings and heading text stay unchanged.
+- Markdown heading level and position are unchanged by repair. Validator-owned
+  semantic repair may replace only the text of an exact targeted H2-H6 heading.
+  The validator-owned synthesis title rule remains the sole level change: when
+  the first non-empty line is an H2-H6 heading, deterministic repair may promote
+  only that marker to H1 while preserving its text.
 - No new PMID may appear.
 - Existing table row count is preserved unless the validator explicitly owns a
   complete-row deletion target.
@@ -168,8 +169,8 @@ Performance acceptance is behavioral rather than tied to network timing:
 3. Resolving the last deterministic error advances to semantic validation even
    when semantic errors are newly revealed.
 4. A valid association/hypothesis candidate reaches `1 → 0` within its active
-   phase without changing
-   headings, PMIDs, or unrelated table rows.
+   phase without changing heading levels/positions, PMIDs, or unrelated table
+   rows; validator-owned exact semantic heading text may change.
 5. Parts and synthesis both defer Claim-RAG until deterministic hard errors are
    zero.
 6. Rejected mutations do not contribute to changed counts.

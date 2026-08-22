@@ -32,6 +32,43 @@ Final verification:
 Concern:
 - Existing LangGraph deprecation warning remains pre-existing: `config_schema` is deprecated in `src/base/base_agent.py:129`.
 
+## Fix round 4
+
+Status: implemented and verified.
+
+Reviewer finding:
+- Deterministic `unsupported_synthesis_overclaim` could target an exact H2-H6 Markdown heading, but generic repair correctly rejected every heading-text change and left the hard error unresolved.
+
+Covering tests:
+- Added a production-shaped H3 structured replacement test proving deterministic `1 → 0`, retained-change accounting, unchanged heading level/position and surrounding content, and second-run idempotence.
+- Added structured delete rejection with byte-exact retention and the hard error preserved.
+- Added empty, multiline, Markdown-heading, and new-PMID replacement rejection cases.
+
+RED evidence:
+- `OPENAI_API_KEY=test LANGCHAIN_TRACING_V2=false uv run pytest -q tests/agents/deep_interpreter/test_report_guardrail_middleware.py::test_synthesis_guardrail_repairs_targeted_semantic_heading_idempotently tests/agents/deep_interpreter/test_report_guardrail_middleware.py::test_synthesis_guardrail_rejects_targeted_semantic_heading_delete tests/agents/deep_interpreter/test_report_guardrail_middleware.py::test_repair_synthesis_report_rejects_unsafe_semantic_heading_replacement`
+- Output before implementation: `2 failed, 4 passed, 1 warning`.
+- Failures showed the H3 remained unresolved and the delete decision never received the stripped heading body.
+
+Change:
+- Added a trusted pre-generic handler only for exact targeted `unsupported_synthesis_overclaim` H2-H6 headings in `synthesis.md`.
+- The handler sends only the stripped heading body through the existing structured `RepairDecision` prompt and semantic safety check, accepts only a safe single-line `replace`, reconstructs the original heading prefix, and exact-splices the unique targeted line.
+- Rejected recognized heading decisions are consumed before generic repair, retain original bytes, and contribute no changed metric.
+- Updated tracked plan/spec invariants and replay layout checks to allow validator-owned semantic heading text changes while preserving level/position; H1 title promotion remains the sole level change.
+
+Focused verification:
+- New heading tests -> `6 passed, 1 warning`.
+- H1, HTML, table rollback/idempotence, semantic frontier, and CRLF preservation set -> `14 passed, 1 warning`.
+- Middleware suite -> `61 passed, 1 warning`.
+
+Final verification:
+- `OPENAI_API_KEY=test LANGCHAIN_TRACING_V2=false uv run pytest -q tests/agents/deep_interpreter/test_report_guardrail_middleware.py tests/agents/deep_interpreter/test_claim_rag_validation.py tests/scripts/test_validate_report.py tests/scripts/test_validate_repair_report.py tests/scripts/test_repair_report.py tests/deep_interpreter/test_comprehensive_template_report.py` -> `232 passed, 1 warning`.
+- `uv run ruff check src/agents/deep_interpreter/report_guardrails.py tests/agents/deep_interpreter/test_report_guardrail_middleware.py` -> `All checks passed!`
+- `uv run python -m py_compile src/agents/deep_interpreter/report_guardrails.py tests/agents/deep_interpreter/test_report_guardrail_middleware.py` -> exit 0.
+- `git diff --check` -> exit 0.
+
+Concern:
+- Existing LangGraph deprecation warning remains pre-existing: `config_schema` is deprecated in `src/base/base_agent.py:129`.
+
 ## Fix round 3
 
 Status: implemented and verified.
