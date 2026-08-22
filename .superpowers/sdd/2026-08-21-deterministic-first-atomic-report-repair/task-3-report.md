@@ -32,6 +32,38 @@ Final verification:
 Concern:
 - Existing LangGraph deprecation warning remains pre-existing: `config_schema` is deprecated in `src/base/base_agent.py:129`.
 
+## Fix round 5
+
+Status: implemented and verified.
+
+Reviewer finding:
+- Accepted trusted semantic-heading replacement rebuilt the heading with one literal space, changing valid noncanonical separators such as multiple spaces or a tab.
+
+Covering test:
+- Added an H4 tab-separator regression proving the accepted repair changes only the heading body bytes, preserves the exact marker and separator bytes, and remains idempotent on the second guardrail run.
+
+RED evidence:
+- `OPENAI_API_KEY=test LANGCHAIN_TRACING_V2=false uv run pytest -q tests/agents/deep_interpreter/test_report_guardrail_middleware.py::test_synthesis_guardrail_preserves_semantic_heading_separator_bytes`
+- Output before implementation: `1 failed, 1 warning`.
+- The repair resolved the hard error, but byte comparison failed exactly where the original tab had been replaced by a space.
+
+Change:
+- Split the existing H2-H6 match into marker, exact whitespace separator, and body captures.
+- The trusted handler still validates only the stripped body and keeps the same unique exact splice and rejection paths, but now reconstructs accepted headings with the original marker and separator bytes.
+- Updated the existing H1 promotion reconstruction for the new capture shape without changing its behavior.
+
+Focused verification:
+- New separator regression plus existing trusted heading/title accept and reject paths -> `8 passed, 1 warning`.
+
+Final verification:
+- `OPENAI_API_KEY=test LANGCHAIN_TRACING_V2=false uv run pytest -q tests/agents/deep_interpreter/test_report_guardrail_middleware.py tests/agents/deep_interpreter/test_claim_rag_validation.py tests/scripts/test_validate_report.py tests/scripts/test_validate_repair_report.py tests/scripts/test_repair_report.py tests/deep_interpreter/test_comprehensive_template_report.py` -> `233 passed, 1 warning`.
+- `uv run ruff check src/agents/deep_interpreter/report_guardrails.py tests/agents/deep_interpreter/test_report_guardrail_middleware.py` -> `All checks passed!`
+- `uv run python -m py_compile src/agents/deep_interpreter/report_guardrails.py tests/agents/deep_interpreter/test_report_guardrail_middleware.py` -> exit 0.
+- `git diff --check` -> exit 0.
+
+Concern:
+- Existing LangGraph deprecation warning remains pre-existing: `config_schema` is deprecated in `src/base/base_agent.py:129`.
+
 ## Fix round 4
 
 Status: implemented and verified.

@@ -536,6 +536,41 @@ def test_synthesis_guardrail_repairs_targeted_semantic_heading_idempotently(
     assert (tmp_path / "synthesis.md").read_bytes() == after_first
 
 
+def test_synthesis_guardrail_preserves_semantic_heading_separator_bytes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    marker_and_separator = "####\t"
+    body = "Therapeutic Target Prioritization from Spatial Evidence"
+    replacement = "Spatial Evidence Associations"
+    heading = marker_and_separator + body
+    original = f"# Integrated Biological Narrative\n\n{heading}\n\nStable context.\n"
+    expected = original.replace(body, replacement, 1)
+    (tmp_path / "papers.json").write_text('{"papers": []}', encoding="utf-8")
+    (tmp_path / "synthesis.md").write_bytes(original.encode("utf-8"))
+    model = StructuredRepairModel(replacement)
+    monkeypatch.setattr(report_guardrails.repair_report_script, "_create_model", lambda *_: model)
+
+    first = report_guardrails.run_synthesis_guardrail(tmp_path, provider="ollama")
+    after_first = (tmp_path / "synthesis.md").read_bytes()
+    second = report_guardrails.run_synthesis_guardrail(tmp_path, provider="ollama")
+
+    assert first["status"] == "passed"
+    assert first["initial_error_count"] == 1
+    assert first["final_error_count"] == 0
+    assert first["changed_claims"] == 1
+    assert after_first == expected.encode("utf-8")
+    assert marker_and_separator.encode("utf-8") in after_first
+    assert model.prompts[0].endswith(f"Claim:\n{body}")
+    assert second["status"] == "passed"
+    assert second["initial_error_count"] == 0
+    assert second["repair_attempt_count"] == 0
+    assert second["changed_claims"] == 0
+    assert (tmp_path / "synthesis.md").read_bytes() == after_first
+
+
 def test_synthesis_guardrail_rejects_targeted_semantic_heading_delete(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

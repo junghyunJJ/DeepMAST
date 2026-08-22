@@ -37,7 +37,7 @@ SYNTHESIS_HTML_FRAGMENT_RE = re.compile(
     re.IGNORECASE | re.MULTILINE,
 )
 SYNTHESIS_H1_RE = re.compile(r"^#\s+\S.*$")
-SYNTHESIS_H2_H6_RE = re.compile(r"^(#{2,6})(\s+\S.*)$")
+SYNTHESIS_H2_H6_RE = re.compile(r"^(#{2,6})(\s+)(\S.*)$")
 EXPLICIT_INLINE_CONTRADICTION_RE = re.compile(
     r"\b(contradict|incorrectly states)\b",
     re.IGNORECASE,
@@ -299,7 +299,7 @@ def validate_synthesis_report(data_dir: str | Path) -> list[dict[str, str]]:
                     evidence="REPORTER must start synthesis.md with a Markdown H1 title.",
                     repair_instruction="Promote the first Markdown heading to H1 without changing its text.",
                     target_text=first_line[2] if match else "",
-                    replacement_text=f"#{match.group(2)}" if match else "",
+                    replacement_text=f"#{match.group(2)}{match.group(3)}" if match else "",
                 )
             )
 
@@ -462,7 +462,7 @@ def _repair_synthesis_semantic_heading(
     if len(spans) != 1:
         return False
 
-    body = match.group(2).strip()
+    body = match.group(3).strip()
     model = repair_report_script._create_model(provider)
     try:
         decision = repair_report_script._invoke_repair_decision(model, [issue], body)
@@ -478,7 +478,7 @@ def _repair_synthesis_semantic_heading(
         return False
 
     start, end = spans[0]
-    repaired_heading = f"{match.group(1)} {replacement}"
+    repaired_heading = f"{match.group(1)}{match.group(2)}{replacement}"
     path.write_text(text[:start] + repaired_heading + text[end:], encoding="utf-8")
     return True
 
