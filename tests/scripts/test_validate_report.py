@@ -844,6 +844,122 @@ def test_lr_metric_mismatches_in_one_sentence_emit_distinct_targets(tmp_path: Pa
     assert flagged[0]["target_text"] != flagged[1]["target_text"]
 
 
+def _write_multi_pair_lr_fixture(tmp_path: Path, sentence: str) -> None:
+    _write_json(tmp_path / "papers.json", [])
+    _write_csv(
+        tmp_path / "sig_liana.csv",
+        [
+            {
+                "interaction": "CDH1^ERBB3",
+                "ligand": "CDH1",
+                "receptor": "ERBB3",
+                "morans": 0.47670004,
+                "genept_score": 0.6969726,
+                "combinedscore": 0.8140706,
+            },
+            {
+                "interaction": "LRIG1^ERBB2",
+                "ligand": "LRIG1",
+                "receptor": "ERBB2",
+                "morans": 0.42133662,
+                "genept_score": 0.7194545,
+                "combinedscore": 0.6365551,
+            },
+            {
+                "interaction": "LRIG1^ERBB3",
+                "ligand": "LRIG1",
+                "receptor": "ERBB3",
+                "morans": 0.3629111,
+                "genept_score": 0.7424312,
+                "combinedscore": 0.7498696,
+            },
+            {
+                "interaction": "LAMA5^BCAM",
+                "ligand": "LAMA5",
+                "receptor": "BCAM",
+                "morans": 0.41454938,
+                "genept_score": 0.694878,
+                "combinedscore": 0.6518967,
+            },
+            {
+                "interaction": "LAMA5^ITGB4",
+                "ligand": "LAMA5",
+                "receptor": "ITGB4",
+                "morans": 0.32653028,
+                "genept_score": 0.8060464,
+                "combinedscore": 0.7170684,
+            },
+        ],
+    )
+    (tmp_path / "part2_final.md").write_text(
+        "## Analysis 2-6: LIANA Moran's R\n"
+        "### Biological Interpretation\n"
+        f"{sentence}\n",
+        encoding="utf-8",
+    )
+
+
+def test_allows_correct_respectively_mapped_lr_metrics(tmp_path: Path) -> None:
+    sentences = [
+        (
+            "The LRIG1-ERBB2 and LRIG1-ERBB3 pairs show substantial spatial "
+            "co-localization (Moran's R = 0.4213 and 0.3629, respectively)."
+        ),
+        (
+            "The LAMA5-ITGB4 and LAMA5-BCAM interactions "
+            "(Moran's R = 0.3265 and 0.4145, respectively)."
+        ),
+        (
+            "CDH1-ERBB3 (combined score = 0.8141) and LRIG1-ERBB3 "
+            "(combined score = 0.7499) have strong spatial co-localization "
+            "(Moran's R = 0.477 and 0.363, respectively)."
+        ),
+    ]
+
+    for index, sentence in enumerate(sentences):
+        case_dir = tmp_path / str(index)
+        case_dir.mkdir()
+        _write_multi_pair_lr_fixture(case_dir, sentence)
+        issues = validate_report.validate_report(case_dir)
+        assert not [issue for issue in issues if issue["code"] == "lr_metric_value_mismatch"]
+
+
+def test_respectively_mapped_lr_mismatch_emits_one_atomic_replacement(tmp_path: Path) -> None:
+    _write_multi_pair_lr_fixture(
+        tmp_path,
+        (
+            "LRIG1-ERBB2 and LRIG1-ERBB3 pairs show "
+            "Moran's R = 0.4213 and 0.4000, respectively."
+        ),
+    )
+
+    issues = validate_report.validate_report(tmp_path)
+
+    flagged = [issue for issue in issues if issue["code"] == "lr_metric_value_mismatch"]
+    assert len(flagged) == 1
+    assert flagged[0]["target_text"] == "Moran's R = 0.4213 and 0.4000, respectively"
+    assert flagged[0]["replacement_text"] == "Moran's R = 0.4213 and 0.3629, respectively"
+
+
+def test_warns_without_repair_when_multi_pair_metric_alignment_is_ambiguous(
+    tmp_path: Path,
+) -> None:
+    _write_multi_pair_lr_fixture(
+        tmp_path,
+        "LRIG1-ERBB2 and LRIG1-ERBB3 have Moran's R = 0.4213.",
+    )
+
+    issues = validate_report.validate_report(tmp_path)
+
+    assert not [issue for issue in issues if issue["code"] == "lr_metric_value_mismatch"]
+    warning = next(
+        issue for issue in issues if issue["code"] == "lr_metric_alignment_ambiguous"
+    )
+    assert warning["severity"] == "warning"
+    assert "target_text" not in warning
+    assert "replacement_text" not in warning
+
+
 def test_flags_lr_metric_value_mismatch_in_part3(tmp_path: Path) -> None:
     _write_json(tmp_path / "papers.json", [])
     _write_csv(
