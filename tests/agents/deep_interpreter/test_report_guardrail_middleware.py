@@ -1019,7 +1019,7 @@ def test_run_synthesis_guardrail_removes_sole_failed_inline_pmid_without_model(
     assert all("target_text" not in issue for issue in warnings)
 
 
-def test_repair_synthesis_report_rewrites_explicit_inline_contradiction(
+def test_repair_synthesis_report_uses_exact_evidence_fallback_for_explicit_inline_contradiction(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from src.agents.deep_interpreter import report_guardrails
@@ -1041,17 +1041,19 @@ def test_repair_synthesis_report_rewrites_explicit_inline_contradiction(
         }
     ]
 
-    model = SimpleNamespace(
-        invoke=lambda _prompt: (
-            "Higher LAMA5 expression was associated with better recurrence-free "
-            "survival (PMID: 40694271). This remains a hypothesis requiring validation."
-        )
-    )
-    monkeypatch.setattr(report_guardrails.repair_report_script, "_create_model", lambda *_: model)
+    model_call_count = 0
+
+    def create_model(*_args: Any) -> Any:
+        nonlocal model_call_count
+        model_call_count += 1
+        return SimpleNamespace(invoke=lambda _prompt: "unreachable")
+
+    monkeypatch.setattr(report_guardrails.repair_report_script, "_create_model", create_model)
 
     assert report_guardrails.repair_synthesis_report(tmp_path, issues) == 1
     text = (tmp_path / "synthesis.md").read_text(encoding="utf-8")
-    assert "better recurrence-free survival (PMID: 40694271)" in text
+    assert model_call_count == 0
+    assert "Higher LAMA5 expression was associated with better recurrence-free survival" in text
     assert "This remains a hypothesis requiring validation." in text
     assert "worse recurrence-free survival" not in text
 
@@ -1370,7 +1372,7 @@ def test_run_synthesis_guardrail_repairs_claim_rag_inline_contradiction(
     )
     text = (tmp_path / "synthesis.md").read_text(encoding="utf-8")
     assert repair_model_call_count == 0
-    assert repair_model_providers == ["ollama"]
+    assert repair_model_providers == []
     assert result["status"] == "passed"
     assert result["repair_attempt_count"] == 1
     contradiction = next(
@@ -1684,12 +1686,9 @@ def test_run_synthesis_guardrail_terminally_repairs_new_final_error(
         _claim_validation: list[dict[str, Any]] | None = None,
         *,
         provider: str | None = None,
-        deterministic_contradictions: bool = False,
     ) -> int:
         _ = provider
         repaired_issue_batches.append(issues)
-        if len(repaired_issue_batches) == 4:
-            assert deterministic_contradictions is True
         return 1
 
     monkeypatch.setattr(report_guardrails, "_validate_synthesis_guardrails", fake_validate)

@@ -340,9 +340,6 @@ def _exact_evidence_fallback(pmid: str, evidence_quote: str) -> str:
 def _repair_explicit_inline_contradiction(
     data_dir: Path,
     issue: dict[str, str],
-    *,
-    provider: str | None = None,
-    deterministic_only: bool = False,
 ) -> bool:
     if issue.get("code") != "inline_citation_overclaimed":
         return False
@@ -364,28 +361,7 @@ def _repair_explicit_inline_contradiction(
     if claim_at < 0:
         return False
 
-    replacement = ""
-    if not deterministic_only:
-        prompt = f"""Rewrite only this claim using the supplied evidence quote and the exact PMID.
-Keep only facts explicitly stated in the quote. Preserve PMID: {pmid} on the factual sentence.
-Move any unsupported mechanism, prognosis extension, or therapeutic implication to exactly:
-This remains a hypothesis requiring validation.
-Return complete Markdown replacement text only.
-
-Claim:
-{claim}
-
-Evidence quote:
-{evidence_quote}
-"""
-        try:
-            model = repair_report_script._create_model(provider)
-            replacement = repair_report_script._content(model.invoke(prompt)).strip()
-        except Exception:
-            replacement = ""
-
-    if not replacement or pmid not in replacement:
-        replacement = _exact_evidence_fallback(pmid, evidence_quote)
+    replacement = _exact_evidence_fallback(pmid, evidence_quote)
     if not replacement:
         return False
     path.write_text(text[:claim_at] + replacement + text[claim_at + len(claim) :], encoding="utf-8")
@@ -415,7 +391,6 @@ def repair_synthesis_report(
     claim_validation: list[dict[str, Any]] | None = None,
     *,
     provider: str | None = None,
-    deterministic_contradictions: bool = False,
 ) -> int:
     data_dir = Path(data_dir).expanduser().resolve()
     changed_claims = 0
@@ -437,12 +412,7 @@ def repair_synthesis_report(
             changed_claims += 1
             handled_issue_ids.add(id(issue))
             continue
-        if _repair_explicit_inline_contradiction(
-            data_dir,
-            issue,
-            provider=provider,
-            deterministic_only=deterministic_contradictions,
-        ):
+        if _repair_explicit_inline_contradiction(data_dir, issue):
             changed_claims += 1
             handled_issue_ids.add(id(issue))
 
@@ -822,7 +792,6 @@ def run_synthesis_guardrail(data_dir: str | Path, *, provider: str | None = None
             current_issues,
             current_claims,
             provider=provider,
-            deterministic_contradictions=repair_attempt_count > 0,
         )
         repair_attempt_count += 1
         if changed == 0:
@@ -881,7 +850,6 @@ def run_synthesis_guardrail(data_dir: str | Path, *, provider: str | None = None
             newly_surfaced_errors,
             current_claims,
             provider=provider,
-            deterministic_contradictions=True,
         )
         if terminal_changed:
             (
