@@ -292,7 +292,52 @@ async def test_reporter_recovery_uses_fresh_context_once(tmp_path: Path) -> None
     assert audit["attempt_count"] == 2
     assert audit["recovery_used"] is True
     assert audit["retry_preparation"]["action"] == "quarantined_invalid"
-    assert audit["retry_preparation"]["failure_codes"] == ["synthesis_not_markdown"]
+    assert audit["retry_preparation"]["failure_codes"] == [
+        "papers_json_missing",
+        "synthesis_not_markdown",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_reporter_recovery_retains_all_invalid_retry_error_codes(
+    tmp_path: Path,
+) -> None:
+    prompts: list[str] = []
+    expected_codes = ["papers_json_missing", "synthesis_not_markdown"]
+
+    async def invoke(description: str) -> dict[str, list[dict[str, str]]]:
+        prompts.append(description)
+        if len(prompts) == 1:
+            (tmp_path / "synthesis.md").write_text(
+                "<p>Unsupported fragment</p>",
+                encoding="utf-8",
+            )
+            (tmp_path / "synthesis_validation.json").write_text(
+                json.dumps(
+                    {
+                        "synthesis_guardrail": {
+                            "status": "failed",
+                            "final_error_count": 1,
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+        else:
+            for code in expected_codes:
+                assert code in description
+            _write_reporter_outputs(tmp_path, status="passed", errors=0)
+        return {"messages": [{"role": "assistant", "content": "done"}]}
+
+    await run_reporter_with_recovery(
+        invoke=invoke,
+        initial_description="normal reporter request",
+        data_dir=tmp_path,
+        timeout_seconds=1,
+    )
+
+    audit = json.loads((tmp_path / "reporter_recovery.json").read_text(encoding="utf-8"))
+    assert audit["retry_preparation"]["failure_codes"] == expected_codes
 
 
 @pytest.mark.asyncio

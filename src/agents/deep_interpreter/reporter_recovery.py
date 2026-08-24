@@ -196,10 +196,9 @@ def _prepare_synthesis_retry(data_dir: Path) -> dict[str, Any]:
 
     failure_codes = sorted(
         {
-            code
+            str(issue.get("code"))
             for issue in validate_synthesis_report(data_dir)
             if issue.get("severity") == "error"
-            and (code := str(issue.get("code"))) == "synthesis_not_markdown"
         }
     )
     if "synthesis_not_markdown" in failure_codes:
