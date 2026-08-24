@@ -262,6 +262,9 @@ async def test_reporter_recovery_uses_fresh_context_once(tmp_path: Path) -> None
                 encoding="utf-8",
             )
         else:
+            assert not (tmp_path / "synthesis.md").exists()
+            assert "synthesis_not_markdown" in description
+            assert "quarantined" in description.lower()
             _write_reporter_outputs(tmp_path, status="passed", errors=0)
         return {
             "messages": [
@@ -288,6 +291,8 @@ async def test_reporter_recovery_uses_fresh_context_once(tmp_path: Path) -> None
     assert audit["status"] == "passed"
     assert audit["attempt_count"] == 2
     assert audit["recovery_used"] is True
+    assert audit["retry_preparation"]["action"] == "quarantined_invalid"
+    assert audit["retry_preparation"]["failure_codes"] == ["synthesis_not_markdown"]
 
 
 @pytest.mark.asyncio
@@ -435,6 +440,31 @@ def test_reporter_task_recovery_middleware_times_out_sync_reporter(
     assert isinstance(result, ToolMessage)
     assert attempts == 2
     assert time.monotonic() - started < 0.1
+
+
+@pytest.mark.asyncio
+async def test_reporter_recovery_records_byte_identical_invalid_retry(
+    tmp_path: Path,
+) -> None:
+    invalid = "<p>Unsupported fragment</p>"
+
+    async def invoke(_description: str) -> dict[str, list[dict[str, str]]]:
+        (tmp_path / "synthesis.md").write_text(invalid, encoding="utf-8")
+        return {"messages": [{"role": "assistant", "content": "done"}]}
+
+    with pytest.raises(ReporterRecoveryError):
+        await run_reporter_with_recovery(
+            invoke=invoke,
+            initial_description="normal reporter request",
+            data_dir=tmp_path,
+            timeout_seconds=1,
+        )
+
+    audit = json.loads((tmp_path / "reporter_recovery.json").read_text(encoding="utf-8"))
+    assert audit["attempts"][1]["repeated_invalid_synthesis"] is True
+    assert (tmp_path / "synthesis_reporter_attempt1.md").read_text(
+        encoding="utf-8"
+    ) == invalid
 
 
 @pytest.mark.asyncio
