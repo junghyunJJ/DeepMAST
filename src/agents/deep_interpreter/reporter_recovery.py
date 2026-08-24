@@ -281,6 +281,21 @@ async def run_reporter_with_recovery(
             )
             cast(list[dict[str, Any]], audit["attempts"]).append(attempt)
             audit["attempt_count"] = attempt_number
+        except Exception as exc:
+            attempt["duration_seconds"] = time.monotonic() - started
+            attempt["completion"] = inspect_reporter_completion(root, previous_state)
+            attempt["repeated_invalid_synthesis"] = _repeated_invalid_synthesis(
+                root,
+                attempt_number,
+                retry_preparation,
+            )
+            attempt["exception_type"] = type(exc).__name__
+            attempt["exception_repr"] = repr(exc)
+            cast(list[dict[str, Any]], audit["attempts"]).append(attempt)
+            audit["attempt_count"] = attempt_number
+            audit["status"] = "failed"
+            _write_audit(root, audit)
+            raise
         else:
             attempt["duration_seconds"] = time.monotonic() - started
             attempt["completion"] = inspect_reporter_completion(root, previous_state)
@@ -300,6 +315,7 @@ async def run_reporter_with_recovery(
             audit["recovery_used"] = True
             retry_preparation = _prepare_synthesis_retry(root)
             audit["retry_preparation"] = retry_preparation
+            _write_audit(root, audit)
             continue
 
         audit["status"] = "failed"
@@ -379,13 +395,21 @@ class ReporterTaskRecoveryMiddleware(AgentMiddleware):
         if not self._is_reporter_task(request):
             return handler(request)
         args = request.tool_call["args"]
-        executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)
+        executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
 
         async def invoke(description: str) -> ToolMessage | Command:
             patched_args = {**args, "description": description}
             tool_call = cast(ToolCall, {**request.tool_call, "args": patched_args})
             future = executor.submit(handler, request.override(tool_call=tool_call))
-            return await asyncio.wrap_future(future)
+            wrapped_future = asyncio.wrap_future(future)
+            try:
+                return await asyncio.shield(wrapped_future)
+            except asyncio.CancelledError:
+                try:
+                    await wrapped_future
+                except Exception:
+                    pass
+                raise
 
         try:
             return asyncio.run(
@@ -397,7 +421,7 @@ class ReporterTaskRecoveryMiddleware(AgentMiddleware):
                 )
             )
         finally:
-            executor.shutdown(wait=False, cancel_futures=True)
+            executor.shutdown(wait=True, cancel_futures=True)
 
     async def awrap_tool_call(
         self,

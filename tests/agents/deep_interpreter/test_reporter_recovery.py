@@ -453,11 +453,12 @@ async def test_reporter_recovery_retries_when_first_attempt_leaves_stale_outputs
     assert prompts[1].startswith("[REPORTER_RECOVERY]")
 
 
-def test_reporter_task_recovery_middleware_times_out_sync_reporter(
+def test_reporter_task_recovery_middleware_waits_for_timed_out_sync_reporter(
     tmp_path: Path,
 ) -> None:
-    middleware = ReporterTaskRecoveryMiddleware(data_dir=tmp_path, timeout_seconds=0.01)
+    middleware = ReporterTaskRecoveryMiddleware(data_dir=tmp_path, timeout_seconds=0.05)
     attempts = 0
+    events: list[str] = []
     request = ToolCallRequest(
         tool_call={
             "name": "task",
@@ -474,17 +475,90 @@ def test_reporter_task_recovery_middleware_times_out_sync_reporter(
         nonlocal attempts
         attempts += 1
         if attempts == 1:
+            events.append("attempt-1-start")
             time.sleep(0.2)
+            (tmp_path / "synthesis.md").write_text(
+                "<p>late invalid synthesis</p>",
+                encoding="utf-8",
+            )
+            events.append("attempt-1-finish")
         else:
+            events.append("attempt-2-start")
             _write_reporter_outputs(tmp_path, status="passed", errors=0)
+            events.append("attempt-2-finish")
         return ToolMessage(content="done", tool_call_id="call-reporter")
 
     started = time.monotonic()
     result = middleware.wrap_tool_call(request, handler)
+    duration = time.monotonic() - started
 
     assert isinstance(result, ToolMessage)
     assert attempts == 2
-    assert time.monotonic() - started < 0.1
+    assert events == [
+        "attempt-1-start",
+        "attempt-1-finish",
+        "attempt-2-start",
+        "attempt-2-finish",
+    ]
+    assert duration >= 0.2
+    time.sleep(0.1)
+    assert (tmp_path / "synthesis.md").read_text(encoding="utf-8").startswith(
+        "# Synthesis"
+    )
+
+
+@pytest.mark.asyncio
+async def test_reporter_recovery_persists_retry_audit_when_second_attempt_raises(
+    tmp_path: Path,
+) -> None:
+    prompts: list[str] = []
+
+    async def invoke(description: str) -> dict[str, list[dict[str, str]]]:
+        prompts.append(description)
+        if len(prompts) == 1:
+            (tmp_path / "synthesis.md").write_text(
+                "<p>Unsupported fragment</p>",
+                encoding="utf-8",
+            )
+            (tmp_path / "synthesis_validation.json").write_text(
+                json.dumps(
+                    {
+                        "synthesis_guardrail": {
+                            "status": "failed",
+                            "final_error_count": 1,
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            return {"messages": [{"role": "assistant", "content": "attempt-1"}]}
+
+        assert not (tmp_path / "synthesis.md").exists()
+        raise RuntimeError("retry exploded")
+
+    with pytest.raises(RuntimeError, match="retry exploded"):
+        await run_reporter_with_recovery(
+            invoke=invoke,
+            initial_description="normal reporter request",
+            data_dir=tmp_path,
+            timeout_seconds=1,
+        )
+
+    audit = json.loads((tmp_path / "reporter_recovery.json").read_text(encoding="utf-8"))
+    assert prompts[1].startswith("[REPORTER_RECOVERY]")
+    assert audit["status"] == "failed"
+    assert audit["attempt_count"] == 2
+    assert audit["recovery_used"] is True
+    assert audit["retry_preparation"]["action"] == "quarantined_invalid"
+    assert "synthesis_not_markdown" in audit["retry_preparation"]["failure_codes"]
+    assert audit["attempts"][0]["completion"]["guardrail_status"] == "failed"
+    assert audit["attempts"][1]["exception_type"] == "RuntimeError"
+    assert audit["attempts"][1]["exception_repr"] == "RuntimeError('retry exploded')"
+    assert audit["attempts"][1]["completion"]["missing_outputs"] == [
+        "synthesis.md",
+        "synthesis_targets.json",
+        "CCI_Analysis_Report.html",
+    ]
 
 
 @pytest.mark.asyncio
