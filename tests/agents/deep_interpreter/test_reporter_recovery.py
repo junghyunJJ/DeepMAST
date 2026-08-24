@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import time
 from pathlib import Path
 from types import SimpleNamespace
@@ -15,6 +16,7 @@ from src.agents.deep_interpreter.reporter_recovery import (
     DEFAULT_REPORTER_ATTEMPT_TIMEOUT_SECONDS,
     ReporterRecoveryError,
     ReporterTaskRecoveryMiddleware,
+    _reporter_output_state,
     inspect_reporter_completion,
     reporter_attempt_timeout_seconds,
     run_reporter_with_recovery,
@@ -34,6 +36,25 @@ def _write_reporter_outputs(data_dir: Path, *, status: str, errors: int) -> None
                     "final_error_count": errors,
                 }
             }
+        ),
+        encoding="utf-8",
+    )
+    (data_dir / "synthesis_targets.json").write_text("{}", encoding="utf-8")
+    (data_dir / "CCI_Analysis_Report.html").write_text(
+        "<html>report</html>",
+        encoding="utf-8",
+    )
+
+
+def _write_reporter_downstream_outputs(
+    data_dir: Path,
+    *,
+    status: str,
+    errors: int,
+) -> None:
+    (data_dir / "synthesis_validation.json").write_text(
+        json.dumps(
+            {"synthesis_guardrail": {"status": status, "final_error_count": errors}}
         ),
         encoding="utf-8",
     )
@@ -82,6 +103,35 @@ def test_inspect_reporter_completion_accepts_complete_pass(tmp_path: Path) -> No
 
     assert result["complete"] is True
     assert result["missing_outputs"] == []
+
+
+def test_inspect_reporter_completion_treats_identical_rewrite_as_stale(
+    tmp_path: Path,
+) -> None:
+    _write_reporter_outputs(tmp_path, status="passed", errors=0)
+    previous = _reporter_output_state(tmp_path)
+
+    for name in (
+        "synthesis.md",
+        "synthesis_validation.json",
+        "synthesis_targets.json",
+        "CCI_Analysis_Report.html",
+    ):
+        path = tmp_path / name
+        original = path.read_bytes()
+        path.write_bytes(original)
+        stat = path.stat()
+        os.utime(path, ns=(stat.st_atime_ns, stat.st_mtime_ns + 1_000_000))
+
+    result = inspect_reporter_completion(tmp_path, previous)
+
+    assert set(result["stale_outputs"]) == {
+        "synthesis.md",
+        "synthesis_validation.json",
+        "synthesis_targets.json",
+        "CCI_Analysis_Report.html",
+    }
+    assert result["complete"] is False
 
 
 def test_deep_interpreter_agent_attaches_reporter_recovery_middleware(
@@ -254,7 +304,11 @@ async def test_reporter_recovery_preserves_valid_synthesis_and_renders_once(
                 encoding="utf-8",
             )
         else:
-            _write_reporter_outputs(tmp_path, status="passed", errors=0)
+            _write_reporter_downstream_outputs(
+                tmp_path,
+                status="passed",
+                errors=0,
+            )
         return {
             "messages": [
                 {"role": "assistant", "content": f"attempt-{len(prompts)}"}
@@ -316,7 +370,26 @@ async def test_reporter_recovery_retries_when_first_attempt_leaves_stale_outputs
     async def invoke(description: str) -> dict[str, list[dict[str, str]]]:
         prompts.append(description)
         if len(prompts) == 2:
-            _write_reporter_outputs(tmp_path, status="passed", errors=0)
+            (tmp_path / "synthesis_validation.json").write_text(
+                json.dumps(
+                    {
+                        "fresh": True,
+                        "synthesis_guardrail": {
+                            "status": "passed",
+                            "final_error_count": 0,
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (tmp_path / "synthesis_targets.json").write_text(
+                '{"fresh": true}',
+                encoding="utf-8",
+            )
+            (tmp_path / "CCI_Analysis_Report.html").write_text(
+                "<html>fresh report</html>",
+                encoding="utf-8",
+            )
         return {"messages": [{"role": "assistant", "content": "done"}]}
 
     await run_reporter_with_recovery(

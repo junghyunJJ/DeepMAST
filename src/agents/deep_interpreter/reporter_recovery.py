@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
+import hashlib
 import json
 import math
 import os
@@ -30,6 +31,7 @@ MAX_REPORTER_ATTEMPTS = 2
 _REPORTER_TIMEOUT_ENV = "REPORTER_ATTEMPT_TIMEOUT_SECONDS"
 
 T = TypeVar("T")
+ReporterOutputState = dict[str, str]
 
 
 class ReporterRecoveryError(RuntimeError):
@@ -51,9 +53,13 @@ def reporter_attempt_timeout_seconds() -> float:
     return timeout
 
 
-def _reporter_output_state(data_dir: Path) -> dict[str, tuple[int, int]]:
+def _file_sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _reporter_output_state(data_dir: Path) -> ReporterOutputState:
     return {
-        name: ((data_dir / name).stat().st_mtime_ns, (data_dir / name).stat().st_size)
+        name: _file_sha256(data_dir / name)
         for name in REPORTER_OUTPUTS
         if (data_dir / name).is_file()
     }
@@ -61,7 +67,7 @@ def _reporter_output_state(data_dir: Path) -> dict[str, tuple[int, int]]:
 
 def inspect_reporter_completion(
     data_dir: str | Path,
-    previous_state: dict[str, tuple[int, int]] | None = None,
+    previous_state: ReporterOutputState | None = None,
 ) -> dict[str, Any]:
     root = Path(data_dir)
     missing_outputs = [
@@ -186,12 +192,13 @@ async def run_reporter_with_recovery(
     }
 
     for attempt_number in range(1, MAX_REPORTER_ATTEMPTS + 1):
+        preserve_synthesis = attempt_number > 1 and _valid_existing_synthesis(root)
         description = (
             initial_description
             if attempt_number == 1
             else build_reporter_recovery_message(
                 root,
-                preserve_synthesis=_valid_existing_synthesis(root),
+                preserve_synthesis=preserve_synthesis,
             )
         )
         started = time.monotonic()
@@ -200,6 +207,8 @@ async def run_reporter_with_recovery(
             "timed_out": False,
         }
         previous_state = _reporter_output_state(root)
+        if preserve_synthesis:
+            previous_state.pop("synthesis.md", None)
         try:
             result = await asyncio.wait_for(invoke(description), timeout=timeout)
         except TimeoutError:
