@@ -1008,12 +1008,7 @@ async def test_reporter_recovery_accepts_preserved_valid_outputs_when_no_refresh
 
 def test_reporter_task_recovery_middleware_waits_for_timed_out_sync_reporter(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(
-        "src.agents.deep_interpreter.reporter_recovery._default_reporter_finalizer",
-        _fake_reporter_finalizer,
-    )
     middleware = ReporterTaskRecoveryMiddleware(data_dir=tmp_path, timeout_seconds=0.05)
     attempts = 0
     events: list[str] = []
@@ -1035,34 +1030,71 @@ def test_reporter_task_recovery_middleware_waits_for_timed_out_sync_reporter(
         if attempts == 1:
             events.append("attempt-1-start")
             time.sleep(0.2)
-            (tmp_path / "synthesis.md").write_text(
-                "<p>late invalid synthesis</p>",
-                encoding="utf-8",
-            )
+            _write_valid_synthesis(tmp_path)
             events.append("attempt-1-finish")
         else:
             events.append("attempt-2-start")
             _write_reporter_outputs(tmp_path, status="passed", errors=0)
             events.append("attempt-2-finish")
-        return ToolMessage(content="done", tool_call_id="call-reporter")
+        return ToolMessage(
+            content=f"attempt-{attempts}-result",
+            tool_call_id="call-reporter",
+        )
+
+    async def finalize(root: Path, required: tuple[str, ...]) -> dict[str, Any]:
+        events.append("finalizer-start")
+        result = await _fake_reporter_finalizer(root, required)
+        events.append("finalizer-finish")
+        return result
 
     started = time.monotonic()
-    result = middleware.wrap_tool_call(request, handler)
+    with pytest.MonkeyPatch.context() as monkeypatch:
+        monkeypatch.setattr(
+            "src.agents.deep_interpreter.reporter_recovery._default_reporter_finalizer",
+            finalize,
+        )
+        result = middleware.wrap_tool_call(request, handler)
     duration = time.monotonic() - started
 
     assert isinstance(result, ToolMessage)
-    assert attempts == 2
+    assert result.content == "attempt-1-result"
+    assert attempts == 1
     assert events == [
         "attempt-1-start",
         "attempt-1-finish",
-        "attempt-2-start",
-        "attempt-2-finish",
+        "finalizer-start",
+        "finalizer-finish",
     ]
     assert duration >= 0.2
-    time.sleep(0.1)
-    assert (tmp_path / "synthesis.md").read_text(encoding="utf-8").startswith(
-        "# Synthesis"
-    )
+    audit = json.loads((tmp_path / "reporter_recovery.json").read_text())
+    assert audit["attempts"][0]["timed_out"] is True
+    assert audit["status"] == "passed"
+    assert audit["recovery_used"] is False
+
+
+@pytest.mark.asyncio
+async def test_reporter_recovery_does_not_fabricate_result_after_timeout(
+    tmp_path: Path,
+) -> None:
+    async def invoke(_description: str) -> dict[str, str]:
+        _write_reporter_outputs(tmp_path, status="passed", errors=0)
+        await asyncio.Event().wait()
+        return {"content": "unreachable"}
+
+    with pytest.raises(TimeoutError):
+        await run_reporter_with_recovery(
+            invoke=invoke,
+            finalize=_fake_reporter_finalizer,
+            initial_description="normal reporter request",
+            data_dir=tmp_path,
+            timeout_seconds=0.01,
+        )
+
+    audit = json.loads((tmp_path / "reporter_recovery.json").read_text(encoding="utf-8"))
+    assert audit["status"] == "failed"
+    assert audit["attempt_count"] == 1
+    assert audit["attempts"][0]["timed_out"] is True
+    assert audit["attempts"][0]["completion"]["complete"] is True
 
 
 @pytest.mark.asyncio

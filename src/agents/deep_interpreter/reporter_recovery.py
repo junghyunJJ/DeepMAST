@@ -47,6 +47,17 @@ class ReporterRecoveryError(RuntimeError):
     pass
 
 
+class _ReporterAttemptTimedOutWithResult(TimeoutError):
+    def __init__(
+        self,
+        result: Any,
+        finalization: dict[str, Any] | None = None,
+    ) -> None:
+        super().__init__("REPORTER attempt timed out after producing a result")
+        self.result = result
+        self.finalization = finalization
+
+
 def reporter_attempt_timeout_seconds() -> float:
     try:
         timeout = float(
@@ -379,42 +390,25 @@ async def run_reporter_with_recovery(
         }
         finalization: dict[str, Any] | None = None
         previous_state = _reporter_output_state(root)
-        try:
-            result = await asyncio.wait_for(invoke(description), timeout=timeout)
-        except TimeoutError:
-            attempt["timed_out"] = True
-            attempt["duration_seconds"] = time.monotonic() - started
-            attempt["completion"] = inspect_reporter_completion(root, previous_state)
-            attempt["repeated_invalid_synthesis"] = _repeated_invalid_synthesis(
-                root,
-                attempt_number,
-                retry_preparation,
-            )
-            cast(list[dict[str, Any]], audit["attempts"]).append(attempt)
-            audit["attempt_count"] = attempt_number
-        except Exception as exc:
-            attempt["duration_seconds"] = time.monotonic() - started
-            attempt["completion"] = inspect_reporter_completion(root, previous_state)
-            attempt["repeated_invalid_synthesis"] = _repeated_invalid_synthesis(
-                root,
-                attempt_number,
-                retry_preparation,
-            )
-            attempt["exception_type"] = type(exc).__name__
-            attempt["exception_repr"] = repr(exc)
-            cast(list[dict[str, Any]], audit["attempts"]).append(attempt)
-            audit["attempt_count"] = attempt_number
-            audit["status"] = "failed"
-            _write_audit(root, audit)
-            raise
-        else:
-            attempt["duration_seconds"] = time.monotonic() - started
+        required_refresh: tuple[str, ...] = ()
+        completion_previous_state = previous_state
+
+        async def run_attempt(
+            description: str = description,
+            previous_state: ReporterOutputState = previous_state,
+        ) -> T:
+            nonlocal completion_previous_state, finalization, required_refresh
+            timed_out_with_result = False
+            try:
+                result = await invoke(description)
+            except _ReporterAttemptTimedOutWithResult as exc:
+                result = cast(T, exc.result)
+                finalization = exc.finalization
+                timed_out_with_result = True
             current_state = _reporter_output_state(root)
             synthesis_changed = (
                 previous_state.get("synthesis.md") != current_state.get("synthesis.md")
             )
-            required_refresh: tuple[str, ...] = ()
-            completion_previous_state = previous_state
             if _valid_existing_synthesis(root):
                 required_refresh = _required_reporter_refresh(
                     root,
@@ -422,38 +416,36 @@ async def run_reporter_with_recovery(
                 )
                 completion_previous_state = _reporter_output_state(root)
                 if required_refresh:
+                    finalizer_task = asyncio.create_task(finalizer(root, required_refresh))
                     try:
-                        finalization = await finalizer(root, required_refresh)
-                    except Exception as exc:
-                        finalization = {
-                            "status": "exception",
-                            "exception_type": type(exc).__name__,
-                            "exception_repr": repr(exc),
-                        }
-                        attempt["required_refresh"] = list(required_refresh)
-                        attempt["finalizer"] = finalization
-                        attempt["completion"] = inspect_reporter_completion(
-                            root,
-                            completion_previous_state,
-                            required_refresh=required_refresh,
-                        )
-                        attempt["repeated_invalid_synthesis"] = (
-                            _repeated_invalid_synthesis(
-                                root,
-                                attempt_number,
-                                retry_preparation,
-                            )
-                        )
-                        cast(list[dict[str, Any]], audit["attempts"]).append(attempt)
-                        audit["attempt_count"] = attempt_number
-                        audit["status"] = "failed"
-                        _write_audit(root, audit)
-                        raise ReporterRecoveryError(
-                            "REPORTER deterministic finalization failed."
+                        finalization = await asyncio.shield(finalizer_task)
+                    except asyncio.CancelledError as exc:
+                        finalization = await finalizer_task
+                        raise _ReporterAttemptTimedOutWithResult(
+                            result,
+                            finalization,
                         ) from exc
                     required_refresh = tuple(
                         finalization.get("required_refresh", required_refresh)
                     )
+            if timed_out_with_result:
+                raise _ReporterAttemptTimedOutWithResult(result, finalization)
+            return result
+
+        def record_attempt_result(
+            *,
+            timed_out: bool,
+            required_refresh: tuple[str, ...],
+            finalization: dict[str, Any] | None,
+            completion_previous_state: ReporterOutputState,
+            attempt: dict[str, Any] = attempt,
+            started: float = started,
+            attempt_number: int = attempt_number,
+            retry_preparation: dict[str, Any] = retry_preparation,
+        ) -> None:
+            attempt["timed_out"] = timed_out
+            attempt["duration_seconds"] = time.monotonic() - started
+            if _valid_existing_synthesis(root):
                 attempt["required_refresh"] = list(required_refresh)
                 attempt["finalizer"] = finalization
             attempt["completion"] = inspect_reporter_completion(
@@ -468,6 +460,85 @@ async def run_reporter_with_recovery(
             )
             cast(list[dict[str, Any]], audit["attempts"]).append(attempt)
             audit["attempt_count"] = attempt_number
+
+        try:
+            result = await asyncio.wait_for(run_attempt(), timeout=timeout)
+        except _ReporterAttemptTimedOutWithResult as exc:
+            result = cast(T, exc.result)
+            finalization = exc.finalization
+            if finalization is not None:
+                required_refresh = tuple(
+                    finalization.get("required_refresh", required_refresh)
+                )
+            record_attempt_result(
+                timed_out=True,
+                required_refresh=required_refresh,
+                finalization=finalization,
+                completion_previous_state=completion_previous_state,
+            )
+            if finalization and finalization.get("status") == "render_failed":
+                audit["status"] = "failed"
+                _write_audit(root, audit)
+                raise ReporterRecoveryError("REPORTER deterministic finalization failed.")
+            if attempt["completion"]["complete"]:
+                audit["status"] = "passed"
+                _write_audit(root, audit)
+                return result
+            if _valid_existing_synthesis(root) and (
+                not finalization or finalization.get("status") != "guardrail_failed"
+            ):
+                audit["status"] = "failed"
+                _write_audit(root, audit)
+                raise ReporterRecoveryError(
+                    "REPORTER deterministic finalization left incomplete artifacts."
+                )
+        except TimeoutError:
+            record_attempt_result(
+                timed_out=True,
+                required_refresh=required_refresh,
+                finalization=finalization,
+                completion_previous_state=completion_previous_state,
+            )
+            if attempt["completion"]["complete"]:
+                audit["status"] = "failed"
+                _write_audit(root, audit)
+                raise
+        except Exception as exc:
+            if required_refresh and finalization is None:
+                finalization = {
+                    "status": "exception",
+                    "exception_type": type(exc).__name__,
+                    "exception_repr": repr(exc),
+                }
+                record_attempt_result(
+                    timed_out=False,
+                    required_refresh=required_refresh,
+                    finalization=finalization,
+                    completion_previous_state=completion_previous_state,
+                )
+                audit["status"] = "failed"
+                _write_audit(root, audit)
+                raise ReporterRecoveryError(
+                    "REPORTER deterministic finalization failed."
+                ) from exc
+            record_attempt_result(
+                timed_out=False,
+                required_refresh=required_refresh,
+                finalization=finalization,
+                completion_previous_state=completion_previous_state,
+            )
+            attempt["exception_type"] = type(exc).__name__
+            attempt["exception_repr"] = repr(exc)
+            audit["status"] = "failed"
+            _write_audit(root, audit)
+            raise
+        else:
+            record_attempt_result(
+                timed_out=False,
+                required_refresh=required_refresh,
+                finalization=finalization,
+                completion_previous_state=completion_previous_state,
+            )
             if finalization and finalization.get("status") == "render_failed":
                 audit["status"] = "failed"
                 _write_audit(root, audit)
@@ -584,12 +655,9 @@ class ReporterTaskRecoveryMiddleware(AgentMiddleware):
             wrapped_future = asyncio.wrap_future(future)
             try:
                 return await asyncio.shield(wrapped_future)
-            except asyncio.CancelledError:
-                try:
-                    await wrapped_future
-                except Exception:
-                    pass
-                raise
+            except asyncio.CancelledError as exc:
+                result = await wrapped_future
+                raise _ReporterAttemptTimedOutWithResult(result) from exc
 
         try:
             return asyncio.run(
