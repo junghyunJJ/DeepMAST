@@ -250,7 +250,7 @@ def test_generate_html_report_persists_parts_synthesis_before_guardrail(
     def fake_render(parts: dict, output_path: str, data_dir: str) -> str:
         del parts, data_dir
         Path(output_path).write_text("<html>ok</html>", encoding="utf-8")
-        return "Report generated successfully"
+        return "<html>ok</html>"
 
     monkeypatch.setattr(report_guardrails, "run_synthesis_guardrail", fake_guardrail)
     monkeypatch.setattr(report_tool, "_render_comprehensive_template", fake_render)
@@ -410,7 +410,7 @@ def test_generate_html_report_preserves_existing_reporter_artifacts(
     def fake_render(parts: dict, output_path: str, data_dir: str) -> str:
         del parts, data_dir
         Path(output_path).write_text("<html>ok</html>", encoding="utf-8")
-        return "Report generated successfully"
+        return "<html>ok</html>"
 
     monkeypatch.setattr(report_guardrails, "run_synthesis_guardrail", fake_guardrail)
     monkeypatch.setattr(report_tool, "_render_comprehensive_template", fake_render)
@@ -426,6 +426,146 @@ def test_generate_html_report_preserves_existing_reporter_artifacts(
     assert "Report generated successfully" in result
     assert json.loads((tmp_path / "synthesis_validation.json").read_text(encoding="utf-8")) == existing_validation
     assert json.loads((tmp_path / "synthesis_targets.json").read_text(encoding="utf-8")) == existing_targets
+
+
+def test_structured_finalizer_html_only_refresh_preserves_validation_and_targets(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    _write_fixture_data(tmp_path)
+    before = {
+        name: (tmp_path / name).read_bytes()
+        for name in ("synthesis_validation.json", "synthesis_targets.json")
+    }
+
+    def fake_guardrail(data_dir: str | Path, *, provider: str | None = None) -> dict[str, object]:
+        del data_dir, provider
+        return {
+            "status": "passed",
+            "artifact": "synthesis.md",
+            "initial_issue_count": 0,
+            "initial_error_count": 0,
+            "changed_claims": 0,
+            "final_issue_count": 0,
+            "final_error_count": 0,
+        }
+
+    def fake_render(parts: dict, output_path: str, data_dir: str) -> str:
+        del parts, data_dir
+        Path(output_path).write_text("<html>ok</html>", encoding="utf-8")
+        return "Report generated successfully"
+
+    monkeypatch.setattr(report_guardrails, "run_synthesis_guardrail", fake_guardrail)
+    monkeypatch.setattr(report_tool, "_render_comprehensive_template", fake_render)
+
+    result = report_tool._finalize_reporter_artifacts(
+        parts={"template_mode": "comprehensive"},
+        output_path="CCI_Analysis_Report.html",
+        data_dir=str(tmp_path),
+        required_refresh=("CCI_Analysis_Report.html",),
+    )
+
+    assert result["status"] == "passed"
+    assert result["required_refresh"] == ["CCI_Analysis_Report.html"]
+    assert (tmp_path / "CCI_Analysis_Report.html").is_file()
+    for name, content in before.items():
+        assert (tmp_path / name).read_bytes() == content
+
+
+def test_structured_finalizer_refreshes_invalid_validation_targets_and_html(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    _write_fixture_data(tmp_path)
+    (tmp_path / "synthesis_validation.json").write_text(
+        json.dumps({"manual": True}),
+        encoding="utf-8",
+    )
+    (tmp_path / "synthesis_targets.json").write_text(
+        json.dumps({"canonical_source": "manual.md"}),
+        encoding="utf-8",
+    )
+
+    def fake_guardrail(data_dir: str | Path, *, provider: str | None = None) -> dict[str, object]:
+        del provider
+        Path(data_dir, "synthesis.md").write_text(
+            "## Executive Summary\n\nRepaired synthesis.\n",
+            encoding="utf-8",
+        )
+        return {
+            "status": "passed",
+            "artifact": "synthesis.md",
+            "initial_issue_count": 1,
+            "initial_error_count": 1,
+            "changed_claims": 1,
+            "final_issue_count": 1,
+            "final_error_count": 0,
+        }
+
+    def fake_render(parts: dict, output_path: str, data_dir: str) -> str:
+        del parts, data_dir
+        Path(output_path).write_text("<html>ok</html>", encoding="utf-8")
+        return "<html>ok</html>"
+
+    monkeypatch.setattr(report_guardrails, "run_synthesis_guardrail", fake_guardrail)
+    monkeypatch.setattr(report_tool, "_render_comprehensive_template", fake_render)
+
+    result = report_tool._finalize_reporter_artifacts(
+        parts={"template_mode": "comprehensive"},
+        output_path="CCI_Analysis_Report.html",
+        data_dir=str(tmp_path),
+        required_refresh=("synthesis_validation.json",),
+    )
+
+    assert result["status"] == "passed"
+    assert result["required_refresh"] == [
+        "synthesis_validation.json",
+        "synthesis_targets.json",
+        "CCI_Analysis_Report.html",
+    ]
+    assert result["refreshed_outputs"] == result["required_refresh"]
+    assert json.loads((tmp_path / "synthesis_validation.json").read_text(encoding="utf-8"))[
+        "auto_generated"
+    ] is True
+    assert json.loads((tmp_path / "synthesis_targets.json").read_text(encoding="utf-8"))[
+        "auto_generated"
+    ] is True
+    assert (tmp_path / "CCI_Analysis_Report.html").read_text(encoding="utf-8") == "<html>ok</html>"
+
+
+def test_structured_finalizer_guardrail_failure_returns_status_without_render(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    _write_fixture_data(tmp_path)
+
+    def fake_guardrail(data_dir: str | Path, *, provider: str | None = None) -> dict[str, object]:
+        del data_dir, provider
+        return {"status": "failed", "artifact": "synthesis.md", "final_error_count": 1}
+
+    def fail_render(parts: dict, output_path: str, data_dir: str) -> str:
+        del parts, output_path, data_dir
+        raise AssertionError("HTML render should not run after failed synthesis guardrail")
+
+    monkeypatch.setattr(report_guardrails, "run_synthesis_guardrail", fake_guardrail)
+    monkeypatch.setattr(report_tool, "_render_comprehensive_template", fail_render)
+
+    result = report_tool._finalize_reporter_artifacts(
+        parts={"template_mode": "comprehensive"},
+        output_path="CCI_Analysis_Report.html",
+        data_dir=str(tmp_path),
+        required_refresh=("CCI_Analysis_Report.html",),
+    )
+
+    assert result == {
+        "status": "guardrail_failed",
+        "guardrail": {"status": "failed", "artifact": "synthesis.md", "final_error_count": 1},
+        "required_refresh": ["CCI_Analysis_Report.html"],
+        "refreshed_outputs": [],
+        "preserved_outputs": [],
+        "render_message": None,
+    }
+    assert not (tmp_path / "CCI_Analysis_Report.html").exists()
 
 
 def test_generate_html_report_blocks_comprehensive_render_on_failed_synthesis_guardrail(
