@@ -212,23 +212,8 @@ def _valid_existing_synthesis(data_dir: Path) -> bool:
 def build_reporter_recovery_message(
     data_dir: Path,
     *,
-    preserve_synthesis: bool,
     failure_codes: tuple[str, ...] = (),
 ) -> str:
-    if preserve_synthesis:
-        return f"""[REPORTER_RECOVERY]
-The previous REPORTER attempt for {data_dir} timed out or did not produce every downstream report artifact.
-Start from a fresh message context. Preserve /synthesis.md exactly as written.
-
-Do not rewrite, regenerate, or rebuild /synthesis.md.
-Use only the already-bound part_name="all" RAG collection.
-Do not call prepare_rag_literature.
-Do not run a new literature search, create a collection, or create reporter-specific paper artifacts.
-Call generate_html_report once with template_mode="comprehensive",
-output_path="CCI_Analysis_Report.html", and the data directory from /data_path.txt.
-Stop after generate_html_report returns.
-"""
-
     failure_note = (
         f"The invalid attempt was quarantined after: {', '.join(failure_codes)}.\n"
         if failure_codes
@@ -236,19 +221,15 @@ Stop after generate_html_report returns.
     )
 
     return f"""[REPORTER_RECOVERY]
-The previous REPORTER attempt for {data_dir} timed out or produced an invalid report.
-Start from a fresh message context and rebuild the final synthesis from the existing artifacts.
+The previous REPORTER synthesis attempt for {data_dir} was absent or invalid.
+Start from a fresh message context and rebuild synthesis from the existing artifacts.
 
 Read /part1_final.md, /part2_final.md, /part3_final.md,
 /part4_therapeutic_synthesis.md when present, /drug.md when present, and /papers.json.
 Use only the already-bound part_name="all" RAG collection.
-Do not call prepare_rag_literature.
-Do not run a new literature search, create a collection, or create reporter-specific paper artifacts.
-{failure_note}Write a complete Markdown document to /synthesis.md. It must start with a Markdown title,
-contain substantive ## sections, and contain no HTML fragment in place of the report.
-Then call generate_html_report once with template_mode="comprehensive",
-output_path="CCI_Analysis_Report.html", and the data directory from /data_path.txt.
-Stop after generate_html_report returns.
+Do not call prepare_rag_literature or run a new literature search.
+{failure_note}Write a complete Markdown document to /synthesis.md.
+Stop after /synthesis.md is written. Deterministic code owns guardrail and HTML finalization.
 """
 
 
@@ -263,9 +244,33 @@ def _write_audit(data_dir: Path, audit: dict[str, Any]) -> None:
     )
 
 
-def _prepare_synthesis_retry(data_dir: Path) -> dict[str, Any]:
+def _clear_derived_reporter_outputs(data_dir: Path) -> None:
+    for name in DERIVED_REPORTER_OUTPUTS:
+        (data_dir / name).unlink(missing_ok=True)
+
+
+def _guardrail_final_failure_codes(data_dir: Path) -> list[str]:
+    final = _load_json_object(data_dir / "synthesis_guardrail_final.json")
+    issues = final.get("issues") if final else None
+    if not isinstance(issues, list):
+        return []
+    return [
+        str(issue.get("code"))
+        for issue in issues
+        if isinstance(issue, dict)
+        and issue.get("severity") == "error"
+        and issue.get("code")
+    ]
+
+
+def _prepare_synthesis_retry(
+    data_dir: Path,
+    *,
+    guardrail_failed: bool = False,
+) -> dict[str, Any]:
     synthesis = data_dir / "synthesis.md"
     if not synthesis.is_file() or synthesis.stat().st_size == 0:
+        _clear_derived_reporter_outputs(data_dir)
         return {
             "action": "absent",
             "failure_codes": [],
@@ -274,6 +279,14 @@ def _prepare_synthesis_retry(data_dir: Path) -> dict[str, Any]:
 
     digest = _file_sha256(synthesis)
     shutil.copyfile(synthesis, data_dir / "synthesis_reporter_attempt1.md")
+    if guardrail_failed:
+        synthesis.unlink()
+        _clear_derived_reporter_outputs(data_dir)
+        return {
+            "action": "quarantined_guardrail_failed",
+            "failure_codes": _guardrail_final_failure_codes(data_dir),
+            "attempt1_synthesis_sha256": digest,
+        }
 
     from src.agents.deep_interpreter.report_guardrails import validate_synthesis_report
 
@@ -286,9 +299,10 @@ def _prepare_synthesis_retry(data_dir: Path) -> dict[str, Any]:
     )
     if "synthesis_not_markdown" in failure_codes:
         synthesis.unlink()
+        _clear_derived_reporter_outputs(data_dir)
         action = "quarantined_invalid"
     else:
-        action = "preserved_valid"
+        action = "absent"
     return {
         "action": action,
         "failure_codes": failure_codes,
@@ -350,13 +364,11 @@ async def run_reporter_with_recovery(
     }
 
     for attempt_number in range(1, MAX_REPORTER_ATTEMPTS + 1):
-        preserve_synthesis = attempt_number > 1 and _valid_existing_synthesis(root)
         description = (
             initial_description
             if attempt_number == 1
             else build_reporter_recovery_message(
                 root,
-                preserve_synthesis=preserve_synthesis,
                 failure_codes=tuple(retry_preparation["failure_codes"]),
             )
         )
@@ -365,9 +377,8 @@ async def run_reporter_with_recovery(
             "attempt": attempt_number,
             "timed_out": False,
         }
+        finalization: dict[str, Any] | None = None
         previous_state = _reporter_output_state(root)
-        if preserve_synthesis:
-            previous_state.pop("synthesis.md", None)
         try:
             result = await asyncio.wait_for(invoke(description), timeout=timeout)
         except TimeoutError:
@@ -400,11 +411,9 @@ async def run_reporter_with_recovery(
             attempt["duration_seconds"] = time.monotonic() - started
             current_state = _reporter_output_state(root)
             synthesis_changed = (
-                not preserve_synthesis
-                and previous_state.get("synthesis.md") != current_state.get("synthesis.md")
+                previous_state.get("synthesis.md") != current_state.get("synthesis.md")
             )
             required_refresh: tuple[str, ...] = ()
-            finalization: dict[str, Any] | None = None
             completion_previous_state = previous_state
             if _valid_existing_synthesis(root):
                 required_refresh = _required_reporter_refresh(
@@ -478,7 +487,13 @@ async def run_reporter_with_recovery(
 
         if attempt_number == 1:
             audit["recovery_used"] = True
-            retry_preparation = _prepare_synthesis_retry(root)
+            guardrail_failed = bool(
+                finalization and finalization.get("status") == "guardrail_failed"
+            )
+            retry_preparation = _prepare_synthesis_retry(
+                root,
+                guardrail_failed=guardrail_failed,
+            )
             audit["retry_preparation"] = retry_preparation
             _write_audit(root, audit)
             continue

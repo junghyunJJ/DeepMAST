@@ -408,10 +408,19 @@ async def test_reporter_recovery_uses_fresh_context_once(tmp_path: Path) -> None
                 ),
                 encoding="utf-8",
             )
+            _write_valid_targets(tmp_path)
+            _write_valid_html(tmp_path)
         else:
             assert not (tmp_path / "synthesis.md").exists()
+            for name in (
+                "synthesis_validation.json",
+                "synthesis_targets.json",
+                "CCI_Analysis_Report.html",
+            ):
+                assert not (tmp_path / name).exists()
             assert "synthesis_not_markdown" in description
             assert "quarantined" in description.lower()
+            assert "generate_html_report" not in description
             _write_reporter_outputs(tmp_path, status="passed", errors=0)
         return {
             "messages": [
@@ -474,6 +483,7 @@ async def test_reporter_recovery_retains_all_invalid_retry_error_codes(
         else:
             for code in expected_codes:
                 assert code in description
+            assert "generate_html_report" not in description
             _write_reporter_outputs(tmp_path, status="passed", errors=0)
         return {"messages": [{"role": "assistant", "content": "done"}]}
 
@@ -574,7 +584,7 @@ async def test_reporter_finalization_refreshes_all_sidecars_for_valid_synthesis_
             "synthesis_validation.json",
             "synthesis_targets.json",
             "CCI_Analysis_Report.html",
-        )
+        ),
     ]
     _single_attempt_audit(tmp_path)
 
@@ -646,7 +656,7 @@ async def test_reporter_finalization_refreshes_from_invalid_validation(
             "synthesis_validation.json",
             "synthesis_targets.json",
             "CCI_Analysis_Report.html",
-        )
+        ),
     ]
     _single_attempt_audit(tmp_path)
 
@@ -731,7 +741,67 @@ async def test_reporter_finalization_refreshes_invalid_html(
 
 
 @pytest.mark.asyncio
-async def test_reporter_finalization_guardrail_failure_uses_existing_retry_path(
+async def test_reporter_recovery_retries_after_guardrail_repairs_are_exhausted(
+    tmp_path: Path,
+) -> None:
+    prompts: list[str] = []
+
+    async def invoke(description: str) -> dict[str, str]:
+        prompts.append(description)
+        assert not (tmp_path / "synthesis.md").exists() or len(prompts) == 1
+        _write_valid_synthesis(
+            tmp_path,
+            text=f"# Synthesis {len(prompts)}\n\n## Summary\n\nText.\n",
+        )
+        return {"content": f"attempt-{len(prompts)}"}
+
+    async def finalize(root: Path, required: tuple[str, ...]) -> dict[str, Any]:
+        if len(prompts) == 1:
+            (root / "synthesis_guardrail_final.json").write_text(
+                json.dumps(
+                    {
+                        "issues": [
+                            {
+                                "severity": "error",
+                                "code": "synthesis_consistency_mismatch",
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            return {
+                "status": "guardrail_failed",
+                "guardrail": {"status": "failed", "final_error_count": 1},
+                "required_refresh": list(required),
+            }
+        _write_valid_validation(root)
+        _write_valid_targets(root)
+        _write_valid_html(root)
+        return {
+            "status": "passed",
+            "guardrail": {"status": "passed", "final_error_count": 0},
+            "required_refresh": list(required),
+        }
+
+    result = await run_reporter_with_recovery(
+        invoke=invoke,
+        finalize=finalize,
+        initial_description="report",
+        data_dir=tmp_path,
+        timeout_seconds=1,
+    )
+
+    assert result == {"content": "attempt-2"}
+    audit = json.loads((tmp_path / "reporter_recovery.json").read_text())
+    assert audit["retry_preparation"]["action"] == "quarantined_guardrail_failed"
+    assert audit["retry_preparation"]["failure_codes"] == [
+        "synthesis_consistency_mismatch"
+    ]
+
+
+@pytest.mark.asyncio
+async def test_reporter_finalization_guardrail_failure_uses_clean_retry_path(
     tmp_path: Path,
 ) -> None:
     _write_valid_synthesis(tmp_path)
@@ -741,12 +811,35 @@ async def test_reporter_finalization_guardrail_failure_uses_existing_retry_path(
     async def invoke(description: str) -> dict[str, str]:
         prompts.append(description)
         if len(prompts) == 2:
-            assert "Preserve /synthesis.md" in description
-            _write_reporter_downstream_outputs(tmp_path, status="passed", errors=0)
+            assert not (tmp_path / "synthesis.md").exists()
+            assert "generate_html_report" not in description
+            _write_valid_synthesis(tmp_path, text="# Synthesis 2\n\n## Summary\n\nText.\n")
         return {"content": f"attempt-{len(prompts)}"}
 
-    async def finalize(_root: Path, required: tuple[str, ...]) -> dict[str, Any]:
+    async def finalize(root: Path, required: tuple[str, ...]) -> dict[str, Any]:
         finalizer_calls.append(required)
+        if len(prompts) == 2:
+            _write_reporter_downstream_outputs(root, status="passed", errors=0)
+            return {
+                "status": "passed",
+                "guardrail": {"status": "passed", "final_error_count": 0},
+                "required_refresh": list(required),
+                "refreshed_outputs": list(required),
+                "preserved_outputs": [],
+            }
+        (root / "synthesis_guardrail_final.json").write_text(
+            json.dumps(
+                {
+                    "issues": [
+                        {
+                            "severity": "error",
+                            "code": "synthesis_consistency_mismatch",
+                        }
+                    ]
+                }
+            ),
+            encoding="utf-8",
+        )
         return {
             "status": "guardrail_failed",
             "guardrail": {"status": "failed", "final_error_count": 1},
@@ -771,13 +864,59 @@ async def test_reporter_finalization_guardrail_failure_uses_existing_retry_path(
             "synthesis_validation.json",
             "synthesis_targets.json",
             "CCI_Analysis_Report.html",
-        )
+        ),
+        (
+            "synthesis_validation.json",
+            "synthesis_targets.json",
+            "CCI_Analysis_Report.html",
+        ),
     ]
     audit = json.loads((tmp_path / "reporter_recovery.json").read_text(encoding="utf-8"))
     assert audit["status"] == "passed"
     assert audit["attempt_count"] == 2
     assert audit["recovery_used"] is True
-    assert audit["retry_preparation"]["action"] == "preserved_valid"
+    assert audit["retry_preparation"]["action"] == "quarantined_guardrail_failed"
+    assert audit["retry_preparation"]["failure_codes"] == [
+        "synthesis_consistency_mismatch"
+    ]
+
+
+@pytest.mark.asyncio
+async def test_reporter_recovery_retries_when_synthesis_is_absent(
+    tmp_path: Path,
+) -> None:
+    prompts: list[str] = []
+
+    async def invoke(description: str) -> dict[str, str]:
+        prompts.append(description)
+        if len(prompts) == 2:
+            assert "generate_html_report" not in description
+            _write_valid_synthesis(tmp_path)
+        return {"content": f"attempt-{len(prompts)}"}
+
+    async def finalize(root: Path, required: tuple[str, ...]) -> dict[str, Any]:
+        _write_reporter_outputs_by_name(root, required)
+        return {
+            "status": "passed",
+            "guardrail": {"status": "passed", "final_error_count": 0},
+            "required_refresh": list(required),
+            "refreshed_outputs": list(required),
+            "preserved_outputs": [],
+        }
+
+    result = await run_reporter_with_recovery(
+        invoke=invoke,
+        finalize=finalize,
+        initial_description="report",
+        data_dir=tmp_path,
+        timeout_seconds=1,
+    )
+
+    assert result == {"content": "attempt-2"}
+    assert len(prompts) == 2
+    audit = json.loads((tmp_path / "reporter_recovery.json").read_text(encoding="utf-8"))
+    assert audit["status"] == "passed"
+    assert audit["retry_preparation"]["action"] == "absent"
 
 
 @pytest.mark.asyncio
@@ -975,6 +1114,7 @@ async def test_reporter_recovery_persists_retry_audit_when_second_attempt_raises
     assert audit["attempts"][1]["exception_repr"] == "RuntimeError('retry exploded')"
     assert audit["attempts"][1]["completion"]["missing_outputs"] == [
         "synthesis.md",
+        "synthesis_validation.json",
         "synthesis_targets.json",
         "CCI_Analysis_Report.html",
     ]
