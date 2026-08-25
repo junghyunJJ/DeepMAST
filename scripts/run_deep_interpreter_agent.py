@@ -165,9 +165,8 @@ Validate citations and do not run planner, searcher, or reporter."""
 Read /part1_final.md, /part2_final.md, /part3_final.md, /part4_therapeutic_synthesis.md if present, and /drug.md if present.
 Use existing /papers.json-backed RAG retrieval only; do not run new literature searches or create reporter-specific paper artifacts.
 Call write_file("/synthesis.md", ...) with the complete integrated narrative as Markdown, not HTML.
-Then call generate_html_report with parts={{"template_mode": "comprehensive", ...}},
-output_path="CCI_Analysis_Report.html", and data_dir from /data_path.txt.
-generate_html_report writes synthesis_validation.json and synthesis_targets.json automatically after running the synthesis guardrail.
+Then stop after synthesis.md.
+Deterministic code owns validation, targets, and HTML after running the synthesis guardrail.
 Do not hand-author part1_html, part2_html, part3_html, summary_html, or therapeutic_html.
 Do not run planner, searcher, or interpreter."""
     raise ValueError(f"Unknown subagent: {subagent}")

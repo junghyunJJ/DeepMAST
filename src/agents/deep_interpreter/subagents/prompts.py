@@ -4,7 +4,7 @@ Simplified 4-Agent Architecture:
 - PLANNER: Target parsing + data assessment + interpretation guide generation
 - SEARCHER: Context extraction + literature search (BioMCP workflow)
 - INTERPRETER: Part 1/2/3 interpretation with inline claim validation + quality scoring
-- REPORTER: Cross-part synthesis + HTML report generation
+- REPORTER: Cross-part synthesis + deterministic finalization handoff
 
 Hallucination Prevention (maintained from original):
 - Literature-First pattern: Search papers BEFORE interpretation
@@ -747,16 +747,16 @@ START
 
 
 # =============================================================================
-# REPORTER - Synthesis + Literature Validation + HTML report generation
-# (replaces synthesizer + report-generator, adds Phase 4.5 synthesis validation)
+# REPORTER - Synthesis + Literature Validation
+# (replaces synthesizer, adds Phase 4.5 synthesis validation)
 # =============================================================================
-REPORTER_PROMPT = """You are an expert at synthesizing biological findings and generating publication-quality reports.
+REPORTER_PROMPT = """You are an expert at synthesizing biological findings for publication-quality reports.
 
 Your role is to:
 1. Synthesize findings across Part 1, 2, and 3
 2. **Validate synthesis claims against the existing /papers.json-backed RAG corpus (Phase 4.5)**
 3. Identify emergent cross-part themes (NOT hypothesis validation)
-4. Generate the final HTML report
+4. Write `/synthesis.md` only; deterministic code owns guardrail sidecars and HTML
 
 ## Workflow Overview
 
@@ -775,15 +775,15 @@ Phase 4.5: RETRIEVE SYNTHESIS SUPPORT FROM EXISTING RAG
     ├── Step 2: Retrieve Theme Support
     ├── Step 3: Validate Cited Claims
     ├── Step 4: Update synthesis.md
-    └── Step 5: Hand off validation metadata to report tool
+    └── Step 5: Hand off validation metadata to deterministic code
     ↓
 Phase 4.7: INTEGRATE PART 4 THERAPEUTIC SYNTHESIS
     │
     ├── Step 1: Read part4_therapeutic_synthesis.md, then drug.md
     ├── Step 2: Integrate concise Part 4 implications into /synthesis.md
-    └── Step 3: Hand off source tracking to report tool
+    └── Step 3: Hand off source tracking to deterministic code
     ↓
-Phase 5: Generate HTML Report (with Therapeutic Implications tab)
+Phase 5: Hand Off to Deterministic Finalization
 ```
 
 ## Workflow
@@ -911,8 +911,8 @@ prepare_rag_literature(
 ```
 
 If RAG is unavailable, use `/papers.json` abstracts only and set
-the validation mode in `/synthesis.md` limitations; `generate_html_report` will record
-missing bookkeeping metadata in `/synthesis_validation.json`.
+the validation mode in `/synthesis.md` limitations; deterministic finalizer code will
+record missing bookkeeping metadata in `/synthesis_validation.json`.
 
 #### Step 2: Retrieve Theme Support
 
@@ -957,11 +957,11 @@ Based on validation results:
 - **confidence < 0.4 or no supporting passage**: Mark as
   **(Hypothesis - Needs Validation)**.
 
-#### Step 5: Hand off validation metadata to report tool
+#### Step 5: Hand off validation metadata to deterministic code
 
 Do not spend a separate LLM turn writing `/synthesis_validation.json`. Keep the validated
-claims, caveats, and hypothesis language in `/synthesis.md`; `generate_html_report` runs
-the guardrail and creates `/synthesis_validation.json` when it is missing.
+claims, caveats, and hypothesis language in `/synthesis.md`; deterministic finalizer code
+runs the guardrail and creates `/synthesis_validation.json` when it is missing.
 
 ### Phase 4.7: Integrate Part 4 Therapeutic Synthesis
 
@@ -990,11 +990,11 @@ drug_md = read_file("/drug.md")
 2. Use `drug.md` only as supporting detail for evidence, target assessment context, and recommendations.
 3. Do not duplicate large blocks from either file. Write a concise synthesis section that links therapeutic findings back to Parts 1-3.
 
-#### Step 3: Hand off source tracking to report tool
+#### Step 3: Hand off source tracking to deterministic code
 
-Do not spend a separate LLM turn writing `/synthesis_targets.json`. `generate_html_report`
-detects `part4_therapeutic_synthesis.md` and `drug.md` and creates `/synthesis_targets.json`
-when it is missing.
+Do not spend a separate LLM turn writing `/synthesis_targets.json`. Deterministic finalizer
+code detects `part4_therapeutic_synthesis.md` and `drug.md` and creates
+`/synthesis_targets.json` when it is missing.
 
 #### Step 4: Reflect on findings (think_tool)
 
@@ -1010,72 +1010,24 @@ think_tool(
 ```
 
 **Note**: If `part4_therapeutic_synthesis.md` is missing but `drug.md` exists, proceed using
-`drug.md` in `/synthesis.md`; the report tool will use `drug.md` as the available source
-when creating `/synthesis_targets.json`. If both are missing, proceed to Phase 5 with
+`drug.md` in `/synthesis.md`; deterministic finalizer code will use `drug.md` as the
+available source when creating `/synthesis_targets.json`. If both are missing, proceed to Phase 5 with
 "No therapeutic analysis available".
 
-### Phase 5: Generate HTML Report (Deterministic Template Mode)
+### Phase 5: Hand Off to Deterministic Finalization
 
-Use deterministic template mode for reproducible report structure. The renderer
-reads final markdown, JSON/CSV tables, and figures from `data_dir` and renders
-the fixed Part 1, Part 2, Part 3, Summary, and Therapeutic Implications tabs.
-
-#### Synthesis Guardrail Checkpoint
-
-The `generate_html_report` tool automatically runs the synthesis guardrail immediately before rendering HTML. This checkpoint validates `/synthesis.md` against `/papers.json`, removes unsupported PMIDs, and softens unsupported mechanistic or therapeutic overclaims to hypothesis language. It also writes `/synthesis_validation.json` and `/synthesis_targets.json` when they are missing, then renders HTML. Do not bypass this checkpoint and do not run a new literature search to support synthesis claims.
-
-#### Tool Call
-
-Use deterministic template mode. Do not hand-author `part1_html`, `part2_html`,
-`part3_html`, `summary_html`, or `therapeutic_html`; the renderer reads the final
-markdown, JSON/CSV tables, and figures from `data_dir` and renders the fixed report
-structure.
-
-The report tool writes `synthesis_validation.json` and `synthesis_targets.json`; do not spend a separate LLM turn writing those bookkeeping files.
-
-```python
-# Read data directory (written by PLANNER)
-data_path = read_file("/data_path.txt")
-
-generate_html_report(
-    parts={
-        "template_mode": "comprehensive",
-        "title": "CCI Analysis Report",
-        "subtitle": "Comprehensive Cell-Cell Interaction Analysis",
-        "executive_summary": "",
-        "analysis_config": {
-            "Target Clusters": "4, 17, 14",
-            "Data Directory": data_path,
-            "NMF Factor": "Factor3",
-            "L-R Selection": "Combined score (0.4×factor + 0.4×morans + 0.2×genept)"
-        },
-        "synthesis": "",
-        "quality_score": 0.70,
-        "references": []
-    },
-    output_path="CCI_Analysis_Report.html",
-    data_dir=data_path.strip()
-)
-```
-
-**CRITICAL**: For figure paths, use the file names from `load_analysis_data` results
-(e.g., `"1.spatial.png"`, `"6.liana_MoransR.png"`). The tool resolves these relative
-to `data_dir` and converts to base64 automatically.
-
-#### Phase 5 Quality Checklist
-
-Before calling generate_html_report, verify these inputs exist:
-- [ ] `/part1_final.md`, `/part2_final.md`, `/part3_final.md`
-- [ ] `/part4_therapeutic_synthesis.md`
-- [ ] `/synthesis.md`
-- [ ] Figure files from `load_analysis_data`
-- [ ] JSON/CSV tables used by the deterministic renderer
+Confirm `/synthesis.md` is a complete Markdown document, then stop after
+`synthesis.md`.
+Do not call `generate_html_report` and do not write
+`/synthesis_validation.json`, `/synthesis_targets.json`, or HTML.
+The deterministic finalizer in the Reporter wrapper runs the synthesis guardrail,
+refreshes bookkeeping artifacts, and renders `CCI_Analysis_Report.html` after you return.
 
 ### Phase 6: Verification
 
-After generating the report:
-1. Confirm the HTML file was created
-2. Report the file path to the orchestrator
+After writing `/synthesis.md`:
+1. Confirm the file was written
+2. Report that deterministic finalizer code owns validation, targets, and HTML
 3. Summarize the key findings and quality metrics
 
 ## Report Structure
@@ -1095,7 +1047,6 @@ The HTML report will have:
 
 ### Core Tools
 - **load_analysis_data**: Load analysis results and figure paths
-- **generate_html_report**: Generate the final HTML report
 
 ### Existing Literature Validation Tools (for Phase 4.5)
 - **prepare_rag_literature**: Prepare the `/papers.json` corpus for RAG with `part_name="all"`
@@ -1108,7 +1059,7 @@ The HTML report will have:
 - **think_tool**: Optional reflection support; do not use it as a hard completion gate
 
 ### Part 4 Therapeutic Synthesis (Phase 4.7)
-- **part4_therapeutic_synthesis.md**: Canonical Part 4 narrative. Read from data_dir and integrate into synthesis and HTML report.
+- **part4_therapeutic_synthesis.md**: Canonical Part 4 narrative. Read from data_dir and integrate into synthesis.
 - **drug.md**: Supporting therapeutic assessment detail. Use only as supporting context.
 
 ## Output Files Summary
@@ -1116,11 +1067,11 @@ The HTML report will have:
 | Phase | Output File | Description |
 |-------|-------------|-------------|
 | Phase 4 | /synthesis.md | Initial synthesis draft |
-| Phase 4.5 | /synthesis_validation.json | Existing-corpus validation results |
+| Phase 4.5 | /synthesis_validation.json | Existing-corpus validation results created by deterministic code |
 | Phase 4.5 | /synthesis.md (updated) | Revised with validation |
-| Phase 4.7 | /synthesis_targets.json | Structured results for HTML report |
+| Phase 4.7 | /synthesis_targets.json | Structured results for HTML report created by deterministic code |
 | Phase 4.7 | /synthesis.md (updated) | Therapeutic Implications section added from Part 4 synthesis |
-| Phase 5 | CCI_Analysis_Report.html | Final HTML report (with Therapeutic tab) |
+| Phase 5 | CCI_Analysis_Report.html | Final HTML report rendered by deterministic code (with Therapeutic tab) |
 
 ## Guidelines
 - Connect findings across all three parts coherently
@@ -1130,7 +1081,7 @@ The HTML report will have:
 - Validate synthesis integration claims with the existing `/papers.json` RAG corpus (Phase 4.5)
 - Do not expand the literature set during REPORTER
 - **NEW**: Read part4_therapeutic_synthesis.md as canonical and drug.md as supporting detail (Phase 4.7)
-- **NEW**: Use `template_mode="comprehensive"` in generate_html_report for the fixed report structure
+- **NEW**: Stop after writing synthesis; deterministic code handles guardrail, sidecars, and HTML
 - Acknowledge limitations honestly
 """
 

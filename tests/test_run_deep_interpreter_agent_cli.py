@@ -69,10 +69,13 @@ def test_reporter_message_delegates_reporter_artifacts_to_html_tool(tmp_path):
     message = run_script._build_subagent_message("reporter", tmp_path, {}, None)
 
     assert 'write_file("/synthesis.md"' in message
+    assert "generate_html_report" not in message
     assert 'write_file("/synthesis_validation.json"' not in message
     assert 'write_file("/synthesis_targets.json"' not in message
-    assert '"template_mode": "comprehensive"' in message
-    assert "generate_html_report writes synthesis_validation.json and synthesis_targets.json" in message
+    assert "deterministic code" in message.lower()
+    assert "validation" in message
+    assert "targets" in message
+    assert "HTML" in message
 
 
 @pytest.mark.parametrize("part", [1, 2, 3])

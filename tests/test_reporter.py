@@ -74,24 +74,21 @@ REPORTER_MESSAGE = {
                 "2. search_literature_fulltext for each cross-part theme with part_name='all'\n"
                 "3. validate_claim_fulltext for cited claims with part_name='all'\n"
                 "4. Update /synthesis.md with supported, caveated, or hypothesis language\n"
-                "5. Do not write /synthesis_validation.json manually; generate_html_report creates it\n\n"
+                "5. Do not write /synthesis_validation.json manually; deterministic code creates it after you stop\n\n"
                 "### Phase 4.7: Part 4 Therapeutic Synthesis\n"
                 "1. read_file('/part4_therapeutic_synthesis.md') as the canonical Part 4 narrative\n"
                 "2. read_file('/drug.md') only as supporting therapeutic assessment detail\n"
                 "3. Add a concise Therapeutic Implications section to /synthesis.md\n"
-                "4. Do not write /synthesis_targets.json manually; generate_html_report records source tracking\n\n"
-                "### Phase 5: Generate HTML Report\n"
-                "Call generate_html_report with parts dict containing:\n"
-                "- template_mode='comprehensive'\n"
-                "- analysis_config, quality_score, references\n"
-                "- output_path='CCI_Analysis_Report.html'\n"
-                "- data_dir from /data_path.txt\n\n"
+                "4. Do not write /synthesis_targets.json manually; deterministic code records source tracking after you stop\n\n"
+                "### Phase 5: Hand Off to Deterministic Finalization\n"
+                "Confirm /synthesis.md is complete, then stop after synthesis.md.\n"
+                "The deterministic finalizer runs validation, writes targets, and renders HTML.\n\n"
                 "## CRITICAL RULES:\n"
                 "- You MUST call write_file to save /synthesis.md\n"
-                "- You MUST call generate_html_report to create the HTML report\n"
-                "- generate_html_report creates synthesis_validation.json and synthesis_targets.json when missing\n"
+                "- You MUST NOT call the HTML report tool\n"
+                "- deterministic code creates synthesis_validation.json, synthesis_targets.json, and HTML when missing\n"
                 "- Do NOT run new literature searches or create reporter-specific paper artifacts\n"
-                "- Do NOT generate part1_html/part2_html/part3_html/summary_html/therapeutic_html; use template_mode='comprehensive'\n"
+                "- Do NOT generate part1_html/part2_html/part3_html/summary_html/therapeutic_html\n"
                 "- Do NOT just output text — all outputs must be persisted to disk\n"
                 "- synthesis.md MUST include: Executive Summary, Cross-Part Themes 1-4, "
                 "Emergent Themes, Limitations\n\n"
@@ -105,7 +102,8 @@ REPORTER_MESSAGE = {
 def test_reporter_message_delegates_bookkeeping_artifacts_to_report_tool():
     content = REPORTER_MESSAGE["messages"][0]["content"]
 
-    assert "generate_html_report creates synthesis_validation.json and synthesis_targets.json" in content
+    assert "deterministic code creates synthesis_validation.json, synthesis_targets.json, and HTML" in content
+    assert "generate_html_report" not in content
     assert not re.search(r"write_file\(['\"]/synthesis_validation\.json", content)
     assert not re.search(r"write_file\(['\"]/synthesis_targets\.json", content)
 
