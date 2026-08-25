@@ -37,6 +37,10 @@ _REPORTER_TIMEOUT_ENV = "REPORTER_ATTEMPT_TIMEOUT_SECONDS"
 
 T = TypeVar("T")
 ReporterOutputState = dict[str, str]
+ReporterFinalizer = Callable[
+    [Path, tuple[str, ...]],
+    Awaitable[dict[str, Any]],
+]
 
 
 class ReporterRecoveryError(RuntimeError):
@@ -307,15 +311,32 @@ def _repeated_invalid_synthesis(
     )
 
 
+async def _default_reporter_finalizer(
+    data_dir: Path,
+    required_refresh: tuple[str, ...],
+) -> dict[str, Any]:
+    from src.agents.deep_interpreter.tools.report import _finalize_reporter_artifacts
+
+    return await asyncio.to_thread(
+        _finalize_reporter_artifacts,
+        parts={"template_mode": "comprehensive"},
+        output_path="CCI_Analysis_Report.html",
+        data_dir=str(data_dir),
+        required_refresh=required_refresh,
+    )
+
+
 async def run_reporter_with_recovery(
     *,
     invoke: Callable[[str], Awaitable[T]],
     initial_description: str,
     data_dir: str | Path,
     timeout_seconds: float | None = None,
+    finalize: ReporterFinalizer | None = None,
 ) -> T:
     root = Path(data_dir)
     timeout = timeout_seconds if timeout_seconds is not None else reporter_attempt_timeout_seconds()
+    finalizer = finalize or _default_reporter_finalizer
     audit: dict[str, Any] = {
         "status": "running",
         "attempt_count": 0,
@@ -377,7 +398,31 @@ async def run_reporter_with_recovery(
             raise
         else:
             attempt["duration_seconds"] = time.monotonic() - started
-            attempt["completion"] = inspect_reporter_completion(root, previous_state)
+            current_state = _reporter_output_state(root)
+            synthesis_changed = previous_state.get("synthesis.md") != current_state.get(
+                "synthesis.md"
+            )
+            required_refresh: tuple[str, ...] = ()
+            finalization: dict[str, Any] | None = None
+            completion_previous_state = previous_state
+            if _valid_existing_synthesis(root):
+                required_refresh = _required_reporter_refresh(
+                    root,
+                    synthesis_changed=synthesis_changed,
+                )
+                completion_previous_state = _reporter_output_state(root)
+                if required_refresh:
+                    finalization = await finalizer(root, required_refresh)
+                    required_refresh = tuple(
+                        finalization.get("required_refresh", required_refresh)
+                    )
+                attempt["required_refresh"] = list(required_refresh)
+                attempt["finalizer"] = finalization
+            attempt["completion"] = inspect_reporter_completion(
+                root,
+                completion_previous_state,
+                required_refresh=required_refresh,
+            )
             attempt["repeated_invalid_synthesis"] = _repeated_invalid_synthesis(
                 root,
                 attempt_number,
@@ -385,10 +430,20 @@ async def run_reporter_with_recovery(
             )
             cast(list[dict[str, Any]], audit["attempts"]).append(attempt)
             audit["attempt_count"] = attempt_number
+            if finalization and finalization.get("status") == "render_failed":
+                audit["status"] = "failed"
+                _write_audit(root, audit)
+                raise ReporterRecoveryError("REPORTER deterministic finalization failed.")
             if attempt["completion"]["complete"]:
                 audit["status"] = "passed"
                 _write_audit(root, audit)
                 return result
+            if _valid_existing_synthesis(root):
+                audit["status"] = "failed"
+                _write_audit(root, audit)
+                raise ReporterRecoveryError(
+                    "REPORTER deterministic finalization left incomplete artifacts."
+                )
 
         if attempt_number == 1:
             audit["recovery_used"] = True
