@@ -25,6 +25,11 @@ REPORTER_OUTPUTS = (
     "synthesis_targets.json",
     "CCI_Analysis_Report.html",
 )
+DERIVED_REPORTER_OUTPUTS = (
+    "synthesis_validation.json",
+    "synthesis_targets.json",
+    "CCI_Analysis_Report.html",
+)
 DEFAULT_REPORTER_ATTEMPT_TIMEOUT_SECONDS = 3600.0
 MAX_REPORTER_ATTEMPTS = 2
 
@@ -65,9 +70,77 @@ def _reporter_output_state(data_dir: Path) -> ReporterOutputState:
     }
 
 
+def _load_json_object(path: Path) -> dict[str, Any] | None:
+    try:
+        loaded = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return loaded if isinstance(loaded, dict) else None
+
+
+def _valid_synthesis_validation(data_dir: Path) -> bool:
+    validation = _load_json_object(data_dir / "synthesis_validation.json")
+    if validation is None:
+        return False
+    guardrail = validation.get("synthesis_guardrail")
+    return bool(
+        isinstance(guardrail, dict)
+        and guardrail.get("status") == "passed"
+        and guardrail.get("final_error_count") == 0
+    )
+
+
+def _valid_synthesis_targets(data_dir: Path) -> bool:
+    targets = _load_json_object(data_dir / "synthesis_targets.json")
+    if targets is None:
+        return False
+    from src.agents.deep_interpreter.tools.report import _default_synthesis_targets
+
+    expected = _default_synthesis_targets(str(data_dir))
+    keys = (
+        "part4_synthesis_available",
+        "drug_md_available",
+        "canonical_source",
+        "supporting_source",
+    )
+    return all(targets.get(key) == expected[key] for key in keys)
+
+
+def _valid_report_html(data_dir: Path) -> bool:
+    path = data_dir / "CCI_Analysis_Report.html"
+    if not path.is_file() or path.stat().st_size == 0:
+        return False
+    content = path.read_bytes().lower()
+    return b"<!doctype html" in content and b"<html" in content and b"</html>" in content
+
+
+def _reporter_artifact_validity(data_dir: Path) -> dict[str, bool]:
+    return {
+        "synthesis_validation.json": _valid_synthesis_validation(data_dir),
+        "synthesis_targets.json": _valid_synthesis_targets(data_dir),
+        "CCI_Analysis_Report.html": _valid_report_html(data_dir),
+    }
+
+
+def _required_reporter_refresh(
+    data_dir: Path,
+    *,
+    synthesis_changed: bool = False,
+) -> tuple[str, ...]:
+    if synthesis_changed:
+        return DERIVED_REPORTER_OUTPUTS
+    validity = _reporter_artifact_validity(data_dir)
+    for index, name in enumerate(DERIVED_REPORTER_OUTPUTS):
+        if not validity[name]:
+            return DERIVED_REPORTER_OUTPUTS[index:]
+    return ()
+
+
 def inspect_reporter_completion(
     data_dir: str | Path,
     previous_state: ReporterOutputState | None = None,
+    *,
+    required_refresh: tuple[str, ...] = (),
 ) -> dict[str, Any]:
     root = Path(data_dir)
     missing_outputs = [
@@ -93,14 +166,18 @@ def inspect_reporter_completion(
     status = guardrail.get("status")
     final_error_count = guardrail.get("final_error_count")
     current_state = _reporter_output_state(root)
+    validity = _reporter_artifact_validity(root)
+    invalid_outputs = [name for name, valid in validity.items() if not valid]
     stale_outputs = [
         name
-        for name, state in (previous_state or {}).items()
-        if current_state.get(name) == state
+        for name in required_refresh
+        if name in (previous_state or {})
+        and current_state.get(name) == previous_state[name]
     ]
 
     complete = (
         not missing_outputs
+        and not invalid_outputs
         and not stale_outputs
         and status == "passed"
         and final_error_count == 0
@@ -111,6 +188,8 @@ def inspect_reporter_completion(
         "guardrail_status": status,
         "final_error_count": final_error_count,
         "validation_parse_error": parse_error,
+        "invalid_outputs": invalid_outputs,
+        "required_refresh": required_refresh,
         "stale_outputs": stale_outputs,
     }
 

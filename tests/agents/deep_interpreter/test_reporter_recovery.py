@@ -16,6 +16,7 @@ from src.agents.deep_interpreter.reporter_recovery import (
     DEFAULT_REPORTER_ATTEMPT_TIMEOUT_SECONDS,
     ReporterRecoveryError,
     ReporterTaskRecoveryMiddleware,
+    _required_reporter_refresh,
     _reporter_output_state,
     inspect_reporter_completion,
     reporter_attempt_timeout_seconds,
@@ -23,11 +24,15 @@ from src.agents.deep_interpreter.reporter_recovery import (
 )
 
 
-def _write_reporter_outputs(data_dir: Path, *, status: str, errors: int) -> None:
-    (data_dir / "synthesis.md").write_text(
-        "# Synthesis\n\n## Executive Summary\n\nGrounded narrative.\n",
-        encoding="utf-8",
-    )
+def _write_valid_synthesis(
+    data_dir: Path,
+    *,
+    text: str = "# Synthesis\n\n## Executive Summary\n\nGrounded narrative.\n",
+) -> None:
+    (data_dir / "synthesis.md").write_text(text, encoding="utf-8")
+
+
+def _write_valid_validation(data_dir: Path, *, status: str = "passed", errors: int = 0) -> None:
     (data_dir / "synthesis_validation.json").write_text(
         json.dumps(
             {
@@ -39,11 +44,29 @@ def _write_reporter_outputs(data_dir: Path, *, status: str, errors: int) -> None
         ),
         encoding="utf-8",
     )
-    (data_dir / "synthesis_targets.json").write_text("{}", encoding="utf-8")
-    (data_dir / "CCI_Analysis_Report.html").write_text(
-        "<html>report</html>",
+
+
+def _write_valid_targets(data_dir: Path) -> None:
+    from src.agents.deep_interpreter.tools.report import _default_synthesis_targets
+
+    (data_dir / "synthesis_targets.json").write_text(
+        json.dumps(_default_synthesis_targets(str(data_dir))),
         encoding="utf-8",
     )
+
+
+def _write_valid_html(data_dir: Path) -> None:
+    (data_dir / "CCI_Analysis_Report.html").write_text(
+        "<!DOCTYPE html><html><body>report</body></html>",
+        encoding="utf-8",
+    )
+
+
+def _write_reporter_outputs(data_dir: Path, *, status: str, errors: int) -> None:
+    _write_valid_synthesis(data_dir)
+    _write_valid_validation(data_dir, status=status, errors=errors)
+    _write_valid_targets(data_dir)
+    _write_valid_html(data_dir)
 
 
 def _write_reporter_downstream_outputs(
@@ -52,16 +75,69 @@ def _write_reporter_downstream_outputs(
     status: str,
     errors: int,
 ) -> None:
-    (data_dir / "synthesis_validation.json").write_text(
-        json.dumps(
-            {"synthesis_guardrail": {"status": status, "final_error_count": errors}}
+    _write_valid_validation(data_dir, status=status, errors=errors)
+    _write_valid_targets(data_dir)
+    _write_valid_html(data_dir)
+
+
+def test_required_reporter_refresh_only_requests_missing_html(
+    tmp_path: Path,
+) -> None:
+    _write_valid_synthesis(tmp_path)
+    _write_valid_validation(tmp_path)
+    _write_valid_targets(tmp_path)
+    hashes = _reporter_output_state(tmp_path)
+
+    assert _required_reporter_refresh(tmp_path) == ("CCI_Analysis_Report.html",)
+    assert _reporter_output_state(tmp_path) == hashes
+
+
+@pytest.mark.parametrize(
+    ("invalid_artifact", "expected"),
+    [
+        (None, ()),
+        (
+            "synthesis_validation.json",
+            (
+                "synthesis_validation.json",
+                "synthesis_targets.json",
+                "CCI_Analysis_Report.html",
+            ),
         ),
-        encoding="utf-8",
-    )
-    (data_dir / "synthesis_targets.json").write_text("{}", encoding="utf-8")
-    (data_dir / "CCI_Analysis_Report.html").write_text(
-        "<html>report</html>",
-        encoding="utf-8",
+        (
+            "synthesis_targets.json",
+            ("synthesis_targets.json", "CCI_Analysis_Report.html"),
+        ),
+        ("CCI_Analysis_Report.html", ("CCI_Analysis_Report.html",)),
+    ],
+)
+def test_required_reporter_refresh_uses_downstream_suffix(
+    tmp_path: Path,
+    invalid_artifact: str | None,
+    expected: tuple[str, ...],
+) -> None:
+    _write_reporter_outputs(tmp_path, status="passed", errors=0)
+    _write_valid_targets(tmp_path)
+    if invalid_artifact == "synthesis_validation.json":
+        (tmp_path / invalid_artifact).write_text("{", encoding="utf-8")
+    elif invalid_artifact == "synthesis_targets.json":
+        (tmp_path / invalid_artifact).write_text("[]", encoding="utf-8")
+    elif invalid_artifact == "CCI_Analysis_Report.html":
+        (tmp_path / invalid_artifact).write_text("not html", encoding="utf-8")
+
+    assert _required_reporter_refresh(tmp_path) == expected
+
+
+def test_required_reporter_refresh_cascades_after_synthesis_change(
+    tmp_path: Path,
+) -> None:
+    _write_reporter_outputs(tmp_path, status="passed", errors=0)
+    _write_valid_targets(tmp_path)
+
+    assert _required_reporter_refresh(tmp_path, synthesis_changed=True) == (
+        "synthesis_validation.json",
+        "synthesis_targets.json",
+        "CCI_Analysis_Report.html",
     )
 
 
@@ -125,13 +201,16 @@ def test_inspect_reporter_completion_treats_identical_rewrite_as_stale(
 
     result = inspect_reporter_completion(tmp_path, previous)
 
-    assert set(result["stale_outputs"]) == {
-        "synthesis.md",
-        "synthesis_validation.json",
-        "synthesis_targets.json",
-        "CCI_Analysis_Report.html",
-    }
-    assert result["complete"] is False
+    assert result["complete"] is True
+    assert result["stale_outputs"] == []
+
+    refresh_result = inspect_reporter_completion(
+        tmp_path,
+        previous,
+        required_refresh=("CCI_Analysis_Report.html",),
+    )
+    assert refresh_result["stale_outputs"] == ["CCI_Analysis_Report.html"]
+    assert refresh_result["complete"] is False
 
 
 def test_deep_interpreter_agent_attaches_reporter_recovery_middleware(
@@ -411,7 +490,7 @@ async def test_reporter_recovery_retries_once_after_timeout(tmp_path: Path) -> N
 
 
 @pytest.mark.asyncio
-async def test_reporter_recovery_retries_when_first_attempt_leaves_stale_outputs(
+async def test_reporter_recovery_accepts_preserved_valid_outputs_when_no_refresh_required(
     tmp_path: Path,
 ) -> None:
     _write_reporter_outputs(tmp_path, status="passed", errors=0)
@@ -419,27 +498,6 @@ async def test_reporter_recovery_retries_when_first_attempt_leaves_stale_outputs
 
     async def invoke(description: str) -> dict[str, list[dict[str, str]]]:
         prompts.append(description)
-        if len(prompts) == 2:
-            (tmp_path / "synthesis_validation.json").write_text(
-                json.dumps(
-                    {
-                        "fresh": True,
-                        "synthesis_guardrail": {
-                            "status": "passed",
-                            "final_error_count": 0,
-                        },
-                    }
-                ),
-                encoding="utf-8",
-            )
-            (tmp_path / "synthesis_targets.json").write_text(
-                '{"fresh": true}',
-                encoding="utf-8",
-            )
-            (tmp_path / "CCI_Analysis_Report.html").write_text(
-                "<html>fresh report</html>",
-                encoding="utf-8",
-            )
         return {"messages": [{"role": "assistant", "content": "done"}]}
 
     await run_reporter_with_recovery(
@@ -449,8 +507,7 @@ async def test_reporter_recovery_retries_when_first_attempt_leaves_stale_outputs
         timeout_seconds=1,
     )
 
-    assert len(prompts) == 2
-    assert prompts[1].startswith("[REPORTER_RECOVERY]")
+    assert len(prompts) == 1
 
 
 def test_reporter_task_recovery_middleware_waits_for_timed_out_sync_reporter(
