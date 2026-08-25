@@ -52,10 +52,12 @@ class _ReporterAttemptTimedOutWithResult(TimeoutError):
         self,
         result: Any,
         finalization: dict[str, Any] | None = None,
+        finalizer_exception: Exception | None = None,
     ) -> None:
         super().__init__("REPORTER attempt timed out after producing a result")
         self.result = result
         self.finalization = finalization
+        self.finalizer_exception = finalizer_exception
 
 
 def reporter_attempt_timeout_seconds() -> float:
@@ -420,7 +422,19 @@ async def run_reporter_with_recovery(
                     try:
                         finalization = await asyncio.shield(finalizer_task)
                     except asyncio.CancelledError as exc:
-                        finalization = await finalizer_task
+                        try:
+                            finalization = await finalizer_task
+                        except Exception as finalizer_exc:
+                            finalization = {
+                                "status": "exception",
+                                "exception_type": type(finalizer_exc).__name__,
+                                "exception_repr": repr(finalizer_exc),
+                            }
+                            raise _ReporterAttemptTimedOutWithResult(
+                                result,
+                                finalization,
+                                finalizer_exc,
+                            ) from exc
                         raise _ReporterAttemptTimedOutWithResult(
                             result,
                             finalization,
@@ -476,6 +490,12 @@ async def run_reporter_with_recovery(
                 finalization=finalization,
                 completion_previous_state=completion_previous_state,
             )
+            if exc.finalizer_exception is not None:
+                audit["status"] = "failed"
+                _write_audit(root, audit)
+                raise ReporterRecoveryError(
+                    "REPORTER deterministic finalization failed."
+                ) from exc.finalizer_exception
             if finalization and finalization.get("status") == "render_failed":
                 audit["status"] = "failed"
                 _write_audit(root, audit)

@@ -1098,6 +1098,45 @@ async def test_reporter_recovery_does_not_fabricate_result_after_timeout(
 
 
 @pytest.mark.asyncio
+async def test_reporter_recovery_preserves_timeout_when_finalizer_raises_after_timeout(
+    tmp_path: Path,
+) -> None:
+    finalizer_started = asyncio.Event()
+
+    async def invoke(_description: str) -> dict[str, str]:
+        _write_valid_synthesis(tmp_path)
+        return {"content": "attempt-1-result"}
+
+    async def finalize(_root: Path, _required: tuple[str, ...]) -> dict[str, Any]:
+        finalizer_started.set()
+        await asyncio.sleep(0.05)
+        raise RuntimeError("late finalizer exploded")
+
+    with pytest.raises(ReporterRecoveryError) as exc_info:
+        await run_reporter_with_recovery(
+            invoke=invoke,
+            finalize=finalize,
+            initial_description="normal reporter request",
+            data_dir=tmp_path,
+            timeout_seconds=0.01,
+        )
+
+    assert isinstance(exc_info.value.__cause__, RuntimeError)
+    assert str(exc_info.value.__cause__) == "late finalizer exploded"
+    assert finalizer_started.is_set()
+    audit = json.loads((tmp_path / "reporter_recovery.json").read_text(encoding="utf-8"))
+    assert audit["status"] == "failed"
+    assert audit["attempt_count"] == 1
+    assert audit["recovery_used"] is False
+    assert audit["attempts"][0]["timed_out"] is True
+    assert audit["attempts"][0]["finalizer"] == {
+        "status": "exception",
+        "exception_type": "RuntimeError",
+        "exception_repr": "RuntimeError('late finalizer exploded')",
+    }
+
+
+@pytest.mark.asyncio
 async def test_reporter_recovery_persists_retry_audit_when_second_attempt_raises(
     tmp_path: Path,
 ) -> None:
