@@ -399,8 +399,9 @@ async def run_reporter_with_recovery(
         else:
             attempt["duration_seconds"] = time.monotonic() - started
             current_state = _reporter_output_state(root)
-            synthesis_changed = previous_state.get("synthesis.md") != current_state.get(
-                "synthesis.md"
+            synthesis_changed = (
+                not preserve_synthesis
+                and previous_state.get("synthesis.md") != current_state.get("synthesis.md")
             )
             required_refresh: tuple[str, ...] = ()
             finalization: dict[str, Any] | None = None
@@ -412,7 +413,35 @@ async def run_reporter_with_recovery(
                 )
                 completion_previous_state = _reporter_output_state(root)
                 if required_refresh:
-                    finalization = await finalizer(root, required_refresh)
+                    try:
+                        finalization = await finalizer(root, required_refresh)
+                    except Exception as exc:
+                        finalization = {
+                            "status": "exception",
+                            "exception_type": type(exc).__name__,
+                            "exception_repr": repr(exc),
+                        }
+                        attempt["required_refresh"] = list(required_refresh)
+                        attempt["finalizer"] = finalization
+                        attempt["completion"] = inspect_reporter_completion(
+                            root,
+                            completion_previous_state,
+                            required_refresh=required_refresh,
+                        )
+                        attempt["repeated_invalid_synthesis"] = (
+                            _repeated_invalid_synthesis(
+                                root,
+                                attempt_number,
+                                retry_preparation,
+                            )
+                        )
+                        cast(list[dict[str, Any]], audit["attempts"]).append(attempt)
+                        audit["attempt_count"] = attempt_number
+                        audit["status"] = "failed"
+                        _write_audit(root, audit)
+                        raise ReporterRecoveryError(
+                            "REPORTER deterministic finalization failed."
+                        ) from exc
                     required_refresh = tuple(
                         finalization.get("required_refresh", required_refresh)
                     )
@@ -438,7 +467,9 @@ async def run_reporter_with_recovery(
                 audit["status"] = "passed"
                 _write_audit(root, audit)
                 return result
-            if _valid_existing_synthesis(root):
+            if _valid_existing_synthesis(root) and (
+                not finalization or finalization.get("status") != "guardrail_failed"
+            ):
                 audit["status"] = "failed"
                 _write_audit(root, audit)
                 raise ReporterRecoveryError(

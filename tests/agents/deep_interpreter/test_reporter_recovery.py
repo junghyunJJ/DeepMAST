@@ -731,6 +731,90 @@ async def test_reporter_finalization_refreshes_invalid_html(
 
 
 @pytest.mark.asyncio
+async def test_reporter_finalization_guardrail_failure_uses_existing_retry_path(
+    tmp_path: Path,
+) -> None:
+    _write_valid_synthesis(tmp_path)
+    prompts: list[str] = []
+    finalizer_calls: list[tuple[str, ...]] = []
+
+    async def invoke(description: str) -> dict[str, str]:
+        prompts.append(description)
+        if len(prompts) == 2:
+            assert "Preserve /synthesis.md" in description
+            _write_reporter_downstream_outputs(tmp_path, status="passed", errors=0)
+        return {"content": f"attempt-{len(prompts)}"}
+
+    async def finalize(_root: Path, required: tuple[str, ...]) -> dict[str, Any]:
+        finalizer_calls.append(required)
+        return {
+            "status": "guardrail_failed",
+            "guardrail": {"status": "failed", "final_error_count": 1},
+            "required_refresh": list(required),
+            "refreshed_outputs": [],
+            "preserved_outputs": ["synthesis.md"],
+        }
+
+    result = await run_reporter_with_recovery(
+        invoke=invoke,
+        finalize=finalize,
+        initial_description="normal reporter request",
+        data_dir=tmp_path,
+        timeout_seconds=1,
+    )
+
+    assert result == {"content": "attempt-2"}
+    assert prompts[0] == "normal reporter request"
+    assert prompts[1].startswith("[REPORTER_RECOVERY]")
+    assert finalizer_calls == [
+        (
+            "synthesis_validation.json",
+            "synthesis_targets.json",
+            "CCI_Analysis_Report.html",
+        )
+    ]
+    audit = json.loads((tmp_path / "reporter_recovery.json").read_text(encoding="utf-8"))
+    assert audit["status"] == "passed"
+    assert audit["attempt_count"] == 2
+    assert audit["recovery_used"] is True
+    assert audit["retry_preparation"]["action"] == "preserved_valid"
+
+
+@pytest.mark.asyncio
+async def test_reporter_finalization_exception_records_failed_attempt_audit(
+    tmp_path: Path,
+) -> None:
+    _write_valid_synthesis(tmp_path)
+
+    async def invoke(_description: str) -> dict[str, str]:
+        return {"content": "done"}
+
+    async def finalize(_root: Path, _required: tuple[str, ...]) -> dict[str, Any]:
+        raise RuntimeError("renderer exploded")
+
+    with pytest.raises(ReporterRecoveryError) as exc_info:
+        await run_reporter_with_recovery(
+            invoke=invoke,
+            finalize=finalize,
+            initial_description="normal reporter request",
+            data_dir=tmp_path,
+            timeout_seconds=1,
+        )
+
+    assert isinstance(exc_info.value.__cause__, RuntimeError)
+    assert str(exc_info.value.__cause__) == "renderer exploded"
+    audit = json.loads((tmp_path / "reporter_recovery.json").read_text(encoding="utf-8"))
+    assert audit["status"] == "failed"
+    assert audit["attempt_count"] == 1
+    assert audit["recovery_used"] is False
+    assert audit["attempts"][0]["finalizer"] == {
+        "status": "exception",
+        "exception_type": "RuntimeError",
+        "exception_repr": "RuntimeError('renderer exploded')",
+    }
+
+
+@pytest.mark.asyncio
 async def test_reporter_recovery_retries_once_after_timeout(tmp_path: Path) -> None:
     prompts: list[str] = []
     never_finishes = asyncio.Event()
