@@ -300,23 +300,32 @@ def _repair_inline_citation_issues(
     ):
         return False
 
-    failed_pmids = {issue.get("inline_pmid") for issue in issues}
     key = (first.get("file"), first.get("section"), first.get("source_claim_index"))
+    matching_rows = [
+        row for row in claim_validation
+        if (row.get("file"), row.get("section"), row.get("source_claim_index")) == key
+    ]
     sibling_supported = any(
-        (row.get("file"), row.get("section"), row.get("source_claim_index")) == key
-        and row.get("status") == "supported"
-        and row.get("inline_pmid") not in failed_pmids
-        for row in claim_validation
+        row.get("status") == "supported" for row in matching_rows
     )
     if not sibling_supported and _delete_reference_only_inline_target(data_dir, first):
         return True
 
+    failed_pmids = [issue.get("inline_pmid") for issue in issues]
+    if matching_rows and not sibling_supported:
+        failed_pmids = [
+            row.get("inline_pmid")
+            for row in matching_rows
+            if row.get("status") != "supported" and row.get("inline_pmid")
+        ]
+
     repaired_value = value
-    for issue in issues:
-        inline_pmid = str(issue.get("inline_pmid") or "")
+    for inline_pmid_value in failed_pmids:
+        inline_pmid = str(inline_pmid_value or "")
         if not inline_pmid:
             return False
         repaired_value = _remove_inline_pmid(repaired_value, inline_pmid)
+    repaired_value = re.sub(r"\s+([,.;)])", r"\1", repaired_value)
     if repaired_value == value:
         return False
 

@@ -2,9 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Let synthesis guardrail repair a bounded sequence of explicit inline-citation hard errors without restoring broad same-count semantic progress, then verify Pair-15 and resume Pair-15-R2 through Pair-20.
+**Goal:** Keep synthesis guardrail progress strict and repair Pair-15's actual failure by removing all non-supported inline PMIDs for one exact claim target in one deterministic pass.
 
-**Architecture:** Keep the existing deterministic inline-PMID repair unchanged and make one narrow change to `_strict_phase_progress`: equal-count semantic movement is accepted only when both hard-error frontiers contain exclusively repairable inline-citation codes and their exact claim keys are disjoint. Validate with a Pair-15-shaped TDD reproduction, isolated finalizer and Reporter-only replays, independent review, and only then launch the approved sequential pairs.
+**Round 2 ruling:** The original equal-count frontier design is disproven. Live Pair-15 revalidation increased hard errors from 1 to 2, so `_strict_phase_progress` must retain aggregate same-phase decrease. When a hard repairable inline issue triggers and no supported sibling exists for its exact `(file, section, source_claim_index)`, `_repair_inline_citation_issues` removes all matching non-supported PMIDs (`overclaimed`, `unsupported`, and `unverifiable`) together. Supported siblings are preserved; reference-only deletion is unchanged.
+
+**Architecture:** Restore strict `_strict_phase_progress`; make the narrow repair-root change in `scripts/repair_report.py` and cover it with three-PMID unit and synthesis guardrail regressions.
 
 **Tech Stack:** Python 3.12, pathlib, JSON, pytest, existing DeepMAST guardrails/Reporter finalizer, Ollama `qwen3.5:122b`, SGCP-RAG, tmux
 

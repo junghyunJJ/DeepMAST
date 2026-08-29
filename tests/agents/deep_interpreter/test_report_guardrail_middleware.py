@@ -728,44 +728,6 @@ def test_strict_phase_progress_accepts_only_safe_phase_transitions() -> None:
     )
 
 
-def test_strict_phase_progress_allows_only_disjoint_inline_citation_frontier() -> None:
-    from src.agents.deep_interpreter import report_guardrails
-
-    first = {
-        "severity": "error",
-        "code": "inline_citation_overclaimed",
-        "file": "synthesis.md",
-        "section": "## Cross-Part Themes",
-        "value": "Mechanism A (PMID: 11111111; PMID: 22222222).",
-        "inline_pmid": "11111111",
-    }
-    second = {
-        **first,
-        "value": "Mechanism A (PMID: 22222222).",
-        "inline_pmid": "22222222",
-    }
-    generic = {
-        "severity": "error",
-        "code": "synthesis_consistency_unresolved",
-        "file": "synthesis.md",
-        "section": "## Cross-Part Themes",
-        "value": "Different semantic target",
-    }
-
-    assert report_guardrails._strict_phase_progress(
-        [first], "semantic", [second], "semantic"
-    )
-    assert not report_guardrails._strict_phase_progress(
-        [first], "semantic", [first], "semantic"
-    )
-    assert not report_guardrails._strict_phase_progress(
-        [first], "semantic", [generic], "semantic"
-    )
-    assert not report_guardrails._strict_phase_progress(
-        [first], "semantic", [second, generic], "semantic"
-    )
-
-
 def test_synthesis_warning_issue_has_no_generic_repair_fields(tmp_path: Path) -> None:
     from src.agents.deep_interpreter import report_guardrails
 
@@ -962,122 +924,55 @@ def test_run_synthesis_guardrail_removes_only_unsupported_sibling_citation(
     assert final["inline_citation_coverage"]["coverage_complete"] is True
 
 
-def test_run_synthesis_guardrail_repairs_cascading_inline_citation_frontier(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
+def test_run_synthesis_guardrail_removes_grouped_non_supported_inline_pmids(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from src.agents.deep_interpreter import report_guardrails
 
-    pmids = ("11111111", "22222222")
-    (tmp_path / "papers.json").write_text(
-        json.dumps(
-            {
-                "papers": [
-                    {"pmid": pmid, "abstract": "association-only evidence"}
-                    for pmid in pmids
-                ]
-            }
-        ),
-        encoding="utf-8",
-    )
+    pmids = ("11111111", "22222222", "33333333")
+    claim = "**Integration**: Mechanism A directly drives response (PMID: 11111111; PMID: 22222222; PMID: 33333333)."
+    (tmp_path / "papers.json").write_text(json.dumps({"papers": []}), encoding="utf-8")
     (tmp_path / "synthesis.md").write_text(
-        "# Synthesis Report\n\n"
-        "## Cross-Part Themes\n\n"
-        "**Integration**: Mechanism A directly drives response "
-        "(PMID: 11111111; PMID: 22222222).\n",
-        encoding="utf-8",
+        f"# Synthesis Report\n\n## Cross-Part Themes\n\n{claim}\n", encoding="utf-8"
     )
 
-    def fake_claim_validate(
-        _data_dir: Path,
-        filenames: tuple[str, ...],
-        **_kwargs: Any,
-    ) -> dict[str, Any]:
+    def fake_validate(_data_dir: Path, filenames: tuple[str, ...], **_kwargs: Any) -> dict[str, Any]:
         assert filenames == ("synthesis.md",)
         text = (tmp_path / "synthesis.md").read_text(encoding="utf-8")
-        claim = next(line for line in text.splitlines() if line.startswith("**Integration**"))
-        remaining = [pmid for pmid in pmids if f"PMID: {pmid}" in claim]
-        claims = [
-            {
-                "file": "synthesis.md",
-                "section": "## Cross-Part Themes",
-                "source_claim_index": 0,
-                "inline_pmid": pmid,
-                "claim": claim,
-                "status": "overclaimed" if pmid == remaining[0] else "unverifiable",
-                "supporting_pmids": [],
-                "evidence_quote": "association-only evidence",
-                "reason": "the evidence does not support the asserted mechanism",
-            }
-            for pmid in remaining
-        ]
-        if remaining:
-            issues = [
-                {
-                    "code": "inline_citation_overclaimed",
-                    "severity": "error",
-                    "file": "synthesis.md",
-                    "section": "## Cross-Part Themes",
-                    "source_claim_index": 0,
-                    "inline_pmid": remaining[0],
-                    "value": claim,
-                    "target_text": claim,
-                }
-            ]
-        else:
-            claims = [
-                {
-                    "file": "synthesis.md",
-                    "section": "## Cross-Part Themes",
-                    "source_claim_index": 0,
-                    "inline_pmid": None,
-                    "claim": claim,
-                    "status": "overclaimed",
-                    "supporting_pmids": [],
-                    "evidence_quote": "association-only evidence",
-                    "reason": "the uncited interpretation remains a warning",
-                }
-            ]
-            issues = [
-                {
-                    "code": "claim_rag_overclaimed",
-                    "severity": "warning",
-                    "file": "synthesis.md",
-                    "section": "## Cross-Part Themes",
-                    "value": claim,
-                }
-            ]
+        remaining = [pmid for pmid in pmids if pmid in text]
+        claims = [{
+            "file": "synthesis.md", "section": "## Cross-Part Themes", "source_claim_index": 0,
+            "inline_pmid": pmid, "claim": claim, "status": "overclaimed" if pmid == "11111111" else "unverifiable",
+        } for pmid in remaining]
+        issues = [{
+            "code": "inline_citation_overclaimed", "severity": "error", "file": "synthesis.md",
+            "section": "## Cross-Part Themes", "source_claim_index": 0, "inline_pmid": remaining[0],
+            "value": claim, "target_text": claim,
+        }] if remaining else [{
+            "code": "claim_rag_overclaimed", "severity": "warning", "file": "synthesis.md",
+            "section": "## Cross-Part Themes", "value": "Mechanism A directly drives response.",
+        }]
         return {
-            "claims": claims,
-            "issues": issues,
+            "claims": claims, "issues": issues,
             "selection": {"selected_claim_count": len(claims)},
-            "inline_citation_coverage": {
-                "expected_count": len(remaining),
-                "evaluated_count": len(remaining),
-                "supported_count": 0,
-                "coverage_complete": not remaining,
-                "citations": claims,
-            },
+            "inline_citation_coverage": {"expected_count": len(remaining), "evaluated_count": len(remaining),
+                                         "supported_count": 0, "coverage_complete": not remaining, "citations": claims},
         }
 
+    monkeypatch.setattr(report_guardrails.claim_rag_validation, "validate_claims", fake_validate)
     monkeypatch.setattr(
-        report_guardrails.claim_rag_validation, "validate_claims", fake_claim_validate
-    )
-    monkeypatch.setattr(
-        report_guardrails.repair_report_script,
-        "_create_model",
+        report_guardrails.repair_report_script, "_create_model",
         lambda *_: (_ for _ in ()).throw(AssertionError("model must not be called")),
     )
 
     result = report_guardrails.run_synthesis_guardrail(tmp_path, provider="ollama")
 
-    synthesis = (tmp_path / "synthesis.md").read_text(encoding="utf-8")
+    repaired = (tmp_path / "synthesis.md").read_text(encoding="utf-8")
     assert result["status"] == "passed"
-    assert result["repair_attempt_count"] == 2
-    assert result["changed_claims"] == 2
+    assert result["repair_attempt_count"] == 1
+    assert result["changed_claims"] == 3
     assert result["final_error_count"] == 0
-    assert "11111111" not in synthesis
-    assert "22222222" not in synthesis
+    assert all(pmid not in repaired for pmid in pmids)
 
 
 def test_run_synthesis_guardrail_removes_sole_failed_inline_pmid_without_model(

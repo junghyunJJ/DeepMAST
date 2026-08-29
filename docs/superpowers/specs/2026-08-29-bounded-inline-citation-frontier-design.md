@@ -1,14 +1,25 @@
 # Bounded Inline Citation Frontier Design
 
-**Status:** Narrow amendment to
+**Status:** Superseded by grouped non-supported citation cleanup (Task 1
+round 2). The former frontier proposal is disproven by live Pair-15 evidence.
+
+**Historical status:** Narrow amendment to
 `2026-08-22-high-precision-guardrail-simplification-design.md` and
 `2026-08-25-reporter-deterministic-finalization-design.md`
 
-## Goal
+## Binding Goal
 
 Allow deterministic synthesis repair to finish a multi-PMID claim when explicit
 inline-citation failures surface one at a time, without restoring broad
-equal-count semantic frontier acceptance or weakening any citation hard gate.
+Keep `_strict_phase_progress` strict while making one deterministic repair
+remove every non-supported inline PMID for the exact `(file, section,
+source_claim_index)` claim when any hard repairable inline issue triggers and
+no supported sibling exists. Supported siblings remain preserved; reference-
+only deletion remains unchanged.
+
+The previously proposed equal-count semantic frontier is rejected: Pair-15
+revalidation increased the hard-error count from 1 to 2, so frontier admission
+could not solve the actual failure.
 
 ## Failure Evidence
 

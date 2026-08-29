@@ -811,6 +811,34 @@ def test_repair_removes_grouped_failed_inline_pmids_without_llm(
     assert "Tail text stays put." in text
 
 
+def test_repair_removes_all_non_supported_inline_pmids_without_llm(
+    tmp_path: Path,
+) -> None:
+    claim = "Mechanism A directly drives response (PMID: 11111111; PMID: 22222222; PMID: 33333333)."
+    report = tmp_path / "synthesis.md"
+    report.write_text(f"## Cross-Part Themes\n{claim}\n", encoding="utf-8")
+    issues_path = _write_issues(tmp_path, [{
+        "severity": "error",
+        "code": "inline_citation_overclaimed",
+        "file": report.name,
+        "section": "## Cross-Part Themes",
+        "source_claim_index": 0,
+        "inline_pmid": "11111111",
+        "value": claim,
+        "target_text": claim,
+    }])
+    rows = [
+        {"file": report.name, "section": "## Cross-Part Themes", "source_claim_index": 0,
+         "inline_pmid": pmid, "status": status}
+        for pmid, status in (("11111111", "overclaimed"), ("22222222", "unverifiable"), ("33333333", "unverifiable"))
+    ]
+
+    assert repair_report.repair_report(
+        tmp_path, issues_path, llm=FailLLM(), claim_validation=rows
+    ) == 1
+    assert report.read_text(encoding="utf-8") == "## Cross-Part Themes\nMechanism A directly drives response.\n"
+
+
 def test_repair_deletes_unsupported_reference_only_inline_target_without_llm(
     tmp_path: Path,
 ) -> None:
