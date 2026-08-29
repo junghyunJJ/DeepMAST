@@ -931,12 +931,19 @@ def test_run_synthesis_guardrail_removes_grouped_non_supported_inline_pmids(
 
     pmids = ("11111111", "22222222", "33333333")
     claim = "**Integration**: Mechanism A directly drives response (PMID: 11111111; PMID: 22222222; PMID: 33333333)."
-    (tmp_path / "papers.json").write_text(json.dumps({"papers": []}), encoding="utf-8")
+    (tmp_path / "papers.json").write_text(
+        json.dumps({"papers": [{"pmid": pmid, "abstract": "association-only evidence"} for pmid in pmids]}),
+        encoding="utf-8",
+    )
     (tmp_path / "synthesis.md").write_text(
         f"# Synthesis Report\n\n## Cross-Part Themes\n\n{claim}\n", encoding="utf-8"
     )
 
+    validate_calls = 0
+
     def fake_validate(_data_dir: Path, filenames: tuple[str, ...], **_kwargs: Any) -> dict[str, Any]:
+        nonlocal validate_calls
+        validate_calls += 1
         assert filenames == ("synthesis.md",)
         text = (tmp_path / "synthesis.md").read_text(encoding="utf-8")
         remaining = [pmid for pmid in pmids if pmid in text]
@@ -970,9 +977,12 @@ def test_run_synthesis_guardrail_removes_grouped_non_supported_inline_pmids(
     repaired = (tmp_path / "synthesis.md").read_text(encoding="utf-8")
     assert result["status"] == "passed"
     assert result["repair_attempt_count"] == 1
-    assert result["changed_claims"] == 3
+    assert result["changed_claims"] == 1
     assert result["final_error_count"] == 0
     assert all(pmid not in repaired for pmid in pmids)
+    assert validate_calls == 2
+    assert " ." not in repaired
+    assert "()" not in repaired
 
 
 def test_run_synthesis_guardrail_removes_sole_failed_inline_pmid_without_model(
