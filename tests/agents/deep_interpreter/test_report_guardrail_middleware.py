@@ -728,6 +728,60 @@ def test_strict_phase_progress_accepts_only_safe_phase_transitions() -> None:
     )
 
 
+def test_strict_phase_progress_allows_only_disjoint_repairable_inline_same_count() -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    def inline_issue(value: str, section: str = "## Cross-Part Themes") -> dict[str, str]:
+        return {
+            "severity": "error",
+            "code": "inline_citation_overclaimed",
+            "file": "synthesis.md",
+            "section": section,
+            "value": value,
+        }
+
+    reference = inline_issue(
+        "PMID: 18922900 - LRIG1 suppression in ErbB2+ tumors",
+        "## References",
+    )
+    prose = inline_issue(
+        "Literature support (PMID: 28174229, 26148232, 39753722) confirms an ErbB mechanism."
+    )
+    other = inline_issue("A second inline target.")
+    generic = {
+        "severity": "error",
+        "code": "synthesis_consistency_unresolved",
+        "file": "synthesis.md",
+        "section": "## Cross-Part Themes",
+        "value": "A generic semantic target.",
+    }
+
+    assert report_guardrails._strict_phase_progress(
+        [reference], "semantic", [prose], "semantic"
+    )
+    assert not report_guardrails._strict_phase_progress(
+        [reference], "semantic", [reference], "semantic"
+    )
+    assert not report_guardrails._strict_phase_progress(
+        [reference, other], "semantic", [other, prose], "semantic"
+    )
+    assert not report_guardrails._strict_phase_progress(
+        [reference], "semantic", [prose, other], "semantic"
+    )
+    assert not report_guardrails._strict_phase_progress(
+        [reference, other], "semantic", [prose, generic], "semantic"
+    )
+    assert not report_guardrails._strict_phase_progress(
+        [generic], "semantic", [{**generic, "value": "Another generic target."}], "semantic"
+    )
+    assert not report_guardrails._strict_phase_progress(
+        [reference], "semantic", [prose], "deterministic"
+    )
+    assert not report_guardrails._strict_phase_progress(
+        [], "semantic", [], "semantic"
+    )
+
+
 def test_synthesis_warning_issue_has_no_generic_repair_fields(tmp_path: Path) -> None:
     from src.agents.deep_interpreter import report_guardrails
 
@@ -983,6 +1037,163 @@ def test_run_synthesis_guardrail_removes_grouped_non_supported_inline_pmids(
     assert validate_calls == 2
     assert " ." not in repaired
     assert "()" not in repaired
+
+
+def test_run_synthesis_guardrail_repairs_pair16_disjoint_inline_frontier(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    reference = (
+        "PMID: 18922900 - LRIG1 suppression in ErbB2+ tumors creates "
+        "feed-forward loop contributing to overexpression"
+    )
+    compound = (
+        "Literature support (PMID: 28174229, 26148232, 39753722) confirms "
+        "ErbB2 overexpression alters cellular phenotype, LRIG1 negatively "
+        "regulates ErbB3, and NRG1-ERBB3 signaling drives CTC survival."
+    )
+    pmids = ("18922900", "28174229", "26148232", "39753722")
+    (tmp_path / "papers.json").write_text(
+        json.dumps(
+            {
+                "papers": [
+                    {"pmid": pmid, "abstract": "captured Pair-16 evidence"}
+                    for pmid in pmids
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / "synthesis.md").write_text(
+        "# Synthesis Report\n\n"
+        f"## Cross-Part Themes\n\n{compound}\n\n"
+        f"## References\n\n{reference}\n",
+        encoding="utf-8",
+    )
+
+    validate_calls = 0
+
+    def citation(
+        *,
+        section: str,
+        index: int,
+        pmid: str,
+        claim: str,
+        status: str,
+    ) -> dict[str, Any]:
+        return {
+            "file": "synthesis.md",
+            "section": section,
+            "source_claim_index": index,
+            "inline_pmid": pmid,
+            "claim": claim,
+            "status": status,
+            "supporting_pmids": [pmid] if status == "supported" else [],
+            "evidence_quote": "captured Pair-16 evidence",
+            "reason": "captured Pair-16 judgment",
+        }
+
+    def hard_issue(row: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "code": "inline_citation_overclaimed",
+            "severity": "error",
+            "file": row["file"],
+            "section": row["section"],
+            "source_claim_index": row["source_claim_index"],
+            "inline_pmid": row["inline_pmid"],
+            "value": row["claim"],
+            "target_text": row["claim"],
+        }
+
+    def fake_validate(
+        _data_dir: Path,
+        filenames: tuple[str, ...],
+        **_kwargs: Any,
+    ) -> dict[str, Any]:
+        nonlocal validate_calls
+        validate_calls += 1
+        assert filenames == ("synthesis.md",)
+        text = (tmp_path / "synthesis.md").read_text(encoding="utf-8")
+        if reference in text:
+            claims = [
+                citation(
+                    section="## References",
+                    index=4,
+                    pmid="18922900",
+                    claim=reference,
+                    status="overclaimed",
+                )
+            ]
+            issues = [hard_issue(claims[0])]
+        elif "28174229" in text:
+            claims = [
+                citation(
+                    section="## Cross-Part Themes",
+                    index=13,
+                    pmid=pmid,
+                    claim=compound,
+                    status="overclaimed" if pmid == "28174229" else "supported",
+                )
+                for pmid in ("28174229", "26148232", "39753722")
+            ]
+            issues = [hard_issue(claims[0])]
+        else:
+            claims = [
+                citation(
+                    section="## Cross-Part Themes",
+                    index=13,
+                    pmid=pmid,
+                    claim=compound,
+                    status="supported",
+                )
+                for pmid in ("26148232", "39753722")
+            ]
+            issues = []
+        return {
+            "claims": claims,
+            "issues": issues,
+            "selection": {"selected_claim_count": len(claims)},
+            "inline_citation_coverage": {
+                "expected_count": len(claims),
+                "evaluated_count": len(claims),
+                "supported_count": sum(
+                    row["status"] == "supported" for row in claims
+                ),
+                "coverage_complete": not issues,
+                "citations": claims,
+            },
+        }
+
+    monkeypatch.setattr(
+        report_guardrails.claim_rag_validation,
+        "validate_claims",
+        fake_validate,
+    )
+    monkeypatch.setattr(
+        report_guardrails.repair_report_script,
+        "_create_model",
+        lambda *_: (_ for _ in ()).throw(AssertionError("model must not be called")),
+    )
+
+    result = report_guardrails.run_synthesis_guardrail(
+        tmp_path,
+        provider="ollama",
+    )
+
+    repaired = (tmp_path / "synthesis.md").read_text(encoding="utf-8")
+    assert result["status"] == "passed"
+    assert result["initial_error_count"] == 1
+    assert result["repair_attempt_count"] == 2
+    assert result["terminal_repair_count"] == 0
+    assert result["changed_claims"] == 2
+    assert result["final_error_count"] == 0
+    assert reference not in repaired
+    assert "28174229" not in repaired
+    assert "26148232" in repaired
+    assert "39753722" in repaired
+    assert validate_calls == 3
 
 
 def test_run_synthesis_guardrail_removes_sole_failed_inline_pmid_without_model(

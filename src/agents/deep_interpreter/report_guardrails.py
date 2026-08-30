@@ -147,7 +147,23 @@ def _strict_phase_progress(
         return False
     before_count = _error_count(before)
     after_count = _error_count(after)
-    return after_count < before_count
+    if after_count < before_count:
+        return True
+    if before_phase != "semantic" or after_count != before_count or not before_count:
+        return False
+
+    before_errors = [issue for issue in before if issue.get("severity") == "error"]
+    after_errors = [issue for issue in after if issue.get("severity") == "error"]
+    repairable = repair_report_script.REPAIRABLE_INLINE_CITATION_CODES
+    if any(
+        issue.get("code") not in repairable
+        for issue in (*before_errors, *after_errors)
+    ):
+        return False
+
+    before_keys = {_issue_claim_key(issue) for issue in before_errors}
+    after_keys = {_issue_claim_key(issue) for issue in after_errors}
+    return bool(before_keys and after_keys) and before_keys.isdisjoint(after_keys)
 
 
 def _section_for_claim(text: str, claim: str) -> str:
