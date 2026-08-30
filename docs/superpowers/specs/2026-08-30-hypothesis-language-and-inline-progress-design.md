@@ -1,7 +1,7 @@
 # Hypothesis Language and Inline Progress Design
 
-**Status:** Approved for implementation after independent artifact diagnosis
-and independent spec review.
+**Status:** Post-fix Replay A amendment approved by independent review; full
+sequence remains blocked pending TDD, final review, and replay re-verification.
 
 **Supersedes for this work:**
 `docs/superpowers/specs/2026-08-29-bounded-inline-citation-frontier-design.md`
@@ -10,13 +10,16 @@ contradictory frontier text is not authoritative here.
 
 ## Goal
 
-Fix only the two code defects independently reproduced at HEAD `3dcd928`:
+Fix the two code defects independently reproduced at HEAD `3dcd928` and the
+shared repair-integrity defect exposed by post-fix Replay A:
 
 1. accept plural `hypotheses` as explicit hypothesis language in the
    pathway-factor validator; and
 2. preserve a successful semantic inline-citation repair when revalidation
    surfaces a different, disjoint repairable inline-citation hard error at the
    same non-zero hard-error count.
+3. never strip a leading PMID that is the grammatical subject of a prose claim;
+   route that exact target to the existing structured repair path instead.
 
 The fixes must retain fail-closed behavior outside those exact boundaries.
 
@@ -86,6 +89,32 @@ exhausted, and the original hashes were unchanged.
 Decision: Pair-17 remains a content/stochastic rerun case. Do not change repair
 budgets, timeouts, or guardrail policy for it.
 
+### Post-fix Pair-15 Replay A: necessary repairs exposed a malformed fragment
+
+At reviewed HEAD `5b4cc8a`, deterministic validation accepts the exact plural
+sentence and reports zero hard errors. The first full semantic Part guardrail
+then discovers 19 legitimate hard inline-citation errors, completes two repair
+passes with zero final hard errors, preserves all headings, and leaves the
+original artifact unchanged.
+
+Those semantic repairs are necessary; the earlier zero-repair assumption is
+superseded. Most changes remove only unsupported inline PMIDs. Three exact
+targets begin with a PMID used as the grammatical subject:
+
+- two distinct `PMID: 28174229 demonstrates ...` claims for CDH1-ERBB3 and
+  LRIG1-ERBB2; and
+- `PMID: 39753722 reports ...`.
+
+The current `_remove_inline_pmid` deletes only the PMID token and leaves
+`demonstrates ...` / `reports ...` without a subject. Final validation does not
+detect the malformed prose.
+
+Decision: when a repairable inline claim begins with its flagged `PMID:` token
+and the next non-whitespace character is a letter, deterministic token stripping
+must return unchanged. The existing exact-target structured repair then owns
+delete/replace. Parenthetical/grouped citations and exact reference-only line
+deletion retain their current deterministic paths.
+
 ## Selected Progress Policy
 
 Keep all existing phase and count behavior, then admit equal-count progress
@@ -132,6 +161,8 @@ admission remain unchanged.
 | K | semantic to deterministic | progress rejected |
 | L | zero-count/empty frontier | progress rejected |
 | M | Pair-16-shaped guardrail chain | reference deletion, disjoint `1 -> 1`, next deterministic repair, final hard errors zero, no model repair |
+| N | `PMID: ... demonstrates/reports ...` prose-prefix target | deterministic strip declines; structured exact-target repair owns the change |
+| O | grouped/parenthetical and reference-only targets | existing deterministic behavior retained |
 
 Every production change follows RED, observed expected failure, minimal GREEN,
 and focused regression verification.
@@ -143,11 +174,13 @@ Modify only:
 - `scripts/validate_report.py`;
 - `tests/scripts/test_validate_report.py`;
 - `src/agents/deep_interpreter/report_guardrails.py`; and
-- `tests/agents/deep_interpreter/test_report_guardrail_middleware.py`.
+- `tests/agents/deep_interpreter/test_report_guardrail_middleware.py`;
+- `scripts/repair_report.py`; and
+- `tests/scripts/test_repair_report.py`.
 
-Use `scripts/repair_report.py` and its tests unchanged unless a RED test proves
-the existing deterministic repair is insufficient. Current artifact replay
-already proves it is sufficient, so the default is no change.
+The first two implementation tasks keep `scripts/repair_report.py` unchanged.
+Post-fix Replay A now provides the required RED evidence for one additional
+guard inside `_remove_inline_pmid`; no other repair behavior may change.
 
 Preserve the grouped non-supported inline-PMID repair implemented by
 `scripts/repair_report.py`: when no supported sibling exists for the exact
@@ -174,7 +207,7 @@ No new dependency, module, configuration switch, or abstraction is allowed.
 
 ### Code and review
 
-- matrix A-M passes;
+- matrix A-O passes;
 - the exact regression command below passes:
 
   ```bash
@@ -197,11 +230,14 @@ No new dependency, module, configuration switch, or abstraction is allowed.
   ```bash
   ruff check \
     scripts/validate_report.py \
+    scripts/repair_report.py \
     src/agents/deep_interpreter/report_guardrails.py \
     tests/scripts/test_validate_report.py \
+    tests/scripts/test_repair_report.py \
     tests/agents/deep_interpreter/test_report_guardrail_middleware.py
   python -m py_compile \
     scripts/validate_report.py \
+    scripts/repair_report.py \
     src/agents/deep_interpreter/report_guardrails.py
   git diff --check
   ```
@@ -216,7 +252,9 @@ Run on a fresh copy, never the original. Require:
 
 - the exact plural-hypothesis sentence is accepted;
 - final hard errors are zero;
-- repair attempts and Markdown rewrites are unnecessary;
+- necessary semantic citation repairs are allowed, but every changed target
+  must trace to an initial hard error and final prose must contain no dangling
+  `demonstrates` / `reports` fragment;
 - heading structure is unchanged; and
 - original artifact hashes remain unchanged.
 

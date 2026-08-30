@@ -179,6 +179,57 @@ Original Part hashes after replay:
 - Part 2: `e430620cff1a49b4ada24e7e2eb82393c72752ff02653d02a35a1050a904cd8f`
 - Part 3: `08da49b8d61da2551ebce15c1cc08d971f7bcf42f8a86aed425a3ac3d4abe09a`
 
+## Post-Fix Replay A Integrity Finding
+
+Durable replay root:
+`res/deep_interpreter/bc/sni_repair_ablation/post_repair_integrity_isolated_replays_20260830T080523Z/pair-15-R2/wiki-off`
+
+Reviewed implementation HEAD: `5b4cc8a846b4487771797fa9ce036ae8c13e9fd9`.
+
+Deterministic post-fix validation:
+
+```json
+{
+  "issue_count": 11,
+  "hard_error_count": 0,
+  "Factor3: Hypoxia": "absent"
+}
+```
+
+Full production Part guardrail:
+
+```json
+{
+  "status": "passed",
+  "deterministic_initial_error_count": 0,
+  "semantic_initial_error_count": 19,
+  "repair_attempt_count": 2,
+  "changed_sections": 20,
+  "final_error_count": 0,
+  "headings_unchanged": true,
+  "original_hashes_unchanged": true
+}
+```
+
+The semantic hard errors are legitimate unsupported/overclaimed inline
+citations. Most final diffs remove only the flagged PMID. The shared token
+stripper produces malformed prose for three claims whose PMID is the
+grammatical subject: two distinct PMID 28174229 claims (CDH1-ERBB3 and
+LRIG1-ERBB2) and one PMID 39753722 claim.
+
+```text
+PMID: 28174229 demonstrates ...  ->   demonstrates ...  (two claims)
+PMID: 39753722 reports ...       ->   reports ...
+```
+
+The replay summary is
+`post_fix_part_replay.json`; the final artifact fragments appear in
+the live replay-root `part3_final.md`. The copied `after/part3_final.md` and
+`diffs/part3_final.md.diff` are older snapshots and do not represent that final
+mutated file. Independent critic verdict: `BLOCK FULL SEQUENCE` until a
+prose-prefix guard routes all three targets to structured exact-target repair
+and Replay A is clean.
+
 ## Baseline Regression
 
 At HEAD `3dcd928` before new production edits:

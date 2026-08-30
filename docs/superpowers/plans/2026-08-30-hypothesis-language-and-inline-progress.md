@@ -2,9 +2,15 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Remove the reproduced Pair-15 plural-hypothesis false positive and preserve only Pair-16-shaped disjoint repairable inline-citation progress without relaxing any other guardrail boundary.
+**Goal:** Remove the Pair-15 plural-hypothesis false positive, preserve only
+Pair-16-shaped disjoint repairable inline-citation progress, and prevent a
+leading PMID repair from leaving subjectless prose.
 
-**Architecture:** Make two local policy edits at the existing shared decision points. `HYPOTHESIS_RE` gains the missing plural word form; `_strict_phase_progress` keeps current phase/count behavior and adds one same-count semantic exception derived entirely from existing repairable codes and claim keys.
+**Architecture:** Make three local policy edits at existing shared decision
+points. `HYPOTHESIS_RE` gains the missing plural word form;
+`_strict_phase_progress` adds one bounded same-count exception; and
+`_remove_inline_pmid` declines only a leading-PMID alphabetic prose target so
+the existing structured exact-target repair handles it.
 
 **Tech Stack:** Python 3.11, stdlib `re`, pytest, existing Deep Interpreter validator and guardrail modules.
 
@@ -13,8 +19,15 @@
 ## Global Constraints
 
 - Treat the spec and `docs/superpowers/specs/2026-08-30-hypothesis-language-and-inline-progress-evidence.md` as authoritative; the 2026-08-29 frontier documents are historical only.
-- Modify only `scripts/validate_report.py`, `tests/scripts/test_validate_report.py`, `src/agents/deep_interpreter/report_guardrails.py`, and `tests/agents/deep_interpreter/test_report_guardrail_middleware.py`.
-- Do not modify `scripts/repair_report.py`; its grouped non-supported inline-PMID cleanup, supported-sibling retention, reference-only deletion, and named regressions must remain intact.
+- Planned production/test scope is limited to `scripts/validate_report.py`,
+  `tests/scripts/test_validate_report.py`,
+  `src/agents/deep_interpreter/report_guardrails.py`,
+  `tests/agents/deep_interpreter/test_report_guardrail_middleware.py`,
+  `scripts/repair_report.py`, and `tests/scripts/test_repair_report.py`.
+- Tasks 1-3 preserve `scripts/repair_report.py`. Task 4 may add only the
+  replay-proven leading-PMID prose guard and its focused tests; grouped
+  non-supported cleanup, supported-sibling retention, and reference-only
+  deletion must remain intact.
 - Keep deterministic-to-semantic admission and same-phase lower-count admission unchanged.
 - Equal-count progress requires semantic phases, equal non-zero counts, exclusively `REPAIRABLE_INLINE_CITATION_CODES`, non-empty key sets, and disjoint `(file, section, value)` key sets.
 - Equal-count count increase, same/overlapping targets, mixed/generic errors, phase regression, and zero-count/empty frontiers remain rejected.
@@ -31,6 +44,8 @@
 - `tests/scripts/test_validate_report.py` — Pair-15 exact-sentence regression plus existing singular/variant/significance boundaries.
 - `src/agents/deep_interpreter/report_guardrails.py` — shared repair progress admission used by Part and synthesis loops.
 - `tests/agents/deep_interpreter/test_report_guardrail_middleware.py` — Pair-16 progress truth table and real two-repair guardrail chain.
+- `scripts/repair_report.py` — shared inline-PMID token stripping and structured fallback routing.
+- `tests/scripts/test_repair_report.py` — replay-shaped leading-PMID RED/GREEN and retained deterministic boundaries.
 
 No production or test file is created.
 
@@ -614,16 +629,197 @@ Expected: only the four approved implementation/test files differ from
 `3dcd928`, in addition to the committed superseding spec, evidence, and plan.
 No new commit is made for a verification-only task.
 
+### Task 4: Preserve grammar for a leading-PMID prose target
+
+**Files:**
+- Modify: `tests/scripts/test_repair_report.py`
+- Modify: `scripts/repair_report.py:160-171`
+
+**Interfaces:**
+- Consumes: `_remove_inline_pmid(value: str, pmid: str) -> str` and the existing
+  exact-target structured repair fallback in `repair_issues`.
+- Produces: a leading `PMID: <id> <alphabetic prose>` target declines
+  deterministic token stripping so structured delete/replace owns the whole
+  target.
+- Preserves: parenthetical/grouped inline removal, supported siblings,
+  reference-only line deletion, headings, repair budgets, and progress policy.
+
+- [ ] **Step 1: Add the replay-shaped failing regression**
+
+Add beside the existing inline-PMID repair tests:
+
+```python
+def test_repair_routes_leading_pmid_prose_to_structured_target_repair(
+    tmp_path: Path,
+) -> None:
+    for case, issue_code, pmid, target in (
+        (
+            "cdh1_erbb3",
+            "inline_citation_overclaimed",
+            "28174229",
+            "PMID: 28174229 demonstrates that ErbB2 overexpression alters "
+            "the proteome and phosphosignaling in mammary luminal epithelial "
+            "cells, with CDH1-ERBB3 being one of the key interactions identified.",
+        ),
+        (
+            "lrig1_erbb2",
+            "inline_citation_overclaimed",
+            "28174229",
+            "PMID: 28174229 demonstrates that ErbB2 overexpression alters "
+            "the proteome and phosphosignaling in mammary luminal epithelial "
+            "cells, with LRIG1-ERBB2 being one of the key interactions identified.",
+        ),
+        (
+            "nectin4",
+            "inline_citation_unsupported",
+            "39753722",
+            "PMID: 39753722 reports NECTIN4 expression patterns in breast "
+            "cancer progression and immune evasion contexts.",
+        ),
+    ):
+        data_dir = tmp_path / case
+        data_dir.mkdir()
+        report = data_dir / "part3_final.md"
+        original = f"## Evidence\nContext before. {target} Context after.\n"
+        report.write_text(original, encoding="utf-8")
+        trace = data_dir / "repair_trace.jsonl"
+        trace.write_text("", encoding="utf-8")
+        issues = _write_issues(
+            data_dir,
+            [
+                {
+                    "severity": "error",
+                    "code": issue_code,
+                    "file": report.name,
+                    "section": "## Evidence",
+                    "source_claim_index": 0,
+                    "inline_pmid": pmid,
+                    "value": target,
+                    "target_text": target,
+                }
+            ],
+        )
+        rows = [
+            {
+                "file": report.name,
+                "section": "## Evidence",
+                "source_claim_index": 0,
+                "inline_pmid": pmid,
+                "status": "overclaimed",
+            }
+        ]
+        llm = RepairDecisionLLM(action="delete", replacement_text="")
+
+        changed = repair_report.repair_report(
+            data_dir,
+            issues,
+            llm=llm,
+            claim_validation=rows,
+        )
+
+        repaired = report.read_text(encoding="utf-8")
+        assert changed == 1
+        assert llm.calls == 1
+        assert target not in repaired
+        assert "Context before." in repaired
+        assert "Context after." in repaired
+        assert repair_report._markdown_headings(repaired) == ["## Evidence"]
+        assert _trace_rows(trace)[-1]["path"] == "llm_delete"
+```
+
+- [ ] **Step 2: Run the exact test and observe RED**
+
+```bash
+pytest -q tests/scripts/test_repair_report.py::test_repair_routes_leading_pmid_prose_to_structured_target_repair
+```
+
+Expected: FAIL because current deterministic stripping returns success,
+`llm.calls == 0`, and a subjectless `demonstrates` / `reports` fragment remains.
+
+- [ ] **Step 3: Add the minimum shared guard**
+
+At the start of `_remove_inline_pmid`, after defining `token`, add:
+
+```python
+    if re.match(
+        rf"^\s*(?:[-*]\s+)?{token}\s+[A-Za-z]",
+        value,
+        flags=re.IGNORECASE,
+    ):
+        return value
+```
+
+Do not change either caller or the structured repair loop.
+
+- [ ] **Step 4: Run focused GREEN and retained deterministic boundaries**
+
+```bash
+pytest -q \
+  tests/scripts/test_repair_report.py::test_repair_routes_leading_pmid_prose_to_structured_target_repair \
+  tests/scripts/test_repair_report.py::test_repair_removes_all_non_supported_inline_pmids_without_llm \
+  tests/scripts/test_repair_report.py::test_repair_deletes_unsupported_reference_only_inline_target_without_llm \
+  tests/scripts/test_repair_report.py::test_repair_removes_only_unsupported_inline_pmid_when_sibling_supports \
+  tests/scripts/test_repair_report.py::test_repair_removes_multiple_unsupported_inline_pmids_when_sibling_supports \
+  tests/scripts/test_repair_report.py::test_repair_removes_sole_failed_prose_inline_pmid_without_llm
+```
+
+Expected: 6 passed.
+
+- [ ] **Step 5: Run repair and combined regression suites**
+
+```bash
+pytest -q tests/scripts/test_repair_report.py
+pytest -q \
+  tests/scripts/test_validate_report.py \
+  tests/scripts/test_repair_report.py \
+  tests/scripts/test_validate_repair_report.py \
+  tests/agents/deep_interpreter/test_report_guardrail_middleware.py \
+  tests/agents/deep_interpreter/test_claim_rag_validation.py \
+  tests/agents/deep_interpreter/test_reporter_recovery.py \
+  tests/deep_interpreter/test_reporter_prompt_policy.py \
+  tests/test_reporter.py \
+  tests/test_reporter_phase45.py \
+  tests/test_reporter_phase5.py \
+  tests/test_sni_ablation_runner.py
+```
+
+Expected: repair module and combined suite pass; the combined total increases
+from 336 to 337.
+
+- [ ] **Step 6: Run static checks and commit with Lore metadata**
+
+```bash
+ruff check scripts/repair_report.py tests/scripts/test_repair_report.py
+python -m py_compile scripts/repair_report.py
+git diff --check
+git add scripts/repair_report.py tests/scripts/test_repair_report.py
+git diff --cached --check
+git commit \
+  -m "Preserve grammar when an inline PMID leads prose" \
+  -m "Constraint: Route only leading-PMID alphabetic prose to existing structured exact-target repair; preserve all other deterministic citation paths." \
+  -m "Rejected: Strip the PMID token and normalize whitespace | That leaves a subjectless demonstrates/reports fragment." \
+  -m "Confidence: high" \
+  -m "Scope-risk: narrow" \
+  -m "Directive: Keep grouped, supported-sibling, parenthetical, and reference-only citation repair deterministic." \
+  -m "Tested: Replay-shaped RED/GREEN, retained deterministic citation boundaries, repair module, combined suite, Ruff, py_compile, and diff check." \
+  -m "Not-tested: Pair-15 Replay A rerun remains the launch gate."
+```
+
 ## Controller Gates After SDD
 
-After all three tasks pass their task-scoped spec and quality reviews, run the
+After all four tasks pass their task-scoped spec and quality reviews, run the
 Subagent-Driven final whole-branch review. Fix any Critical or Important
 finding through the required single fix/re-review loop before continuing.
 
 The leader then executes, in order, the spec's two required isolated replays:
 
-1. Pair-15-R2 no-SNI Parts on a fresh copy, requiring zero hard errors, zero
-   Markdown rewrite, stable headings, and unchanged original hashes.
+1. Pair-15-R2 no-SNI Parts on a fresh copy, seeded only with the prior replay's
+   production Claim-RAG checkpoint to avoid repeating judgments. Require zero
+   hard errors, only initial-hard-target citation repairs, no dangling prose
+   fragment, stable headings, and unchanged original hashes. Inspect the live
+   replay-root `part1_final.md`, `part2_final.md`, and especially
+   `part3_final.md`; do not use copied `after/` files or `diffs/*.diff`, which
+   predate the live guardrail mutation.
 2. Pair-16 SNI finalizer on a fresh fixed-collection copy, requiring preserved
    reference deletion, accepted disjoint `1 -> 1` progress, subsequent repair,
    zero final hard errors, validation/targets/HTML, and unchanged Part/source
@@ -647,11 +843,13 @@ continuation, service-failure stop, preserved failed artifacts, and portable
   non-vacuous known-label table test for `hypothesis`, `hypothesized`, and
   `hypothesised`; and D to
   `test_flags_factor_pathway_significance_when_csv_lacks_claimed_pair`.
-  Task 2 implements E-M; Task 3 proves the named code gates; Controller Gates
-  cover isolated replays and the fresh sequence.
+  Task 2 implements E-M; Task 3 proves the original code gates; Task 4 maps N
+  to the prose-prefix structured fallback and O to the named deterministic
+  regressions. Controller Gates cover isolated replays and the fresh sequence.
 - Placeholder scan: no `TBD`, `TODO`, deferred implementation, or unstated test
   exists.
 - Type consistency: tests use existing `dict[str, Any]`, `Path`, pytest, and
   guardrail signatures; no new production interface is introduced.
-- Task boundaries: Pair-15 and Pair-16 can be independently rejected, tested,
-  reviewed, and committed; combined verification changes no tracked file.
+- Task boundaries: Pair-15, Pair-16, and post-replay grammar integrity can be
+  independently rejected, tested, reviewed, and committed; combined
+  verification changes no production file.
