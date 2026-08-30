@@ -70,7 +70,7 @@ FACTOR_PATHWAY_CLAIM_RE = re.compile(
 FACTOR_PATHWAY_CONNECTOR_RE = re.compile(r"\b(?:and|but|while|whereas)\b", re.IGNORECASE)
 FACTOR_RE = re.compile(r"\bFactor\s*\d+\b", re.IGNORECASE)
 HYPOTHESIS_RE = re.compile(
-    r"\b(may|might|could|hypothes(?:is|i[sz]ed)|hypothetical|inferred|suggests?|consistent with|"
+    r"\b(may|might|could|hypothes(?:is|es|i[sz]ed)|hypothetical|inferred|suggests?|consistent with|"
     r"not pathway-factor significance)\b",
     re.IGNORECASE,
 )

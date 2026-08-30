@@ -184,6 +184,99 @@ def test_allows_factor1_hypothesis_language(tmp_path: Path) -> None:
     assert not any(i["code"] == "unsupported_pathway_factor_significance" for i in issues)
 
 
+def test_allows_pair15_plural_hypotheses_language(tmp_path: Path) -> None:
+    _write_json(tmp_path / "papers.json", [])
+    _write_csv(
+        tmp_path / "sig_liana_pathway_factor.csv",
+        [
+            {
+                "factor": "Factor3",
+                "pathway": "EGFR",
+                "estimate": -2.897,
+                "p": 0.004,
+                "adj_p": 0.028,
+            },
+            {
+                "factor": "Factor3",
+                "pathway": "Estrogen",
+                "estimate": -5.480,
+                "p": 4.98e-08,
+                "adj_p": 4.98e-07,
+            },
+            {
+                "factor": "Factor2",
+                "pathway": "Hypoxia",
+                "estimate": 7.335,
+                "p": 3.59e-13,
+                "adj_p": 3.59e-12,
+            },
+        ],
+    )
+    target = (
+        "- **Connection to Analysis 2-7 (NMF Factor)**: The pathway enrichments "
+        "provide annotation-based hypotheses for Factor3's biological program, "
+        "suggesting potential associations with estrogen-independent, "
+        "hypoxia-resistant states and restrained EGFR signaling."
+    )
+    (tmp_path / "part2_final.md").write_text(
+        f"## Analysis 2-8: Pathway-Factor Enrichment\n{target}\n",
+        encoding="utf-8",
+    )
+
+    issues = validate_report.validate_report(tmp_path)
+
+    assert not any(
+        issue["code"] == "unsupported_pathway_factor_significance"
+        and issue["value"] == "Factor3: Hypoxia"
+        for issue in issues
+    )
+
+
+def test_allows_hypothesis_word_forms_in_triggering_pathway_claims(
+    tmp_path: Path,
+) -> None:
+    for case, word_form in (
+        ("singular", "hypothesis"),
+        ("american", "hypothesized"),
+        ("british", "hypothesised"),
+    ):
+        data_dir = tmp_path / case
+        data_dir.mkdir()
+        _write_json(data_dir / "papers.json", [])
+        _write_csv(
+            data_dir / "sig_liana_pathway_factor.csv",
+            [
+                {
+                    "factor": "Factor3",
+                    "pathway": "EGFR",
+                    "estimate": -2.897,
+                    "p": 0.004,
+                    "adj_p": 0.028,
+                },
+                {
+                    "factor": "Factor2",
+                    "pathway": "Hypoxia",
+                    "estimate": 7.335,
+                    "p": 3.59e-13,
+                    "adj_p": 3.59e-12,
+                },
+            ],
+        )
+        (data_dir / "part2_final.md").write_text(
+            "## Analysis 2-8: Pathway-Factor Enrichment\n"
+            f"Factor3 Hypoxia enrichment remains an annotation-based {word_form}.\n",
+            encoding="utf-8",
+        )
+
+        issues = validate_report.validate_report(data_dir)
+
+        assert not any(
+            issue["code"] == "unsupported_pathway_factor_significance"
+            and issue["value"] == "Factor3: Hypoxia"
+            for issue in issues
+        ), word_form
+
+
 def test_flags_factor_pathway_claim_when_pathway_only_exists_in_decoupler_vocab(tmp_path: Path) -> None:
     _write_json(tmp_path / "papers.json", [])
     _write_csv(
