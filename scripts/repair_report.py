@@ -159,6 +159,12 @@ def _repair_pmid_issue(data_dir: Path, issue: dict[str, Any]) -> bool:
 
 def _remove_inline_pmid(value: str, pmid: str) -> str:
     token = rf"PMID:\s*{re.escape(pmid)}\b"
+    if re.match(
+        rf"^\s*(?:[-*]\s+)?{token}\s+[A-Za-z]",
+        value,
+        flags=re.IGNORECASE,
+    ):
+        return value
     for pattern in (
         rf"\s*[;,]\s*{token}",
         rf"{token}\s*[;,]\s*",

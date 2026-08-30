@@ -883,6 +883,84 @@ def test_repair_deletes_unsupported_reference_only_inline_target_without_llm(
     assert _trace_rows(trace)[-1]["path"] == "deterministic_reference_delete"
 
 
+def test_repair_routes_leading_pmid_prose_to_structured_target_repair(
+    tmp_path: Path,
+) -> None:
+    for case, issue_code, pmid, target in (
+        (
+            "cdh1_erbb3",
+            "inline_citation_overclaimed",
+            "28174229",
+            "PMID: 28174229 demonstrates that ErbB2 overexpression alters "
+            "the proteome and phosphosignaling in mammary luminal epithelial "
+            "cells, with CDH1-ERBB3 being one of the key interactions identified.",
+        ),
+        (
+            "lrig1_erbb2",
+            "inline_citation_overclaimed",
+            "28174229",
+            "PMID: 28174229 demonstrates that ErbB2 overexpression alters "
+            "the proteome and phosphosignaling in mammary luminal epithelial "
+            "cells, with LRIG1-ERBB2 being one of the key interactions identified.",
+        ),
+        (
+            "nectin4",
+            "inline_citation_unsupported",
+            "39753722",
+            "PMID: 39753722 reports NECTIN4 expression patterns in breast "
+            "cancer progression and immune evasion contexts.",
+        ),
+    ):
+        data_dir = tmp_path / case
+        data_dir.mkdir()
+        report = data_dir / "part3_final.md"
+        original = f"## Evidence\nContext before. {target} Context after.\n"
+        report.write_text(original, encoding="utf-8")
+        trace = data_dir / "repair_trace.jsonl"
+        trace.write_text("", encoding="utf-8")
+        issues = _write_issues(
+            data_dir,
+            [
+                {
+                    "severity": "error",
+                    "code": issue_code,
+                    "file": report.name,
+                    "section": "## Evidence",
+                    "source_claim_index": 0,
+                    "inline_pmid": pmid,
+                    "value": target,
+                    "target_text": target,
+                }
+            ],
+        )
+        rows = [
+            {
+                "file": report.name,
+                "section": "## Evidence",
+                "source_claim_index": 0,
+                "inline_pmid": pmid,
+                "status": "overclaimed",
+            }
+        ]
+        llm = RepairDecisionLLM(action="delete", replacement_text="")
+
+        changed = repair_report.repair_report(
+            data_dir,
+            issues,
+            llm=llm,
+            claim_validation=rows,
+        )
+
+        repaired = report.read_text(encoding="utf-8")
+        assert changed == 1
+        assert llm.calls == 1
+        assert target not in repaired
+        assert "Context before." in repaired
+        assert "Context after." in repaired
+        assert repair_report._markdown_headings(repaired) == ["## Evidence"]
+        assert _trace_rows(trace)[-1]["path"] == "llm_delete"
+
+
 def test_repair_routes_non_inline_claim_rag_overclaimed_to_exact_claim(
     tmp_path: Path,
 ) -> None:
