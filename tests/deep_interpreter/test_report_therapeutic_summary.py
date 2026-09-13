@@ -96,3 +96,43 @@ def test_generate_simple_report_renders_string_tractability():
         )
 
         assert "approved" in out_path.read_text(encoding="utf-8")
+
+
+def test_generate_simple_report_ignores_non_mapping_therapeutic_entries():
+    from src.agents.deep_interpreter.tools.report import generate_simple_report
+
+    therapeutic = {
+        "druggable_targets": [
+            "invalid target",
+            {"gene": "ERBB2", "name": "ERBB2 receptor", "association_score": 0.91},
+        ],
+        "known_drugs": [
+            "invalid drug",
+            {"drug_name": "TRASTUZUMAB", "phase": 4, "target_genes": ["ERBB2"]},
+        ],
+        "novel_targets": [
+            "invalid novel target",
+            {"gene": "ERBB3", "name": "ERBB3 receptor"},
+        ],
+        "summary": {},
+    }
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        out_path = Path(tmpdir) / "report.html"
+        status = generate_simple_report(
+            title="Test Report",
+            content={
+                "part1": {}, "part2": {}, "part3": {}, "references": [],
+                "therapeutic": therapeutic,
+            },
+            output_path=str(out_path),
+        )
+
+        assert "Report generated successfully" in status
+        html = out_path.read_text(encoding="utf-8")
+        assert "ERBB2" in html
+        assert "TRASTUZUMAB" in html
+        assert "ERBB3" in html
+        assert "invalid target" not in html
+        assert "invalid drug" not in html
+        assert "invalid novel target" not in html

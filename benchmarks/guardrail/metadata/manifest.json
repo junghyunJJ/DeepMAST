@@ -1,0 +1,907 @@
+{
+  "created_at": "2026-09-08T05:50:45.739240+00:00",
+  "historical_model_digest": null,
+  "original_experiment": "res/deep_interpreter/bc/sni_repair_ablation/guardrail_on_off_20260905T154030Z",
+  "policy": "report complete and common-policy hard errors zero; known hard error fails despite incomplete other checks",
+  "reuse": "content-addressed successful common-posthoc checks only; never generation guardrail verdicts",
+  "root_cause": "reproduced Event loop is closed on second call with reused Ollama async client",
+  "rows": [
+    {
+      "arm": "on",
+      "data_dir": "res/deep_interpreter/bc/sni_repair_ablation/post_repair_integrity_pair15r2_pair20_sequential_20260830T095354Z/pairs/pair-16/wiki-on",
+      "failure_reason": null,
+      "generation_audit_error": null,
+      "generation_classification": "completed",
+      "generation_seconds": 9975.271864,
+      "generation_status": "passed",
+      "generation_tokens": null,
+      "index": 0,
+      "original_report_hashes": {
+        "CCI_Analysis_Report.html": "0d651e18d9bc77a54d1aa2b40f3fe9e242d12dd53acc06ca5b5da4f08e938483",
+        "part1_final.md": "dc4ed9f1df4d066a517de32136d11f3dd92980be55d2e2e10c4a3912d9a3536c",
+        "part2_final.md": "46d1af7ccc36aa35bf196f549affa3a829680bfa221a36709e12f1f7cdc8b735",
+        "part3_final.md": "9a9096b6794f8b6cd63ac815ca34a9f07ec669cd9d5306ac0cd6886c6eaa606e",
+        "synthesis.md": "8bcc66fdfcaea32f6256a0bdca8f94a80507ebb93affe3525ccaaf3ff9d2513a"
+      },
+      "pair_id": "16",
+      "report_complete": true,
+      "sequence": "AB"
+    },
+    {
+      "arm": "off",
+      "data_dir": "res/deep_interpreter/bc/sni_repair_ablation/guardrail_on_off_20260905T154030Z/off/pair-16-AB/pairs/pair-16/wiki-on",
+      "failure_reason": "execution_error",
+      "generation_audit_error": {
+        "message": "missing RAG audit: res/deep_interpreter/bc/sni_repair_ablation/guardrail_on_off_20260905T154030Z/off/pair-16-AB/pairs/pair-16/wiki-on/rag_audit.jsonl",
+        "type": "RuntimeError"
+      },
+      "generation_classification": "completed",
+      "generation_seconds": 1881.7117652919987,
+      "generation_status": "failed",
+      "generation_tokens": null,
+      "index": 0,
+      "original_report_hashes": {
+        "CCI_Analysis_Report.html": "5265a07e815d86ef96974c52b5b508ceb5e4b244e0a04c4043c3247c508ade26",
+        "part1_final.md": "3fd434f757986a215c4025ceda87edf84ada582b28ed083e45991528723c30fb",
+        "part2_final.md": "b06c417c350cdf9a2347a4f27fa26cc0cb890ce6dfaeac0619a4c6a3c3455fcc",
+        "part3_final.md": "e5f6bc00aaca00a53ab3dec07f699bcbca052fb698fd6cb7d57f160c32bad640",
+        "synthesis.md": "bdf43ec33944dd1cfb3e4024ce4e45073cb953b567499869617b0076e749c19f"
+      },
+      "pair_id": "16",
+      "report_complete": true,
+      "sequence": "AB"
+    },
+    {
+      "arm": "on",
+      "data_dir": "res/deep_interpreter/bc/sni_repair_ablation/post_repair_integrity_counterbalanced_pair16_pair25_20260831T182417Z/sequences/pair-16/01-ba/pairs/pair-16/wiki-on",
+      "failure_reason": "content_guardrail",
+      "generation_audit_error": {
+        "message": "stage runner returned 1",
+        "type": "RuntimeError"
+      },
+      "generation_classification": "guardrail_blocked",
+      "generation_seconds": 1205.001475,
+      "generation_status": "failed",
+      "generation_tokens": null,
+      "index": 1,
+      "original_report_hashes": {
+        "part1_final.md": "f949160529e8890c81cecd51e1c295aa291e7003dc838b53c51532f6f81c903e",
+        "part2_final.md": "78f1eae924dd666347e2f4ba5c21241d5ac613636eadbf5c5e5fda8fd9f6d690",
+        "part3_final.md": "488785792a0cc6848df42dbc4616d4517736b32987f3fe54763b6d24bcf36076"
+      },
+      "pair_id": "16",
+      "report_complete": false,
+      "sequence": "BA"
+    },
+    {
+      "arm": "off",
+      "data_dir": "res/deep_interpreter/bc/sni_repair_ablation/guardrail_on_off_20260905T154030Z/off/pair-16-BA/pairs/pair-16/wiki-on",
+      "failure_reason": "execution_error",
+      "generation_audit_error": {
+        "message": "missing RAG audit: res/deep_interpreter/bc/sni_repair_ablation/guardrail_on_off_20260905T154030Z/off/pair-16-BA/pairs/pair-16/wiki-on/rag_audit.jsonl",
+        "type": "RuntimeError"
+      },
+      "generation_classification": "completed",
+      "generation_seconds": 3138.0384951669985,
+      "generation_status": "failed",
+      "generation_tokens": null,
+      "index": 1,
+      "original_report_hashes": {
+        "CCI_Analysis_Report.html": "1782f6429f8d3ab1ca0edfcd55fa271406ce33d5892a5e2199f29968467dd63f",
+        "part1_final.md": "b0320a34a24e4f62495dd73b419a7d3662a91e0ae1d6279504296cd48cc80feb",
+        "part2_final.md": "e6a11718049af4f0a0a0ee0ccd09158d11854d1d67f58d83411fe9094d39d29d",
+        "part3_final.md": "751098933c5ea5dc9422e20b892a5ffdebf0fe2e18bdb15fc1027dd045d1be5c",
+        "synthesis.md": "7029c0c3f12f9ed4d31b06d12ab3f0bb47aacf832c5fa329ac183b8d1aa9503a"
+      },
+      "pair_id": "16",
+      "report_complete": true,
+      "sequence": "BA"
+    },
+    {
+      "arm": "on",
+      "data_dir": "res/deep_interpreter/bc/sni_repair_ablation/post_repair_integrity_pair15r2_pair20_sequential_20260830T095354Z/pairs/pair-17/wiki-on",
+      "failure_reason": null,
+      "generation_audit_error": null,
+      "generation_classification": "completed",
+      "generation_seconds": 9862.66145,
+      "generation_status": "passed",
+      "generation_tokens": null,
+      "index": 2,
+      "original_report_hashes": {
+        "CCI_Analysis_Report.html": "bfcd96e1c9d757f371c711e12cd11f31aa54164bf08ab1b4165bda2135cf61de",
+        "part1_final.md": "12a199877e80baba721303e4ac17eb307ca54be4ae9410a88a1d9a386ad96553",
+        "part2_final.md": "a1c365881632d40eb8d99dd40cd6bec8e51bd8715d70e381ce439620e6980908",
+        "part3_final.md": "bc2c243633ba36e1c1fc362f1fd7ee440f13dffaf5392e072d5e0f6f65438f90",
+        "synthesis.md": "5f1f88570ed0fefecf0f53083b9b78145315c6b667b1be704b75a949f0937a79"
+      },
+      "pair_id": "17",
+      "report_complete": true,
+      "sequence": "AB"
+    },
+    {
+      "arm": "off",
+      "data_dir": "res/deep_interpreter/bc/sni_repair_ablation/guardrail_on_off_20260905T154030Z/off/pair-17-AB/pairs/pair-17/wiki-on",
+      "failure_reason": "execution_error",
+      "generation_audit_error": {
+        "message": "missing RAG audit: res/deep_interpreter/bc/sni_repair_ablation/guardrail_on_off_20260905T154030Z/off/pair-17-AB/pairs/pair-17/wiki-on/rag_audit.jsonl",
+        "type": "RuntimeError"
+      },
+      "generation_classification": "completed",
+      "generation_seconds": 2469.924656416988,
+      "generation_status": "failed",
+      "generation_tokens": null,
+      "index": 2,
+      "original_report_hashes": {
+        "CCI_Analysis_Report.html": "348528764c65af51e191c9779737069631502929d2e83db1b5c352b399c5275a",
+        "part1_final.md": "80926883248ba6b763e162274b6cf299aec2fa22936ce41d8031221bb1b217cc",
+        "part2_final.md": "1e113a44865b864a3b90ee4e63f1a4211e687f6c1a789a5e973c3ecbaed2df2f",
+        "part3_final.md": "6006d6c0528da27d7c24b2d4b2158d99c175f189f92696334855bdaf2830f8e9",
+        "synthesis.md": "3f5e8d064e07e694128f61a2093101f0b1accb5c3f410dd1118225f0af7f21e2"
+      },
+      "pair_id": "17",
+      "report_complete": true,
+      "sequence": "AB"
+    },
+    {
+      "arm": "on",
+      "data_dir": "res/deep_interpreter/bc/sni_repair_ablation/post_repair_integrity_counterbalanced_pair16_pair25_20260831T182417Z/sequences/pair-17/02-ba/pairs/pair-17/wiki-on",
+      "failure_reason": "content_guardrail",
+      "generation_audit_error": {
+        "message": "stage runner returned 1",
+        "type": "RuntimeError"
+      },
+      "generation_classification": "guardrail_blocked",
+      "generation_seconds": 8763.544036,
+      "generation_status": "failed",
+      "generation_tokens": null,
+      "index": 3,
+      "original_report_hashes": {
+        "part1_final.md": "7a7c07ebb888300aa7aec7db0db104532be8f0264662d4a9578f0cb3e115bc97",
+        "part2_final.md": "61ec596c963a4fdf1f961c6ba4e0e20b3107b86886cf6b899236d4e418c79043",
+        "part3_final.md": "c4b920e1c816816f9097d8213fe2890259248204720d18c9f9dc7f5e84d3232e"
+      },
+      "pair_id": "17",
+      "report_complete": false,
+      "sequence": "BA"
+    },
+    {
+      "arm": "off",
+      "data_dir": "res/deep_interpreter/bc/sni_repair_ablation/guardrail_on_off_20260905T154030Z/off/pair-17-BA/pairs/pair-17/wiki-on",
+      "failure_reason": "execution_error",
+      "generation_audit_error": {
+        "message": "missing RAG audit: res/deep_interpreter/bc/sni_repair_ablation/guardrail_on_off_20260905T154030Z/off/pair-17-BA/pairs/pair-17/wiki-on/rag_audit.jsonl",
+        "type": "RuntimeError"
+      },
+      "generation_classification": "completed",
+      "generation_seconds": 1859.1119119590148,
+      "generation_status": "failed",
+      "generation_tokens": null,
+      "index": 3,
+      "original_report_hashes": {
+        "CCI_Analysis_Report.html": "c02642652e748b4253192953157f9f4f8dbaeb7c8a31d59e954816ee1fa91917",
+        "part1_final.md": "035b6d9c4b7add09f90c7a5ff781155edb74e878e54c759588624998a0793141",
+        "part2_final.md": "c92f9acecb363758b8e0d0635f1e7133d1e1e0619af41a6b2e3966ec58454ab8",
+        "part3_final.md": "05f1f12d52a937ec7e186fd92358ebf81773c953030b27d552be98d67c011d1e",
+        "synthesis.md": "c7e91516eafa944d360043dffa14fc323b2b19ef2c759811282700ab8df69244"
+      },
+      "pair_id": "17",
+      "report_complete": true,
+      "sequence": "BA"
+    },
+    {
+      "arm": "on",
+      "data_dir": "res/deep_interpreter/bc/sni_repair_ablation/post_repair_integrity_pair15r2_pair20_sequential_20260830T095354Z/pairs/pair-18/wiki-on",
+      "failure_reason": null,
+      "generation_audit_error": null,
+      "generation_classification": "completed",
+      "generation_seconds": 11263.113767,
+      "generation_status": "passed",
+      "generation_tokens": null,
+      "index": 4,
+      "original_report_hashes": {
+        "CCI_Analysis_Report.html": "05aec826e7f9dbb8b122157468efc463ea9efa84e849b1d9efb75ab7b482a120",
+        "part1_final.md": "de9bb4bd38b36838fe6cd2c12e9138e7b1afcb30ccc5839c5c54c053c96dde0a",
+        "part2_final.md": "eb9419237b2e2d2ecc8cc05ca5ebe4698c34ad56d3be2b762bb90ad9d1dc1b3f",
+        "part3_final.md": "65fdf1c7688e5554cb4be8a4fcc08143c389d9c3140311255df406ab91681258",
+        "synthesis.md": "125e0f2b3aca9aca4fbc10982f080f0bb35db13a38064ed342b0fb281dbd5569"
+      },
+      "pair_id": "18",
+      "report_complete": true,
+      "sequence": "AB"
+    },
+    {
+      "arm": "off",
+      "data_dir": "res/deep_interpreter/bc/sni_repair_ablation/guardrail_on_off_20260905T154030Z/off/pair-18-AB/pairs/pair-18/wiki-on",
+      "failure_reason": "execution_error",
+      "generation_audit_error": {
+        "message": "missing RAG audit: res/deep_interpreter/bc/sni_repair_ablation/guardrail_on_off_20260905T154030Z/off/pair-18-AB/pairs/pair-18/wiki-on/rag_audit.jsonl",
+        "type": "RuntimeError"
+      },
+      "generation_classification": "completed",
+      "generation_seconds": 2748.169873375009,
+      "generation_status": "failed",
+      "generation_tokens": null,
+      "index": 4,
+      "original_report_hashes": {
+        "CCI_Analysis_Report.html": "638efae4695d2a0224bce1ae4fc877a0f744aac8dea9f4d1898ec5868d31cbe4",
+        "part1_final.md": "a0cb4b75ba904e5cae32199ca2c659b6edeeb1bb2a7fcafb54017a67836b1b89",
+        "part2_final.md": "f1a4f8f25acda4bb76f04eab0aa2036a21fdb002c30fa0a1198ecc4a6135b8a4",
+        "part3_final.md": "1a433b304afaf3193966bdfa10e9add66a7a06229c2b2e1a0c62699267b87efb",
+        "synthesis.md": "30e397a49648b59aee6dc579c36ae87e27d4a1f8c39ba3b38f92cccdd7ca455b"
+      },
+      "pair_id": "18",
+      "report_complete": true,
+      "sequence": "AB"
+    },
+    {
+      "arm": "on",
+      "data_dir": "res/deep_interpreter/bc/sni_repair_ablation/post_repair_integrity_counterbalanced_resume_pair17nosni_pair25_20260901T000438Z/sequences/pair-18/02-ba/pairs/pair-18/wiki-on",
+      "failure_reason": null,
+      "generation_audit_error": null,
+      "generation_classification": "completed",
+      "generation_seconds": 11264.935942,
+      "generation_status": "passed",
+      "generation_tokens": null,
+      "index": 5,
+      "original_report_hashes": {
+        "CCI_Analysis_Report.html": "5c73b5c7ac9b984f9e2be4d56518ec03325920a7f482d74e55967cc366f7d189",
+        "part1_final.md": "59a0b5f5477de43c189e77faa41aacffe602c4e407ac5252813ae5cb43cba0b7",
+        "part2_final.md": "31ec5ca9cfcb0d4358ddd3fe820fb29fcbbd78999987297c2aa064242e7fdf1d",
+        "part3_final.md": "59e24d28b6098151aeda326b09e7aac1631d238fb17f255aaadd7644976b5fa9",
+        "synthesis.md": "f9b311ed737e7240e57ea7b084e5050b3835c13d2161dbd16822841f50904216"
+      },
+      "pair_id": "18",
+      "report_complete": true,
+      "sequence": "BA"
+    },
+    {
+      "arm": "off",
+      "data_dir": "res/deep_interpreter/bc/sni_repair_ablation/guardrail_on_off_20260905T154030Z/off/pair-18-BA/pairs/pair-18/wiki-on",
+      "failure_reason": "execution_error",
+      "generation_audit_error": {
+        "message": "missing RAG audit: res/deep_interpreter/bc/sni_repair_ablation/guardrail_on_off_20260905T154030Z/off/pair-18-BA/pairs/pair-18/wiki-on/rag_audit.jsonl",
+        "type": "RuntimeError"
+      },
+      "generation_classification": "completed",
+      "generation_seconds": 2158.758263625001,
+      "generation_status": "failed",
+      "generation_tokens": null,
+      "index": 5,
+      "original_report_hashes": {
+        "CCI_Analysis_Report.html": "3c8709c6c4c11b0b59e09efef83a28296c9174fd0efa7edf115dfb79be335af5",
+        "part1_final.md": "eb7aa46142a447118bdc939cbf350f01caa120b5f31be165e393ecb5e520ae2b",
+        "part2_final.md": "a5d42a6127a85e27b398ec3f45b2a8ad56e828ee589519b715ec115648368f87",
+        "part3_final.md": "697bfd1b6248996df94f7f0a9c34f631461532cdd0e9d0c04c8b0ff6b2351ef2",
+        "synthesis.md": "e82fea4bff4e70961dd389ddc99491d7f9fd777f48bc5c0d38e8abeeb22b29da"
+      },
+      "pair_id": "18",
+      "report_complete": true,
+      "sequence": "BA"
+    },
+    {
+      "arm": "on",
+      "data_dir": "res/deep_interpreter/bc/sni_repair_ablation/post_repair_integrity_pair15r2_pair20_sequential_20260830T095354Z/pairs/pair-19/wiki-on",
+      "failure_reason": null,
+      "generation_audit_error": null,
+      "generation_classification": "completed",
+      "generation_seconds": 8549.380969,
+      "generation_status": "passed",
+      "generation_tokens": null,
+      "index": 6,
+      "original_report_hashes": {
+        "CCI_Analysis_Report.html": "e3d78a10b6f2b1cd1a1460ddd60231d9f350d0662fe712b0bff651885e651b8f",
+        "part1_final.md": "8ca3deeca0b3aefaad40f5ba13706ba50b64fc5d4aabb76fa534ac7c31d65250",
+        "part2_final.md": "4c10da4873c4bc41cc2fe2668991600cee791702d75bb3b97a903bd4b8395c7f",
+        "part3_final.md": "dde3d9b9952076a5af8290cf1ed3ea4bba5fc70107fb183316edfc2126558a02",
+        "synthesis.md": "9485e94c22dde8d87a90b7a4a9cde43f0b8adf208e2f8c8e8e4dfd5f5825ae97"
+      },
+      "pair_id": "19",
+      "report_complete": true,
+      "sequence": "AB"
+    },
+    {
+      "arm": "off",
+      "data_dir": "res/deep_interpreter/bc/sni_repair_ablation/guardrail_on_off_20260905T154030Z/off/pair-19-AB/pairs/pair-19/wiki-on",
+      "failure_reason": "execution_error",
+      "generation_audit_error": {
+        "message": "missing RAG audit: res/deep_interpreter/bc/sni_repair_ablation/guardrail_on_off_20260905T154030Z/off/pair-19-AB/pairs/pair-19/wiki-on/rag_audit.jsonl",
+        "type": "RuntimeError"
+      },
+      "generation_classification": "completed",
+      "generation_seconds": 2238.311134083022,
+      "generation_status": "failed",
+      "generation_tokens": null,
+      "index": 6,
+      "original_report_hashes": {
+        "CCI_Analysis_Report.html": "68221bd43e46e24483d7239b327084edad9722dd34d760ce584ab76728747853",
+        "part1_final.md": "efcd4f032fcf1c45a71c2194c8dbc94f779709e8f94e548fd9cb0abe212b5a12",
+        "part2_final.md": "791cd8adecf2d7d512c2e7cae9c0b449de8b8a9f7921217b0917b67be9799c5a",
+        "part3_final.md": "39167fb13a8065687461fe875eed18b58d7cb37e2ce68e131bbacba2e36e931a",
+        "synthesis.md": "a10574bd381543bda1dd64ff82596a3675a162669b96be5bb69e46694a5cfaca"
+      },
+      "pair_id": "19",
+      "report_complete": true,
+      "sequence": "AB"
+    },
+    {
+      "arm": "on",
+      "data_dir": "res/deep_interpreter/bc/sni_repair_ablation/post_repair_integrity_counterbalanced_resume_pair17nosni_pair25_20260901T000438Z/sequences/pair-19/03-ba/pairs/pair-19/wiki-on",
+      "failure_reason": null,
+      "generation_audit_error": null,
+      "generation_classification": "completed",
+      "generation_seconds": 7444.107874,
+      "generation_status": "passed",
+      "generation_tokens": null,
+      "index": 7,
+      "original_report_hashes": {
+        "CCI_Analysis_Report.html": "f6c77a8080d4c4f41b9cf4400a079871121e4031b1c0b38c9ce47197b3bced6e",
+        "part1_final.md": "e3fa9f1b5f1e335dd294e7ce64cc8fa0aa33d5e612dfed14dba195ab610ad2cf",
+        "part2_final.md": "7381677fd52093d9d3cec661022921e07125b9aa3e5e224b306b454bd087f1c1",
+        "part3_final.md": "b05f717c4b423a0479d2466318959268dc80f146c16265d6a29735a3812d4cdd",
+        "synthesis.md": "34caa51fb0046f4bf2719c6e022b27b1eac7470c274b8d1a136566c205e74d0e"
+      },
+      "pair_id": "19",
+      "report_complete": true,
+      "sequence": "BA"
+    },
+    {
+      "arm": "off",
+      "data_dir": "res/deep_interpreter/bc/sni_repair_ablation/guardrail_on_off_20260905T154030Z/off/pair-19-BA/pairs/pair-19/wiki-on",
+      "failure_reason": "execution_error",
+      "generation_audit_error": {
+        "message": "missing RAG audit: res/deep_interpreter/bc/sni_repair_ablation/guardrail_on_off_20260905T154030Z/off/pair-19-BA/pairs/pair-19/wiki-on/rag_audit.jsonl",
+        "type": "RuntimeError"
+      },
+      "generation_classification": "completed",
+      "generation_seconds": 1295.4674836249906,
+      "generation_status": "failed",
+      "generation_tokens": null,
+      "index": 7,
+      "original_report_hashes": {
+        "CCI_Analysis_Report.html": "c28abc3a992aecc1c56fdb2d055cb5eec37dc97f4b8ebd89aae4e7572e79366c",
+        "part1_final.md": "1f0cd20b505a8269b5413a907aa366488846666de766abed6499f838a1f6b3c0",
+        "part2_final.md": "dbc32851b8c01d4fe6a72981970de533aadbb3512058b2901489b5e346818574",
+        "part3_final.md": "9e49899d14b1ab674985749f1a45f6fe196328d65af098c8f197bb9820f84247",
+        "synthesis.md": "f61de889f83367edf9b450a671608873777a02da9c168d43c9d6254d3efe7440"
+      },
+      "pair_id": "19",
+      "report_complete": true,
+      "sequence": "BA"
+    },
+    {
+      "arm": "on",
+      "data_dir": "res/deep_interpreter/bc/sni_repair_ablation/post_repair_integrity_pair15r2_pair20_sequential_20260830T095354Z/pairs/pair-20/wiki-on",
+      "failure_reason": null,
+      "generation_audit_error": null,
+      "generation_classification": "completed",
+      "generation_seconds": 12042.850002,
+      "generation_status": "passed",
+      "generation_tokens": null,
+      "index": 8,
+      "original_report_hashes": {
+        "CCI_Analysis_Report.html": "2abe8de31a556e47ce93d55a32dba527a098db31a66eed62eb6a19f631a1d12f",
+        "part1_final.md": "b0e4ada4b08b85e2607978cfa7243c485301022570ed52e72efbe426a244cf66",
+        "part2_final.md": "4753b96087c3e22f3906a591d499ac800ae44a4e5f1284f15f3e009610c719da",
+        "part3_final.md": "7956939ed86d06e045bc7350e8a3e6e67f8387225bcb93db4f0083147b715cf9",
+        "synthesis.md": "0c8ba2056f299f16f25d1575a9ff6573d94755025a26462c1efc6db17200a36c"
+      },
+      "pair_id": "20",
+      "report_complete": true,
+      "sequence": "AB"
+    },
+    {
+      "arm": "off",
+      "data_dir": "res/deep_interpreter/bc/sni_repair_ablation/guardrail_on_off_20260905T154030Z/off/pair-20-AB/pairs/pair-20/wiki-on",
+      "failure_reason": null,
+      "generation_audit_error": null,
+      "generation_classification": "completed",
+      "generation_seconds": 2193.620893291023,
+      "generation_status": "passed",
+      "generation_tokens": null,
+      "index": 8,
+      "original_report_hashes": {
+        "CCI_Analysis_Report.html": "59880c4491eaba5fcdf93da8f6aaab0391c8062a9ca2e2ce17d645ce47aed415",
+        "part1_final.md": "5fdf4718b29610321bcf8309f8bdb2913f420b4c85ac3c32ead088322ad42e9d",
+        "part2_final.md": "a85bcd18405f24aee2d1b3d9d900681e34ea26028b2662d1cc48a48e606c3989",
+        "part3_final.md": "ae9be5c817a11ae238712d3642e306bd56d271ee6efe89e8cf1b6836ae20028b",
+        "synthesis.md": "3d33192576ffdd2196901007d85823880916c9c059c43e48a0a5b723b92e5d27"
+      },
+      "pair_id": "20",
+      "report_complete": true,
+      "sequence": "AB"
+    },
+    {
+      "arm": "on",
+      "data_dir": "res/deep_interpreter/bc/sni_repair_ablation/post_repair_integrity_counterbalanced_resume_pair17nosni_pair25_20260901T000438Z/sequences/pair-20/04-ba/pairs/pair-20/wiki-on",
+      "failure_reason": null,
+      "generation_audit_error": null,
+      "generation_classification": "completed",
+      "generation_seconds": 12193.256573,
+      "generation_status": "passed",
+      "generation_tokens": null,
+      "index": 9,
+      "original_report_hashes": {
+        "CCI_Analysis_Report.html": "bca349e56849f3547c923add5e2d7f6070861107dbbbe67a79016062fd2d351c",
+        "part1_final.md": "dfacdabc2548db0731781948311b499fabb6e7707e948fbe26a5a954e4473104",
+        "part2_final.md": "c7407d045793b61a513a705f2001f87464075d4039027a1c5ed1f4a9b3e3482f",
+        "part3_final.md": "20fbba21c10ec6968333d504d5f4ff945d86dc75a563ed92262405b9dc92e48d",
+        "synthesis.md": "2f5992642caaa8942624943d99bc56f813aa89f934b224e398b671aa155c29ff"
+      },
+      "pair_id": "20",
+      "report_complete": true,
+      "sequence": "BA"
+    },
+    {
+      "arm": "off",
+      "data_dir": "res/deep_interpreter/bc/sni_repair_ablation/guardrail_on_off_20260905T154030Z/off/pair-20-BA/pairs/pair-20/wiki-on",
+      "failure_reason": "execution_error",
+      "generation_audit_error": {
+        "message": "missing RAG audit: res/deep_interpreter/bc/sni_repair_ablation/guardrail_on_off_20260905T154030Z/off/pair-20-BA/pairs/pair-20/wiki-on/rag_audit.jsonl",
+        "type": "RuntimeError"
+      },
+      "generation_classification": "completed",
+      "generation_seconds": 2426.5847405410022,
+      "generation_status": "failed",
+      "generation_tokens": null,
+      "index": 9,
+      "original_report_hashes": {
+        "CCI_Analysis_Report.html": "1a20a7d2f13e9a828c5cb0cd739287cd27903667a6059065b6dac508a647b548",
+        "part1_final.md": "8035c649fe21d8eb8185d93c56b67f375c88fb0c44ca1bc5b54241df40f786e0",
+        "part2_final.md": "e75070b0383b1fdbd99510888715a542943771ec6d7de479ebfc186c7860d453",
+        "part3_final.md": "b57a5238af359c39c19ed9c8aa4d2669b7bf89707d3fdd46702dcb7c554d1511",
+        "synthesis.md": "a784cc1c663a9449ab69113df792e882e1af92842562c23ac6b1389f2976368e"
+      },
+      "pair_id": "20",
+      "report_complete": true,
+      "sequence": "BA"
+    },
+    {
+      "arm": "on",
+      "data_dir": "res/deep_interpreter/bc/sni_repair_ablation/post_repair_integrity_counterbalanced_resume2_pair21_pair25_20260901T170744Z/sequences/pair-21/01-ab-restart/pairs/pair-21/wiki-on",
+      "failure_reason": null,
+      "generation_audit_error": null,
+      "generation_classification": "completed",
+      "generation_seconds": 11398.572915,
+      "generation_status": "passed",
+      "generation_tokens": null,
+      "index": 10,
+      "original_report_hashes": {
+        "CCI_Analysis_Report.html": "61ffafe14364c23ea240ebee5cfba8f5456d65cb0904d910a4bf14f83d4589f0",
+        "part1_final.md": "10d5308c6444e56fc406b5ac60d6d0bb03f781e5e3342746e2da8a3608945de4",
+        "part2_final.md": "92e9e5a563851d2de0d10d7142d7601130c1b516afa4ffcbf90da4b15c53008c",
+        "part3_final.md": "5b5be9b4917d47d2870e05864cff8b274e3a492ac4617e5215337e7ac6d4d2c5",
+        "synthesis.md": "313d707bbdfeeda9bcf291940a35e4201a508a38da942b47b161529c44a39eeb"
+      },
+      "pair_id": "21",
+      "report_complete": true,
+      "sequence": "AB"
+    },
+    {
+      "arm": "off",
+      "data_dir": "res/deep_interpreter/bc/sni_repair_ablation/guardrail_on_off_20260905T154030Z/off/pair-21-AB/pairs/pair-21/wiki-on",
+      "failure_reason": "execution_error",
+      "generation_audit_error": {
+        "message": "missing RAG audit: res/deep_interpreter/bc/sni_repair_ablation/guardrail_on_off_20260905T154030Z/off/pair-21-AB/pairs/pair-21/wiki-on/rag_audit.jsonl",
+        "type": "RuntimeError"
+      },
+      "generation_classification": "completed",
+      "generation_seconds": 1951.6995533330191,
+      "generation_status": "failed",
+      "generation_tokens": null,
+      "index": 10,
+      "original_report_hashes": {
+        "CCI_Analysis_Report.html": "9e225a7e098760ed6d8e56ba7bd4fe0d22d86b6362e20de91c1a319ba2833e7f",
+        "part1_final.md": "6f47b91df56504ac593dc7f88b2215ba345c0ac935d992e4d270fbfec6f6cb2a",
+        "part2_final.md": "9937f464fcb08721dbb5f0e2890e83d5b3bfc435a366add9efaa49f0d6f42aad",
+        "part3_final.md": "b64a77bf678f76c6d76b9384eebdb33009ea0cf77461c34ba5d6881275b99a8f",
+        "synthesis.md": "0d7cdc00c5a627cfb78b7a9b2a055b9510f1d06c1688d613378d42982f244b78"
+      },
+      "pair_id": "21",
+      "report_complete": true,
+      "sequence": "AB"
+    },
+    {
+      "arm": "on",
+      "data_dir": "res/deep_interpreter/bc/sni_repair_ablation/post_repair_integrity_counterbalanced_resume2_pair21_pair25_20260901T170744Z/sequences/pair-21/02-ba/pairs/pair-21/wiki-on",
+      "failure_reason": null,
+      "generation_audit_error": null,
+      "generation_classification": "completed",
+      "generation_seconds": 11427.354017,
+      "generation_status": "passed",
+      "generation_tokens": null,
+      "index": 11,
+      "original_report_hashes": {
+        "CCI_Analysis_Report.html": "fcdd21da3843c06dc1f5b2602ae5a0a4fdd58c084e48e08df864d214a7932d15",
+        "part1_final.md": "2e03a253ee83f4f08f6eb87abb261dba806edea70b58f54f31c8b8094f14e1d8",
+        "part2_final.md": "963f7052bd65eedce8b8f65022f0f1f186a8ab84e5e39d52e2858638d8ef0402",
+        "part3_final.md": "b74d65ec44db6e5705a8bc983cc8754eb31eebe0fd1d975954f28ea1c9abca81",
+        "synthesis.md": "c070434843f704fc198ba14d09f6088975e8d5e77f0a6162e9f690702b5cd8d0"
+      },
+      "pair_id": "21",
+      "report_complete": true,
+      "sequence": "BA"
+    },
+    {
+      "arm": "off",
+      "data_dir": "res/deep_interpreter/bc/sni_repair_ablation/guardrail_on_off_20260905T154030Z/off/pair-21-BA/pairs/pair-21/wiki-on",
+      "failure_reason": "execution_error",
+      "generation_audit_error": {
+        "message": "missing RAG audit: res/deep_interpreter/bc/sni_repair_ablation/guardrail_on_off_20260905T154030Z/off/pair-21-BA/pairs/pair-21/wiki-on/rag_audit.jsonl",
+        "type": "RuntimeError"
+      },
+      "generation_classification": "completed",
+      "generation_seconds": 1957.2729783749965,
+      "generation_status": "failed",
+      "generation_tokens": null,
+      "index": 11,
+      "original_report_hashes": {
+        "CCI_Analysis_Report.html": "aa23f82575e164f4d6114dde5c6df0e37419c5cc976d13740ee59984e2cb4fcd",
+        "part1_final.md": "f43126dcd7f12524967a3c1897ce521d7c17f2e16ba56a12e329a9dd33675dda",
+        "part2_final.md": "89bbf06f7f27b4ed803b4b94c3b1dab5c5bd177e2aa3c5ff29c34a3e9facaae6",
+        "part3_final.md": "feeab4067d78f16616f798b2eb3d3949de4acdf6cdc88b853d494fbd9f79808b",
+        "synthesis.md": "b7668495ecff5a4a76a16b223e7e7e0d7d843988622fcf3720d926ddcfbb6d6e"
+      },
+      "pair_id": "21",
+      "report_complete": true,
+      "sequence": "BA"
+    },
+    {
+      "arm": "on",
+      "data_dir": "res/deep_interpreter/bc/sni_repair_ablation/post_repair_integrity_counterbalanced_resume2_pair21_pair25_20260901T170744Z/sequences/pair-22/04-ab/pairs/pair-22/wiki-on",
+      "failure_reason": null,
+      "generation_audit_error": null,
+      "generation_classification": "completed",
+      "generation_seconds": 9930.984728,
+      "generation_status": "passed",
+      "generation_tokens": null,
+      "index": 12,
+      "original_report_hashes": {
+        "CCI_Analysis_Report.html": "bfd2d14ce58282683faf14dccaefc90d42d9694c459bfb765650656f9597431e",
+        "part1_final.md": "0f12655c9ae5cb3d75abde609ec226f7419e5a2ec10b4caa3e4557a95281f924",
+        "part2_final.md": "7129b0355282c0e317cc3819e8a4870b19bb35ee15c25bb567db83f82d11f803",
+        "part3_final.md": "2d1f043baca4d10db8b9151862e448e6dfa2687399f55197a45b5e381c272e59",
+        "synthesis.md": "4d467827a5686f2f792e2e3e6e146c198c61fc20e3a644976ac2ae561887cada"
+      },
+      "pair_id": "22",
+      "report_complete": true,
+      "sequence": "AB"
+    },
+    {
+      "arm": "off",
+      "data_dir": "res/deep_interpreter/bc/sni_repair_ablation/guardrail_on_off_20260905T154030Z/off/pair-22-AB/pairs/pair-22/wiki-on",
+      "failure_reason": "execution_error",
+      "generation_audit_error": {
+        "message": "missing RAG audit: res/deep_interpreter/bc/sni_repair_ablation/guardrail_on_off_20260905T154030Z/off/pair-22-AB/pairs/pair-22/wiki-on/rag_audit.jsonl",
+        "type": "RuntimeError"
+      },
+      "generation_classification": "completed",
+      "generation_seconds": 1772.2721787499904,
+      "generation_status": "failed",
+      "generation_tokens": null,
+      "index": 12,
+      "original_report_hashes": {
+        "CCI_Analysis_Report.html": "102c413fc6d4edbe90a6c74de2224a75dee6b795e6567ed7050c1066ff27d5f1",
+        "part1_final.md": "5501218fbf43790e02baaa7a72713bb97e606424f5e50c55807cd56bf0f0d13b",
+        "part2_final.md": "1b46810c0eb8c2fb7bd676607afa8e84f3cfe107a764b0266e9c0e6e26b97b11",
+        "part3_final.md": "b461831ed50e495e21ab13fa35a23a30718b707a8a1e889e3952711642d5849d",
+        "synthesis.md": "e4111bb71125d19e684d2e7475918d838b740942301fb81bf79ab4c66e2e00d3"
+      },
+      "pair_id": "22",
+      "report_complete": true,
+      "sequence": "AB"
+    },
+    {
+      "arm": "on",
+      "data_dir": "res/deep_interpreter/bc/sni_repair_ablation/post_repair_integrity_counterbalanced_resume2_pair21_pair25_20260901T170744Z/sequences/pair-22/03-ba/pairs/pair-22/wiki-on",
+      "failure_reason": null,
+      "generation_audit_error": null,
+      "generation_classification": "completed",
+      "generation_seconds": 10181.268347,
+      "generation_status": "passed",
+      "generation_tokens": null,
+      "index": 13,
+      "original_report_hashes": {
+        "CCI_Analysis_Report.html": "7f80e54f038ebe398035151b25165dbe353eb20e520dfb076d8717b109d6f72e",
+        "part1_final.md": "75e65b979378485e4e9bddeaa038f4c6a924491203fc89adfec1bc2137d5d153",
+        "part2_final.md": "3c6ac504de4d4e14868ccc3b20a2f8848c6f59490ef19607785980cb7989f82a",
+        "part3_final.md": "296af78ad522bb247ddd4d2ae18427cfd8cd580a03459586233a92aff9ada50d",
+        "synthesis.md": "45108ecbd86c6811dc90655d906f0decb95eeb9b478a6721d7112a79a817be17"
+      },
+      "pair_id": "22",
+      "report_complete": true,
+      "sequence": "BA"
+    },
+    {
+      "arm": "off",
+      "data_dir": "res/deep_interpreter/bc/sni_repair_ablation/guardrail_on_off_20260905T154030Z/off/pair-22-BA/pairs/pair-22/wiki-on",
+      "failure_reason": "execution_error",
+      "generation_audit_error": {
+        "message": "missing RAG audit: res/deep_interpreter/bc/sni_repair_ablation/guardrail_on_off_20260905T154030Z/off/pair-22-BA/pairs/pair-22/wiki-on/rag_audit.jsonl",
+        "type": "RuntimeError"
+      },
+      "generation_classification": "completed",
+      "generation_seconds": 1989.5099209170148,
+      "generation_status": "failed",
+      "generation_tokens": null,
+      "index": 13,
+      "original_report_hashes": {
+        "CCI_Analysis_Report.html": "d64425c24d387a408b62566ea55ebe5ee5e9cdcda8f0ea54afc06fb3f6204b1a",
+        "part1_final.md": "556548f72334023c205e0d75432b3dafa0b45d7276ce50949ed9a86cd2faadfd",
+        "part2_final.md": "52338f9e3d1153e8e4731623a540d376220670a646c49910d3d2b50cea1b8057",
+        "part3_final.md": "79b9183ec03df152fb3b388e21509340f603bcc91773e78bb5880d5fa76ac62f",
+        "synthesis.md": "14fcf245d1b27d90daa70eee7edd44de38ff3bf1d4e522843342500301588284"
+      },
+      "pair_id": "22",
+      "report_complete": true,
+      "sequence": "BA"
+    },
+    {
+      "arm": "on",
+      "data_dir": "res/deep_interpreter/bc/sni_repair_ablation/post_repair_integrity_counterbalanced_resume2_pair21_pair25_20260901T170744Z/sequences/pair-23/05-ab/pairs/pair-23/wiki-on",
+      "failure_reason": null,
+      "generation_audit_error": null,
+      "generation_classification": "completed",
+      "generation_seconds": 11102.237094,
+      "generation_status": "passed",
+      "generation_tokens": null,
+      "index": 14,
+      "original_report_hashes": {
+        "CCI_Analysis_Report.html": "4e7bc399ac4c555e855a76f2f88cd755629a043f91d9efc16cc83f11a12a565a",
+        "part1_final.md": "8fa5821bb1e253fb8efc6eced8e663a89d496f97a00c3fb15582e4d493309cb0",
+        "part2_final.md": "204c74e6f7fbd8bc28a074cfe9a4987558d556ce0121f9eab959c96f3147571e",
+        "part3_final.md": "a9a50767f3f5479a14cde01838a2a7bf6f342ff6af8c9dc1968ddb8e1872692f",
+        "synthesis.md": "a658f585597dd8dd1ff9149d7c365ccfca25186041ae9708489b07043bf596ea"
+      },
+      "pair_id": "23",
+      "report_complete": true,
+      "sequence": "AB"
+    },
+    {
+      "arm": "off",
+      "data_dir": "res/deep_interpreter/bc/sni_repair_ablation/guardrail_on_off_20260905T154030Z/off/pair-23-AB/pairs/pair-23/wiki-on",
+      "failure_reason": "execution_error",
+      "generation_audit_error": {
+        "message": "missing RAG audit: res/deep_interpreter/bc/sni_repair_ablation/guardrail_on_off_20260905T154030Z/off/pair-23-AB/pairs/pair-23/wiki-on/rag_audit.jsonl",
+        "type": "RuntimeError"
+      },
+      "generation_classification": "completed",
+      "generation_seconds": 2778.131181625009,
+      "generation_status": "failed",
+      "generation_tokens": null,
+      "index": 14,
+      "original_report_hashes": {
+        "CCI_Analysis_Report.html": "e37bf96d05459442d656e2adfb0dd15bbde81a5c438bd995dcab6d23eb27ed13",
+        "part1_final.md": "9e1d3e44525a955fb58a15656a4ec48d5bb61587a97b69c96dac2026afe9f56d",
+        "part2_final.md": "f4592db22c0dcd40aea9c9ede070fe8c3e4a128d29e9ecdfc1b9c5ba8ca5b666",
+        "part3_final.md": "4dd2b8e6959e0ae6792733f571fb1c4e0228f04dc9b47e188336c2ed97ddc1fd",
+        "synthesis.md": "f2d1013a857484d08c35b83c350e1ce75cd415f70ae0ff4a92a5a73d4cf4a169"
+      },
+      "pair_id": "23",
+      "report_complete": true,
+      "sequence": "AB"
+    },
+    {
+      "arm": "on",
+      "data_dir": "res/deep_interpreter/bc/sni_repair_ablation/post_repair_integrity_counterbalanced_resume2_pair21_pair25_20260901T170744Z/sequences/pair-23/06-ba/pairs/pair-23/wiki-on",
+      "failure_reason": null,
+      "generation_audit_error": null,
+      "generation_classification": "completed",
+      "generation_seconds": 15175.961098,
+      "generation_status": "passed",
+      "generation_tokens": null,
+      "index": 15,
+      "original_report_hashes": {
+        "CCI_Analysis_Report.html": "a29fdde4fc9916b3f8803b888319b3e1051e83254a71d52a96584254fba7fc21",
+        "part1_final.md": "7d0f12690446f50b81a07140fbc084237eb4646ef2a7483380e6401cd2d2132f",
+        "part2_final.md": "8ccbcfb971151ef4fea2c2963e9d64986e1dd2a18b2d44dced41a0e62108a4de",
+        "part3_final.md": "19bef452917c0084471c64475263386871f7fb494ca3a1d417169f84129340ed",
+        "synthesis.md": "1ce853e78ea096da9f859335087a45bddeecca0b328ce4c48d51a9add3a173f4"
+      },
+      "pair_id": "23",
+      "report_complete": true,
+      "sequence": "BA"
+    },
+    {
+      "arm": "off",
+      "data_dir": "res/deep_interpreter/bc/sni_repair_ablation/guardrail_on_off_20260905T154030Z/off/pair-23-BA/pairs/pair-23/wiki-on",
+      "failure_reason": "execution_error",
+      "generation_audit_error": {
+        "message": "missing RAG audit: res/deep_interpreter/bc/sni_repair_ablation/guardrail_on_off_20260905T154030Z/off/pair-23-BA/pairs/pair-23/wiki-on/rag_audit.jsonl",
+        "type": "RuntimeError"
+      },
+      "generation_classification": "completed",
+      "generation_seconds": 1779.6543400830124,
+      "generation_status": "failed",
+      "generation_tokens": null,
+      "index": 15,
+      "original_report_hashes": {
+        "CCI_Analysis_Report.html": "96a05735b43687085f1f6fcca3127ae994d7c9a7380c35fc28bd92d9bfb0a8d0",
+        "part1_final.md": "ec52eabd799386044f0291c1e5f1b93f8d75c6e9eae04dffaebd7aca60aeefe3",
+        "part2_final.md": "74d39f1123cb1b7e5005409ed053a46607d7175ad63847aca6904dbb65aefed4",
+        "part3_final.md": "9e86903f05a947d5fb8be7bcbb43a67c6a74fa217b890643d0912785a6bcbba1",
+        "synthesis.md": "1d8f4740ce8c594f45338bebacca4a231a87632d79a34876aa8919de1769fa7f"
+      },
+      "pair_id": "23",
+      "report_complete": true,
+      "sequence": "BA"
+    },
+    {
+      "arm": "on",
+      "data_dir": "res/deep_interpreter/bc/sni_repair_ablation/post_repair_integrity_counterbalanced_resume2_pair21_pair25_20260901T170744Z/sequences/pair-24/08-ab/pairs/pair-24/wiki-on",
+      "failure_reason": null,
+      "generation_audit_error": null,
+      "generation_classification": "completed",
+      "generation_seconds": 10672.673975,
+      "generation_status": "passed",
+      "generation_tokens": null,
+      "index": 16,
+      "original_report_hashes": {
+        "CCI_Analysis_Report.html": "a566874a004b0f11d43509260847bea61c090c602a5cc96118589dd355a9b8c3",
+        "part1_final.md": "717fc08b7eac613eea31356c080663d41943ae54fa9193caa8cbb8213af1789e",
+        "part2_final.md": "dc21c57f6fe58a2278c70a2e34d8d4137d852d300fbd4ae7e395be8e82e958ae",
+        "part3_final.md": "39df7e005d068ffa1c372df0127461b4bba15499b43be6fbd81aba29c440db71",
+        "synthesis.md": "666bb601d89ecfd5837c6051e0aaaff5ad2e372275096b9f3a3e5428cfb72b32"
+      },
+      "pair_id": "24",
+      "report_complete": true,
+      "sequence": "AB"
+    },
+    {
+      "arm": "off",
+      "data_dir": "res/deep_interpreter/bc/sni_repair_ablation/guardrail_on_off_20260905T154030Z/off/pair-24-AB/pairs/pair-24/wiki-on",
+      "failure_reason": "execution_error",
+      "generation_audit_error": {
+        "message": "missing RAG audit: res/deep_interpreter/bc/sni_repair_ablation/guardrail_on_off_20260905T154030Z/off/pair-24-AB/pairs/pair-24/wiki-on/rag_audit.jsonl",
+        "type": "RuntimeError"
+      },
+      "generation_classification": "completed",
+      "generation_seconds": 1975.8982937500114,
+      "generation_status": "failed",
+      "generation_tokens": null,
+      "index": 16,
+      "original_report_hashes": {
+        "CCI_Analysis_Report.html": "d139db8745998113577dd1f86c45ff23d6db7409db67289faae3fe31ebc14329",
+        "part1_final.md": "d00b16efe0bfe9c9a7da1bc6e9207110bdbc27d87df8ab86af155fa276fe2e83",
+        "part2_final.md": "c94a7e6ac4ba5de4309fed13f65f312f6bc6c176ac2979850c70354bd498ea6b",
+        "part3_final.md": "d581898c79626bcfb6cd4d6343b5ab4a98a1785d5bd0ef1b4589393a23b08f8c",
+        "synthesis.md": "f03553d0e86213b346264d1f046a8e6fa7ef7ad120566a50e5ea77ac97a1f675"
+      },
+      "pair_id": "24",
+      "report_complete": true,
+      "sequence": "AB"
+    },
+    {
+      "arm": "on",
+      "data_dir": "res/deep_interpreter/bc/sni_repair_ablation/post_repair_integrity_counterbalanced_resume2_pair21_pair25_20260901T170744Z/sequences/pair-24/07-ba/pairs/pair-24/wiki-on",
+      "failure_reason": null,
+      "generation_audit_error": null,
+      "generation_classification": "completed",
+      "generation_seconds": 9205.881564,
+      "generation_status": "passed",
+      "generation_tokens": null,
+      "index": 17,
+      "original_report_hashes": {
+        "CCI_Analysis_Report.html": "3d111c8218ed47e03a4522358db056d49795e87cb4ed52f9a9eae772f0386d0f",
+        "part1_final.md": "b9e0f01362406d24746dc3d33670d0c9a695f55506691057decae54db97a7180",
+        "part2_final.md": "54dd636be3639e284d1ea9d944fdb11c1f3c0293c348ffe0b3664728c8af7be4",
+        "part3_final.md": "8e7d0aaa4641bc03b0e6e7dc1ae3d69fec3a1be2fd54c5f9d4a0ef637d44d9a7",
+        "synthesis.md": "73be5092c0d1afdc4e31072777de61b3a4c8da751aa4da0344761003bc6a75b6"
+      },
+      "pair_id": "24",
+      "report_complete": true,
+      "sequence": "BA"
+    },
+    {
+      "arm": "off",
+      "data_dir": "res/deep_interpreter/bc/sni_repair_ablation/guardrail_on_off_20260905T154030Z/off/pair-24-BA/pairs/pair-24/wiki-on",
+      "failure_reason": null,
+      "generation_audit_error": null,
+      "generation_classification": "completed",
+      "generation_seconds": 2693.8477872499498,
+      "generation_status": "passed",
+      "generation_tokens": null,
+      "index": 17,
+      "original_report_hashes": {
+        "CCI_Analysis_Report.html": "35cf37b6e49c40de0c19e2f53f67cea240299c9eeec049e19957e566c1cca7f6",
+        "part1_final.md": "5e3c24e7fc09125d7c5593e94ccc1be772acf4770455ea0e94a2e7b2e7e2cd53",
+        "part2_final.md": "e937ec131cad062cf706735077788cdc4d6987c698caa99d6349ef773a9079c9",
+        "part3_final.md": "4ba5bc03dbc595fea2e962a59c4db14a507e20edc7df4e0d0e75fd4903427b59",
+        "synthesis.md": "42676be4a9b2bd0c05e2f1be88ecd852fe30a78440188380220ed3898eb852c5"
+      },
+      "pair_id": "24",
+      "report_complete": true,
+      "sequence": "BA"
+    },
+    {
+      "arm": "on",
+      "data_dir": "res/deep_interpreter/bc/sni_repair_ablation/post_repair_integrity_counterbalanced_resume2_pair21_pair25_20260901T170744Z/sequences/pair-25/09-ab/pairs/pair-25/wiki-on",
+      "failure_reason": null,
+      "generation_audit_error": null,
+      "generation_classification": "completed",
+      "generation_seconds": 14081.080681,
+      "generation_status": "passed",
+      "generation_tokens": null,
+      "index": 18,
+      "original_report_hashes": {
+        "CCI_Analysis_Report.html": "10ba4da7c52d336fd85cca5097b6880ad4a1e9b523625488500a740f25126882",
+        "part1_final.md": "9cb59d7d8cf7488dadd978e8ea5bf238a7a56c22508f7d07b3382f18039471cd",
+        "part2_final.md": "dbdbde533ea3fd2f2c5d4f75c3f7f090b35362c89d764cb732129fabf2469560",
+        "part3_final.md": "87900507b9cc16f535e133f948937361afaa2b160845fceae34d56bee82449f0",
+        "synthesis.md": "362108b29ece3955e817649a439198740e295b73a046a7ae503401bc610a97e8"
+      },
+      "pair_id": "25",
+      "report_complete": true,
+      "sequence": "AB"
+    },
+    {
+      "arm": "off",
+      "data_dir": "res/deep_interpreter/bc/sni_repair_ablation/guardrail_on_off_20260905T154030Z/off/pair-25-AB/pairs/pair-25/wiki-on",
+      "failure_reason": "execution_error",
+      "generation_audit_error": {
+        "message": "missing RAG audit: res/deep_interpreter/bc/sni_repair_ablation/guardrail_on_off_20260905T154030Z/off/pair-25-AB/pairs/pair-25/wiki-on/rag_audit.jsonl",
+        "type": "RuntimeError"
+      },
+      "generation_classification": "completed",
+      "generation_seconds": 2611.2423562500044,
+      "generation_status": "failed",
+      "generation_tokens": null,
+      "index": 18,
+      "original_report_hashes": {
+        "CCI_Analysis_Report.html": "c99a3394a6e6d4085a00a89664991d04900aba1228de6779fde28fb08e46bf9c",
+        "part1_final.md": "7f20d53c3f273b32de767a44a12f6acd751d508ae05272d3a5b4b036ca2cea97",
+        "part2_final.md": "23f63563d7f500c1af38935e2c237eba68ffb17792ddd418144135ff3abe212e",
+        "part3_final.md": "6efadd4bae6cbcb341a79e3537b195039ee38815d175a02a72ed95fa87d32141",
+        "synthesis.md": "870fc86827c9c30c2a43a09975e42d6598a3390e4ecf9b513084198dc18a0603"
+      },
+      "pair_id": "25",
+      "report_complete": true,
+      "sequence": "AB"
+    },
+    {
+      "arm": "on",
+      "data_dir": "res/deep_interpreter/bc/sni_repair_ablation/post_repair_integrity_counterbalanced_resume2_pair21_pair25_20260901T170744Z/sequences/pair-25/10-ba/pairs/pair-25/wiki-on",
+      "failure_reason": null,
+      "generation_audit_error": null,
+      "generation_classification": "completed",
+      "generation_seconds": 10378.858353,
+      "generation_status": "passed",
+      "generation_tokens": null,
+      "index": 19,
+      "original_report_hashes": {
+        "CCI_Analysis_Report.html": "c917a4a2d3711368c8cf54bda486ba3dc6abe429e24fc88244eac9c69fdf38b3",
+        "part1_final.md": "93c1496821d10ec1e578a359afafcf13c085306dfb7f2f75f42dfd601c7b13fb",
+        "part2_final.md": "2a47615874c160d7d70ef90c4ffdb59bc593a5b2509f8b391aed54cc5aef65e4",
+        "part3_final.md": "2a7850bae8a579a709d06b25c1146e4268cb62c46a16bfd59d4d110c673f7bb9",
+        "synthesis.md": "8ef0543169ff26c4625a9e6817e21dcb4e5ac7f2c080a6b994c77a762a77c0cf"
+      },
+      "pair_id": "25",
+      "report_complete": true,
+      "sequence": "BA"
+    },
+    {
+      "arm": "off",
+      "data_dir": "res/deep_interpreter/bc/sni_repair_ablation/guardrail_on_off_20260905T154030Z/off/pair-25-BA/pairs/pair-25/wiki-on",
+      "failure_reason": "execution_error",
+      "generation_audit_error": {
+        "message": "missing RAG audit: res/deep_interpreter/bc/sni_repair_ablation/guardrail_on_off_20260905T154030Z/off/pair-25-BA/pairs/pair-25/wiki-on/rag_audit.jsonl",
+        "type": "RuntimeError"
+      },
+      "generation_classification": "completed",
+      "generation_seconds": 2765.0697608340415,
+      "generation_status": "failed",
+      "generation_tokens": null,
+      "index": 19,
+      "original_report_hashes": {
+        "CCI_Analysis_Report.html": "7779138576ea5b82f0eca4d8d54f2c95a64c75a27ef6492dfa7da6c55ad0a460",
+        "part1_final.md": "da5ab49e9ad3c99f81df6e95c1e1255adeb6527b5624bc100cf9e528be7e0d81",
+        "part2_final.md": "ab16a1619796fa42029df2c9d709a40ecf541ae7fda9c6ff69e291df0de9ab67",
+        "part3_final.md": "7cb17f5e38bd581785e87fc69d995de22df32d4833ed9445548b8f145cf7c788",
+        "synthesis.md": "e7bde3f3b09952c6010905773b811b60b31a515b5af04b08fa75c55b8aaf801b"
+      },
+      "pair_id": "25",
+      "report_complete": true,
+      "sequence": "BA"
+    }
+  ],
+  "transport_fix": "reuse one asyncio.Runner across each report's async judge client requests"
+}

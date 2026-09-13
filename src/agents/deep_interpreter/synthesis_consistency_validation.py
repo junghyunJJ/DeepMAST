@@ -374,6 +374,9 @@ def _add_issue(
     if start is not None and end is not None:
         issue["start_offset"] = start
         issue["end_offset"] = end
+    if repairable:
+        issue["target_text"] = value
+        issue["replacement_text"] = replacement
     issues.append(issue)
 
 

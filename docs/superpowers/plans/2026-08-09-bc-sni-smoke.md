@@ -45,8 +45,30 @@ agentic query schema contains the boolean `use_wiki_context` property.
    smoke-test failure. Preserve the response; do not retry with a different
    model or collection.
 
-**Verification:** response is successful and `elapsed_seconds` is a positive
-number in `rebuild_timing.json`.
+### Root-cause recovery (triggered by the initial 2026-08-09 failure)
+
+The first exact request returned HTTP 500 in 0.72 seconds. Read-only runtime
+diagnosis established that the running `langconnect-api` container lacked
+`SNI_LLM_BASE_URL`; it consequently sent `qwen3.5:122b` to port 11434, where
+that model is absent, instead of the configured port 4000. This is a stale
+container configuration, not a collection or model-selection failure.
+
+1. Preserve the initial failure files already committed at
+   `rebuild_response.json` and `rebuild_timing.json`.
+2. Recreate only the Compose `api` service, using the current `.env` and the
+   existing `langconnect_mcp` project name. Do not rebuild an image or touch
+   PostgreSQL, Next.js, collection data, or model files.
+3. Confirm the recreated container exposes
+   `SNI_LLM_BASE_URL=http://host.docker.internal:4000`,
+   `SNI_LLM_PROVIDER=ollama`, and `SNI_LLM_MODEL=qwen3.5:122b`.
+4. Submit the same saved request body to the same collection exactly once.
+   Save it as `rebuild_response_after_env_reload.json` and
+   `rebuild_timing_after_env_reload.json` rather than overwriting the initial
+   failure evidence.
+5. If this one recovery request fails, preserve its response and stop.
+
+**Verification:** the recovery response is successful, reports a positive
+`elapsed_seconds`, and both failed and recovery attempts remain inspectable.
 
 ## Task 3: Prove the collection did not change
 
@@ -94,7 +116,8 @@ entry, and `wiki_context_status == "disabled"`.
 - Create: `res/deep_interpreter/bc/bc/sni_smoke_test/summary.md`
 
 1. Build a compact summary containing collection invariants, selected model,
-   SNI elapsed seconds, and one status/result-count row for each paired query.
+   SNI elapsed seconds (including the initial failed attempt), and one
+   status/result-count row for each paired query.
 2. State explicitly that this is a mechanism smoke test, not a repair-quality
    or replicate result.
 3. Run the existing regression test that checks DeepMAST passes
@@ -112,7 +135,8 @@ artifact paths.
 
 ## Completion criteria
 
-- One successful 122b SNI rebuild with exact elapsed time.
+- One successful 122b SNI rebuild with exact elapsed time, while preserving
+  the initial stale-container failure evidence.
 - Identical pre/post collection UUID, document count, and chunk count.
 - Three successful paired agentic searches with the expected SNI statuses.
 - A persisted, committed summary and raw evidence for the later repair A/B

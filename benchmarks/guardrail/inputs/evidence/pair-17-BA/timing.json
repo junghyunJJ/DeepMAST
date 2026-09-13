@@ -1,0 +1,22 @@
+{
+  "stages": [
+    {
+      "elapsed_seconds": 356.115,
+      "ollama_num_predict": 12000,
+      "return_code": 0,
+      "stage": "part1"
+    },
+    {
+      "elapsed_seconds": 351.61,
+      "ollama_num_predict": 12000,
+      "return_code": 0,
+      "stage": "part2"
+    },
+    {
+      "elapsed_seconds": 8055.35,
+      "ollama_num_predict": 8000,
+      "return_code": 1,
+      "stage": "part3"
+    }
+  ]
+}

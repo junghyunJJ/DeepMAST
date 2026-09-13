@@ -1,0 +1,229 @@
+{
+  "api_ollama_map": [
+    {
+      "api_port": 8881,
+      "ollama_base_url": "http://localhost:4000",
+      "ollama_port": 4000,
+      "rag_api_url": "http://localhost:8881",
+      "service": "sgcp-sni-api-4000"
+    },
+    {
+      "api_port": 8882,
+      "ollama_base_url": "http://localhost:5000",
+      "ollama_port": 5000,
+      "rag_api_url": "http://localhost:8882",
+      "service": "sgcp-sni-api-5000"
+    },
+    {
+      "api_port": 8883,
+      "ollama_base_url": "http://localhost:6000",
+      "ollama_port": 6000,
+      "rag_api_url": "http://localhost:8883",
+      "service": "sgcp-sni-api-6000"
+    },
+    {
+      "api_port": 8884,
+      "ollama_base_url": "http://localhost:7000",
+      "ollama_port": 7000,
+      "rag_api_url": "http://localhost:8884",
+      "service": "sgcp-sni-api-7000"
+    }
+  ],
+  "condition_switch_semantics": {
+    "SNI": {
+      "DEEP_INTERPRETER_USE_WIKI_CONTEXT": "true",
+      "agentic_payload_use_wiki_context": true,
+      "required_wiki_context_status": "selected"
+    },
+    "no-SNI": {
+      "DEEP_INTERPRETER_USE_WIKI_CONTEXT": "false",
+      "agentic_payload_use_wiki_context": false,
+      "required_wiki_context_status": "disabled"
+    }
+  },
+  "created_at_utc": "2026-08-09T10:54:34.997459+00:00",
+  "fixed_collection": {
+    "expected_chunk_count": 1553,
+    "expected_document_count": 100,
+    "immutable_during_preflight_and_runs": true,
+    "snapshot": {
+      "chunk_count": 1553,
+      "document_count": 100,
+      "metadata": {
+        "created_by": "deep_interpreter",
+        "type": "literature_rag"
+      },
+      "name": "deep_interpreter_bc_cfd96ddb_all",
+      "uuid": "a208e916-bd32-405a-9eee-de4cd82b2a3b"
+    },
+    "uuid": "a208e916-bd32-405a-9eee-de4cd82b2a3b"
+  },
+  "git": {
+    "branch": "feat/bc-sni-smoke",
+    "commit": "10af2de2065262d2323704000c719a7809f0ee5f",
+    "preflight_verified_at_git_head": "982de1107ad83998ad92ab7460449191ca2877bd"
+  },
+  "manifest_type": "bc_sni_repair_ablation_preflight",
+  "model_configuration": {
+    "backend_model_required_before_run": true,
+    "hard_no_fallback": true,
+    "model": "qwen3.5:122b",
+    "provider": "ollama",
+    "reasoning": true
+  },
+  "ordered_pairs": [
+    {
+      "api_port": 8881,
+      "condition_order": [
+        "no-SNI",
+        "SNI"
+      ],
+      "first_condition": "no-SNI",
+      "ollama_port": 4000,
+      "pair_id": "01"
+    },
+    {
+      "api_port": 8881,
+      "condition_order": [
+        "SNI",
+        "no-SNI"
+      ],
+      "first_condition": "SNI",
+      "ollama_port": 4000,
+      "pair_id": "02"
+    },
+    {
+      "api_port": 8881,
+      "condition_order": [
+        "no-SNI",
+        "SNI"
+      ],
+      "first_condition": "no-SNI",
+      "ollama_port": 4000,
+      "pair_id": "03"
+    },
+    {
+      "api_port": 8882,
+      "condition_order": [
+        "no-SNI",
+        "SNI"
+      ],
+      "first_condition": "no-SNI",
+      "ollama_port": 5000,
+      "pair_id": "04"
+    },
+    {
+      "api_port": 8882,
+      "condition_order": [
+        "SNI",
+        "no-SNI"
+      ],
+      "first_condition": "SNI",
+      "ollama_port": 5000,
+      "pair_id": "05"
+    },
+    {
+      "api_port": 8882,
+      "condition_order": [
+        "SNI",
+        "no-SNI"
+      ],
+      "first_condition": "SNI",
+      "ollama_port": 5000,
+      "pair_id": "06"
+    },
+    {
+      "api_port": 8883,
+      "condition_order": [
+        "no-SNI",
+        "SNI"
+      ],
+      "first_condition": "no-SNI",
+      "ollama_port": 6000,
+      "pair_id": "07"
+    },
+    {
+      "api_port": 8883,
+      "condition_order": [
+        "no-SNI",
+        "SNI"
+      ],
+      "first_condition": "no-SNI",
+      "ollama_port": 6000,
+      "pair_id": "08"
+    },
+    {
+      "api_port": 8884,
+      "condition_order": [
+        "SNI",
+        "no-SNI"
+      ],
+      "first_condition": "SNI",
+      "ollama_port": 7000,
+      "pair_id": "09"
+    },
+    {
+      "api_port": 8884,
+      "condition_order": [
+        "SNI",
+        "no-SNI"
+      ],
+      "first_condition": "SNI",
+      "ollama_port": 7000,
+      "pair_id": "10"
+    }
+  ],
+  "recovery_notes": {
+    "container_health_evidence": "topology_container_health_round5.json",
+    "initial_failed_smoke_preserved_as": "topology_smoke_initial_connection_reset.json",
+    "initial_failure_label": "connection reset before readiness-aware recovery",
+    "preflight_verified_at_git_head": "982de1107ad83998ad92ab7460449191ca2877bd",
+    "readiness_recovery_v1_preserved_as": "topology_smoke_readiness_recovery_v1.json",
+    "standard_smoke_report": "topology_smoke.json",
+    "standard_smoke_report_status": "round5 expanded observed evidence success",
+    "task5_full_replicates_started": false,
+    "updated_at_utc": "2026-08-09T11:44:17.086776+00:00"
+  },
+  "run_settings": {
+    "collection_rebuild": false,
+    "conditions_per_pair": 2,
+    "pair_count": 10,
+    "raw_full_run_allowed_in_task_4": false,
+    "schedule_seed": 20260809,
+    "sni_rebuild": false,
+    "source_copy_per_condition": true,
+    "stop_before_task_5_on_topology_failure": true
+  },
+  "source": {
+    "input_files": {
+      "interpretation_guide.md": {
+        "sha256": "8b273d020c6541e0df3fb1dce631accb4a59ecaa0ce4de9894b251dc6155cc5c"
+      },
+      "papers.json": {
+        "sha256": "12439af9926a0e63e3d317985dab366e8c7e7187dbcd9c68c61208d5a54c9864"
+      },
+      "part4_candidate_selection.json": {
+        "sha256": "99da372bf1962909d6b4d03acd8f1f575f30a397d281490ac86ba27698b1e041"
+      },
+      "targets.json": {
+        "sha256": "adc1dfb49e35660fb92aa539bfd60a33ada379c42d7b1a8f2663347f73757ac1"
+      }
+    },
+    "path": "/Users/jungj2/Dropbox/Metadata/aiagent/DeepMAST/res/bc_interpreter"
+  },
+  "topology_preflight": {
+    "allowed_container_services": [
+      "sgcp-sni-api-4000",
+      "sgcp-sni-api-5000",
+      "sgcp-sni-api-6000",
+      "sgcp-sni-api-7000"
+    ],
+    "expected_collection_snapshot_checked_on_every_endpoint": true,
+    "expected_model_checked_on_every_backend": "qwen3.5:122b",
+    "script": "scripts/sni_ablation_api_stack.py",
+    "smoke_pairs_per_endpoint": [
+      "SNI",
+      "no-SNI"
+    ]
+  }
+}

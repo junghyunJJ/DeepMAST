@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from scripts import repair_report as repair_report_script
 from scripts import validate_report as validate_report_script
@@ -18,7 +18,6 @@ REQUIRED_PART_FILES = (
 )
 SYNTHESIS_REQUIRED_FILES = ("papers.json", "synthesis.md")
 MAX_GUARDRAIL_REPAIR_PASSES = 3
-SYNTHESIS_GUARDRAIL_SENTENCE = "this remains a hypothesis requiring validation."
 SYNTHESIS_THERAPEUTIC_OVERCLAIM_RE = re.compile(
     r"\b(high-confidence therapeutic target|clinical prioritization|most effective|"
     r"would be particularly sensitive to|therapy[-\s]+resistant|treatment[-\s]+sensitive|"
@@ -36,6 +35,8 @@ SYNTHESIS_HTML_FRAGMENT_RE = re.compile(
     r"</(?:article|div|h[1-6]|li|ol|p|section|table|ul)>",
     re.IGNORECASE | re.MULTILINE,
 )
+SYNTHESIS_H1_RE = re.compile(r"^#\s+\S.*$")
+SYNTHESIS_H2_H6_RE = re.compile(r"^(#{2,6})(\s+)(\S.*)$")
 EXPLICIT_INLINE_CONTRADICTION_RE = re.compile(
     r"\b(contradict|incorrectly states)\b",
     re.IGNORECASE,
@@ -46,6 +47,7 @@ PAPERS_JSON_LOAD_ERROR_CODES = {
     "papers_json_malformed",
     "papers_json_invalid",
 }
+ValidationPhase = Literal["deterministic", "semantic"]
 
 
 def _issue_payload(
@@ -54,8 +56,11 @@ def _issue_payload(
     consistency_validation: list[dict[str, Any]] | None = None,
     claim_selection: dict[str, Any] | None = None,
     inline_citation_coverage: dict[str, Any] | None = None,
+    phase: ValidationPhase | None = None,
 ) -> dict[str, Any]:
     payload: dict[str, Any] = {"issue_count": len(issues), "issues": issues}
+    if phase is not None:
+        payload["phase"] = phase
     if claim_validation is not None:
         payload["claim_validation"] = claim_validation
     if consistency_validation is not None:
@@ -74,6 +79,7 @@ def _write_issues(
     consistency_validation: list[dict[str, Any]] | None = None,
     claim_selection: dict[str, Any] | None = None,
     inline_citation_coverage: dict[str, Any] | None = None,
+    phase: ValidationPhase | None = None,
 ) -> None:
     path.write_text(
         json.dumps(
@@ -83,6 +89,7 @@ def _write_issues(
                 consistency_validation,
                 claim_selection,
                 inline_citation_coverage,
+                phase,
             ),
             indent=2,
             ensure_ascii=False,
@@ -104,12 +111,59 @@ def _issue_claim_key(issue: dict[str, str]) -> tuple[str, str, str]:
     )
 
 
-def _missing_required_files(data_dir: Path) -> list[str]:
-    return [name for name in REQUIRED_PART_FILES if not (data_dir / name).exists()]
+def _missing_required_files(data_dir: Path, filenames: tuple[str, ...]) -> list[str]:
+    return [name for name in filenames if not (data_dir / name).exists()]
 
 
 def _missing_synthesis_required_files(data_dir: Path) -> list[str]:
     return [name for name in SYNTHESIS_REQUIRED_FILES if not (data_dir / name).exists()]
+
+
+def _snapshot_markdown_files(
+    data_dir: Path,
+    filenames: tuple[str, ...],
+) -> dict[str, bytes]:
+    return {
+        filename: (data_dir / filename).read_bytes()
+        for filename in filenames
+        if (data_dir / filename).is_file()
+    }
+
+
+def _restore_markdown_files(data_dir: Path, snapshot: dict[str, bytes]) -> None:
+    for filename, content in snapshot.items():
+        (data_dir / filename).write_bytes(content)
+
+
+def _strict_phase_progress(
+    before: list[dict[str, Any]],
+    before_phase: ValidationPhase,
+    after: list[dict[str, Any]],
+    after_phase: ValidationPhase,
+) -> bool:
+    if before_phase == "deterministic" and after_phase == "semantic":
+        return True
+    if before_phase != after_phase:
+        return False
+    before_count = _error_count(before)
+    after_count = _error_count(after)
+    if after_count < before_count:
+        return True
+    if before_phase != "semantic" or after_count != before_count or not before_count:
+        return False
+
+    before_errors = [issue for issue in before if issue.get("severity") == "error"]
+    after_errors = [issue for issue in after if issue.get("severity") == "error"]
+    repairable = repair_report_script.REPAIRABLE_INLINE_CITATION_CODES
+    if any(
+        issue.get("code") not in repairable
+        for issue in (*before_errors, *after_errors)
+    ):
+        return False
+
+    before_keys = {_issue_claim_key(issue) for issue in before_errors}
+    after_keys = {_issue_claim_key(issue) for issue in after_errors}
+    return bool(before_keys and after_keys) and before_keys.isdisjoint(after_keys)
 
 
 def _section_for_claim(text: str, claim: str) -> str:
@@ -124,11 +178,15 @@ def _section_for_claim(text: str, claim: str) -> str:
     return heading
 
 
-def _is_hedged_claim(claim: str, following: str = "") -> bool:
-    return bool(
-        validate_report_script.MECHANISTIC_HEDGE_RE.search(claim)
-        or SYNTHESIS_GUARDRAIL_SENTENCE in following.lower()
-    )
+def _first_non_empty_line(text: str) -> tuple[int, int, str] | None:
+    cursor = 0
+    for line in text.splitlines(keepends=True):
+        end = cursor + len(line)
+        stripped_newline = line.rstrip("\r\n")
+        if stripped_newline.strip():
+            return cursor, cursor + len(stripped_newline), stripped_newline
+        cursor = end
+    return None
 
 
 def _is_negated_therapeutic_claim(claim: str) -> bool:
@@ -143,8 +201,10 @@ def _synthesis_issue(
     severity: str = "error",
     evidence: str = "",
     repair_instruction: str = "",
+    target_text: str = "",
+    replacement_text: str = "",
 ) -> dict[str, str]:
-    return {
+    issue = {
         "code": code,
         "severity": severity,
         "file": "synthesis.md",
@@ -153,6 +213,11 @@ def _synthesis_issue(
         "evidence": evidence,
         "repair_instruction": repair_instruction,
     }
+    if target_text:
+        issue["target_text"] = target_text
+    if replacement_text:
+        issue["replacement_text"] = replacement_text
+    return issue
 
 
 def _validate_part_reports(
@@ -160,18 +225,24 @@ def _validate_part_reports(
     *,
     provider: str | None,
     claim_cache: dict[str, list[dict[str, Any]]],
+    filenames: tuple[str, ...],
 ) -> tuple[
     list[dict[str, str]],
     list[dict[str, Any]],
     dict[str, Any] | None,
     dict[str, Any] | None,
+    ValidationPhase,
 ]:
-    deterministic = validate_report_script.validate_report(data_dir)
-    if any(issue.get("code") in PAPERS_JSON_LOAD_ERROR_CODES for issue in deterministic):
-        return deterministic, [], None, None
+    deterministic = [
+        issue
+        for issue in validate_report_script.validate_report(data_dir)
+        if issue.get("file") not in REQUIRED_PART_FILES or issue.get("file") in filenames
+    ]
+    if _error_count(deterministic):
+        return deterministic, [], None, None, "deterministic"
     semantic = claim_rag_validation.validate_claims(
         data_dir,
-        REQUIRED_PART_FILES,
+        filenames,
         provider=provider,
         cache=claim_cache,
     )
@@ -180,6 +251,7 @@ def _validate_part_reports(
         semantic["claims"],
         semantic.get("selection"),
         semantic.get("inline_citation_coverage"),
+        "semantic",
     )
 
 
@@ -188,7 +260,8 @@ def validate_synthesis_report(data_dir: str | Path) -> list[dict[str, str]]:
     text = (data_dir / "synthesis.md").read_text(encoding="utf-8")
     issues: list[dict[str, str]] = []
 
-    if SYNTHESIS_HTML_FRAGMENT_RE.search(text):
+    is_html = bool(SYNTHESIS_HTML_FRAGMENT_RE.search(text))
+    if is_html:
         issues.append(
             _synthesis_issue(
                 code="synthesis_not_markdown",
@@ -198,6 +271,31 @@ def validate_synthesis_report(data_dir: str | Path) -> list[dict[str, str]]:
                 repair_instruction="Rewrite synthesis.md as Markdown before generating HTML.",
             )
         )
+    else:
+        first_line = _first_non_empty_line(text)
+        if first_line is None:
+            issues.append(
+                _synthesis_issue(
+                    code="synthesis_title_not_h1",
+                    section="",
+                    value="synthesis.md has no Markdown H1 title.",
+                    evidence="REPORTER must start synthesis.md with a Markdown H1 title.",
+                    repair_instruction="Add a first-line Markdown H1 title before synthesis validation can pass.",
+                )
+            )
+        elif not SYNTHESIS_H1_RE.match(first_line[2]):
+            match = SYNTHESIS_H2_H6_RE.match(first_line[2])
+            issues.append(
+                _synthesis_issue(
+                    code="synthesis_title_not_h1",
+                    section="",
+                    value=first_line[2],
+                    evidence="REPORTER must start synthesis.md with a Markdown H1 title.",
+                    repair_instruction="Promote the first Markdown heading to H1 without changing its text.",
+                    target_text=first_line[2] if match else "",
+                    replacement_text=f"#{match.group(2)}{match.group(3)}" if match else "",
+                )
+            )
 
     known_pmids = validate_report_script._papers_pmids(data_dir, issues)
     if known_pmids is not None:
@@ -223,18 +321,12 @@ def validate_synthesis_report(data_dir: str | Path) -> list[dict[str, str]]:
         therapeutic_overclaim = SYNTHESIS_THERAPEUTIC_OVERCLAIM_RE.search(claim)
         if not (mechanistic_overclaim or therapeutic_overclaim):
             continue
-        following = claims[index + 1].lower() if index + 1 < len(claims) else ""
-        warning = _is_hedged_claim(claim, following)
         issues.append(
             _synthesis_issue(
-                code=(
-                    "synthesis_overclaim_warning"
-                    if warning
-                    else "unsupported_synthesis_overclaim"
-                ),
+                code="synthesis_overclaim_warning",
                 section=_section_for_claim(text, claim),
                 value=claim,
-                severity="warning" if warning else "error",
+                severity="warning",
                 evidence="Synthesis report-derived spatial/statistical evidence was written as a mechanistic or therapeutic claim.",
                 repair_instruction=(
                     "Rewrite as an association or hypothesis unless direct experimental evidence supports this exact claim."
@@ -264,9 +356,6 @@ def _exact_evidence_fallback(pmid: str, evidence_quote: str) -> str:
 def _repair_explicit_inline_contradiction(
     data_dir: Path,
     issue: dict[str, str],
-    *,
-    provider: str | None = None,
-    deterministic_only: bool = False,
 ) -> bool:
     if issue.get("code") != "inline_citation_overclaimed":
         return False
@@ -288,31 +377,27 @@ def _repair_explicit_inline_contradiction(
     if claim_at < 0:
         return False
 
-    replacement = ""
-    if not deterministic_only:
-        prompt = f"""Rewrite only this claim using the supplied evidence quote and the exact PMID.
-Keep only facts explicitly stated in the quote. Preserve PMID: {pmid} on the factual sentence.
-Move any unsupported mechanism, prognosis extension, or therapeutic implication to exactly:
-This remains a hypothesis requiring validation.
-Return complete Markdown replacement text only.
-
-Claim:
-{claim}
-
-Evidence quote:
-{evidence_quote}
-"""
-        try:
-            model = repair_report_script._create_model(provider)
-            replacement = repair_report_script._content(model.invoke(prompt)).strip()
-        except Exception:
-            replacement = ""
-
-    if not replacement or pmid not in replacement:
-        replacement = _exact_evidence_fallback(pmid, evidence_quote)
+    replacement = _exact_evidence_fallback(pmid, evidence_quote)
     if not replacement:
         return False
     path.write_text(text[:claim_at] + replacement + text[claim_at + len(claim) :], encoding="utf-8")
+    return True
+
+
+def _repair_synthesis_title(data_dir: Path, issue: dict[str, str]) -> bool:
+    if issue.get("code") != "synthesis_title_not_h1":
+        return False
+    target = issue.get("target_text") or ""
+    replacement = issue.get("replacement_text") or ""
+    if not target or not replacement:
+        return False
+    path = data_dir / "synthesis.md"
+    text = path.read_text(encoding="utf-8")
+    first_line = _first_non_empty_line(text)
+    if first_line is None or first_line[2] != target:
+        return False
+    start, end, _line = first_line
+    path.write_text(text[:start] + replacement + text[end:], encoding="utf-8")
     return True
 
 
@@ -322,14 +407,18 @@ def repair_synthesis_report(
     claim_validation: list[dict[str, Any]] | None = None,
     *,
     provider: str | None = None,
-    deterministic_contradictions: bool = False,
 ) -> int:
     data_dir = Path(data_dir).expanduser().resolve()
     changed_claims = 0
     claim_validation = claim_validation or []
+    handled_issue_ids: set[int] = set()
 
     for issue in issues:
         if issue.get("severity") != "error":
+            continue
+        if _repair_synthesis_title(data_dir, issue):
+            changed_claims += 1
+            handled_issue_ids.add(id(issue))
             continue
         if repair_report_script._repair_inline_citation_issue(
             data_dir,
@@ -337,40 +426,49 @@ def repair_synthesis_report(
             claim_validation,
         ):
             changed_claims += 1
+            handled_issue_ids.add(id(issue))
             continue
-        if _repair_explicit_inline_contradiction(
-            data_dir,
-            issue,
-            provider=provider,
-            deterministic_only=deterministic_contradictions,
-        ):
+        if _repair_explicit_inline_contradiction(data_dir, issue):
             changed_claims += 1
+            handled_issue_ids.add(id(issue))
 
-    path = data_dir / "synthesis.md"
-    current = path.read_text(encoding="utf-8")
-    cursor = 0
+    generic_issues: list[dict[str, str]] = []
     for issue in issues:
-        if issue.get("severity") != "error" or issue.get("code") not in {
-            "unsupported_synthesis_overclaim",
-            "claim_rag_overclaimed",
-            "claim_rag_unsupported",
-            "inline_citation_unsupported",
-            "inline_citation_overclaimed",
-        }:
+        if id(issue) in handled_issue_ids:
             continue
-        claim = issue.get("value") or ""
-        if not claim or SYNTHESIS_GUARDRAIL_SENTENCE in claim.lower():
-            continue
-        claim_at = current.find(claim, cursor)
-        if claim_at < 0:
-            continue
-        replacement = f"{claim} {SYNTHESIS_GUARDRAIL_SENTENCE}"
-        current = current[:claim_at] + replacement + current[claim_at + len(claim) :]
-        cursor = claim_at + len(replacement)
-        changed_claims += 1
-
-    if changed_claims:
-        path.write_text(current, encoding="utf-8")
+        target_text = issue.get("target_text") or ""
+        filename = issue.get("file") or ""
+        section = issue.get("section") or ""
+        path = (data_dir / filename).resolve()
+        if (
+            issue.get("severity") == "error"
+            and target_text
+            and filename
+            and section
+            and path.is_relative_to(data_dir)
+            and path.suffix == ".md"
+            and path.exists()
+        ):
+            generic_issues.append(issue)
+    generic_groups: dict[tuple[str, str, str], list[dict[str, str]]] = {}
+    for issue in generic_issues:
+        generic_groups.setdefault(
+            (
+                str(issue.get("file") or ""),
+                str(issue.get("section") or ""),
+                str(issue.get("target_text") or ""),
+            ),
+            [],
+        ).append(issue)
+    for grouped_issues in generic_groups.values():
+        changed = repair_report_script.repair_issues(
+            data_dir,
+            grouped_issues,
+            provider=provider,
+            claim_validation=claim_validation,
+        )
+        if changed:
+            changed_claims += len(grouped_issues)
 
     for issue in issues:
         if issue.get("severity") != "error":
@@ -402,29 +500,43 @@ def _validate_synthesis_guardrails(
     dict[str, list[dict[str, Any]]],
     dict[str, Any] | None,
     dict[str, Any] | None,
+    ValidationPhase,
 ]:
     deterministic = validate_synthesis_report(data_dir)
-    if any(issue.get("code") in PAPERS_JSON_LOAD_ERROR_CODES for issue in deterministic):
-        return deterministic, [], {"issues": [], "results": []}, None, None
+    if any(
+        issue.get("code") in PAPERS_JSON_LOAD_ERROR_CODES
+        or issue.get("code") == "synthesis_not_markdown"
+        for issue in deterministic
+    ):
+        return deterministic, [], {"issues": [], "results": []}, None, None, "deterministic"
+    consistency = synthesis_consistency_validation.validate_synthesis_consistency(data_dir)
+    cheap_issues = deterministic + consistency["issues"]
+    if _error_count(cheap_issues):
+        return cheap_issues, [], consistency, None, None, "deterministic"
     semantic = claim_rag_validation.validate_claims(
         data_dir,
         ("synthesis.md",),
         provider=provider,
         cache=claim_cache,
     )
-    consistency = synthesis_consistency_validation.validate_synthesis_consistency(data_dir)
     return (
-        deterministic + semantic["issues"] + consistency["issues"],
+        cheap_issues + semantic["issues"],
         semantic["claims"],
         consistency,
         semantic.get("selection"),
         semantic.get("inline_citation_coverage"),
+        "semantic",
     )
 
 
-def run_report_guardrail(data_dir: str | Path, *, provider: str | None = None) -> dict[str, Any]:
+def run_report_guardrail(
+    data_dir: str | Path,
+    *,
+    provider: str | None = None,
+    filenames: tuple[str, ...] = REQUIRED_PART_FILES,
+) -> dict[str, Any]:
     data_dir = Path(data_dir).expanduser().resolve()
-    missing = _missing_required_files(data_dir)
+    missing = _missing_required_files(data_dir, filenames)
     if missing:
         return {"status": "skipped", "missing": missing}
 
@@ -432,10 +544,11 @@ def run_report_guardrail(data_dir: str | Path, *, provider: str | None = None) -
     final_path = data_dir / "report_validation_final.json"
 
     claim_cache: dict[str, list[dict[str, Any]]] = {}
-    initial_issues, initial_claims, initial_selection, initial_coverage = _validate_part_reports(
+    initial_issues, initial_claims, initial_selection, initial_coverage, initial_phase = _validate_part_reports(
         data_dir,
         provider=provider,
         claim_cache=claim_cache,
+        filenames=filenames,
     )
     _write_issues(
         initial_path,
@@ -443,21 +556,44 @@ def run_report_guardrail(data_dir: str | Path, *, provider: str | None = None) -
         initial_claims,
         claim_selection=initial_selection,
         inline_citation_coverage=initial_coverage,
+        phase=initial_phase,
     )
-    initial_error_count = _error_count(initial_issues)
+    deterministic_initial_error_count = (
+        _error_count(initial_issues) if initial_phase == "deterministic" else 0
+    )
+    semantic_initial_error_count: int | None = None
+    if initial_phase == "semantic":
+        semantic_initial_error_count = _error_count(initial_issues)
+        _write_issues(
+            data_dir / "report_validation_semantic_initial.json",
+            initial_issues,
+            initial_claims,
+            claim_selection=initial_selection,
+            inline_citation_coverage=initial_coverage,
+            phase=initial_phase,
+        )
 
     current_issues = initial_issues
     current_claims = initial_claims
     current_selection = initial_selection
     current_coverage = initial_coverage
+    current_phase = initial_phase
     issues_path = initial_path
     changed_sections = 0
     repair_attempt_count = 0
+    terminal_repair_count = 0
+    last_repair_error_keys: set[tuple[str, str, str]] = set()
 
     while (
         _error_count(current_issues)
         and repair_attempt_count < MAX_GUARDRAIL_REPAIR_PASSES
     ):
+        last_repair_error_keys = {
+            _issue_claim_key(issue)
+            for issue in current_issues
+            if issue.get("severity") == "error"
+        }
+        snapshot = _snapshot_markdown_files(data_dir, filenames)
         changed = repair_report_script.repair_report(
             data_dir,
             issues_path,
@@ -465,22 +601,113 @@ def run_report_guardrail(data_dir: str | Path, *, provider: str | None = None) -
             claim_validation=current_claims,
         )
         repair_attempt_count += 1
-        changed_sections += changed
-        current_issues, current_claims, current_selection, current_coverage = _validate_part_reports(
+        if changed == 0:
+            _restore_markdown_files(data_dir, snapshot)
+            break
+        (
+            candidate_issues,
+            candidate_claims,
+            candidate_selection,
+            candidate_coverage,
+            candidate_phase,
+        ) = _validate_part_reports(
             data_dir,
             provider=provider,
             claim_cache=claim_cache,
+            filenames=filenames,
         )
+        if not _strict_phase_progress(
+            current_issues,
+            current_phase,
+            candidate_issues,
+            candidate_phase,
+        ):
+            _restore_markdown_files(data_dir, snapshot)
+            continue
+        changed_sections += changed
+        current_issues = candidate_issues
+        current_claims = candidate_claims
+        current_selection = candidate_selection
+        current_coverage = candidate_coverage
+        current_phase = candidate_phase
+        if current_phase == "semantic" and semantic_initial_error_count is None:
+            semantic_initial_error_count = _error_count(current_issues)
+            _write_issues(
+                data_dir / "report_validation_semantic_initial.json",
+                current_issues,
+                current_claims,
+                claim_selection=current_selection,
+                inline_citation_coverage=current_coverage,
+                phase=current_phase,
+            )
         _write_issues(
             final_path,
             current_issues,
             current_claims,
             claim_selection=current_selection,
             inline_citation_coverage=current_coverage,
+            phase=current_phase,
         )
-        if changed == 0:
-            break
         issues_path = final_path
+
+    newly_surfaced_errors = [
+        issue
+        for issue in current_issues
+        if issue.get("severity") == "error"
+        and _issue_claim_key(issue) not in last_repair_error_keys
+    ]
+    if repair_attempt_count == MAX_GUARDRAIL_REPAIR_PASSES and newly_surfaced_errors:
+        terminal_repair_count = 1
+        terminal_path = data_dir / "report_validation_terminal.json"
+        _write_issues(
+            terminal_path,
+            newly_surfaced_errors,
+            current_claims,
+            claim_selection=current_selection,
+            inline_citation_coverage=current_coverage,
+            phase=current_phase,
+        )
+        snapshot = _snapshot_markdown_files(data_dir, filenames)
+        terminal_changed = repair_report_script.repair_report(
+            data_dir,
+            terminal_path,
+            provider=provider,
+            claim_validation=current_claims,
+        )
+        if terminal_changed:
+            (
+                candidate_issues,
+                candidate_claims,
+                candidate_selection,
+                candidate_coverage,
+                candidate_phase,
+            ) = _validate_part_reports(
+                data_dir,
+                provider=provider,
+                claim_cache=claim_cache,
+                filenames=filenames,
+            )
+            if _error_count(candidate_issues) < _error_count(current_issues):
+                changed_sections += terminal_changed
+                current_issues = candidate_issues
+                current_claims = candidate_claims
+                current_selection = candidate_selection
+                current_coverage = candidate_coverage
+                current_phase = candidate_phase
+            else:
+                _restore_markdown_files(data_dir, snapshot)
+        else:
+            _restore_markdown_files(data_dir, snapshot)
+        if current_phase == "semantic" and semantic_initial_error_count is None:
+            semantic_initial_error_count = _error_count(current_issues)
+            _write_issues(
+                data_dir / "report_validation_semantic_initial.json",
+                current_issues,
+                current_claims,
+                claim_selection=current_selection,
+                inline_citation_coverage=current_coverage,
+                phase=current_phase,
+            )
 
     final_issues = current_issues
     _write_issues(
@@ -489,14 +716,19 @@ def run_report_guardrail(data_dir: str | Path, *, provider: str | None = None) -
         current_claims,
         claim_selection=current_selection,
         inline_citation_coverage=current_coverage,
+        phase=current_phase,
     )
     final_error_count = _error_count(final_issues)
+    semantic_initial_error_count = semantic_initial_error_count or 0
 
     return {
         "status": "failed" if final_error_count else "passed",
         "initial_issue_count": len(initial_issues),
-        "initial_error_count": initial_error_count,
+        "deterministic_initial_error_count": deterministic_initial_error_count,
+        "semantic_initial_error_count": semantic_initial_error_count,
+        "initial_error_count": deterministic_initial_error_count + semantic_initial_error_count,
         "repair_attempt_count": repair_attempt_count,
+        "terminal_repair_count": terminal_repair_count,
         "changed_sections": changed_sections,
         "final_issue_count": len(final_issues),
         "final_error_count": final_error_count,
@@ -519,6 +751,7 @@ def run_synthesis_guardrail(data_dir: str | Path, *, provider: str | None = None
         initial_consistency,
         initial_selection,
         initial_coverage,
+        initial_phase,
     ) = _validate_synthesis_guardrails(
         data_dir,
         provider=provider,
@@ -531,14 +764,30 @@ def run_synthesis_guardrail(data_dir: str | Path, *, provider: str | None = None
         initial_consistency["results"],
         claim_selection=initial_selection,
         inline_citation_coverage=initial_coverage,
+        phase=initial_phase,
     )
-    initial_error_count = _error_count(initial_issues)
+    deterministic_initial_error_count = (
+        _error_count(initial_issues) if initial_phase == "deterministic" else 0
+    )
+    semantic_initial_error_count: int | None = None
+    if initial_phase == "semantic":
+        semantic_initial_error_count = _error_count(initial_issues)
+        _write_issues(
+            data_dir / "synthesis_guardrail_semantic_initial.json",
+            initial_issues,
+            initial_claims,
+            initial_consistency["results"],
+            claim_selection=initial_selection,
+            inline_citation_coverage=initial_coverage,
+            phase=initial_phase,
+        )
 
     current_issues = initial_issues
     current_claims = initial_claims
     current_consistency = initial_consistency
     current_selection = initial_selection
     current_coverage = initial_coverage
+    current_phase = initial_phase
     changed_claims = 0
     repair_attempt_count = 0
     terminal_repair_count = 0
@@ -553,28 +802,55 @@ def run_synthesis_guardrail(data_dir: str | Path, *, provider: str | None = None
             for issue in current_issues
             if issue.get("severity") == "error"
         }
+        snapshot = _snapshot_markdown_files(data_dir, ("synthesis.md",))
         changed = repair_synthesis_report(
             data_dir,
             current_issues,
             current_claims,
             provider=provider,
-            deterministic_contradictions=repair_attempt_count > 0,
         )
         repair_attempt_count += 1
-        changed_claims += changed
+        if changed == 0:
+            _restore_markdown_files(data_dir, snapshot)
+            break
         (
-            current_issues,
-            current_claims,
-            current_consistency,
-            current_selection,
-            current_coverage,
+            candidate_issues,
+            candidate_claims,
+            candidate_consistency,
+            candidate_selection,
+            candidate_coverage,
+            candidate_phase,
         ) = _validate_synthesis_guardrails(
             data_dir,
             provider=provider,
             claim_cache=claim_cache,
         )
-        if changed == 0:
-            break
+        if not _strict_phase_progress(
+            current_issues,
+            current_phase,
+            candidate_issues,
+            candidate_phase,
+        ):
+            _restore_markdown_files(data_dir, snapshot)
+            continue
+        changed_claims += changed
+        current_issues = candidate_issues
+        current_claims = candidate_claims
+        current_consistency = candidate_consistency
+        current_selection = candidate_selection
+        current_coverage = candidate_coverage
+        current_phase = candidate_phase
+        if current_phase == "semantic" and semantic_initial_error_count is None:
+            semantic_initial_error_count = _error_count(current_issues)
+            _write_issues(
+                data_dir / "synthesis_guardrail_semantic_initial.json",
+                current_issues,
+                current_claims,
+                current_consistency["results"],
+                claim_selection=current_selection,
+                inline_citation_coverage=current_coverage,
+                phase=current_phase,
+            )
 
     newly_surfaced_errors = [
         issue
@@ -584,25 +860,48 @@ def run_synthesis_guardrail(data_dir: str | Path, *, provider: str | None = None
     ]
     if repair_attempt_count == MAX_GUARDRAIL_REPAIR_PASSES and newly_surfaced_errors:
         terminal_repair_count = 1
+        snapshot = _snapshot_markdown_files(data_dir, ("synthesis.md",))
         terminal_changed = repair_synthesis_report(
             data_dir,
             newly_surfaced_errors,
             current_claims,
             provider=provider,
-            deterministic_contradictions=True,
         )
-        changed_claims += terminal_changed
         if terminal_changed:
             (
-                current_issues,
-                current_claims,
-                current_consistency,
-                current_selection,
-                current_coverage,
+                candidate_issues,
+                candidate_claims,
+                candidate_consistency,
+                candidate_selection,
+                candidate_coverage,
+                candidate_phase,
             ) = _validate_synthesis_guardrails(
                 data_dir,
                 provider=provider,
                 claim_cache=claim_cache,
+            )
+            if _error_count(candidate_issues) < _error_count(current_issues):
+                changed_claims += terminal_changed
+                current_issues = candidate_issues
+                current_claims = candidate_claims
+                current_consistency = candidate_consistency
+                current_selection = candidate_selection
+                current_coverage = candidate_coverage
+                current_phase = candidate_phase
+            else:
+                _restore_markdown_files(data_dir, snapshot)
+        else:
+            _restore_markdown_files(data_dir, snapshot)
+        if current_phase == "semantic" and semantic_initial_error_count is None:
+            semantic_initial_error_count = _error_count(current_issues)
+            _write_issues(
+                data_dir / "synthesis_guardrail_semantic_initial.json",
+                current_issues,
+                current_claims,
+                current_consistency["results"],
+                claim_selection=current_selection,
+                inline_citation_coverage=current_coverage,
+                phase=current_phase,
             )
 
     final_issues = current_issues
@@ -613,14 +912,18 @@ def run_synthesis_guardrail(data_dir: str | Path, *, provider: str | None = None
         current_consistency["results"],
         claim_selection=current_selection,
         inline_citation_coverage=current_coverage,
+        phase=current_phase,
     )
     final_error_count = _error_count(final_issues)
+    semantic_initial_error_count = semantic_initial_error_count or 0
 
     return {
         "status": "failed" if final_error_count else "passed",
         "artifact": "synthesis.md",
         "initial_issue_count": len(initial_issues),
-        "initial_error_count": initial_error_count,
+        "deterministic_initial_error_count": deterministic_initial_error_count,
+        "semantic_initial_error_count": semantic_initial_error_count,
+        "initial_error_count": deterministic_initial_error_count + semantic_initial_error_count,
         "repair_attempt_count": repair_attempt_count,
         "terminal_repair_count": terminal_repair_count,
         "changed_claims": changed_claims,

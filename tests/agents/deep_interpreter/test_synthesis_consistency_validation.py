@@ -53,6 +53,8 @@ def test_validator_reports_repairable_canonical_fact_mismatches(
     ]
     assert [issue["replacement"] for issue in errors] == ["16", "0.8141", "-5.480"]
     assert all(issue["repairable"] is True for issue in errors)
+    assert [issue["target_text"] for issue in errors] == ["15", "0.7000", "-4.200"]
+    assert [issue["replacement_text"] for issue in errors] == ["16", "0.8141", "-5.480"]
     assert {item["canonical_value"] for item in result["results"]} >= {
         "16",
         "0.8141",
@@ -164,6 +166,8 @@ def test_unselected_candidate_and_lr_pair_are_unrepairable(tmp_path: Path) -> No
     ]
     assert all(issue["severity"] == "error" for issue in issues)
     assert all(issue["repairable"] is False for issue in issues)
+    assert all("target_text" not in issue for issue in issues)
+    assert all("replacement_text" not in issue for issue in issues)
 
 
 def test_missing_part4_json_warns_without_fabricated_canonical_values(

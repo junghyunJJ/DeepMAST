@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
+import hashlib
 import json
 import math
 import os
@@ -24,16 +25,39 @@ REPORTER_OUTPUTS = (
     "synthesis_targets.json",
     "CCI_Analysis_Report.html",
 )
+DERIVED_REPORTER_OUTPUTS = (
+    "synthesis_validation.json",
+    "synthesis_targets.json",
+    "CCI_Analysis_Report.html",
+)
 DEFAULT_REPORTER_ATTEMPT_TIMEOUT_SECONDS = 3600.0
 MAX_REPORTER_ATTEMPTS = 2
 
 _REPORTER_TIMEOUT_ENV = "REPORTER_ATTEMPT_TIMEOUT_SECONDS"
 
 T = TypeVar("T")
+ReporterOutputState = dict[str, str]
+ReporterFinalizer = Callable[
+    [Path, tuple[str, ...]],
+    Awaitable[dict[str, Any]],
+]
 
 
 class ReporterRecoveryError(RuntimeError):
     pass
+
+
+class _ReporterAttemptTimedOutWithResult(TimeoutError):
+    def __init__(
+        self,
+        result: Any,
+        finalization: dict[str, Any] | None = None,
+        finalizer_exception: Exception | None = None,
+    ) -> None:
+        super().__init__("REPORTER attempt timed out after producing a result")
+        self.result = result
+        self.finalization = finalization
+        self.finalizer_exception = finalizer_exception
 
 
 def reporter_attempt_timeout_seconds() -> float:
@@ -51,17 +75,89 @@ def reporter_attempt_timeout_seconds() -> float:
     return timeout
 
 
-def _reporter_output_state(data_dir: Path) -> dict[str, tuple[int, int]]:
+def _file_sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _reporter_output_state(data_dir: Path) -> ReporterOutputState:
     return {
-        name: ((data_dir / name).stat().st_mtime_ns, (data_dir / name).stat().st_size)
+        name: _file_sha256(data_dir / name)
         for name in REPORTER_OUTPUTS
         if (data_dir / name).is_file()
     }
 
 
+def _load_json_object(path: Path) -> dict[str, Any] | None:
+    try:
+        loaded = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return loaded if isinstance(loaded, dict) else None
+
+
+def _valid_synthesis_validation(data_dir: Path) -> bool:
+    validation = _load_json_object(data_dir / "synthesis_validation.json")
+    if validation is None:
+        return False
+    guardrail = validation.get("synthesis_guardrail")
+    return bool(
+        isinstance(guardrail, dict)
+        and guardrail.get("status") == "passed"
+        and guardrail.get("final_error_count") == 0
+    )
+
+
+def _valid_synthesis_targets(data_dir: Path) -> bool:
+    targets = _load_json_object(data_dir / "synthesis_targets.json")
+    if targets is None:
+        return False
+    from src.agents.deep_interpreter.tools.report import _default_synthesis_targets
+
+    expected = _default_synthesis_targets(str(data_dir))
+    keys = (
+        "part4_synthesis_available",
+        "drug_md_available",
+        "canonical_source",
+        "supporting_source",
+    )
+    return all(targets.get(key) == expected[key] for key in keys)
+
+
+def _valid_report_html(data_dir: Path) -> bool:
+    path = data_dir / "CCI_Analysis_Report.html"
+    if not path.is_file() or path.stat().st_size == 0:
+        return False
+    content = path.read_bytes().lower()
+    return b"<!doctype html" in content and b"<html" in content and b"</html>" in content
+
+
+def _reporter_artifact_validity(data_dir: Path) -> dict[str, bool]:
+    return {
+        "synthesis_validation.json": _valid_synthesis_validation(data_dir),
+        "synthesis_targets.json": _valid_synthesis_targets(data_dir),
+        "CCI_Analysis_Report.html": _valid_report_html(data_dir),
+    }
+
+
+def _required_reporter_refresh(
+    data_dir: Path,
+    *,
+    synthesis_changed: bool = False,
+) -> tuple[str, ...]:
+    if synthesis_changed:
+        return DERIVED_REPORTER_OUTPUTS
+    validity = _reporter_artifact_validity(data_dir)
+    for index, name in enumerate(DERIVED_REPORTER_OUTPUTS):
+        if not validity[name]:
+            return DERIVED_REPORTER_OUTPUTS[index:]
+    return ()
+
+
 def inspect_reporter_completion(
     data_dir: str | Path,
-    previous_state: dict[str, tuple[int, int]] | None = None,
+    previous_state: ReporterOutputState | None = None,
+    *,
+    required_refresh: tuple[str, ...] = (),
 ) -> dict[str, Any]:
     root = Path(data_dir)
     missing_outputs = [
@@ -87,14 +183,18 @@ def inspect_reporter_completion(
     status = guardrail.get("status")
     final_error_count = guardrail.get("final_error_count")
     current_state = _reporter_output_state(root)
+    validity = _reporter_artifact_validity(root)
+    invalid_outputs = [name for name, valid in validity.items() if not valid]
     stale_outputs = [
         name
-        for name, state in (previous_state or {}).items()
-        if current_state.get(name) == state
+        for name in required_refresh
+        if name in (previous_state or {})
+        and current_state.get(name) == previous_state[name]
     ]
 
     complete = (
         not missing_outputs
+        and not invalid_outputs
         and not stale_outputs
         and status == "passed"
         and final_error_count == 0
@@ -105,25 +205,44 @@ def inspect_reporter_completion(
         "guardrail_status": status,
         "final_error_count": final_error_count,
         "validation_parse_error": parse_error,
+        "invalid_outputs": invalid_outputs,
+        "required_refresh": required_refresh,
         "stale_outputs": stale_outputs,
     }
 
 
-def build_reporter_recovery_message(data_dir: Path) -> str:
+def _valid_existing_synthesis(data_dir: Path) -> bool:
+    synthesis_path = data_dir / "synthesis.md"
+    if not synthesis_path.is_file() or synthesis_path.stat().st_size == 0:
+        return False
+
+    from src.agents.deep_interpreter.report_guardrails import validate_synthesis_report
+
+    issues = validate_synthesis_report(data_dir)
+    return not any(issue.get("code") == "synthesis_not_markdown" for issue in issues)
+
+
+def build_reporter_recovery_message(
+    data_dir: Path,
+    *,
+    failure_codes: tuple[str, ...] = (),
+) -> str:
+    failure_note = (
+        f"The invalid attempt was quarantined after: {', '.join(failure_codes)}.\n"
+        if failure_codes
+        else ""
+    )
+
     return f"""[REPORTER_RECOVERY]
-The previous REPORTER attempt for {data_dir} timed out or produced an invalid report.
-Start from a fresh message context and rebuild the final synthesis from the existing artifacts.
+The previous REPORTER synthesis attempt for {data_dir} was absent or invalid.
+Start from a fresh message context and rebuild synthesis from the existing artifacts.
 
 Read /part1_final.md, /part2_final.md, /part3_final.md,
 /part4_therapeutic_synthesis.md when present, /drug.md when present, and /papers.json.
 Use only the already-bound part_name="all" RAG collection.
-Do not call prepare_rag_literature.
-Do not run a new literature search, create a collection, or create reporter-specific paper artifacts.
-Write a complete Markdown document to /synthesis.md. It must start with a Markdown title,
-contain substantive ## sections, and contain no HTML fragment in place of the report.
-Then call generate_html_report once with template_mode="comprehensive",
-output_path="CCI_Analysis_Report.html", and the data directory from /data_path.txt.
-Stop after generate_html_report returns.
+Do not call prepare_rag_literature or run a new literature search.
+{failure_note}Write a complete Markdown document to /synthesis.md.
+Stop after /synthesis.md is written. Deterministic code owns guardrail and HTML finalization.
 """
 
 
@@ -138,10 +257,100 @@ def _write_audit(data_dir: Path, audit: dict[str, Any]) -> None:
     )
 
 
-def _copy_first_synthesis(data_dir: Path) -> None:
-    source = data_dir / "synthesis.md"
-    if source.is_file():
-        shutil.copyfile(source, data_dir / "synthesis_reporter_attempt1.md")
+def _clear_derived_reporter_outputs(data_dir: Path) -> None:
+    for name in DERIVED_REPORTER_OUTPUTS:
+        (data_dir / name).unlink(missing_ok=True)
+
+
+def _guardrail_final_failure_codes(data_dir: Path) -> list[str]:
+    final = _load_json_object(data_dir / "synthesis_guardrail_final.json")
+    issues = final.get("issues") if final else None
+    if not isinstance(issues, list):
+        return []
+    return [
+        str(issue.get("code"))
+        for issue in issues
+        if isinstance(issue, dict)
+        and issue.get("severity") == "error"
+        and issue.get("code")
+    ]
+
+
+def _prepare_synthesis_retry(
+    data_dir: Path,
+    *,
+    guardrail_failed: bool = False,
+) -> dict[str, Any]:
+    synthesis = data_dir / "synthesis.md"
+    if not synthesis.is_file() or synthesis.stat().st_size == 0:
+        _clear_derived_reporter_outputs(data_dir)
+        return {
+            "action": "absent",
+            "failure_codes": [],
+            "attempt1_synthesis_sha256": None,
+        }
+
+    digest = _file_sha256(synthesis)
+    shutil.copyfile(synthesis, data_dir / "synthesis_reporter_attempt1.md")
+    if guardrail_failed:
+        synthesis.unlink()
+        _clear_derived_reporter_outputs(data_dir)
+        return {
+            "action": "quarantined_guardrail_failed",
+            "failure_codes": _guardrail_final_failure_codes(data_dir),
+            "attempt1_synthesis_sha256": digest,
+        }
+
+    from src.agents.deep_interpreter.report_guardrails import validate_synthesis_report
+
+    failure_codes = sorted(
+        {
+            str(issue.get("code"))
+            for issue in validate_synthesis_report(data_dir)
+            if issue.get("severity") == "error"
+        }
+    )
+    if "synthesis_not_markdown" in failure_codes:
+        synthesis.unlink()
+        _clear_derived_reporter_outputs(data_dir)
+        action = "quarantined_invalid"
+    else:
+        action = "absent"
+    return {
+        "action": action,
+        "failure_codes": failure_codes,
+        "attempt1_synthesis_sha256": digest,
+    }
+
+
+def _repeated_invalid_synthesis(
+    data_dir: Path,
+    attempt_number: int,
+    retry_preparation: dict[str, Any],
+) -> bool:
+    current_synthesis = data_dir / "synthesis.md"
+    return bool(
+        attempt_number == 2
+        and current_synthesis.is_file()
+        and not _valid_existing_synthesis(data_dir)
+        and retry_preparation["attempt1_synthesis_sha256"]
+        == _file_sha256(current_synthesis)
+    )
+
+
+async def _default_reporter_finalizer(
+    data_dir: Path,
+    required_refresh: tuple[str, ...],
+) -> dict[str, Any]:
+    from src.agents.deep_interpreter.tools.report import _finalize_reporter_artifacts
+
+    return await asyncio.to_thread(
+        _finalize_reporter_artifacts,
+        parts={"template_mode": "comprehensive"},
+        output_path="CCI_Analysis_Report.html",
+        data_dir=str(data_dir),
+        required_refresh=required_refresh,
+    )
 
 
 async def run_reporter_with_recovery(
@@ -150,49 +359,239 @@ async def run_reporter_with_recovery(
     initial_description: str,
     data_dir: str | Path,
     timeout_seconds: float | None = None,
+    finalize: ReporterFinalizer | None = None,
 ) -> T:
     root = Path(data_dir)
     timeout = timeout_seconds if timeout_seconds is not None else reporter_attempt_timeout_seconds()
+    finalizer = finalize or _default_reporter_finalizer
     audit: dict[str, Any] = {
         "status": "running",
         "attempt_count": 0,
         "recovery_used": False,
         "attempts": [],
     }
+    retry_preparation: dict[str, Any] = {
+        "action": "not_needed",
+        "failure_codes": [],
+        "attempt1_synthesis_sha256": None,
+    }
 
     for attempt_number in range(1, MAX_REPORTER_ATTEMPTS + 1):
         description = (
             initial_description
             if attempt_number == 1
-            else build_reporter_recovery_message(root)
+            else build_reporter_recovery_message(
+                root,
+                failure_codes=tuple(retry_preparation["failure_codes"]),
+            )
         )
         started = time.monotonic()
         attempt: dict[str, Any] = {
             "attempt": attempt_number,
             "timed_out": False,
         }
+        finalization: dict[str, Any] | None = None
         previous_state = _reporter_output_state(root)
+        required_refresh: tuple[str, ...] = ()
+        completion_previous_state = previous_state
+
+        async def run_attempt(
+            description: str = description,
+            previous_state: ReporterOutputState = previous_state,
+            attempt_number: int = attempt_number,
+        ) -> T:
+            nonlocal completion_previous_state, finalization, required_refresh
+            timed_out_with_result = False
+            try:
+                result = await invoke(description)
+            except _ReporterAttemptTimedOutWithResult as exc:
+                result = cast(T, exc.result)
+                finalization = exc.finalization
+                timed_out_with_result = True
+            current_state = _reporter_output_state(root)
+            synthesis_changed = (
+                previous_state.get("synthesis.md") != current_state.get("synthesis.md")
+            )
+            if _valid_existing_synthesis(root):
+                required_refresh = _required_reporter_refresh(
+                    root,
+                    # Existing sidecars do not record the upstream content they validated.
+                    synthesis_changed=attempt_number == 1 or synthesis_changed,
+                )
+                if required_refresh:
+                    # Require recreation even when deterministic bytes stay identical.
+                    for name in required_refresh:
+                        (root / name).unlink(missing_ok=True)
+                    completion_previous_state = _reporter_output_state(root)
+                    finalizer_task = asyncio.create_task(finalizer(root, required_refresh))
+                    try:
+                        finalization = await asyncio.shield(finalizer_task)
+                    except asyncio.CancelledError as exc:
+                        try:
+                            finalization = await finalizer_task
+                        except Exception as finalizer_exc:
+                            finalization = {
+                                "status": "exception",
+                                "exception_type": type(finalizer_exc).__name__,
+                                "exception_repr": repr(finalizer_exc),
+                            }
+                            raise _ReporterAttemptTimedOutWithResult(
+                                result,
+                                finalization,
+                                finalizer_exc,
+                            ) from exc
+                        raise _ReporterAttemptTimedOutWithResult(
+                            result,
+                            finalization,
+                        ) from exc
+                    required_refresh = tuple(
+                        finalization.get("required_refresh", required_refresh)
+                    )
+            if timed_out_with_result:
+                raise _ReporterAttemptTimedOutWithResult(result, finalization)
+            return result
+
+        def record_attempt_result(
+            *,
+            timed_out: bool,
+            required_refresh: tuple[str, ...],
+            finalization: dict[str, Any] | None,
+            completion_previous_state: ReporterOutputState,
+            attempt: dict[str, Any] = attempt,
+            started: float = started,
+            attempt_number: int = attempt_number,
+            retry_preparation: dict[str, Any] = retry_preparation,
+        ) -> None:
+            attempt["timed_out"] = timed_out
+            attempt["duration_seconds"] = time.monotonic() - started
+            if _valid_existing_synthesis(root):
+                attempt["required_refresh"] = list(required_refresh)
+                attempt["finalizer"] = finalization
+            attempt["completion"] = inspect_reporter_completion(
+                root,
+                completion_previous_state,
+                required_refresh=required_refresh,
+            )
+            attempt["repeated_invalid_synthesis"] = _repeated_invalid_synthesis(
+                root,
+                attempt_number,
+                retry_preparation,
+            )
+            cast(list[dict[str, Any]], audit["attempts"]).append(attempt)
+            audit["attempt_count"] = attempt_number
+
         try:
-            result = await asyncio.wait_for(invoke(description), timeout=timeout)
-        except TimeoutError:
-            attempt["timed_out"] = True
-            attempt["duration_seconds"] = time.monotonic() - started
-            attempt["completion"] = inspect_reporter_completion(root, previous_state)
-            cast(list[dict[str, Any]], audit["attempts"]).append(attempt)
-            audit["attempt_count"] = attempt_number
-        else:
-            attempt["duration_seconds"] = time.monotonic() - started
-            attempt["completion"] = inspect_reporter_completion(root, previous_state)
-            cast(list[dict[str, Any]], audit["attempts"]).append(attempt)
-            audit["attempt_count"] = attempt_number
+            result = await asyncio.wait_for(run_attempt(), timeout=timeout)
+        except _ReporterAttemptTimedOutWithResult as exc:
+            result = cast(T, exc.result)
+            finalization = exc.finalization
+            if finalization is not None:
+                required_refresh = tuple(
+                    finalization.get("required_refresh", required_refresh)
+                )
+            record_attempt_result(
+                timed_out=True,
+                required_refresh=required_refresh,
+                finalization=finalization,
+                completion_previous_state=completion_previous_state,
+            )
+            if exc.finalizer_exception is not None:
+                audit["status"] = "failed"
+                _write_audit(root, audit)
+                raise ReporterRecoveryError(
+                    "REPORTER deterministic finalization failed."
+                ) from exc.finalizer_exception
+            if finalization and finalization.get("status") == "render_failed":
+                audit["status"] = "failed"
+                _write_audit(root, audit)
+                raise ReporterRecoveryError("REPORTER deterministic finalization failed.")
             if attempt["completion"]["complete"]:
                 audit["status"] = "passed"
                 _write_audit(root, audit)
                 return result
+            if _valid_existing_synthesis(root) and (
+                not finalization or finalization.get("status") != "guardrail_failed"
+            ):
+                audit["status"] = "failed"
+                _write_audit(root, audit)
+                raise ReporterRecoveryError(
+                    "REPORTER deterministic finalization left incomplete artifacts."
+                )
+        except TimeoutError:
+            record_attempt_result(
+                timed_out=True,
+                required_refresh=required_refresh,
+                finalization=finalization,
+                completion_previous_state=completion_previous_state,
+            )
+            if attempt["completion"]["complete"]:
+                audit["status"] = "failed"
+                _write_audit(root, audit)
+                raise
+        except Exception as exc:
+            if required_refresh and finalization is None:
+                finalization = {
+                    "status": "exception",
+                    "exception_type": type(exc).__name__,
+                    "exception_repr": repr(exc),
+                }
+                record_attempt_result(
+                    timed_out=False,
+                    required_refresh=required_refresh,
+                    finalization=finalization,
+                    completion_previous_state=completion_previous_state,
+                )
+                audit["status"] = "failed"
+                _write_audit(root, audit)
+                raise ReporterRecoveryError(
+                    "REPORTER deterministic finalization failed."
+                ) from exc
+            record_attempt_result(
+                timed_out=False,
+                required_refresh=required_refresh,
+                finalization=finalization,
+                completion_previous_state=completion_previous_state,
+            )
+            attempt["exception_type"] = type(exc).__name__
+            attempt["exception_repr"] = repr(exc)
+            audit["status"] = "failed"
+            _write_audit(root, audit)
+            raise
+        else:
+            record_attempt_result(
+                timed_out=False,
+                required_refresh=required_refresh,
+                finalization=finalization,
+                completion_previous_state=completion_previous_state,
+            )
+            if finalization and finalization.get("status") == "render_failed":
+                audit["status"] = "failed"
+                _write_audit(root, audit)
+                raise ReporterRecoveryError("REPORTER deterministic finalization failed.")
+            if attempt["completion"]["complete"]:
+                audit["status"] = "passed"
+                _write_audit(root, audit)
+                return result
+            if _valid_existing_synthesis(root) and (
+                not finalization or finalization.get("status") != "guardrail_failed"
+            ):
+                audit["status"] = "failed"
+                _write_audit(root, audit)
+                raise ReporterRecoveryError(
+                    "REPORTER deterministic finalization left incomplete artifacts."
+                )
 
         if attempt_number == 1:
             audit["recovery_used"] = True
-            _copy_first_synthesis(root)
+            guardrail_failed = bool(
+                finalization and finalization.get("status") == "guardrail_failed"
+            )
+            retry_preparation = _prepare_synthesis_retry(
+                root,
+                guardrail_failed=guardrail_failed,
+            )
+            audit["retry_preparation"] = retry_preparation
+            _write_audit(root, audit)
             continue
 
         audit["status"] = "failed"
@@ -272,13 +671,18 @@ class ReporterTaskRecoveryMiddleware(AgentMiddleware):
         if not self._is_reporter_task(request):
             return handler(request)
         args = request.tool_call["args"]
-        executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)
+        executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
 
         async def invoke(description: str) -> ToolMessage | Command:
             patched_args = {**args, "description": description}
             tool_call = cast(ToolCall, {**request.tool_call, "args": patched_args})
             future = executor.submit(handler, request.override(tool_call=tool_call))
-            return await asyncio.wrap_future(future)
+            wrapped_future = asyncio.wrap_future(future)
+            try:
+                return await asyncio.shield(wrapped_future)
+            except asyncio.CancelledError as exc:
+                result = await wrapped_future
+                raise _ReporterAttemptTimedOutWithResult(result) from exc
 
         try:
             return asyncio.run(
@@ -290,7 +694,7 @@ class ReporterTaskRecoveryMiddleware(AgentMiddleware):
                 )
             )
         finally:
-            executor.shutdown(wait=False, cancel_futures=True)
+            executor.shutdown(wait=True, cancel_futures=True)
 
     async def awrap_tool_call(
         self,

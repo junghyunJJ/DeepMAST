@@ -6,7 +6,6 @@ import csv
 import json
 import re
 import sys
-from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
@@ -20,6 +19,10 @@ BIOLOGICAL_INTERPRETATION_RE = re.compile(
 THERAPEUTIC_RE = re.compile(
     r"\b(therapeutic|druggability|drug ranking|clinical prioritization|high-confidence therapeutic target)\b",
     re.IGNORECASE,
+)
+PART4_BOUNDARY_RE = re.compile(
+    r"(?=.*\bPart\s*4\b)(?=.*\b(?:reserv\w*|defer\w*|belong\w*|own\w*|exclud\w*|avoid\w*)\b)",
+    re.IGNORECASE | re.DOTALL,
 )
 REPORT_EVIDENCE_RE = re.compile(
     r"\b(MISTy|Moran|co[-\s]?locali[zs]ation|spatial|Factor\s*\d+|FactorN|clusters?|importance|"
@@ -38,28 +41,36 @@ MECHANISTIC_HEDGE_RE = re.compile(
     re.IGNORECASE,
 )
 FACTOR_PATHWAY_POSITIVE_RE = re.compile(
-    r"\b(enriched|enrichment|activation|activated|active|higher|increased|positive)\b",
+    r"\b(enriched|enrichments?|activations?|activated|active|higher|increased|positive(?:ly)?)\b",
     re.IGNORECASE,
 )
 FACTOR_PATHWAY_NEGATIVE_RE = re.compile(
-    r"\b(depleted|depletion|negative|lower|reduced|attenuated|suppressed)\b",
+    r"\b(depleted|depletions?|negative(?:ly)?|inverse(?:ly)?|lower|reduced|attenuated|suppressed)\b",
     re.IGNORECASE,
 )
 FACTOR_PATHWAY_NEGATED_DIRECTION_RE = re.compile(
     r"\b(?:no|not|without|lack|lacks|lacked|absent)\b(?:\s+\w+){0,2}\s+"
-    r"\b(?:enriched|enrichment|activation|activated|active|higher|increased|positive|"
-    r"depleted|depletion|negative|lower|reduced|attenuated|suppressed)\b",
+    r"\b(?:enriched|enrichments?|activations?|activated|active|higher|increased|positive(?:ly)?|"
+    r"depleted|depletions?|negative(?:ly)?|inverse(?:ly)?|lower|reduced|attenuated|suppressed)\b",
+    re.IGNORECASE,
+)
+FACTOR_CLUSTER_STATUS_RE = re.compile(
+    r"\bFactor\s*\d+\b(?:\s+[A-Za-z][\w-]*){0,4}\*{0,2}\s+(?:is\s+)?(?:specifically\s+)?"
+    r"(?:enriched|higher|increased|active)\s+in\s+(?:[A-Za-z][\w-]*\s+){0,6}clusters?\b"
+    r"(?:\s+\d+)*(?:\s*,\s*\d+)*(?:\s*,?\s+and\s+\d+)?"
+    r"(?:\s+\([^)]*(?:loadings|scores|\d)[^)]*\))?"
+    r"(?:\s+with\s+(?:scores?|loadings)\s+[0-9.]+(?:\s*-\s*\d+(?:\.\d+)?)?)?",
     re.IGNORECASE,
 )
 FACTOR_PATHWAY_CLAIM_RE = re.compile(
-    r"\b(significant|significantly|enriched|enrichment|activation|activated|active|higher|increased|positive|"
-    r"depleted|depletion|negative|lower|reduced|attenuated|suppressed)\b",
+    r"\b(significant|significantly|enriched|enrichments?|activations?|activated|active|higher|increased|positive(?:ly)?|"
+    r"depleted|depletions?|negative(?:ly)?|inverse(?:ly)?|lower|reduced|attenuated|suppressed)\b",
     re.IGNORECASE,
 )
 FACTOR_PATHWAY_CONNECTOR_RE = re.compile(r"\b(?:and|but|while|whereas)\b", re.IGNORECASE)
 FACTOR_RE = re.compile(r"\bFactor\s*\d+\b", re.IGNORECASE)
 HYPOTHESIS_RE = re.compile(
-    r"\b(may|might|could|hypothes(?:is|i[sz]ed)|hypothetical|inferred|suggests?|consistent with|"
+    r"\b(may|might|could|hypothes(?:is|es|i[sz]ed)|hypothetical|inferred|suggests?|consistent with|"
     r"not pathway-factor significance)\b",
     re.IGNORECASE,
 )
@@ -72,14 +83,20 @@ NEGATED_SIGNIFICANCE_RE = re.compile(
     r"lacks|lacked|absent)\b",
     re.IGNORECASE,
 )
+MARKDOWN_TABLE_SEPARATOR_RE = re.compile(r"^\|(?:\s*:?-+:?\s*\|)+$")
+LR_NUMBER_PATTERN = r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?"
+LR_METRIC_LABEL_PATTERN = r"Moran(?:'s|s)?\s*[RI]|combined\s*score|combinedscore|GenePT\s*score"
 LR_METRIC_CLAIM_RE = re.compile(
-    r"\b(?P<label>Moran(?:'s|s)?\s*[RI]|combined\s*score|combinedscore|GenePT\s*score)\b"
+    rf"\b(?P<label>{LR_METRIC_LABEL_PATTERN})\b"
     r"(?:\s+(?:score|value))?"
     r"\s*(?:=|:|of|is|was)?\s*\(?\s*"
-    r"(?P<value>[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)"
+    rf"(?P<value>{LR_NUMBER_PATTERN})"
     r"\s*\)?",
     re.IGNORECASE,
 )
+LR_NUMBER_RE = re.compile(LR_NUMBER_PATTERN)
+LR_RESPECTIVELY_RE = re.compile(r"\brespectively\b", re.IGNORECASE)
+LR_RESPECTIVE_SEPARATOR_RE = re.compile(r"[\s,]*(?:and[\s,]*)*")
 LR_METRIC_COLUMNS = {
     "morans": ("morans", "moransR", "morans_r"),
     "combinedscore": ("combinedscore", "combined_rank_score"),
@@ -172,8 +189,10 @@ def _issue(
     severity: str = "error",
     evidence: str = "",
     repair_instruction: str = "",
+    target_text: str = "",
+    replacement_text: str = "",
 ) -> dict[str, str]:
-    return {
+    issue = {
         "code": code,
         "severity": severity,
         "file": file,
@@ -182,6 +201,11 @@ def _issue(
         "evidence": evidence,
         "repair_instruction": repair_instruction,
     }
+    if target_text:
+        issue["target_text"] = target_text
+    if replacement_text:
+        issue["replacement_text"] = replacement_text
+    return issue
 
 
 def _check_pmids(data_dir: Path, issues: list[dict[str, str]]) -> None:
@@ -252,7 +276,42 @@ def _known_factor_mentions(text: str, known: dict[str, str]) -> list[tuple[int, 
 
 
 def _claim_windows(text: str) -> list[str]:
-    return [part.strip() for part in re.split(r"(?<=[.!?])\s+|\n+", text) if part.strip()]
+    chunks: list[tuple[str, bool]] = []
+    paragraph: list[str] = []
+
+    def flush_paragraph() -> None:
+        if paragraph:
+            chunks.append(("\n".join(paragraph).strip(), False))
+            paragraph.clear()
+
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line:
+            flush_paragraph()
+            continue
+        if line.startswith("|") and line.endswith("|"):
+            flush_paragraph()
+            if not MARKDOWN_TABLE_SEPARATOR_RE.fullmatch(line):
+                chunks.append((line, True))
+            continue
+        if re.match(r"^(?:#{1,6}\s|[-*+]\s|\d+[.)]\s)", line):
+            flush_paragraph()
+            chunks.append((line, False))
+            continue
+        paragraph.append(line)
+    flush_paragraph()
+
+    windows: list[str] = []
+    for chunk, atomic in chunks:
+        if atomic:
+            windows.append(chunk)
+            continue
+        windows.extend(
+            part.strip()
+            for part in re.split(r"(?<=[.!?])(?:[ \t]+|\n+)(?=\S)", chunk)
+            if part.strip()
+        )
+    return windows
 
 
 def _biological_interpretation_blocks(section_body: str) -> list[str]:
@@ -269,18 +328,13 @@ def _check_mechanistic_interpretations(data_dir: Path, issues: list[dict[str, st
                 for window in _claim_windows(block):
                     if not (REPORT_EVIDENCE_RE.search(window) and MECHANISTIC_TRIGGER_RE.search(window)):
                         continue
-                    warning = bool(MECHANISTIC_HEDGE_RE.search(window))
                     issues.append(
                         _issue(
-                            code=(
-                                "mechanistic_interpretation_warning"
-                                if warning
-                                else "unsupported_mechanistic_interpretation"
-                            ),
+                            code="mechanistic_interpretation_warning",
                             file=path.name,
                             section=str(section["heading"]),
                             value=window,
-                            severity="warning" if warning else "error",
+                            severity="warning",
                             evidence="Report-derived spatial/statistical evidence was written as a mechanistic or causal claim.",
                             repair_instruction=(
                                 "Rewrite as an association or hypothesis unless direct experimental evidence is cited "
@@ -346,18 +400,53 @@ def _lr_pair_pattern(pair: str) -> str:
     return rf"\b{re.escape(ligand)}\s*(?:\^|[-–/])\s*{re.escape(receptor)}\b"
 
 
-def _lr_pair_mentions(text: str, pairs: Iterable[str]) -> list[tuple[int, int, str]]:
+def _lr_pair_mentions(
+    text: str,
+    pair_patterns: dict[str, re.Pattern[str]],
+) -> list[tuple[int, int, str]]:
     mentions: list[tuple[int, int, str]] = []
-    for pair in pairs:
-        for match in re.finditer(_lr_pair_pattern(str(pair)), text, re.IGNORECASE):
+    for pair, pattern in pair_patterns.items():
+        for match in pattern.finditer(text):
             mentions.append((match.start(), match.end(), str(pair)))
     return sorted(mentions)
+
+
+def _lr_respectively_values(
+    text: str,
+    first_value: re.Match[str],
+) -> tuple[int, list[tuple[int, int, str]]] | None:
+    value_end = first_value.end("value")
+    suffix = text[value_end : value_end + 160]
+    marker = LR_RESPECTIVELY_RE.search(suffix)
+    if marker is None:
+        return None
+    between = suffix[: marker.start()]
+    additional = list(LR_NUMBER_RE.finditer(between))
+    if not additional or not LR_RESPECTIVE_SEPARATOR_RE.fullmatch(
+        LR_NUMBER_RE.sub("", between)
+    ):
+        return None
+    values = [
+        (
+            first_value.start("value"),
+            first_value.end("value"),
+            first_value.group("value"),
+        )
+    ]
+    values.extend(
+        (value_end + match.start(), value_end + match.end(), match.group(0))
+        for match in additional
+    )
+    return value_end + marker.end(), values
 
 
 def _check_lr_metric_claims(data_dir: Path, issues: list[dict[str, str]]) -> None:
     metrics = _sig_liana_metrics(data_dir)
     if not metrics:
         return
+    pair_patterns = {
+        pair: re.compile(_lr_pair_pattern(pair), re.IGNORECASE) for pair in metrics
+    }
 
     for path in sorted(data_dir.glob("part*_final.md")):
         text = _read_text(path)
@@ -365,10 +454,118 @@ def _check_lr_metric_claims(data_dir: Path, issues: list[dict[str, str]]) -> Non
             continue
         for section in _sections(text):
             for window in _claim_windows(str(section["body"])):
-                pair_mentions = _lr_pair_mentions(window, metrics.keys())
-                for index, (_, pair_end, pair) in enumerate(pair_mentions):
+                pair_mentions = _lr_pair_mentions(window, pair_patterns)
+                grouped_spans: list[tuple[int, int]] = []
+                grouped_matches = []
+                for first_value in LR_METRIC_CLAIM_RE.finditer(window):
+                    grouped = _lr_respectively_values(window, first_value)
+                    if grouped:
+                        grouped_matches.append((first_value, *grouped))
+
+                if len(pair_mentions) > 1:
+                    pair_order = [pair for _start, _end, pair in pair_mentions]
+                    unique_pair_order = list(dict.fromkeys(pair_order))
+                    for first_value, grouped_end, value_spans in grouped_matches:
+                        grouped_start = first_value.start()
+                        grouped_spans.append((grouped_start, grouped_end))
+                        if (
+                            len(unique_pair_order) != len(pair_order)
+                            or len(value_spans) != len(pair_order)
+                        ):
+                            issues.append(
+                                _issue(
+                                    code="lr_metric_alignment_ambiguous",
+                                    file=path.name,
+                                    section=str(section["heading"]),
+                                    value=window[grouped_start:grouped_end],
+                                    severity="warning",
+                                    evidence="LR pair and metric counts do not form an unambiguous respectively mapping.",
+                                    repair_instruction="Leave unchanged and review the pair-to-metric alignment manually.",
+                                )
+                            )
+                            continue
+
+                        metric = _lr_metric_from_label(first_value.group("label"))
+                        replacements: list[tuple[int, int, float]] = []
+                        mismatch_evidence: list[str] = []
+                        for pair, (value_start, value_end, claimed_text) in zip(
+                            pair_order,
+                            value_spans,
+                        ):
+                            expected = metrics[pair].get(metric)
+                            if expected is None:
+                                replacements = []
+                                mismatch_evidence = []
+                                break
+                            if abs(float(claimed_text) - expected) <= 0.001:
+                                continue
+                            replacements.append(
+                                (
+                                    value_start - grouped_start,
+                                    value_end - grouped_start,
+                                    expected,
+                                )
+                            )
+                            mismatch_evidence.append(
+                                f"sig_liana.csv has {metric}={expected:.4f} for {pair}."
+                            )
+
+                        if replacements:
+                            target_text = window[grouped_start:grouped_end]
+                            replacement_text = target_text
+                            for value_start, value_end, expected in reversed(replacements):
+                                replacement_text = (
+                                    f"{replacement_text[:value_start]}{expected:.4f}"
+                                    f"{replacement_text[value_end:]}"
+                                )
+                            issues.append(
+                                _issue(
+                                    code="lr_metric_value_mismatch",
+                                    file=path.name,
+                                    section=str(section["heading"]),
+                                    value="; ".join(mismatch_evidence),
+                                    evidence=" ".join(mismatch_evidence),
+                                    repair_instruction="Use the metric values from sig_liana.csv in the same respectively order.",
+                                    target_text=target_text,
+                                    replacement_text=replacement_text,
+                                )
+                            )
+
+                    if not grouped_matches:
+                        local_claims = [
+                            list(
+                                LR_METRIC_CLAIM_RE.finditer(
+                                    window,
+                                    pair_end,
+                                    pair_mentions[index + 1][0]
+                                    if index + 1 < len(pair_mentions)
+                                    else len(window),
+                                )
+                            )
+                            for index, (_pair_start, pair_end, _pair) in enumerate(pair_mentions)
+                        ]
+                        if any(local_claims) and any(not claims for claims in local_claims):
+                            issues.append(
+                                _issue(
+                                    code="lr_metric_alignment_ambiguous",
+                                    file=path.name,
+                                    section=str(section["heading"]),
+                                    value=window,
+                                    severity="warning",
+                                    evidence="Multiple LR pairs share metric text without an explicit one-to-one mapping.",
+                                    repair_instruction="Leave unchanged or rewrite with one metric next to each pair.",
+                                )
+                            )
+                            continue
+
+                for index, (pair_start, pair_end, pair) in enumerate(pair_mentions):
                     phrase_end = pair_mentions[index + 1][0] if index + 1 < len(pair_mentions) else len(window)
                     for claim in LR_METRIC_CLAIM_RE.finditer(window, pair_end, phrase_end):
+                        if any(
+                            claim.start() < grouped_end and claim.end() > grouped_start
+                            for grouped_start, grouped_end in grouped_spans
+                        ):
+                            continue
                         metric = _lr_metric_from_label(claim.group("label"))
                         expected = metrics[pair].get(metric)
                         if expected is None:
@@ -377,6 +574,9 @@ def _check_lr_metric_claims(data_dir: Path, issues: list[dict[str, str]]) -> Non
                         claimed = float(claimed_text)
                         if abs(claimed - expected) <= 0.001:
                             continue
+                        target_text = window[pair_start : claim.end("value")]
+                        value_start = claim.start("value") - pair_start
+                        value_end = claim.end("value") - pair_start
                         issues.append(
                             _issue(
                                 code="lr_metric_value_mismatch",
@@ -385,6 +585,11 @@ def _check_lr_metric_claims(data_dir: Path, issues: list[dict[str, str]]) -> Non
                                 value=f"{pair} {metric}={claimed_text}",
                                 evidence=f"sig_liana.csv has {metric}={expected:.4f} for {pair}.",
                                 repair_instruction="Use the metric value from sig_liana.csv or relabel the claim to the correct LR metric.",
+                                target_text=target_text,
+                                replacement_text=(
+                                    f"{target_text[:value_start]}{expected:.4f}"
+                                    f"{target_text[value_end:]}"
+                                ),
                             )
                         )
 
@@ -418,6 +623,12 @@ def _supported_factor_pathways(data_dir: Path) -> tuple[dict[str, dict[str, floa
 
 
 def _direction_flags(text: str) -> tuple[bool, bool]:
+    text = FACTOR_CLUSTER_STATUS_RE.sub("", text)
+    text = FACTOR_PATHWAY_NEGATED_DIRECTION_RE.sub("", text)
+    return bool(FACTOR_PATHWAY_POSITIVE_RE.search(text)), bool(FACTOR_PATHWAY_NEGATIVE_RE.search(text))
+
+
+def _raw_direction_flags(text: str) -> tuple[bool, bool]:
     text = FACTOR_PATHWAY_NEGATED_DIRECTION_RE.sub("", text)
     return bool(FACTOR_PATHWAY_POSITIVE_RE.search(text)), bool(FACTOR_PATHWAY_NEGATIVE_RE.search(text))
 
@@ -542,6 +753,7 @@ def _check_pathway_factor_claims(data_dir: Path, issues: list[dict[str, str]]) -
                             value=", ".join(f"{factor_labels[factor]}: {pathway_labels[p]}" for p in unsupported),
                             evidence="sig_liana_pathway_factor.csv lacks the claimed factor-pathway support.",
                             repair_instruction="Rephrase as an LR-annotation-based hypothesis, not measured pathway-factor significance.",
+                            target_text=window,
                         )
                     )
                 for pathway in sorted(pathways & set(factor_pathways)):
@@ -549,7 +761,26 @@ def _check_pathway_factor_claims(data_dir: Path, issues: list[dict[str, str]]) -
                     positive, negative = pathway_directions.get(pathway, (False, False))
                     if estimate is None:
                         continue
-                    if (estimate < 0 and positive and not negative) or (estimate > 0 and negative and not positive):
+                    mismatch = (estimate < 0 and positive) or (estimate > 0 and negative)
+                    raw_positive, raw_negative = _raw_direction_flags(local_window)
+                    ambiguous = (raw_positive and raw_negative) or len(pathways) > 1
+                    if not mismatch:
+                        mismatch = ambiguous and ((estimate < 0 and raw_positive) or (estimate > 0 and raw_negative))
+                    if not mismatch:
+                        continue
+                    if ambiguous:
+                        issues.append(
+                            _issue(
+                                code="factor_pathway_direction_ambiguous",
+                                severity="warning",
+                                file=path.name,
+                                section=str(section["heading"]),
+                                value=f"{factor_labels[factor]}: {pathway_labels[pathway]} estimate={estimate}",
+                                evidence="Mixed or multi-pathway wording prevents a high-confidence direction verdict.",
+                                repair_instruction="Leave unchanged and retain as an audit warning.",
+                            )
+                        )
+                    else:
                         issues.append(
                             _issue(
                                 code="factor_pathway_direction_mismatch",
@@ -558,6 +789,7 @@ def _check_pathway_factor_claims(data_dir: Path, issues: list[dict[str, str]]) -
                                 value=f"{factor_labels[factor]}: {pathway_labels[pathway]} estimate={estimate}",
                                 evidence="sig_liana_pathway_factor.csv estimate direction conflicts with the local factor-pathway wording.",
                                 repair_instruction="Align enrichment/depletion wording with the estimate sign for this factor-pathway pair.",
+                                target_text=window,
                             )
                         )
 
@@ -588,17 +820,19 @@ def _check_part3_scope_and_pairs(data_dir: Path, issues: list[dict[str, str]]) -
 
     for section in _sections(text):
         body = str(section["body"])
-        if THERAPEUTIC_RE.search(body):
-            issues.append(
-                _issue(
-                    code="part3_therapeutic_spillover",
-                    file=path.name,
-                    section=str(section["heading"]),
-                    value="therapeutic/druggability language",
-                    evidence="Part3 should interpret selected L-R spatial evidence only; Part4 owns therapeutic synthesis.",
-                    repair_instruction="Remove therapeutic prioritization language and keep the section to spatial/statistical LR evidence.",
+        for window in _claim_windows(body):
+            if THERAPEUTIC_RE.search(window) and not PART4_BOUNDARY_RE.search(window):
+                issues.append(
+                    _issue(
+                        code="part3_therapeutic_spillover",
+                        file=path.name,
+                        section=str(section["heading"]),
+                        value=window,
+                        evidence="Part3 should interpret selected L-R spatial evidence only; Part4 owns therapeutic synthesis.",
+                        repair_instruction="Remove therapeutic prioritization language and keep the section to spatial/statistical LR evidence.",
+                        target_text=window,
+                    )
                 )
-            )
 
     for pair in _selected_lr_pairs(data_dir):
         if not _mentions_lr_pair(text, pair):

@@ -15,6 +15,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+import time
 from html import unescape
 from html.parser import HTMLParser
 from pathlib import Path
@@ -130,6 +131,71 @@ def _rag_collection_key(part_name: str, data_dir: str = "") -> str:
     data_dir_name = _slugify_collection_component(Path(resolved).name)
     digest = hashlib.sha1(resolved.encode("utf-8")).hexdigest()[:8]
     return f"{data_dir_name}_{digest}_{part}"
+
+
+def _env_bool(name: str, default: bool = False) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() not in {"0", "false", "no", "off", ""}
+
+
+def _append_rag_audit(
+    query: str,
+    collection_id: str,
+    use_wiki_context: bool,
+    result_count: int,
+    error_type: str | None,
+    elapsed_seconds: float | None = None,
+    rewrite_count: int | None = None,
+    retrieved_document_count: int | None = None,
+    relevant_document_count: int | None = None,
+    selected_wiki_page_count: int | None = None,
+    result_pmids: list[str] | None = None,
+) -> None:
+    audit_path = os.getenv("DEEP_INTERPRETER_RAG_AUDIT_PATH")
+    if not audit_path:
+        return
+    record = {
+        "endpoint": "agentic_search",
+        "collection_uuid": collection_id,
+        "query_sha256": hashlib.sha256(query.encode("utf-8")).hexdigest(),
+        "use_wiki_context": use_wiki_context,
+        "success": error_type is None and result_count > 0,
+        "result_count": result_count,
+        "error_type": error_type,
+    }
+    optional = {
+        "elapsed_seconds": elapsed_seconds,
+        "rewrite_count": rewrite_count,
+        "retrieved_document_count": retrieved_document_count,
+        "relevant_document_count": relevant_document_count,
+        "selected_wiki_page_count": selected_wiki_page_count,
+        "result_pmids": result_pmids,
+    }
+    record.update({key: value for key, value in optional.items() if value is not None})
+    path = Path(audit_path)
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a") as f:
+            f.write(json.dumps(record, sort_keys=True) + "\n")
+    except OSError as e:
+        logger.warning("RAG audit write failed: %r", e)
+
+
+def _pmids_from_result_metadata(results: list[dict]) -> list[str]:
+    pmids: list[str] = []
+    seen: set[str] = set()
+    for result in results:
+        metadata = result.get("metadata") if isinstance(result, dict) else None
+        if not isinstance(metadata, dict):
+            continue
+        for key in ("filename", "source"):
+            match = re.search(r"pmid_(\d+)\.txt\b", str(metadata.get(key, "")))
+            if match and match.group(1) not in seen:
+                seen.add(match.group(1))
+                pmids.append(match.group(1))
+    return pmids
 
 
 def _repair_json(raw: str) -> Any:
@@ -1423,7 +1489,9 @@ async def _agentic_search_with_sni(
     collection_id: str,
     limit: int,
     search_type: str,
+    require_agentic: bool = False,
 ) -> list[dict]:
+    use_wiki_context = _env_bool("DEEP_INTERPRETER_USE_WIKI_CONTEXT", default=True)
     tools = await _get_cci_rag_tools()
     agentic_tool = next(
         (
@@ -1434,8 +1502,12 @@ async def _agentic_search_with_sni(
         None,
     )
     if agentic_tool is None:
+        _append_rag_audit(query, collection_id, use_wiki_context, 0, "ToolNotFound")
+        if require_agentic:
+            raise RAGSearchError("Required agentic RAG failed: ToolNotFound")
         return []
 
+    started = time.monotonic()
     try:
         raw = await agentic_tool.ainvoke(
             {
@@ -1444,11 +1516,21 @@ async def _agentic_search_with_sni(
                 "search_type": search_type,
                 "search_limit": limit,
                 "max_rewrites": 3,
-                "use_wiki_context": True,
+                "use_wiki_context": use_wiki_context,
             }
         )
     except Exception as e:
         logger.warning("SNI agentic search failed: %r", e, exc_info=True)
+        _append_rag_audit(
+            query,
+            collection_id,
+            use_wiki_context,
+            0,
+            type(e).__name__,
+            elapsed_seconds=round(time.monotonic() - started, 3),
+        )
+        if require_agentic:
+            raise
         return []
 
     if isinstance(raw, list) and raw and isinstance(raw[0], dict) and "text" in raw[0]:
@@ -1458,18 +1540,91 @@ async def _agentic_search_with_sni(
         try:
             payload = json.loads(raw)
         except json.JSONDecodeError:
+            _append_rag_audit(
+                query,
+                collection_id,
+                use_wiki_context,
+                0,
+                "JSONDecodeError",
+                elapsed_seconds=round(time.monotonic() - started, 3),
+            )
+            if require_agentic:
+                raise RAGSearchError("Required agentic RAG failed: JSONDecodeError")
             return []
     elif isinstance(raw, dict):
         payload = raw
     else:
+        _append_rag_audit(
+            query,
+            collection_id,
+            use_wiki_context,
+            0,
+            type(raw).__name__,
+            elapsed_seconds=round(time.monotonic() - started, 3),
+        )
+        if require_agentic:
+            raise RAGSearchError(f"Required agentic RAG failed: {type(raw).__name__}")
         return []
+
+    def payload_list_count(name: str) -> int | None:
+        value = payload.get(name)
+        return len(value) if isinstance(value, list) else None
+
+    audit_payload_fields = {
+        "elapsed_seconds": round(time.monotonic() - started, 3),
+        "rewrite_count": payload.get("rewrite_count")
+        if isinstance(payload.get("rewrite_count"), int)
+        else None,
+        "retrieved_document_count": payload_list_count("retrieved_document_ids"),
+        "relevant_document_count": payload_list_count("relevant_documents"),
+        "selected_wiki_page_count": payload_list_count("selected_wiki_pages"),
+    }
 
     if payload.get("error"):
         logger.warning("SNI agentic search returned error: %s", payload.get("error"))
+        error_type = (
+            "NoRelevantContext"
+            if payload.get("error") == "no_relevant_context"
+            else "AgenticError"
+        )
+        _append_rag_audit(
+            query,
+            collection_id,
+            use_wiki_context,
+            0,
+            error_type,
+            **audit_payload_fields,
+        )
+        if require_agentic and error_type != "NoRelevantContext":
+            raise RAGSearchError(f"Required agentic RAG failed: {error_type}")
+        return []
+
+    sources = payload.get("sources")
+    if not isinstance(sources, list):
+        _append_rag_audit(
+            query,
+            collection_id,
+            use_wiki_context,
+            0,
+            "InvalidSources",
+            **audit_payload_fields,
+        )
+        if require_agentic:
+            raise RAGSearchError("Required agentic RAG failed: InvalidSources")
+        return []
+    if not sources:
+        _append_rag_audit(
+            query,
+            collection_id,
+            use_wiki_context,
+            0,
+            "NoRelevantContext",
+            **audit_payload_fields,
+        )
         return []
 
     results = []
-    for source in payload.get("sources", []):
+    for source in sources:
         metadata = dict(source.get("metadata") or {})
         metadata.update(
             {
@@ -1490,7 +1645,17 @@ async def _agentic_search_with_sni(
             }
         )
 
-    return [r for r in results if r.get("page_content")][:limit]
+    usable_results = [r for r in results if r.get("page_content")][:limit]
+    _append_rag_audit(
+        query,
+        collection_id,
+        use_wiki_context,
+        len(usable_results),
+        None,
+        result_pmids=_pmids_from_result_metadata(usable_results),
+        **audit_payload_fields,
+    )
+    return usable_results
 
 
 async def search_fulltext_rag(
@@ -1521,15 +1686,17 @@ async def search_fulltext_rag(
     query_preview = query[:50] + "..." if len(query) > 50 else query
     logger.debug(f"search_fulltext_rag: query={query_preview}, collection={collection_name}")
 
-    collection_id = _RAG_STATE["collection_ids"].get(collection_name)
+    collection_id = os.getenv("DEEP_INTERPRETER_FIXED_COLLECTION_ID", "").strip()
+    if not collection_id:
+        collection_id = _RAG_STATE["collection_ids"].get(collection_name)
 
-    # Fallback: look up from Vector DB if not in cache
-    if collection_id is None:
-        logger.debug(f"search_fulltext_rag: Collection {collection_name} not in cache, looking up from DB...")
-        collection_id = await _lookup_collection_from_db(collection_name)
-        if collection_id:
-            _RAG_STATE["collection_ids"][collection_name] = collection_id
-            logger.debug(f"search_fulltext_rag: Found collection in DB and cached: {collection_id}")
+        # Fallback: look up from Vector DB if not in cache
+        if collection_id is None:
+            logger.debug(f"search_fulltext_rag: Collection {collection_name} not in cache, looking up from DB...")
+            collection_id = await _lookup_collection_from_db(collection_name)
+            if collection_id:
+                _RAG_STATE["collection_ids"][collection_name] = collection_id
+                logger.debug(f"search_fulltext_rag: Found collection in DB and cached: {collection_id}")
 
     if collection_id is None:
         logger.debug(f"search_fulltext_rag: Collection {collection_name} not found in cache or DB")
@@ -1540,18 +1707,24 @@ async def search_fulltext_rag(
 
     logger.debug(f"search_fulltext_rag: Using collection_id: {collection_id}")
 
+    require_agentic = _env_bool("DEEP_INTERPRETER_REQUIRE_AGENTIC_RAG")
     try:
         agentic_results = await _agentic_search_with_sni(
             query=query,
             collection_id=collection_id,
             limit=limit,
             search_type=search_type,
+            require_agentic=require_agentic,
         )
     except Exception as e:
         logger.warning("SNI agentic search failed: %r", e, exc_info=True)
+        if require_agentic:
+            raise RAGSearchError(f"Required agentic RAG failed: {e}") from e
         agentic_results = []
     if agentic_results:
         return agentic_results
+    if require_agentic:
+        return []
 
     # Generate multiple search queries using LLM
     queries = await generate_multi_query(query, num_queries=5)
@@ -1903,11 +2076,13 @@ async def prepare_rag_for_interpretation(
         }
 
     # Extract PMIDs
-    pmids = []
+    pmids: list[str] = []
     if isinstance(papers, list):
-        pmids = [p.get("pmid") for p in papers if isinstance(p, dict) and p.get("pmid")]
+        pmids = [
+            str(p["pmid"]) for p in papers if isinstance(p, dict) and p.get("pmid")
+        ]
     elif isinstance(papers, dict):
-        pmids = [papers.get("pmid")] if papers.get("pmid") else []
+        pmids = [str(papers["pmid"])] if papers.get("pmid") else []
 
     logger.debug(f"Extracted PMIDs: {len(pmids)}")
     if pmids:

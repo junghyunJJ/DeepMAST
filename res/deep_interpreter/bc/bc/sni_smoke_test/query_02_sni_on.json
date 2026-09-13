@@ -1,0 +1,227 @@
+{
+  "body": {
+    "error": null,
+    "generation": "Based on the provided context, the interaction between the EphB4 receptor and its ligand Ephrin-B2 is implicated in breast cancer cell-cell communication, contributing to dysregulated signaling and tumor progression. Additionally, WNT5A signaling involves interactions dependent on the availability of key receptors and intercellular interactions among different cell types. The text also mentions that ligands binding to receptors such as RYK and FZD mediate downstream signaling cascades affecting proliferation, migration, and invasion in breast cancer cells.",
+    "no_context_found": false,
+    "query_rewrites": [],
+    "relevant_documents": [
+      {
+        "id": "d112613d-fe44-4b97-b81e-b42ea7d167f3",
+        "metadata": {
+          "chunk_count": 21,
+          "chunk_index": 11,
+          "created_at": "2026-07-29T14:39:10.880163",
+          "file_id": "ace84794-6e2f-4793-8844-164325487395",
+          "filename": "pmid_30171384.txt",
+          "mime_type": "text/plain",
+          "source": "pmid_30171384.txt"
+        },
+        "page_content": "to different cognate receptors (e.g., RYK, FZD), mediates downstream signaling cascades and how these affect proliferation, migration and invasion in breast cancer cells. The red up-arrow symbol refers to upregulation or activation of the indicated proteins, whereas the black down-arrow symbol refers to downregulation or inactivation of the indicated signaling molecules. The blue horizontal arrow refers to activation of a signaling molecule, whereas the blue broken arrow indicates undefined signaling mechanisms. Finally, the red stop symbol indicates inhibition of proliferation or migration/invasion",
+        "score": 0.5089851126404193
+      },
+      {
+        "content": "Title: Design and Evaluation ofEb4Mab\u20107\u2010mG2a: A Dual\u2010Action Anti\u2010EphB4Monoclonal Antibody for Targeted Breast Cancer Therapy\nAuthors: Tomokazu Ohishi, Hiroyuki Suzuki, Mika K. Kaneko, Tomohiro Tanaka, Akiko Harakawa, Junjiro Yoshida, Daisuke Tatsuda, Yukinari Kato, Manabu Kawada\nJournal: Cancer Science\nYear: 2025\nDOI: 10.1111/cas.70198\n\nAbstract:\nBreast cancer remains a leading cause of cancer mortality worldwide, underscoring the urgent need for novel and effective therapeutic strategies. Eph receptor tyrosine kinases, particularly EphB4, exhibit diverse roles in cancer biology, acting as either tumor promoters or suppressors depending on the cellular environment and ligand engagement. EphB4 is frequently overexpressed in breast cancer and contributes to dysregulated signaling and tumor progression through the abnormal interaction with its ligand Ephrin\u2010B2. We herein developed an improved anti\u2010EphB4 monoclonal antibody, Eb4Mab\u20107\u2010mG2a, which can be characterized as a subclass\u2010switched IgG2avariant designed to enhance immune effector function, specifically antibody\u2010dependent cellular cytotoxicity (ADCC) and complement\u2010dependent cytotoxicity (CDC). Our findings showed that Eb4Mab\u20107\u2010mG2aeffectively blocked Ephrin\u2010B2\u2010induced ERK phosphorylation and proliferation in EphB4\u2010positive MCF\u20107 breast cancer cells but had no effect on EphB4\u2010knockout (KO) MCF\u20107 cells. Flow cytometry confirmed high\u2010affinity binding between Eb4Mab\u20107\u2010mG2aand EphB4\u2010expressing cells, whereas in\u00a0vitro assays demonstrated potent and selective ADCC and CDC activities against EphB4\u2010positive tumor cells. In\u00a0vivo experiments showed that Eb4Mab\u20107\u2010mG2asignificantly suppressed xenograft\u00a0growth in models bearing EphB4\u2010overexpressing CHO\u2010K1 and EphB4\u2010positive MCF\u20107, but showed no therapeutic effect in EphB4\u2010negative CHO\u2010K1 and EphB4\u2010KO MCF\u20107 xenografts. Immunohistochemical analysis revealed reduced Ki\u201067 proliferation indices in treated tumors, supporting the antiproliferative effects of the developed antibody. Overall, these findings demonstrate that Eb4Mab\u20107\u2010mG2aexerts dual\u2010action antitumor activity through ligand blockade and immune effector engagement. Further evaluations in other EphB4\u2010overexpressing cancers and in combination with immune checkpoint inhibitors are warranted. Humanization and tumor\u2010selective engineering may enhance its clinical potential for precision oncology.\n\nFull Text:\n\n## Introduction\n\nBreast cancer remains one of the most common and lethal malignancies affecting women worldwide, accounting for 11.7% of all cancer cases and 6.9% of cancer\u2010related deaths globally in 2020 [1]. Despite improvements in early detection and systemic therapies, breast cancer continues to be the second leading cause of cancer\u2010related death among women [2], highlighting the urgent need for novel and more effective therapeutic strategies.",
+        "id": "b28f4077-89a2-44d2-89f6-c93dcb5fc40e",
+        "metadata": {
+          "chunk_count": 15,
+          "chunk_index": 0,
+          "created_at": "2026-07-29T14:38:18.427067",
+          "file_id": "d6ddb6e5-7e8b-4674-b6d4-cbb0741f9c03",
+          "filename": "pmid_41023731.txt",
+          "mime_type": "text/plain",
+          "source": "pmid_41023731.txt",
+          "wiki_chunk_id": "b28f4077-89a2-44d2-89f6-c93dcb5fc40e",
+          "wiki_file_id": "d6ddb6e5-7e8b-4674-b6d4-cbb0741f9c03",
+          "wiki_promoted": true
+        },
+        "page_content": "Title: Design and Evaluation ofEb4Mab\u20107\u2010mG2a: A Dual\u2010Action Anti\u2010EphB4Monoclonal Antibody for Targeted Breast Cancer Therapy\nAuthors: Tomokazu Ohishi, Hiroyuki Suzuki, Mika K. Kaneko, Tomohiro Tanaka, Akiko Harakawa, Junjiro Yoshida, Daisuke Tatsuda, Yukinari Kato, Manabu Kawada\nJournal: Cancer Science\nYear: 2025\nDOI: 10.1111/cas.70198\n\nAbstract:\nBreast cancer remains a leading cause of cancer mortality worldwide, underscoring the urgent need for novel and effective therapeutic strategies. Eph receptor tyrosine kinases, particularly EphB4, exhibit diverse roles in cancer biology, acting as either tumor promoters or suppressors depending on the cellular environment and ligand engagement. EphB4 is frequently overexpressed in breast cancer and contributes to dysregulated signaling and tumor progression through the abnormal interaction with its ligand Ephrin\u2010B2. We herein developed an improved anti\u2010EphB4 monoclonal antibody, Eb4Mab\u20107\u2010mG2a, which can be characterized as a subclass\u2010switched IgG2avariant designed to enhance immune effector function, specifically antibody\u2010dependent cellular cytotoxicity (ADCC) and complement\u2010dependent cytotoxicity (CDC). Our findings showed that Eb4Mab\u20107\u2010mG2aeffectively blocked Ephrin\u2010B2\u2010induced ERK phosphorylation and proliferation in EphB4\u2010positive MCF\u20107 breast cancer cells but had no effect on EphB4\u2010knockout (KO) MCF\u20107 cells. Flow cytometry confirmed high\u2010affinity binding between Eb4Mab\u20107\u2010mG2aand EphB4\u2010expressing cells, whereas in\u00a0vitro assays demonstrated potent and selective ADCC and CDC activities against EphB4\u2010positive tumor cells. In\u00a0vivo experiments showed that Eb4Mab\u20107\u2010mG2asignificantly suppressed xenograft\u00a0growth in models bearing EphB4\u2010overexpressing CHO\u2010K1 and EphB4\u2010positive MCF\u20107, but showed no therapeutic effect in EphB4\u2010negative CHO\u2010K1 and EphB4\u2010KO MCF\u20107 xenografts. Immunohistochemical analysis revealed reduced Ki\u201067 proliferation indices in treated tumors, supporting the antiproliferative effects of the developed antibody. Overall, these findings demonstrate that Eb4Mab\u20107\u2010mG2aexerts dual\u2010action antitumor activity through ligand blockade and immune effector engagement. Further evaluations in other EphB4\u2010overexpressing cancers and in combination with immune checkpoint inhibitors are warranted. Humanization and tumor\u2010selective engineering may enhance its clinical potential for precision oncology.\n\nFull Text:\n\n## Introduction\n\nBreast cancer remains one of the most common and lethal malignancies affecting women worldwide, accounting for 11.7% of all cancer cases and 6.9% of cancer\u2010related deaths globally in 2020 [1]. Despite improvements in early detection and systemic therapies, breast cancer continues to be the second leading cause of cancer\u2010related death among women [2], highlighting the urgent need for novel and more effective therapeutic strategies.",
+        "score": 1.0
+      },
+      {
+        "content": "Title: [Semaphorins and cancers : an up 'dating'].\n\nAuthors: Nasarre Patrick, Constantin Bruno, Drabkin Harry A, Roche Jo\u00eblle\n\nJournal: Medecine sciences : M/S\nYear: 2005\nPMID: 15985208\n\nAbstract:\nSemaphorins, first described as axon guidance molecules, play an essential role in neural development, angiogenesis and immunological response. In 1996, two semaphorin genes, SEMA3B and SEMA3F, were isolated from chromosomal region 3p21.3 believed to contain a tumor suppressor gene based on frequent loss of heterozygosity in lung and breast cancer. Since these first studies, several semaphorins have been involved in tumor progression. Some semaphorins have been proposed to have pro-tumoral properties, whereas others have been shown to have tumor suppressive activity. This review summarizes the most recent data implicating semaphorins in cancers.\n\n---\nNote: Full text not available. This file contains only the abstract and metadata from PubMed.",
+        "id": "ce020908-9311-4b73-8116-143480de44d7",
+        "metadata": {
+          "chunk_count": 1,
+          "chunk_index": 0,
+          "created_at": "2026-07-29T14:40:13.882232",
+          "file_id": "3e8a1af3-bc79-4e9a-9d16-282ee44a1e83",
+          "filename": "pmid_15985208.txt",
+          "mime_type": "text/plain",
+          "source": "pmid_15985208.txt",
+          "wiki_chunk_id": "ce020908-9311-4b73-8116-143480de44d7",
+          "wiki_file_id": "3e8a1af3-bc79-4e9a-9d16-282ee44a1e83",
+          "wiki_promoted": true
+        },
+        "page_content": "Title: [Semaphorins and cancers : an up 'dating'].\n\nAuthors: Nasarre Patrick, Constantin Bruno, Drabkin Harry A, Roche Jo\u00eblle\n\nJournal: Medecine sciences : M/S\nYear: 2005\nPMID: 15985208\n\nAbstract:\nSemaphorins, first described as axon guidance molecules, play an essential role in neural development, angiogenesis and immunological response. In 1996, two semaphorin genes, SEMA3B and SEMA3F, were isolated from chromosomal region 3p21.3 believed to contain a tumor suppressor gene based on frequent loss of heterozygosity in lung and breast cancer. Since these first studies, several semaphorins have been involved in tumor progression. Some semaphorins have been proposed to have pro-tumoral properties, whereas others have been shown to have tumor suppressive activity. This review summarizes the most recent data implicating semaphorins in cancers.\n\n---\nNote: Full text not available. This file contains only the abstract and metadata from PubMed.",
+        "score": 1.0
+      },
+      {
+        "content": "Title: Multiple Roles of WNT5A in Breast Cancer\nAuthors: Ruolan Zeng, Junhui Huang, Mei-zuo Zhong, Li Li, Guorong Yang, Li Liu, Yin Wu, Xiaoyi Yao, Jing Shi, Zhifu Wu\nJournal: Medical Science Monitor : International Medical Journal of Experimental and Clinical Research\nYear: 2016\nDOI: 10.12659/MSM.902022\n\nAbstract:\nBreast cancer is one of the most common malignant tumors of women. Modern combinatorial therapeutic regimens can reduce patient tumor burdens to undetectable levels, yet in many cases these tumors will relapse. Understanding of breast cancer biology, developing more potent therapeutic approaches, and overcoming resistance are of great importance. WNT5A is a non-canonical signaling member of the WNT family. Its role in breast cancer still remains unclear. Most of the evidence shows that WNT5A is a suppressor in breast cancer and loss of its expression is associated with poor prognosis, while some evidence suggests the tumorigenicity of WNT5A. WNT signaling molecules are potent targets for treatment of cancer. Therefore, understanding the role of WNT5A in breast cancer may provide new ideas and methods for breast cancer treatment. We review the evidence concerning WNT5A and breast cancer involving the signaling pathways and the molecular-targeted therapy of WNT5A. Our results show that the role WNT5A plays depends on the availability of key receptors and intercellular interactions among different cell types.\n\nFull Text:\n\n## Background\n\nBreast cancer is one of the most common malignant tumors of women and is the second leading cause of cancer death in women. In the United States, about 231,840 new cases of invasive breast cancer and 40,290 breast cancer deaths are expected to occur in 2015. Breast cancer has become one of the biggest threats to woman\u2019s health [1].",
+        "id": "eca437d3-79e6-4a31-8df2-f4edf18d30df",
+        "metadata": {
+          "chunk_count": 12,
+          "chunk_index": 0,
+          "created_at": "2026-07-29T14:40:13.880719",
+          "file_id": "313078ac-af7e-4f8c-a9d4-9b31f60d0513",
+          "filename": "pmid_28005837.txt",
+          "mime_type": "text/plain",
+          "source": "pmid_28005837.txt",
+          "wiki_chunk_id": "eca437d3-79e6-4a31-8df2-f4edf18d30df",
+          "wiki_file_id": "313078ac-af7e-4f8c-a9d4-9b31f60d0513",
+          "wiki_promoted": true
+        },
+        "page_content": "Title: Multiple Roles of WNT5A in Breast Cancer\nAuthors: Ruolan Zeng, Junhui Huang, Mei-zuo Zhong, Li Li, Guorong Yang, Li Liu, Yin Wu, Xiaoyi Yao, Jing Shi, Zhifu Wu\nJournal: Medical Science Monitor : International Medical Journal of Experimental and Clinical Research\nYear: 2016\nDOI: 10.12659/MSM.902022\n\nAbstract:\nBreast cancer is one of the most common malignant tumors of women. Modern combinatorial therapeutic regimens can reduce patient tumor burdens to undetectable levels, yet in many cases these tumors will relapse. Understanding of breast cancer biology, developing more potent therapeutic approaches, and overcoming resistance are of great importance. WNT5A is a non-canonical signaling member of the WNT family. Its role in breast cancer still remains unclear. Most of the evidence shows that WNT5A is a suppressor in breast cancer and loss of its expression is associated with poor prognosis, while some evidence suggests the tumorigenicity of WNT5A. WNT signaling molecules are potent targets for treatment of cancer. Therefore, understanding the role of WNT5A in breast cancer may provide new ideas and methods for breast cancer treatment. We review the evidence concerning WNT5A and breast cancer involving the signaling pathways and the molecular-targeted therapy of WNT5A. Our results show that the role WNT5A plays depends on the availability of key receptors and intercellular interactions among different cell types.\n\nFull Text:\n\n## Background\n\nBreast cancer is one of the most common malignant tumors of women and is the second leading cause of cancer death in women. In the United States, about 231,840 new cases of invasive breast cancer and 40,290 breast cancer deaths are expected to occur in 2015. Breast cancer has become one of the biggest threats to woman\u2019s health [1].",
+        "score": 1.0
+      }
+    ],
+    "retrieved_document_ids": [
+      "d112613d-fe44-4b97-b81e-b42ea7d167f3",
+      "b28f4077-89a2-44d2-89f6-c93dcb5fc40e",
+      "ce020908-9311-4b73-8116-143480de44d7",
+      "eca437d3-79e6-4a31-8df2-f4edf18d30df",
+      "047f7fb6-9782-434c-8006-b9aa567450e0",
+      "13f94e12-e950-405e-b4f6-ed479974d3df",
+      "8f395c20-75cf-42f2-90c7-81a815201ab7",
+      "a9d8d875-f4ce-4142-afba-c2ce4a048316",
+      "151a1796-2d19-407b-b15f-0769ce592c28"
+    ],
+    "rewrite_count": 0,
+    "selected_wiki_pages": [
+      {
+        "id": "concept-targeting-guidance-cues-ephb4-and-semaphorins-in-breast-cancer-therapy",
+        "score": 5,
+        "source_refs": [
+          {
+            "chunk_id": "b28f4077-89a2-44d2-89f6-c93dcb5fc40e",
+            "file_id": "d6ddb6e5-7e8b-4674-b6d4-cbb0741f9c03"
+          },
+          {
+            "chunk_id": "ce020908-9311-4b73-8116-143480de44d7",
+            "file_id": "3e8a1af3-bc79-4e9a-9d16-282ee44a1e83"
+          }
+        ],
+        "summary": "These sources converge on the therapeutic potential of targeting cell guidance molecules in cancer, specifically highlighting the dual nature of these pathways. One source details a novel anti-EphB4 antibody (Eb4Mab-7-mG2a) that leverages immune effector functions to treat EphB4-positive breast cancer, while the other outlines the complex, context-dependent roles of semaphorins as either tumor suppressors or promoters. Together, they illustrate the broader strategy of modulating receptor-ligand interactions (Eph/ephrin and semaphorin/plexin) to inhibit tumor progression and enhance immune response.",
+        "title": "Targeting Guidance Cues: EphB4 and Semaphorins in Breast Cancer Therapy"
+      },
+      {
+        "id": "source-wnt5a-in-breast-cancer-dual-roles-and-therapeutic-implications",
+        "score": 4,
+        "source_refs": [
+          {
+            "chunk_id": "eca437d3-79e6-4a31-8df2-f4edf18d30df",
+            "file_id": "313078ac-af7e-4f8c-a9d4-9b31f60d0513"
+          },
+          {
+            "chunk_id": "047f7fb6-9782-434c-8006-b9aa567450e0",
+            "file_id": "313078ac-af7e-4f8c-a9d4-9b31f60d0513"
+          },
+          {
+            "chunk_id": "13f94e12-e950-405e-b4f6-ed479974d3df",
+            "file_id": "313078ac-af7e-4f8c-a9d4-9b31f60d0513"
+          },
+          {
+            "chunk_id": "8f395c20-75cf-42f2-90c7-81a815201ab7",
+            "file_id": "313078ac-af7e-4f8c-a9d4-9b31f60d0513"
+          }
+        ],
+        "summary": "This source reviews the ambiguous role of WNT5A in breast cancer, noting conflicting evidence where it acts as either a tumor suppressor or a promoter depending on receptor availability and cell interactions. It highlights the potential of targeting WNT5A signaling to overcome resistance and improve combinatorial therapies.",
+        "title": "WNT5A in Breast Cancer: Dual Roles and Therapeutic Implications"
+      },
+      {
+        "id": "source-cdh1-as-an-oncogene-in-breast-cancer-role-mirna-interactions-and-diagnostic-valu",
+        "score": 3,
+        "source_refs": [
+          {
+            "chunk_id": "a9d8d875-f4ce-4142-afba-c2ce4a048316",
+            "file_id": "8ac410e1-b8cb-47d3-a487-61d90585e021"
+          },
+          {
+            "chunk_id": "151a1796-2d19-407b-b15f-0769ce592c28",
+            "file_id": "8ac410e1-b8cb-47d3-a487-61d90585e021"
+          },
+          {
+            "chunk_id": "089f296a-bfee-4f66-a65a-e8a8a6fcbdaf",
+            "file_id": "8ac410e1-b8cb-47d3-a487-61d90585e021"
+          },
+          {
+            "chunk_id": "431d98be-8029-46e2-94ef-565ac2f9cc76",
+            "file_id": "8ac410e1-b8cb-47d3-a487-61d90585e021"
+          }
+        ],
+        "summary": "This source discusses a study proposing CDH1's potential role as an oncogene in breast cancer, specifically examining its relationship with related microRNAs (miRNAs) and evaluating their combined utility for diagnostic purposes.",
+        "title": "CDH1 as an Oncogene in Breast Cancer: Role, miRNA Interactions, and Diagnostic Value"
+      }
+    ],
+    "steps": [
+      "retrieve: found 9 documents",
+      "wiki_promotion: promoted 8/8 refs",
+      "grade_documents: 4/9 relevant",
+      "wiki_context: selected 3 pages",
+      "generate: answer produced",
+      "grade_generation: PASSED both checks"
+    ],
+    "wiki_context_status": "selected",
+    "wiki_promoted_document_ids": [
+      "b28f4077-89a2-44d2-89f6-c93dcb5fc40e",
+      "ce020908-9311-4b73-8116-143480de44d7",
+      "eca437d3-79e6-4a31-8df2-f4edf18d30df",
+      "047f7fb6-9782-434c-8006-b9aa567450e0",
+      "13f94e12-e950-405e-b4f6-ed479974d3df",
+      "8f395c20-75cf-42f2-90c7-81a815201ab7",
+      "a9d8d875-f4ce-4142-afba-c2ce4a048316",
+      "151a1796-2d19-407b-b15f-0769ce592c28"
+    ],
+    "wiki_promotion_status": "promoted",
+    "wiki_source_refs": [
+      {
+        "chunk_id": "b28f4077-89a2-44d2-89f6-c93dcb5fc40e",
+        "file_id": "d6ddb6e5-7e8b-4674-b6d4-cbb0741f9c03"
+      },
+      {
+        "chunk_id": "ce020908-9311-4b73-8116-143480de44d7",
+        "file_id": "3e8a1af3-bc79-4e9a-9d16-282ee44a1e83"
+      },
+      {
+        "chunk_id": "eca437d3-79e6-4a31-8df2-f4edf18d30df",
+        "file_id": "313078ac-af7e-4f8c-a9d4-9b31f60d0513"
+      },
+      {
+        "chunk_id": "047f7fb6-9782-434c-8006-b9aa567450e0",
+        "file_id": "313078ac-af7e-4f8c-a9d4-9b31f60d0513"
+      },
+      {
+        "chunk_id": "13f94e12-e950-405e-b4f6-ed479974d3df",
+        "file_id": "313078ac-af7e-4f8c-a9d4-9b31f60d0513"
+      },
+      {
+        "chunk_id": "8f395c20-75cf-42f2-90c7-81a815201ab7",
+        "file_id": "313078ac-af7e-4f8c-a9d4-9b31f60d0513"
+      },
+      {
+        "chunk_id": "a9d8d875-f4ce-4142-afba-c2ce4a048316",
+        "file_id": "8ac410e1-b8cb-47d3-a487-61d90585e021"
+      },
+      {
+        "chunk_id": "151a1796-2d19-407b-b15f-0769ce592c28",
+        "file_id": "8ac410e1-b8cb-47d3-a487-61d90585e021"
+      }
+    ]
+  },
+  "completed_at": "2026-08-09T09:04:59.216219+00:00",
+  "curl_returncode": 0,
+  "headers": "HTTP/1.1 200 OK\ndate: Sun, 09 Aug 2026 09:04:33 GMT\nserver: uvicorn\ncontent-length: 19013\ncontent-type: application/json\n\n",
+  "http_status": 200,
+  "raw_body": "{\"generation\":\"Based on the provided context, the interaction between the EphB4 receptor and its ligand Ephrin-B2 is implicated in breast cancer cell-cell communication, contributing to dysregulated signaling and tumor progression. Additionally, WNT5A signaling involves interactions dependent on the availability of key receptors and intercellular interactions among different cell types. The text also mentions that ligands binding to receptors such as RYK and FZD mediate downstream signaling cascades affecting proliferation, migration, and invasion in breast cancer cells.\",\"relevant_documents\":[{\"id\":\"d112613d-fe44-4b97-b81e-b42ea7d167f3\",\"page_content\":\"to different cognate receptors (e.g., RYK, FZD), mediates downstream signaling cascades and how these affect proliferation, migration and invasion in breast cancer cells. The red up-arrow symbol refers to upregulation or activation of the indicated proteins, whereas the black down-arrow symbol refers to downregulation or inactivation of the indicated signaling molecules. The blue horizontal arrow refers to activation of a signaling molecule, whereas the blue broken arrow indicates undefined signaling mechanisms. Finally, the red stop symbol indicates inhibition of proliferation or migration/invasion\",\"metadata\":{\"source\":\"pmid_30171384.txt\",\"file_id\":\"ace84794-6e2f-4793-8844-164325487395\",\"filename\":\"pmid_30171384.txt\",\"mime_type\":\"text/plain\",\"created_at\":\"2026-07-29T14:39:10.880163\",\"chunk_count\":21,\"chunk_index\":11},\"score\":0.5089851126404193},{\"id\":\"b28f4077-89a2-44d2-89f6-c93dcb5fc40e\",\"page_content\":\"Title: Design and Evaluation ofEb4Mab\u20107\u2010mG2a: A Dual\u2010Action Anti\u2010EphB4Monoclonal Antibody for Targeted Breast Cancer Therapy\\nAuthors: Tomokazu Ohishi, Hiroyuki Suzuki, Mika K. Kaneko, Tomohiro Tanaka, Akiko Harakawa, Junjiro Yoshida, Daisuke Tatsuda, Yukinari Kato, Manabu Kawada\\nJournal: Cancer Science\\nYear: 2025\\nDOI: 10.1111/cas.70198\\n\\nAbstract:\\nBreast cancer remains a leading cause of cancer mortality worldwide, underscoring the urgent need for novel and effective therapeutic strategies. Eph receptor tyrosine kinases, particularly EphB4, exhibit diverse roles in cancer biology, acting as either tumor promoters or suppressors depending on the cellular environment and ligand engagement. EphB4 is frequently overexpressed in breast cancer and contributes to dysregulated signaling and tumor progression through the abnormal interaction with its ligand Ephrin\u2010B2. We herein developed an improved anti\u2010EphB4 monoclonal antibody, Eb4Mab\u20107\u2010mG2a, which can be characterized as a subclass\u2010switched IgG2avariant designed to enhance immune effector function, specifically antibody\u2010dependent cellular cytotoxicity (ADCC) and complement\u2010dependent cytotoxicity (CDC). Our findings showed that Eb4Mab\u20107\u2010mG2aeffectively blocked Ephrin\u2010B2\u2010induced ERK phosphorylation and proliferation in EphB4\u2010positive MCF\u20107 breast cancer cells but had no effect on EphB4\u2010knockout (KO) MCF\u20107 cells. Flow cytometry confirmed high\u2010affinity binding between Eb4Mab\u20107\u2010mG2aand EphB4\u2010expressing cells, whereas in\u00a0vitro assays demonstrated potent and selective ADCC and CDC activities against EphB4\u2010positive tumor cells. In\u00a0vivo experiments showed that Eb4Mab\u20107\u2010mG2asignificantly suppressed xenograft\u00a0growth in models bearing EphB4\u2010overexpressing CHO\u2010K1 and EphB4\u2010positive MCF\u20107, but showed no therapeutic effect in EphB4\u2010negative CHO\u2010K1 and EphB4\u2010KO MCF\u20107 xenografts. Immunohistochemical analysis revealed reduced Ki\u201067 proliferation indices in treated tumors, supporting the antiproliferative effects of the developed antibody. Overall, these findings demonstrate that Eb4Mab\u20107\u2010mG2aexerts dual\u2010action antitumor activity through ligand blockade and immune effector engagement. Further evaluations in other EphB4\u2010overexpressing cancers and in combination with immune checkpoint inhibitors are warranted. Humanization and tumor\u2010selective engineering may enhance its clinical potential for precision oncology.\\n\\nFull Text:\\n\\n## Introduction\\n\\nBreast cancer remains one of the most common and lethal malignancies affecting women worldwide, accounting for 11.7% of all cancer cases and 6.9% of cancer\u2010related deaths globally in 2020 [1]. Despite improvements in early detection and systemic therapies, breast cancer continues to be the second leading cause of cancer\u2010related death among women [2], highlighting the urgent need for novel and more effective therapeutic strategies.\",\"content\":\"Title: Design and Evaluation ofEb4Mab\u20107\u2010mG2a: A Dual\u2010Action Anti\u2010EphB4Monoclonal Antibody for Targeted Breast Cancer Therapy\\nAuthors: Tomokazu Ohishi, Hiroyuki Suzuki, Mika K. Kaneko, Tomohiro Tanaka, Akiko Harakawa, Junjiro Yoshida, Daisuke Tatsuda, Yukinari Kato, Manabu Kawada\\nJournal: Cancer Science\\nYear: 2025\\nDOI: 10.1111/cas.70198\\n\\nAbstract:\\nBreast cancer remains a leading cause of cancer mortality worldwide, underscoring the urgent need for novel and effective therapeutic strategies. Eph receptor tyrosine kinases, particularly EphB4, exhibit diverse roles in cancer biology, acting as either tumor promoters or suppressors depending on the cellular environment and ligand engagement. EphB4 is frequently overexpressed in breast cancer and contributes to dysregulated signaling and tumor progression through the abnormal interaction with its ligand Ephrin\u2010B2. We herein developed an improved anti\u2010EphB4 monoclonal antibody, Eb4Mab\u20107\u2010mG2a, which can be characterized as a subclass\u2010switched IgG2avariant designed to enhance immune effector function, specifically antibody\u2010dependent cellular cytotoxicity (ADCC) and complement\u2010dependent cytotoxicity (CDC). Our findings showed that Eb4Mab\u20107\u2010mG2aeffectively blocked Ephrin\u2010B2\u2010induced ERK phosphorylation and proliferation in EphB4\u2010positive MCF\u20107 breast cancer cells but had no effect on EphB4\u2010knockout (KO) MCF\u20107 cells. Flow cytometry confirmed high\u2010affinity binding between Eb4Mab\u20107\u2010mG2aand EphB4\u2010expressing cells, whereas in\u00a0vitro assays demonstrated potent and selective ADCC and CDC activities against EphB4\u2010positive tumor cells. In\u00a0vivo experiments showed that Eb4Mab\u20107\u2010mG2asignificantly suppressed xenograft\u00a0growth in models bearing EphB4\u2010overexpressing CHO\u2010K1 and EphB4\u2010positive MCF\u20107, but showed no therapeutic effect in EphB4\u2010negative CHO\u2010K1 and EphB4\u2010KO MCF\u20107 xenografts. Immunohistochemical analysis revealed reduced Ki\u201067 proliferation indices in treated tumors, supporting the antiproliferative effects of the developed antibody. Overall, these findings demonstrate that Eb4Mab\u20107\u2010mG2aexerts dual\u2010action antitumor activity through ligand blockade and immune effector engagement. Further evaluations in other EphB4\u2010overexpressing cancers and in combination with immune checkpoint inhibitors are warranted. Humanization and tumor\u2010selective engineering may enhance its clinical potential for precision oncology.\\n\\nFull Text:\\n\\n## Introduction\\n\\nBreast cancer remains one of the most common and lethal malignancies affecting women worldwide, accounting for 11.7% of all cancer cases and 6.9% of cancer\u2010related deaths globally in 2020 [1]. Despite improvements in early detection and systemic therapies, breast cancer continues to be the second leading cause of cancer\u2010related death among women [2], highlighting the urgent need for novel and more effective therapeutic strategies.\",\"metadata\":{\"source\":\"pmid_41023731.txt\",\"file_id\":\"d6ddb6e5-7e8b-4674-b6d4-cbb0741f9c03\",\"filename\":\"pmid_41023731.txt\",\"mime_type\":\"text/plain\",\"created_at\":\"2026-07-29T14:38:18.427067\",\"chunk_count\":15,\"chunk_index\":0,\"wiki_promoted\":true,\"wiki_file_id\":\"d6ddb6e5-7e8b-4674-b6d4-cbb0741f9c03\",\"wiki_chunk_id\":\"b28f4077-89a2-44d2-89f6-c93dcb5fc40e\"},\"score\":1.0},{\"id\":\"ce020908-9311-4b73-8116-143480de44d7\",\"page_content\":\"Title: [Semaphorins and cancers : an up 'dating'].\\n\\nAuthors: Nasarre Patrick, Constantin Bruno, Drabkin Harry A, Roche Jo\u00eblle\\n\\nJournal: Medecine sciences : M/S\\nYear: 2005\\nPMID: 15985208\\n\\nAbstract:\\nSemaphorins, first described as axon guidance molecules, play an essential role in neural development, angiogenesis and immunological response. In 1996, two semaphorin genes, SEMA3B and SEMA3F, were isolated from chromosomal region 3p21.3 believed to contain a tumor suppressor gene based on frequent loss of heterozygosity in lung and breast cancer. Since these first studies, several semaphorins have been involved in tumor progression. Some semaphorins have been proposed to have pro-tumoral properties, whereas others have been shown to have tumor suppressive activity. This review summarizes the most recent data implicating semaphorins in cancers.\\n\\n---\\nNote: Full text not available. This file contains only the abstract and metadata from PubMed.\",\"content\":\"Title: [Semaphorins and cancers : an up 'dating'].\\n\\nAuthors: Nasarre Patrick, Constantin Bruno, Drabkin Harry A, Roche Jo\u00eblle\\n\\nJournal: Medecine sciences : M/S\\nYear: 2005\\nPMID: 15985208\\n\\nAbstract:\\nSemaphorins, first described as axon guidance molecules, play an essential role in neural development, angiogenesis and immunological response. In 1996, two semaphorin genes, SEMA3B and SEMA3F, were isolated from chromosomal region 3p21.3 believed to contain a tumor suppressor gene based on frequent loss of heterozygosity in lung and breast cancer. Since these first studies, several semaphorins have been involved in tumor progression. Some semaphorins have been proposed to have pro-tumoral properties, whereas others have been shown to have tumor suppressive activity. This review summarizes the most recent data implicating semaphorins in cancers.\\n\\n---\\nNote: Full text not available. This file contains only the abstract and metadata from PubMed.\",\"metadata\":{\"source\":\"pmid_15985208.txt\",\"file_id\":\"3e8a1af3-bc79-4e9a-9d16-282ee44a1e83\",\"filename\":\"pmid_15985208.txt\",\"mime_type\":\"text/plain\",\"created_at\":\"2026-07-29T14:40:13.882232\",\"chunk_count\":1,\"chunk_index\":0,\"wiki_promoted\":true,\"wiki_file_id\":\"3e8a1af3-bc79-4e9a-9d16-282ee44a1e83\",\"wiki_chunk_id\":\"ce020908-9311-4b73-8116-143480de44d7\"},\"score\":1.0},{\"id\":\"eca437d3-79e6-4a31-8df2-f4edf18d30df\",\"page_content\":\"Title: Multiple Roles of WNT5A in Breast Cancer\\nAuthors: Ruolan Zeng, Junhui Huang, Mei-zuo Zhong, Li Li, Guorong Yang, Li Liu, Yin Wu, Xiaoyi Yao, Jing Shi, Zhifu Wu\\nJournal: Medical Science Monitor : International Medical Journal of Experimental and Clinical Research\\nYear: 2016\\nDOI: 10.12659/MSM.902022\\n\\nAbstract:\\nBreast cancer is one of the most common malignant tumors of women. Modern combinatorial therapeutic regimens can reduce patient tumor burdens to undetectable levels, yet in many cases these tumors will relapse. Understanding of breast cancer biology, developing more potent therapeutic approaches, and overcoming resistance are of great importance. WNT5A is a non-canonical signaling member of the WNT family. Its role in breast cancer still remains unclear. Most of the evidence shows that WNT5A is a suppressor in breast cancer and loss of its expression is associated with poor prognosis, while some evidence suggests the tumorigenicity of WNT5A. WNT signaling molecules are potent targets for treatment of cancer. Therefore, understanding the role of WNT5A in breast cancer may provide new ideas and methods for breast cancer treatment. We review the evidence concerning WNT5A and breast cancer involving the signaling pathways and the molecular-targeted therapy of WNT5A. Our results show that the role WNT5A plays depends on the availability of key receptors and intercellular interactions among different cell types.\\n\\nFull Text:\\n\\n## Background\\n\\nBreast cancer is one of the most common malignant tumors of women and is the second leading cause of cancer death in women. In the United States, about 231,840 new cases of invasive breast cancer and 40,290 breast cancer deaths are expected to occur in 2015. Breast cancer has become one of the biggest threats to woman\u2019s health [1].\",\"content\":\"Title: Multiple Roles of WNT5A in Breast Cancer\\nAuthors: Ruolan Zeng, Junhui Huang, Mei-zuo Zhong, Li Li, Guorong Yang, Li Liu, Yin Wu, Xiaoyi Yao, Jing Shi, Zhifu Wu\\nJournal: Medical Science Monitor : International Medical Journal of Experimental and Clinical Research\\nYear: 2016\\nDOI: 10.12659/MSM.902022\\n\\nAbstract:\\nBreast cancer is one of the most common malignant tumors of women. Modern combinatorial therapeutic regimens can reduce patient tumor burdens to undetectable levels, yet in many cases these tumors will relapse. Understanding of breast cancer biology, developing more potent therapeutic approaches, and overcoming resistance are of great importance. WNT5A is a non-canonical signaling member of the WNT family. Its role in breast cancer still remains unclear. Most of the evidence shows that WNT5A is a suppressor in breast cancer and loss of its expression is associated with poor prognosis, while some evidence suggests the tumorigenicity of WNT5A. WNT signaling molecules are potent targets for treatment of cancer. Therefore, understanding the role of WNT5A in breast cancer may provide new ideas and methods for breast cancer treatment. We review the evidence concerning WNT5A and breast cancer involving the signaling pathways and the molecular-targeted therapy of WNT5A. Our results show that the role WNT5A plays depends on the availability of key receptors and intercellular interactions among different cell types.\\n\\nFull Text:\\n\\n## Background\\n\\nBreast cancer is one of the most common malignant tumors of women and is the second leading cause of cancer death in women. In the United States, about 231,840 new cases of invasive breast cancer and 40,290 breast cancer deaths are expected to occur in 2015. Breast cancer has become one of the biggest threats to woman\u2019s health [1].\",\"metadata\":{\"source\":\"pmid_28005837.txt\",\"file_id\":\"313078ac-af7e-4f8c-a9d4-9b31f60d0513\",\"filename\":\"pmid_28005837.txt\",\"mime_type\":\"text/plain\",\"created_at\":\"2026-07-29T14:40:13.880719\",\"chunk_count\":12,\"chunk_index\":0,\"wiki_promoted\":true,\"wiki_file_id\":\"313078ac-af7e-4f8c-a9d4-9b31f60d0513\",\"wiki_chunk_id\":\"eca437d3-79e6-4a31-8df2-f4edf18d30df\"},\"score\":1.0}],\"steps\":[\"retrieve: found 9 documents\",\"wiki_promotion: promoted 8/8 refs\",\"grade_documents: 4/9 relevant\",\"wiki_context: selected 3 pages\",\"generate: answer produced\",\"grade_generation: PASSED both checks\"],\"query_rewrites\":[],\"rewrite_count\":0,\"error\":null,\"no_context_found\":false,\"selected_wiki_pages\":[{\"id\":\"concept-targeting-guidance-cues-ephb4-and-semaphorins-in-breast-cancer-therapy\",\"title\":\"Targeting Guidance Cues: EphB4 and Semaphorins in Breast Cancer Therapy\",\"source_refs\":[{\"file_id\":\"d6ddb6e5-7e8b-4674-b6d4-cbb0741f9c03\",\"chunk_id\":\"b28f4077-89a2-44d2-89f6-c93dcb5fc40e\"},{\"file_id\":\"3e8a1af3-bc79-4e9a-9d16-282ee44a1e83\",\"chunk_id\":\"ce020908-9311-4b73-8116-143480de44d7\"}],\"score\":5,\"summary\":\"These sources converge on the therapeutic potential of targeting cell guidance molecules in cancer, specifically highlighting the dual nature of these pathways. One source details a novel anti-EphB4 antibody (Eb4Mab-7-mG2a) that leverages immune effector functions to treat EphB4-positive breast cancer, while the other outlines the complex, context-dependent roles of semaphorins as either tumor suppressors or promoters. Together, they illustrate the broader strategy of modulating receptor-ligand interactions (Eph/ephrin and semaphorin/plexin) to inhibit tumor progression and enhance immune response.\"},{\"id\":\"source-wnt5a-in-breast-cancer-dual-roles-and-therapeutic-implications\",\"title\":\"WNT5A in Breast Cancer: Dual Roles and Therapeutic Implications\",\"source_refs\":[{\"file_id\":\"313078ac-af7e-4f8c-a9d4-9b31f60d0513\",\"chunk_id\":\"eca437d3-79e6-4a31-8df2-f4edf18d30df\"},{\"file_id\":\"313078ac-af7e-4f8c-a9d4-9b31f60d0513\",\"chunk_id\":\"047f7fb6-9782-434c-8006-b9aa567450e0\"},{\"file_id\":\"313078ac-af7e-4f8c-a9d4-9b31f60d0513\",\"chunk_id\":\"13f94e12-e950-405e-b4f6-ed479974d3df\"},{\"file_id\":\"313078ac-af7e-4f8c-a9d4-9b31f60d0513\",\"chunk_id\":\"8f395c20-75cf-42f2-90c7-81a815201ab7\"}],\"score\":4,\"summary\":\"This source reviews the ambiguous role of WNT5A in breast cancer, noting conflicting evidence where it acts as either a tumor suppressor or a promoter depending on receptor availability and cell interactions. It highlights the potential of targeting WNT5A signaling to overcome resistance and improve combinatorial therapies.\"},{\"id\":\"source-cdh1-as-an-oncogene-in-breast-cancer-role-mirna-interactions-and-diagnostic-valu\",\"title\":\"CDH1 as an Oncogene in Breast Cancer: Role, miRNA Interactions, and Diagnostic Value\",\"source_refs\":[{\"file_id\":\"8ac410e1-b8cb-47d3-a487-61d90585e021\",\"chunk_id\":\"a9d8d875-f4ce-4142-afba-c2ce4a048316\"},{\"file_id\":\"8ac410e1-b8cb-47d3-a487-61d90585e021\",\"chunk_id\":\"151a1796-2d19-407b-b15f-0769ce592c28\"},{\"file_id\":\"8ac410e1-b8cb-47d3-a487-61d90585e021\",\"chunk_id\":\"089f296a-bfee-4f66-a65a-e8a8a6fcbdaf\"},{\"file_id\":\"8ac410e1-b8cb-47d3-a487-61d90585e021\",\"chunk_id\":\"431d98be-8029-46e2-94ef-565ac2f9cc76\"}],\"score\":3,\"summary\":\"This source discusses a study proposing CDH1's potential role as an oncogene in breast cancer, specifically examining its relationship with related microRNAs (miRNAs) and evaluating their combined utility for diagnostic purposes.\"}],\"wiki_context_status\":\"selected\",\"wiki_source_refs\":[{\"file_id\":\"d6ddb6e5-7e8b-4674-b6d4-cbb0741f9c03\",\"chunk_id\":\"b28f4077-89a2-44d2-89f6-c93dcb5fc40e\"},{\"file_id\":\"3e8a1af3-bc79-4e9a-9d16-282ee44a1e83\",\"chunk_id\":\"ce020908-9311-4b73-8116-143480de44d7\"},{\"file_id\":\"313078ac-af7e-4f8c-a9d4-9b31f60d0513\",\"chunk_id\":\"eca437d3-79e6-4a31-8df2-f4edf18d30df\"},{\"file_id\":\"313078ac-af7e-4f8c-a9d4-9b31f60d0513\",\"chunk_id\":\"047f7fb6-9782-434c-8006-b9aa567450e0\"},{\"file_id\":\"313078ac-af7e-4f8c-a9d4-9b31f60d0513\",\"chunk_id\":\"13f94e12-e950-405e-b4f6-ed479974d3df\"},{\"file_id\":\"313078ac-af7e-4f8c-a9d4-9b31f60d0513\",\"chunk_id\":\"8f395c20-75cf-42f2-90c7-81a815201ab7\"},{\"file_id\":\"8ac410e1-b8cb-47d3-a487-61d90585e021\",\"chunk_id\":\"a9d8d875-f4ce-4142-afba-c2ce4a048316\"},{\"file_id\":\"8ac410e1-b8cb-47d3-a487-61d90585e021\",\"chunk_id\":\"151a1796-2d19-407b-b15f-0769ce592c28\"}],\"wiki_promotion_status\":\"promoted\",\"wiki_promoted_document_ids\":[\"b28f4077-89a2-44d2-89f6-c93dcb5fc40e\",\"ce020908-9311-4b73-8116-143480de44d7\",\"eca437d3-79e6-4a31-8df2-f4edf18d30df\",\"047f7fb6-9782-434c-8006-b9aa567450e0\",\"13f94e12-e950-405e-b4f6-ed479974d3df\",\"8f395c20-75cf-42f2-90c7-81a815201ab7\",\"a9d8d875-f4ce-4142-afba-c2ce4a048316\",\"151a1796-2d19-407b-b15f-0769ce592c28\"],\"retrieved_document_ids\":[\"d112613d-fe44-4b97-b81e-b42ea7d167f3\",\"b28f4077-89a2-44d2-89f6-c93dcb5fc40e\",\"ce020908-9311-4b73-8116-143480de44d7\",\"eca437d3-79e6-4a31-8df2-f4edf18d30df\",\"047f7fb6-9782-434c-8006-b9aa567450e0\",\"13f94e12-e950-405e-b4f6-ed479974d3df\",\"8f395c20-75cf-42f2-90c7-81a815201ab7\",\"a9d8d875-f4ce-4142-afba-c2ce4a048316\",\"151a1796-2d19-407b-b15f-0769ce592c28\"]}",
+  "request": {
+    "llm_model": "qwen3.5:122b",
+    "llm_provider": "ollama",
+    "max_rewrites": 3,
+    "question": "Which ligand-receptor interactions are implicated in breast cancer cell-cell communication?",
+    "search_limit": 5,
+    "search_type": "hybrid",
+    "use_wiki_context": true
+  },
+  "started_at": "2026-08-09T09:04:34.312397+00:00",
+  "stderr": "",
+  "url": "http://localhost:8888/collections/a208e916-bd32-405a-9eee-de4cd82b2a3b/agentic-search"
+}

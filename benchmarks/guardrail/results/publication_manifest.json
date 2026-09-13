@@ -1,0 +1,50 @@
+{
+  "source_sha256": {
+    "res/deep_interpreter/bc/sni_repair_ablation/guardrail_posthoc_recovered_20260908T055100Z/comparison.json": "f98ef8cc659133df1e6674143b0065d1abb16dd8169dac3cc176b71a08faf7d4",
+    "res/deep_interpreter/bc/sni_repair_ablation/post_repair_integrity_counterbalanced_pair16_pair25_20260831T182417Z/sequences/pair-16/01-ba/pairs/pair-16/wiki-on/report_validation_final.json": "ff1cf8d8cac5c9401dc5aa0d3bb48c4856a15dc95509254901401dce1bde6f5a",
+    "res/deep_interpreter/bc/sni_repair_ablation/post_repair_integrity_counterbalanced_pair16_pair25_20260831T182417Z/sequences/pair-17/02-ba/pairs/pair-17/wiki-on/report_validation_final.json": "dbd8c65f949b07bfa5ebe7b3b85edab5e673166fb4248d49602be2d21aab204e",
+    "res/deep_interpreter/bc/sni_repair_ablation/post_repair_integrity_counterbalanced_resume2_pair21_pair25_20260901T170744Z/sequences/pair-25/10-ba/pairs/pair-25/wiki-on/after/part2_final.md": "2a47615874c160d7d70ef90c4ffdb59bc593a5b2509f8b391aed54cc5aef65e4",
+    "res/deep_interpreter/bc/sni_repair_ablation/post_repair_integrity_counterbalanced_resume2_pair21_pair25_20260901T170744Z/sequences/pair-25/10-ba/pairs/pair-25/wiki-on/before/part2_final.md": "618444cf976146e8cdbf3b05e524c877f264a60554b874d3ca973f9117e4ec27",
+    "res/deep_interpreter/bc/sni_repair_ablation/post_repair_integrity_counterbalanced_resume2_pair21_pair25_20260901T170744Z/sequences/pair-25/10-ba/pairs/pair-25/wiki-on/sig_liana.csv": "62439012f4334e2b88eba9b93338ef60eee0e387d104d22fb3bb8d8819d7ac25"
+  },
+  "script_sha256": "39403358896e4f260cae9d22a1b9a37a1cbfc1382f8a1c6e768e6615f01cecb6",
+  "counts": {
+    "on": {
+      "passed": 16,
+      "blocked": 2,
+      "errors": 2
+    },
+    "off": {
+      "errors": 20
+    }
+  },
+  "figure_size_mm": [
+    180,
+    140
+  ],
+  "png_dpi": 300,
+  "correction_example": {
+    "run": "25–BA",
+    "directory": "res/deep_interpreter/bc/sni_repair_ablation/post_repair_integrity_counterbalanced_resume2_pair21_pair25_20260901T170744Z/sequences/pair-25/10-ba/pairs/pair-25/wiki-on",
+    "before": 0.806,
+    "before_source": "res/deep_interpreter/bc/sni_repair_ablation/post_repair_integrity_counterbalanced_resume2_pair21_pair25_20260901T170744Z/sequences/pair-25/10-ba/pairs/pair-25/wiki-on/before/part2_final.md",
+    "after": 0.7171,
+    "after_source": "res/deep_interpreter/bc/sni_repair_ablation/post_repair_integrity_counterbalanced_resume2_pair21_pair25_20260901T170744Z/sequences/pair-25/10-ba/pairs/pair-25/wiki-on/after/part2_final.md",
+    "reference": 0.7170684216386449,
+    "reference_source": "res/deep_interpreter/bc/sni_repair_ablation/post_repair_integrity_counterbalanced_resume2_pair21_pair25_20260901T170744Z/sequences/pair-25/10-ba/pairs/pair-25/wiki-on/sig_liana.csv"
+  },
+  "blocks": [
+    {
+      "run": "16–BA",
+      "hard_errors": 1,
+      "codes": "factor_pathway_direction_mismatch",
+      "source": "res/deep_interpreter/bc/sni_repair_ablation/post_repair_integrity_counterbalanced_pair16_pair25_20260831T182417Z/sequences/pair-16/01-ba/pairs/pair-16/wiki-on/report_validation_final.json"
+    },
+    {
+      "run": "17–BA",
+      "hard_errors": 1,
+      "codes": "inline_citation_overclaimed",
+      "source": "res/deep_interpreter/bc/sni_repair_ablation/post_repair_integrity_counterbalanced_pair16_pair25_20260831T182417Z/sequences/pair-17/02-ba/pairs/pair-17/wiki-on/report_validation_final.json"
+    }
+  ]
+}

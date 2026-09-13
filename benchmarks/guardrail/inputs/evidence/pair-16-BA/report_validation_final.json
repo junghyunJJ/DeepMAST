@@ -1,0 +1,188 @@
+{
+  "issue_count": 20,
+  "issues": [
+    {
+      "code": "lr_metric_alignment_ambiguous",
+      "severity": "warning",
+      "file": "part2_final.md",
+      "section": "## Analysis 2-6: LIANA Moran's R - Spatially Co-localized L-R Pairs",
+      "value": "- **RET-PTPRF** and **PTPRF-RET** both show combined scores of 0.7149 with Moran's R = 0.2573 (p < 0.001)",
+      "evidence": "Multiple LR pairs share metric text without an explicit one-to-one mapping.",
+      "repair_instruction": "Leave unchanged or rewrite with one metric next to each pair."
+    },
+    {
+      "code": "lr_metric_alignment_ambiguous",
+      "severity": "warning",
+      "file": "part2_final.md",
+      "section": "## Part 2 Summary",
+      "value": "**Regulatory balance via LRIG1**: LRIG1-ERBB3 and LRIG1-ERBB2 interactions are strongly co-localized (Moran's R = 0.36-0.42), reflecting a feedback mechanism controlling ErbB signaling intensity (PMID: 18922900, 26148232).",
+      "evidence": "Multiple LR pairs share metric text without an explicit one-to-one mapping.",
+      "repair_instruction": "Leave unchanged or rewrite with one metric next to each pair."
+    },
+    {
+      "code": "factor_pathway_direction_ambiguous",
+      "severity": "warning",
+      "file": "part2_final.md",
+      "section": "## Analysis 2-7: NMF Factor Spatial Distribution",
+      "value": "Factor3: EGFR estimate=-2.8971509571226797",
+      "evidence": "Mixed or multi-pathway wording prevents a high-confidence direction verdict.",
+      "repair_instruction": "Leave unchanged and retain as an audit warning."
+    },
+    {
+      "code": "factor_pathway_direction_ambiguous",
+      "severity": "warning",
+      "file": "part2_final.md",
+      "section": "## Analysis 2-7: NMF Factor Spatial Distribution",
+      "value": "Factor3: Estrogen estimate=-5.479801410924036",
+      "evidence": "Mixed or multi-pathway wording prevents a high-confidence direction verdict.",
+      "repair_instruction": "Leave unchanged and retain as an audit warning."
+    },
+    {
+      "code": "factor_pathway_direction_ambiguous",
+      "severity": "warning",
+      "file": "part2_final.md",
+      "section": "## Analysis 2-7: NMF Factor Spatial Distribution",
+      "value": "Factor3: NFkB estimate=-2.589492475601927",
+      "evidence": "Mixed or multi-pathway wording prevents a high-confidence direction verdict.",
+      "repair_instruction": "Leave unchanged and retain as an audit warning."
+    },
+    {
+      "code": "factor_pathway_direction_ambiguous",
+      "severity": "warning",
+      "file": "part2_final.md",
+      "section": "## Analysis 2-8: Pathway-Factor Enrichment",
+      "value": "Factor3: EGFR estimate=-2.8971509571226797",
+      "evidence": "Mixed or multi-pathway wording prevents a high-confidence direction verdict.",
+      "repair_instruction": "Leave unchanged and retain as an audit warning."
+    },
+    {
+      "code": "factor_pathway_direction_ambiguous",
+      "severity": "warning",
+      "file": "part2_final.md",
+      "section": "## Analysis 2-8: Pathway-Factor Enrichment",
+      "value": "Factor3: Estrogen estimate=-5.479801410924036",
+      "evidence": "Mixed or multi-pathway wording prevents a high-confidence direction verdict.",
+      "repair_instruction": "Leave unchanged and retain as an audit warning."
+    },
+    {
+      "code": "factor_pathway_direction_ambiguous",
+      "severity": "warning",
+      "file": "part2_final.md",
+      "section": "## Analysis 2-8: Pathway-Factor Enrichment",
+      "value": "Factor3: NFkB estimate=-2.589492475601927",
+      "evidence": "Mixed or multi-pathway wording prevents a high-confidence direction verdict.",
+      "repair_instruction": "Leave unchanged and retain as an audit warning."
+    },
+    {
+      "code": "factor_pathway_direction_mismatch",
+      "severity": "error",
+      "file": "part2_final.md",
+      "section": "## Analysis 2-8: Pathway-Factor Enrichment",
+      "value": "Factor3: Estrogen estimate=-5.479801410924036",
+      "evidence": "sig_liana_pathway_factor.csv estimate direction conflicts with the local factor-pathway wording.",
+      "repair_instruction": "Align enrichment/depletion wording with the estimate sign for this factor-pathway pair.",
+      "target_text": "This aligns with literature showing that LRIG1, a key component of Factor3, is expressed at significantly higher levels in ERα-positive disease and functions as an estrogen-regulated growth suppressor (PMID: 21821674)."
+    },
+    {
+      "code": "factor_pathway_direction_ambiguous",
+      "severity": "warning",
+      "file": "part2_final.md",
+      "section": "## Analysis 2-8: Pathway-Factor Enrichment",
+      "value": "Factor3: EGFR estimate=-2.8971509571226797",
+      "evidence": "Mixed or multi-pathway wording prevents a high-confidence direction verdict.",
+      "repair_instruction": "Leave unchanged and retain as an audit warning."
+    },
+    {
+      "code": "factor_pathway_direction_ambiguous",
+      "severity": "warning",
+      "file": "part2_final.md",
+      "section": "## Analysis 2-8: Pathway-Factor Enrichment",
+      "value": "Factor3: Estrogen estimate=-5.479801410924036",
+      "evidence": "Mixed or multi-pathway wording prevents a high-confidence direction verdict.",
+      "repair_instruction": "Leave unchanged and retain as an audit warning."
+    },
+    {
+      "code": "factor_pathway_direction_ambiguous",
+      "severity": "warning",
+      "file": "part2_final.md",
+      "section": "## Analysis 2-8: Pathway-Factor Enrichment",
+      "value": "Factor3: NFkB estimate=-2.589492475601927",
+      "evidence": "Mixed or multi-pathway wording prevents a high-confidence direction verdict.",
+      "repair_instruction": "Leave unchanged and retain as an audit warning."
+    },
+    {
+      "code": "factor_pathway_direction_ambiguous",
+      "severity": "warning",
+      "file": "part2_final.md",
+      "section": "## Part 2 Summary",
+      "value": "Factor3: EGFR estimate=-2.8971509571226797",
+      "evidence": "Mixed or multi-pathway wording prevents a high-confidence direction verdict.",
+      "repair_instruction": "Leave unchanged and retain as an audit warning."
+    },
+    {
+      "code": "factor_pathway_direction_ambiguous",
+      "severity": "warning",
+      "file": "part2_final.md",
+      "section": "## Part 2 Summary",
+      "value": "Factor3: Estrogen estimate=-5.479801410924036",
+      "evidence": "Mixed or multi-pathway wording prevents a high-confidence direction verdict.",
+      "repair_instruction": "Leave unchanged and retain as an audit warning."
+    },
+    {
+      "code": "factor_pathway_direction_ambiguous",
+      "severity": "warning",
+      "file": "part2_final.md",
+      "section": "## Part 2 Summary",
+      "value": "Factor3: NFkB estimate=-2.589492475601927",
+      "evidence": "Mixed or multi-pathway wording prevents a high-confidence direction verdict.",
+      "repair_instruction": "Leave unchanged and retain as an audit warning."
+    },
+    {
+      "code": "factor_pathway_direction_ambiguous",
+      "severity": "warning",
+      "file": "part2_final.md",
+      "section": "## Part 2 Summary",
+      "value": "Factor3: Estrogen estimate=-5.479801410924036",
+      "evidence": "Mixed or multi-pathway wording prevents a high-confidence direction verdict.",
+      "repair_instruction": "Leave unchanged and retain as an audit warning."
+    },
+    {
+      "code": "mechanistic_interpretation_warning",
+      "severity": "warning",
+      "file": "part1_final.md",
+      "section": "## Analysis 1-4: Decoupler Pathway",
+      "value": "The co-activation of MAPK and PI3K pathways in Prolif Invasive Tumor clusters suggests synergistic signaling that may drive tumor progression and therapeutic resistance.",
+      "evidence": "Report-derived spatial/statistical evidence was written as a mechanistic or causal claim.",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence is cited for this exact report-derived claim."
+    },
+    {
+      "code": "mechanistic_interpretation_warning",
+      "severity": "warning",
+      "file": "part2_final.md",
+      "section": "## Analysis 2-7: NMF Factor Spatial Distribution",
+      "value": "The dominance of Factor3 in these clusters (scores 0.51-0.60) compared to other factors suggests that ErbB-mediated signaling and epithelial adhesion interactions are the primary communication mechanisms driving the proliferative invasive phenotype.",
+      "evidence": "Report-derived spatial/statistical evidence was written as a mechanistic or causal claim.",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence is cited for this exact report-derived claim."
+    },
+    {
+      "code": "mechanistic_interpretation_warning",
+      "severity": "warning",
+      "file": "part2_final.md",
+      "section": "## Analysis 2-7: NMF Factor Spatial Distribution",
+      "value": "The factor's enrichment in proliferative invasive clusters connects to the known role of ErbB receptors (particularly ERBB2 and ERBB3) in driving cell proliferation, survival, and invasion through MAPK and PI3K pathways.",
+      "evidence": "Report-derived spatial/statistical evidence was written as a mechanistic or causal claim.",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence is cited for this exact report-derived claim."
+    },
+    {
+      "code": "mechanistic_interpretation_warning",
+      "severity": "warning",
+      "file": "part2_final.md",
+      "section": "## Analysis 2-8: Pathway-Factor Enrichment",
+      "value": "The strong Hypoxia association with Factor2 (estimate = 7.34, p < 0.001) suggests that Factor2-enriched regions experience hypoxic stress, potentially driving angiogenic (VEGF) and invasive (TGFb) responses.",
+      "evidence": "Report-derived spatial/statistical evidence was written as a mechanistic or causal claim.",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence is cited for this exact report-derived claim."
+    }
+  ],
+  "phase": "deterministic",
+  "claim_validation": []
+}

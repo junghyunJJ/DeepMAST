@@ -1,0 +1,88 @@
+{
+  "body": {
+    "error": null,
+    "generation": "Evidence supporting EGF-ERBB2 signaling in the breast cancer tumor microenvironment includes the frequent overlap of ErbB2 and ErbB3 overexpression in human breast tumors, which function together as an \"oncogenic unit\" essential for tumor cell proliferation. Additionally, transgenic mice expressing activated ErbB2 in the mammary gland also overexpress ErbB3, further validating this signaling axis. The context also notes that overexpression of these receptors, often driven by gene amplification, correlates with poor prognosis and chemoresistance in breast cancer patients. Furthermore, the suppression of negative regulatory proteins like RALT/Mig-6 and Nrdp1 in ErbB2-amplified cells enhances tumor cell proliferation and motility, indicating a permissive environment for this signaling.",
+    "no_context_found": false,
+    "query_rewrites": [],
+    "relevant_documents": [
+      {
+        "id": "09f9fad7-db3c-413c-a766-9b1ea86ca6f9",
+        "metadata": {
+          "chunk_count": 20,
+          "chunk_index": 19,
+          "created_at": "2026-07-29T14:36:21.818467",
+          "file_id": "430cbcde-2d33-4c4f-a665-0dd50d08d23e",
+          "filename": "pmid_28174229.txt",
+          "mime_type": "text/plain",
+          "source": "pmid_28174229.txt"
+        },
+        "page_content": "In conclusion, we have characterized protein expression changes and phosphorylation events that occur in response to ErbB2 overexpression and ErbB growth factor triggering in a relevant cell model of early mammary luminal epithelial cell transformation. The work demonstrates the complexity of the responses to oncogene expression and growth factor signaling, and we have attempted to put some of the changes into the context of an altered cellular phenotype, in particular cell cycle progression and hyper-proliferation, reduced adhesion, and enhanced motility. Moreover, we have defined a novel mechanism by which ErbB signaling suppresses basal IFN signaling that may promote the survival and proliferation of HMLECs and that may have implications for breast cancer metastasis and treatment. Our findings may also help in understanding the consequences of dysregulated ErbB2 signaling in other cancer types where ErbB2 overexpression occurs in a significant proportion of cases.\n\n## Supplementary Material",
+        "score": 0.5028460003831288
+      },
+      {
+        "id": "d7de0ba6-3816-4a32-8c39-839fa42fddc1",
+        "metadata": {
+          "chunk_count": 10,
+          "chunk_index": 1,
+          "created_at": "2026-07-29T14:37:26.006286",
+          "file_id": "80603f2d-3dcf-4bbe-b8f7-941a5e8f433a",
+          "filename": "pmid_25414785.txt",
+          "mime_type": "text/plain",
+          "source": "pmid_25414785.txt"
+        },
+        "page_content": "Full Text:\n\n## Introduction\n\nHuman epidermal growth factor receptors B1 (ErbB1) and B2 (ErbB2) are members of the transmembrane receptor tyrosine kinase family(1). ErbB1 through binding by a ligand growth factor undergoes dimerization and generates intracellular signals resulting in cell proliferation, migration and differentiation. ErbB2 binds no ligand, but upon stimulation acts as a co-receptor for another ErbB family member(1). ErbB1 is a prime ErbB2 co-re-ceptor due to its activation in carcinomas(2). Overexpression of ErbB1 and ErbB2 proteins, predominantly through amplification of the genes, has been found in 7-20% and 20-30% of breast cancers, respectively(3\u20135). In majority of cases, overexpression of ErbB1 and ErbB2 is associated with chemoresistance and poor prognosis in patients with early breast cancer(6,7). ErbB1 and ErbB2 overexpression can prolong the intracellular signaling in breast and other types of tumors which promotes carcinogenesis. It has been shown that ErbB1 plays a similar but not necessarily interdependent role in ErbB2-related breast cancers(2). In addition, ErbB1 and ErbB2 amplification correlates inversely with Estrogen Receptor (ER) status(8,9)and they are often expressed in ER-negative tumors with poor prognosis. Expressions of these markers are of clinical significance. Therefore, these receptors are constantly and intensively pursued as therapeutic targets for breast cancer therapy(5,10,11).",
+        "score": 0.4946914741482271
+      },
+      {
+        "id": "ced6f539-5a34-4a18-a880-305ab7c61c8c",
+        "metadata": {
+          "chunk_count": 13,
+          "chunk_index": 1,
+          "created_at": "2026-07-29T14:36:21.820752",
+          "file_id": "a1b0f28f-eda4-4ae5-a6c5-1edb5cdd5a0f",
+          "filename": "pmid_18922900.txt",
+          "mime_type": "text/plain",
+          "source": "pmid_18922900.txt"
+        },
+        "page_content": "The ErbB family of receptor tyrosine kinases, which includes EGF receptor, ErbB2/Her2/Neu, ErbB3, and ErbB4, forms a complex signaling network driven by ligand stimulated receptor heterodimerization. ErbB2 is overexpressed in 20 \u2013 30% of human breast cancers and correlates with poor patient prognosis and therapeutic resistance (3). The ErbB2/ErbB3 heterodimer functions as an \u201concogenic unit\u201d and both receptors are essential for breast tumor cell proliferation (4). In support of this, ErbB2 and ErbB3 overexpression frequently overlap in human breast tumors (5). Moreover, tumors from transgenic mice that express activated ErbB2 in the mammary gland also overexpress ErbB3 (6).\n\nErbB receptors are subject to strenuous regulation and loss or suppression of negative regulatory proteins unleashes potent growth and survival signals. For example, under-expression of the pan-ErbB inhibitor RALT/Mig-6 in ErbB2 amplified breast cancer cells heightens tumor cell proliferation and favors Herceptin resistance (7). Similarly, loss of the ErbB3 negative regulator Nrdp1 in breast cancer enhances ErbB2/ErbB3 driven tumor cell proliferation and motility (8). Aberrant activation of Src promotes degradation of the ubiquitin ligase c-Cbl, enhancing EGF receptor stability and providing a mechanism by which Src and EGFR cooperate to drive tumorigenesis (9). These studies suggest that full oncogenic signaling by receptor tyrosine kinases requires the suppression of negative regulators and that loss of negative regulatory proteins may cooperate with receptor gene amplification to yield a permissive environment for receptor overexpression. Strategies that augment or restore expression of endogenous negative regulatory molecules may prove effective in the clinic.",
+        "score": 0.4908261906319228
+      }
+    ],
+    "retrieved_document_ids": [
+      "09f9fad7-db3c-413c-a766-9b1ea86ca6f9",
+      "147a4213-2d2a-49a4-8851-046302da5b9e",
+      "d7de0ba6-3816-4a32-8c39-839fa42fddc1",
+      "4d3b4bdb-4e8f-4962-8bae-e2f5f5adeffc",
+      "ced6f539-5a34-4a18-a880-305ab7c61c8c"
+    ],
+    "rewrite_count": 0,
+    "selected_wiki_pages": [],
+    "steps": [
+      "retrieve: found 5 documents",
+      "grade_documents: 3/5 relevant",
+      "generate: answer produced",
+      "grade_generation: PASSED both checks"
+    ],
+    "wiki_context_status": "disabled",
+    "wiki_promoted_document_ids": [],
+    "wiki_promotion_status": "disabled",
+    "wiki_source_refs": []
+  },
+  "completed_at": "2026-08-09T09:04:34.309227+00:00",
+  "curl_returncode": 0,
+  "headers": "HTTP/1.1 200 OK\ndate: Sun, 09 Aug 2026 09:04:19 GMT\nserver: uvicorn\ncontent-length: 6596\ncontent-type: application/json\n\n",
+  "http_status": 200,
+  "raw_body": "{\"generation\":\"Evidence supporting EGF-ERBB2 signaling in the breast cancer tumor microenvironment includes the frequent overlap of ErbB2 and ErbB3 overexpression in human breast tumors, which function together as an \\\"oncogenic unit\\\" essential for tumor cell proliferation. Additionally, transgenic mice expressing activated ErbB2 in the mammary gland also overexpress ErbB3, further validating this signaling axis. The context also notes that overexpression of these receptors, often driven by gene amplification, correlates with poor prognosis and chemoresistance in breast cancer patients. Furthermore, the suppression of negative regulatory proteins like RALT/Mig-6 and Nrdp1 in ErbB2-amplified cells enhances tumor cell proliferation and motility, indicating a permissive environment for this signaling.\",\"relevant_documents\":[{\"id\":\"09f9fad7-db3c-413c-a766-9b1ea86ca6f9\",\"page_content\":\"In conclusion, we have characterized protein expression changes and phosphorylation events that occur in response to ErbB2 overexpression and ErbB growth factor triggering in a relevant cell model of early mammary luminal epithelial cell transformation. The work demonstrates the complexity of the responses to oncogene expression and growth factor signaling, and we have attempted to put some of the changes into the context of an altered cellular phenotype, in particular cell cycle progression and hyper-proliferation, reduced adhesion, and enhanced motility. Moreover, we have defined a novel mechanism by which ErbB signaling suppresses basal IFN signaling that may promote the survival and proliferation of HMLECs and that may have implications for breast cancer metastasis and treatment. Our findings may also help in understanding the consequences of dysregulated ErbB2 signaling in other cancer types where ErbB2 overexpression occurs in a significant proportion of cases.\\n\\n## Supplementary Material\",\"metadata\":{\"source\":\"pmid_28174229.txt\",\"file_id\":\"430cbcde-2d33-4c4f-a665-0dd50d08d23e\",\"filename\":\"pmid_28174229.txt\",\"mime_type\":\"text/plain\",\"created_at\":\"2026-07-29T14:36:21.818467\",\"chunk_count\":20,\"chunk_index\":19},\"score\":0.5028460003831288},{\"id\":\"d7de0ba6-3816-4a32-8c39-839fa42fddc1\",\"page_content\":\"Full Text:\\n\\n## Introduction\\n\\nHuman epidermal growth factor receptors B1 (ErbB1) and B2 (ErbB2) are members of the transmembrane receptor tyrosine kinase family(1). ErbB1 through binding by a ligand growth factor undergoes dimerization and generates intracellular signals resulting in cell proliferation, migration and differentiation. ErbB2 binds no ligand, but upon stimulation acts as a co-receptor for another ErbB family member(1). ErbB1 is a prime ErbB2 co-re-ceptor due to its activation in carcinomas(2). Overexpression of ErbB1 and ErbB2 proteins, predominantly through amplification of the genes, has been found in 7-20% and 20-30% of breast cancers, respectively(3\u20135). In majority of cases, overexpression of ErbB1 and ErbB2 is associated with chemoresistance and poor prognosis in patients with early breast cancer(6,7). ErbB1 and ErbB2 overexpression can prolong the intracellular signaling in breast and other types of tumors which promotes carcinogenesis. It has been shown that ErbB1 plays a similar but not necessarily interdependent role in ErbB2-related breast cancers(2). In addition, ErbB1 and ErbB2 amplification correlates inversely with Estrogen Receptor (ER) status(8,9)and they are often expressed in ER-negative tumors with poor prognosis. Expressions of these markers are of clinical significance. Therefore, these receptors are constantly and intensively pursued as therapeutic targets for breast cancer therapy(5,10,11).\",\"metadata\":{\"source\":\"pmid_25414785.txt\",\"file_id\":\"80603f2d-3dcf-4bbe-b8f7-941a5e8f433a\",\"filename\":\"pmid_25414785.txt\",\"mime_type\":\"text/plain\",\"created_at\":\"2026-07-29T14:37:26.006286\",\"chunk_count\":10,\"chunk_index\":1},\"score\":0.4946914741482271},{\"id\":\"ced6f539-5a34-4a18-a880-305ab7c61c8c\",\"page_content\":\"The ErbB family of receptor tyrosine kinases, which includes EGF receptor, ErbB2/Her2/Neu, ErbB3, and ErbB4, forms a complex signaling network driven by ligand stimulated receptor heterodimerization. ErbB2 is overexpressed in 20 \u2013 30% of human breast cancers and correlates with poor patient prognosis and therapeutic resistance (3). The ErbB2/ErbB3 heterodimer functions as an \u201concogenic unit\u201d and both receptors are essential for breast tumor cell proliferation (4). In support of this, ErbB2 and ErbB3 overexpression frequently overlap in human breast tumors (5). Moreover, tumors from transgenic mice that express activated ErbB2 in the mammary gland also overexpress ErbB3 (6).\\n\\nErbB receptors are subject to strenuous regulation and loss or suppression of negative regulatory proteins unleashes potent growth and survival signals. For example, under-expression of the pan-ErbB inhibitor RALT/Mig-6 in ErbB2 amplified breast cancer cells heightens tumor cell proliferation and favors Herceptin resistance (7). Similarly, loss of the ErbB3 negative regulator Nrdp1 in breast cancer enhances ErbB2/ErbB3 driven tumor cell proliferation and motility (8). Aberrant activation of Src promotes degradation of the ubiquitin ligase c-Cbl, enhancing EGF receptor stability and providing a mechanism by which Src and EGFR cooperate to drive tumorigenesis (9). These studies suggest that full oncogenic signaling by receptor tyrosine kinases requires the suppression of negative regulators and that loss of negative regulatory proteins may cooperate with receptor gene amplification to yield a permissive environment for receptor overexpression. Strategies that augment or restore expression of endogenous negative regulatory molecules may prove effective in the clinic.\",\"metadata\":{\"source\":\"pmid_18922900.txt\",\"file_id\":\"a1b0f28f-eda4-4ae5-a6c5-1edb5cdd5a0f\",\"filename\":\"pmid_18922900.txt\",\"mime_type\":\"text/plain\",\"created_at\":\"2026-07-29T14:36:21.820752\",\"chunk_count\":13,\"chunk_index\":1},\"score\":0.4908261906319228}],\"steps\":[\"retrieve: found 5 documents\",\"grade_documents: 3/5 relevant\",\"generate: answer produced\",\"grade_generation: PASSED both checks\"],\"query_rewrites\":[],\"rewrite_count\":0,\"error\":null,\"no_context_found\":false,\"selected_wiki_pages\":[],\"wiki_context_status\":\"disabled\",\"wiki_source_refs\":[],\"wiki_promotion_status\":\"disabled\",\"wiki_promoted_document_ids\":[],\"retrieved_document_ids\":[\"09f9fad7-db3c-413c-a766-9b1ea86ca6f9\",\"147a4213-2d2a-49a4-8851-046302da5b9e\",\"d7de0ba6-3816-4a32-8c39-839fa42fddc1\",\"4d3b4bdb-4e8f-4962-8bae-e2f5f5adeffc\",\"ced6f539-5a34-4a18-a880-305ab7c61c8c\"]}",
+  "request": {
+    "llm_model": "qwen3.5:122b",
+    "llm_provider": "ollama",
+    "max_rewrites": 3,
+    "question": "What evidence supports EGF-ERBB2 signaling in the breast cancer tumor microenvironment?",
+    "search_limit": 5,
+    "search_type": "hybrid",
+    "use_wiki_context": false
+  },
+  "started_at": "2026-08-09T09:04:19.302700+00:00",
+  "stderr": "",
+  "url": "http://localhost:8888/collections/a208e916-bd32-405a-9eee-de4cd82b2a3b/agentic-search"
+}

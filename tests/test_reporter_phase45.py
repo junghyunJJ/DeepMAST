@@ -102,7 +102,7 @@ def test_reporter_prompt_5step_workflow():
         "Step 2: Retrieve Theme Support",
         "Step 3: Validate Cited Claims",
         "Step 4: Update synthesis.md",
-        "Step 5: Hand off validation metadata to report tool",
+        "Step 5: Hand off validation metadata to deterministic code",
     ]
 
     for step in steps:

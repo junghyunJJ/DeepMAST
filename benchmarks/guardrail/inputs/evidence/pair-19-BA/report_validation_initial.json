@@ -1,0 +1,180 @@
+{
+  "issue_count": 18,
+  "issues": [
+    {
+      "code": "pmid_not_in_papers",
+      "severity": "error",
+      "file": "part3_final.md",
+      "section": "",
+      "value": "28967543",
+      "evidence": "28967543 is cited in part3_final.md but absent from papers.json.",
+      "repair_instruction": "Remove the unsupported PMID or replace it with a PMID present in papers.json."
+    },
+    {
+      "code": "pmid_not_in_papers",
+      "severity": "error",
+      "file": "part3_final.md",
+      "section": "",
+      "value": "29876543",
+      "evidence": "29876543 is cited in part3_final.md but absent from papers.json.",
+      "repair_instruction": "Remove the unsupported PMID or replace it with a PMID present in papers.json."
+    },
+    {
+      "code": "pmid_not_in_papers",
+      "severity": "error",
+      "file": "part3_final.md",
+      "section": "",
+      "value": "31234567",
+      "evidence": "31234567 is cited in part3_final.md but absent from papers.json.",
+      "repair_instruction": "Remove the unsupported PMID or replace it with a PMID present in papers.json."
+    },
+    {
+      "code": "pmid_not_in_papers",
+      "severity": "error",
+      "file": "part3_final.md",
+      "section": "",
+      "value": "35123456",
+      "evidence": "35123456 is cited in part3_final.md but absent from papers.json.",
+      "repair_instruction": "Remove the unsupported PMID or replace it with a PMID present in papers.json."
+    },
+    {
+      "code": "factor_pathway_direction_mismatch",
+      "severity": "error",
+      "file": "part2_final.md",
+      "section": "## Analysis 2-6: LIANA Moran's R - Spatially Co-localized Ligand-Receptor Pairs",
+      "value": "Factor3: EGFR estimate=-2.8971509571226797",
+      "evidence": "sig_liana_pathway_factor.csv estimate direction conflicts with the local factor-pathway wording.",
+      "repair_instruction": "Align enrichment/depletion wording with the estimate sign for this factor-pathway pair.",
+      "target_text": "- **Connection to Analysis 2-8**: The EGFR pathway enrichment in Factor3 (estimate = -2.897, p = 0.0038) aligns with the prominence of ERBB2 and ERBB3 interactions in the LIANA analysis, confirming the pathway-level significance of these L-R pairs."
+    },
+    {
+      "code": "factor_pathway_direction_mismatch",
+      "severity": "error",
+      "file": "part2_final.md",
+      "section": "## Analysis 2-7: NMF Factor Spatial Distribution",
+      "value": "Factor3: EGFR estimate=-2.8971509571226797",
+      "evidence": "sig_liana_pathway_factor.csv estimate direction conflicts with the local factor-pathway wording.",
+      "repair_instruction": "Align enrichment/depletion wording with the estimate sign for this factor-pathway pair.",
+      "target_text": "**Paragraph 2: Factor-Specific Pathway Enrichment**\nThe pathway enrichment analysis (Analysis 2-8) reveals that Factor3 is significantly associated with EGFR signaling (estimate = -2.897, p = 0.0038) and NFκB signaling (estimate = -2.589, p = 0.0097)."
+    },
+    {
+      "code": "factor_pathway_direction_mismatch",
+      "severity": "error",
+      "file": "part2_final.md",
+      "section": "## Analysis 2-7: NMF Factor Spatial Distribution",
+      "value": "Factor3: EGFR estimate=-2.8971509571226797",
+      "evidence": "sig_liana_pathway_factor.csv estimate direction conflicts with the local factor-pathway wording.",
+      "repair_instruction": "Align enrichment/depletion wording with the estimate sign for this factor-pathway pair.",
+      "target_text": "- **Connection to Analysis 2-8**: Factor3's pathway enrichment (EGFR, NFκB) provides mechanistic context for the L-R interactions observed in Analysis 2-6."
+    },
+    {
+      "code": "unsupported_pathway_factor_significance",
+      "severity": "error",
+      "file": "part2_final.md",
+      "section": "## Analysis 2-8: Pathway-Factor Enrichment",
+      "value": "Factor1: Estrogen",
+      "evidence": "sig_liana_pathway_factor.csv lacks the claimed factor-pathway support.",
+      "repair_instruction": "Rephrase as an LR-annotation-based hypothesis, not measured pathway-factor significance.",
+      "target_text": "**Paragraph 3: VEGF and Estrogen Pathway Context**\nThe enrichment of VEGF in Factor1 (estimate = 2.627, p = 0.0087) and Estrogen in Factor3 (estimate = -5.480, p = 4.98e-08) provides additional context for the pathway-factor relationships."
+    },
+    {
+      "code": "factor_pathway_direction_mismatch",
+      "severity": "error",
+      "file": "part2_final.md",
+      "section": "## Analysis 2-8: Pathway-Factor Enrichment",
+      "value": "Factor3: EGFR estimate=-2.8971509571226797",
+      "evidence": "sig_liana_pathway_factor.csv estimate direction conflicts with the local factor-pathway wording.",
+      "repair_instruction": "Align enrichment/depletion wording with the estimate sign for this factor-pathway pair.",
+      "target_text": "- **Connection to Analysis 2-6**: The EGFR pathway enrichment in Factor3 aligns with the prominence of ERBB2 and ERBB3 interactions in the LIANA analysis."
+    },
+    {
+      "code": "factor_pathway_direction_ambiguous",
+      "severity": "warning",
+      "file": "part2_final.md",
+      "section": "## Part 2 Summary",
+      "value": "Factor3: EGFR estimate=-2.8971509571226797",
+      "evidence": "Mixed or multi-pathway wording prevents a high-confidence direction verdict.",
+      "repair_instruction": "Leave unchanged and retain as an audit warning."
+    },
+    {
+      "code": "mechanistic_interpretation_warning",
+      "severity": "warning",
+      "file": "part1_final.md",
+      "section": "## Analysis 1-4: Decoupler Pathway",
+      "value": "The MAPK pathway, with mean changes exceeding 4.5 in these clusters, drives cell cycle progression and survival signaling.",
+      "evidence": "Report-derived spatial/statistical evidence was written as a mechanistic or causal claim.",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence is cited for this exact report-derived claim."
+    },
+    {
+      "code": "mechanistic_interpretation_warning",
+      "severity": "warning",
+      "file": "part2_final.md",
+      "section": "## Analysis 2-7: NMF Factor Spatial Distribution",
+      "value": "The co-occurrence of EGFR and NFκB pathway signatures in Factor3 suggests a coordinated regulatory network that may drive tumor progression and therapeutic resistance.",
+      "evidence": "Report-derived spatial/statistical evidence was written as a mechanistic or causal claim.",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence is cited for this exact report-derived claim."
+    },
+    {
+      "code": "part3_therapeutic_spillover",
+      "severity": "error",
+      "file": "part3_final.md",
+      "section": "## 3-9 NMF Quadrant + GenePT",
+      "value": "- PMID: 28967543 - ERBB3 (HER3) signaling in breast cancer progression and therapeutic resistance",
+      "evidence": "Part3 should interpret selected L-R spatial evidence only; Part4 owns therapeutic synthesis.",
+      "repair_instruction": "Remove therapeutic prioritization language and keep the section to spatial/statistical LR evidence.",
+      "target_text": "- PMID: 28967543 - ERBB3 (HER3) signaling in breast cancer progression and therapeutic resistance"
+    },
+    {
+      "code": "part3_therapeutic_spillover",
+      "severity": "error",
+      "file": "part3_final.md",
+      "section": "## Selected Gene L-R Spatial Evidence (3-10 & 3-11 Integrated)",
+      "value": "In breast cancer, ERBB3 signaling is critical for tumor cell survival, proliferation, and therapeutic resistance.",
+      "evidence": "Part3 should interpret selected L-R spatial evidence only; Part4 owns therapeutic synthesis.",
+      "repair_instruction": "Remove therapeutic prioritization language and keep the section to spatial/statistical LR evidence.",
+      "target_text": "In breast cancer, ERBB3 signaling is critical for tumor cell survival, proliferation, and therapeutic resistance."
+    },
+    {
+      "code": "part3_therapeutic_spillover",
+      "severity": "error",
+      "file": "part3_final.md",
+      "section": "## Selected Gene L-R Spatial Evidence (3-10 & 3-11 Integrated)",
+      "value": "This finding suggests that therapeutic strategies targeting ERBB3 may need to consider the spatial context of epithelial-tumor cell interactions.",
+      "evidence": "Part3 should interpret selected L-R spatial evidence only; Part4 owns therapeutic synthesis.",
+      "repair_instruction": "Remove therapeutic prioritization language and keep the section to spatial/statistical LR evidence.",
+      "target_text": "This finding suggests that therapeutic strategies targeting ERBB3 may need to consider the spatial context of epithelial-tumor cell interactions."
+    },
+    {
+      "code": "part3_therapeutic_spillover",
+      "severity": "error",
+      "file": "part3_final.md",
+      "section": "## Selected Gene L-R Spatial Evidence (3-10 & 3-11 Integrated)",
+      "value": "The moderate-to-strong spatial autocorrelation suggests that LRIG1 may create spatially restricted zones of ERBB2 signaling attenuation, potentially influencing tumor heterogeneity and therapeutic response.",
+      "evidence": "Part3 should interpret selected L-R spatial evidence only; Part4 owns therapeutic synthesis.",
+      "repair_instruction": "Remove therapeutic prioritization language and keep the section to spatial/statistical LR evidence.",
+      "target_text": "The moderate-to-strong spatial autocorrelation suggests that LRIG1 may create spatially restricted zones of ERBB2 signaling attenuation, potentially influencing tumor heterogeneity and therapeutic response."
+    },
+    {
+      "code": "part3_therapeutic_spillover",
+      "severity": "error",
+      "file": "part3_final.md",
+      "section": "## Selected Gene L-R Spatial Evidence (3-10 & 3-11 Integrated)",
+      "value": "In cancer, NECTIN4 is frequently overexpressed and has emerged as a therapeutic target, particularly in breast cancer and urothelial carcinoma.",
+      "evidence": "Part3 should interpret selected L-R spatial evidence only; Part4 owns therapeutic synthesis.",
+      "repair_instruction": "Remove therapeutic prioritization language and keep the section to spatial/statistical LR evidence.",
+      "target_text": "In cancer, NECTIN4 is frequently overexpressed and has emerged as a therapeutic target, particularly in breast cancer and urothelial carcinoma."
+    },
+    {
+      "code": "part3_therapeutic_spillover",
+      "severity": "error",
+      "file": "part3_final.md",
+      "section": "## Selected Gene L-R Spatial Evidence (3-10 & 3-11 Integrated)",
+      "value": "- NECTIN4 is a validated therapeutic target with antibody-drug conjugates showing clinical efficacy",
+      "evidence": "Part3 should interpret selected L-R spatial evidence only; Part4 owns therapeutic synthesis.",
+      "repair_instruction": "Remove therapeutic prioritization language and keep the section to spatial/statistical LR evidence.",
+      "target_text": "- NECTIN4 is a validated therapeutic target with antibody-drug conjugates showing clinical efficacy"
+    }
+  ],
+  "phase": "deterministic",
+  "claim_validation": []
+}

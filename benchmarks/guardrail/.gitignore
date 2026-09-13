@@ -1,0 +1,6 @@
+/live_runs/
+/work/
+!/results/
+!/results/**
+__pycache__/
+.DS_Store

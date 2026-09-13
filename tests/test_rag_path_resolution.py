@@ -4,6 +4,7 @@ import json
 import os
 import tempfile
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -519,6 +520,7 @@ class TestRagSniIntegration:
     async def test_search_fulltext_rag_prefers_agentic_search_with_wiki_context(
         self, monkeypatch
     ):
+        monkeypatch.delenv("DEEP_INTERPRETER_USE_WIKI_CONTEXT", raising=False)
         literature_rag.reset_rag_state()
         literature_rag._RAG_STATE["collection_ids"]["all"] = "collection-id"
 
@@ -577,6 +579,460 @@ class TestRagSniIntegration:
         assert result[0]["metadata"]["filename"] == "pmid_12345678.txt"
         assert result[0]["metadata"]["rag_backend"] == "agentic_search"
         assert result[0]["metadata"]["wiki_context_status"] == "selected"
+
+    @pytest.mark.asyncio
+    async def test_search_fulltext_rag_can_disable_wiki_context_per_run(
+        self, tmp_path, monkeypatch
+    ):
+        literature_rag.reset_rag_state()
+        literature_rag._RAG_STATE["collection_ids"]["all"] = "collection-id"
+        monkeypatch.setenv("DEEP_INTERPRETER_USE_WIKI_CONTEXT", "false")
+        monkeypatch.setenv(
+            "DEEP_INTERPRETER_RAG_AUDIT_PATH", str(tmp_path / "rag-audit.jsonl")
+        )
+
+        class FakeTool:
+            name = "agentic_search"
+
+            def __init__(self):
+                self.calls = []
+
+            async def ainvoke(self, args):
+                self.calls.append(args)
+                return {
+                    "sources": [
+                        {
+                            "content": "ICAM1 supports inflammatory fibroblast signaling.",
+                            "metadata": {"filename": "pmid_12345678.txt"},
+                            "score": 0.91,
+                        }
+                    ],
+                    "wiki_context_status": "disabled",
+                }
+
+        agentic = FakeTool()
+
+        async def fake_tools():
+            return [agentic]
+
+        monkeypatch.setattr(literature_rag, "_get_cci_rag_tools", fake_tools)
+
+        result = await literature_rag.search_fulltext_rag(
+            "ICAM1 fibrosis",
+            "all",
+            limit=5,
+        )
+
+        assert agentic.calls == [
+            {
+                "collection_id": "collection-id",
+                "question": "ICAM1 fibrosis",
+                "search_type": "hybrid",
+                "search_limit": 5,
+                "max_rewrites": 3,
+                "use_wiki_context": False,
+            }
+        ]
+        assert result[0]["page_content"] == (
+            "ICAM1 supports inflammatory fibroblast signaling."
+        )
+        audit = json.loads((tmp_path / "rag-audit.jsonl").read_text())
+        expected_audit = {
+            "endpoint": "agentic_search",
+            "collection_uuid": "collection-id",
+            "query_sha256": "4e542d55a3e8433eeb8c1f03861d4f40346f7c1ce88ecbc5fcffefc84a56bc8f",
+            "use_wiki_context": False,
+            "success": True,
+            "result_count": 1,
+            "error_type": None,
+        }
+        assert {key: audit[key] for key in expected_audit} == expected_audit
+        assert "ICAM1 fibrosis" not in (tmp_path / "rag-audit.jsonl").read_text()
+
+    @pytest.mark.asyncio
+    async def test_agentic_search_audit_records_observational_payload_fields(
+        self, tmp_path, monkeypatch
+    ):
+        monkeypatch.setenv("DEEP_INTERPRETER_USE_WIKI_CONTEXT", "true")
+        monkeypatch.setenv(
+            "DEEP_INTERPRETER_RAG_AUDIT_PATH", str(tmp_path / "rag-audit.jsonl")
+        )
+        ticks = iter([100.0, 101.25])
+        monkeypatch.setattr(
+            literature_rag,
+            "time",
+            SimpleNamespace(monotonic=lambda: next(ticks)),
+            raising=False,
+        )
+
+        class FakeTool:
+            name = "agentic_search"
+
+            async def ainvoke(self, args):
+                return {
+                    "sources": [
+                        {
+                            "content": "ICAM1 supports fibroblast activation.",
+                            "metadata": {"filename": "pmid_12345678.txt"},
+                            "score": 0.91,
+                        },
+                        {
+                            "content": "VCAM1 overlaps the inflammatory program.",
+                            "metadata": {"source": "/papers/pmid_87654321.txt"},
+                            "score": 0.82,
+                        },
+                        {
+                            "content": "Duplicate ICAM1 chunk.",
+                            "metadata": {"filename": "pmid_12345678.txt"},
+                            "score": 0.7,
+                        },
+                    ],
+                    "retrieved_document_ids": ["a", "b", "c", "d"],
+                    "relevant_documents": [{"id": "a"}, {"id": "b"}],
+                    "selected_wiki_pages": [{"title": "ICAM1"}, {"title": "VCAM1"}],
+                    "rewrite_count": 2,
+                    "wiki_context_status": "selected",
+                }
+
+        async def fake_tools():
+            return [FakeTool()]
+
+        monkeypatch.setattr(literature_rag, "_get_cci_rag_tools", fake_tools)
+
+        result = await literature_rag._agentic_search_with_sni(
+            "ICAM1 fibrosis",
+            "collection-id",
+            limit=5,
+            search_type="hybrid",
+        )
+
+        assert len(result) == 3
+        audit = json.loads((tmp_path / "rag-audit.jsonl").read_text())
+        expected_audit = {
+            "endpoint": "agentic_search",
+            "collection_uuid": "collection-id",
+            "query_sha256": "4e542d55a3e8433eeb8c1f03861d4f40346f7c1ce88ecbc5fcffefc84a56bc8f",
+            "use_wiki_context": True,
+            "success": True,
+            "result_count": 3,
+            "error_type": None,
+            "elapsed_seconds": 1.25,
+            "rewrite_count": 2,
+            "retrieved_document_count": 4,
+            "relevant_document_count": 2,
+            "selected_wiki_page_count": 2,
+            "result_pmids": ["12345678", "87654321"],
+        }
+        assert audit == expected_audit
+
+    @pytest.mark.asyncio
+    async def test_search_fulltext_rag_audits_no_relevant_context_payload(
+        self, tmp_path, monkeypatch
+    ):
+        literature_rag.reset_rag_state()
+        literature_rag._RAG_STATE["collection_ids"]["all"] = "collection-id"
+        monkeypatch.setenv("DEEP_INTERPRETER_USE_WIKI_CONTEXT", "false")
+        monkeypatch.setenv(
+            "DEEP_INTERPRETER_RAG_AUDIT_PATH", str(tmp_path / "rag-audit.jsonl")
+        )
+
+        class FakeTool:
+            name = "agentic_search"
+
+            async def ainvoke(self, args):
+                return {"error": "no_relevant_context"}
+
+        async def fake_tools():
+            return [FakeTool()]
+
+        monkeypatch.setattr(literature_rag, "_get_cci_rag_tools", fake_tools)
+
+        result = await literature_rag.search_fulltext_rag(
+            "ICAM1 fibrosis",
+            "all",
+            limit=5,
+        )
+
+        assert result == []
+        audit = json.loads((tmp_path / "rag-audit.jsonl").read_text())
+        expected_audit = {
+            "endpoint": "agentic_search",
+            "collection_uuid": "collection-id",
+            "query_sha256": "4e542d55a3e8433eeb8c1f03861d4f40346f7c1ce88ecbc5fcffefc84a56bc8f",
+            "use_wiki_context": False,
+            "success": False,
+            "result_count": 0,
+            "error_type": "NoRelevantContext",
+        }
+        assert {key: audit[key] for key in expected_audit} == expected_audit
+        assert "ICAM1 fibrosis" not in (tmp_path / "rag-audit.jsonl").read_text()
+
+    @pytest.mark.asyncio
+    async def test_agentic_search_audits_empty_sources_as_no_relevant_context(
+        self, tmp_path, monkeypatch
+    ):
+        monkeypatch.setenv("DEEP_INTERPRETER_USE_WIKI_CONTEXT", "false")
+        monkeypatch.setenv(
+            "DEEP_INTERPRETER_RAG_AUDIT_PATH", str(tmp_path / "rag-audit.jsonl")
+        )
+
+        class FakeTool:
+            name = "agentic_search"
+
+            async def ainvoke(self, args):
+                return {"sources": [], "wiki_context_status": "disabled"}
+
+        async def fake_tools():
+            return [FakeTool()]
+
+        monkeypatch.setattr(literature_rag, "_get_cci_rag_tools", fake_tools)
+
+        result = await literature_rag._agentic_search_with_sni(
+            "ICAM1 fibrosis",
+            "collection-id",
+            limit=5,
+            search_type="hybrid",
+        )
+
+        assert result == []
+        audit = json.loads((tmp_path / "rag-audit.jsonl").read_text())
+        expected_audit = {
+            "endpoint": "agentic_search",
+            "collection_uuid": "collection-id",
+            "query_sha256": "4e542d55a3e8433eeb8c1f03861d4f40346f7c1ce88ecbc5fcffefc84a56bc8f",
+            "use_wiki_context": False,
+            "success": False,
+            "result_count": 0,
+            "error_type": "NoRelevantContext",
+        }
+        assert {key: audit[key] for key in expected_audit} == expected_audit
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("payload", [{"answer": "none"}, {"sources": "none"}])
+    async def test_agentic_search_audits_invalid_sources_shape_as_payload_error(
+        self, payload, tmp_path, monkeypatch
+    ):
+        monkeypatch.setenv("DEEP_INTERPRETER_USE_WIKI_CONTEXT", "false")
+        monkeypatch.setenv(
+            "DEEP_INTERPRETER_RAG_AUDIT_PATH", str(tmp_path / "rag-audit.jsonl")
+        )
+
+        class FakeTool:
+            name = "agentic_search"
+
+            async def ainvoke(self, args):
+                return payload
+
+        async def fake_tools():
+            return [FakeTool()]
+
+        monkeypatch.setattr(literature_rag, "_get_cci_rag_tools", fake_tools)
+
+        result = await literature_rag._agentic_search_with_sni(
+            "ICAM1 fibrosis",
+            "collection-id",
+            limit=5,
+            search_type="hybrid",
+        )
+
+        assert result == []
+        audit = json.loads((tmp_path / "rag-audit.jsonl").read_text())
+        assert audit["success"] is False
+        assert audit["result_count"] == 0
+        assert audit["error_type"] == "InvalidSources"
+        assert audit["error_type"] != "NoRelevantContext"
+
+    @pytest.mark.asyncio
+    async def test_search_fulltext_rag_fixed_collection_override_bypasses_name_resolution(
+        self, tmp_path, monkeypatch
+    ):
+        literature_rag.reset_rag_state()
+        literature_rag._RAG_STATE["collection_ids"][
+            "model supplied mismatched collection key"
+        ] = "wrong-cache-id"
+        monkeypatch.setenv("DEEP_INTERPRETER_FIXED_COLLECTION_ID", "fixed-collection-id")
+        monkeypatch.setenv(
+            "DEEP_INTERPRETER_RAG_AUDIT_PATH", str(tmp_path / "rag-audit.jsonl")
+        )
+
+        class FakeTool:
+            name = "agentic_search"
+
+            def __init__(self):
+                self.calls = []
+
+            async def ainvoke(self, args):
+                self.calls.append(args)
+                return {
+                    "sources": [
+                        {
+                            "content": "fixed collection chunk",
+                            "metadata": {"filename": "pmid_12345678.txt"},
+                            "score": 0.91,
+                        }
+                    ],
+                    "wiki_context_status": "selected",
+                }
+
+        agentic = FakeTool()
+
+        async def fake_tools():
+            return [agentic]
+
+        async def lookup_must_not_run(collection_name):
+            raise AssertionError(f"DB lookup should not run for {collection_name}")
+
+        monkeypatch.setattr(literature_rag, "_get_cci_rag_tools", fake_tools)
+        monkeypatch.setattr(literature_rag, "_lookup_collection_from_db", lookup_must_not_run)
+
+        result = await literature_rag.search_fulltext_rag(
+            "ICAM1 fibrosis",
+            "model supplied mismatched collection key",
+            limit=5,
+        )
+
+        assert agentic.calls[0]["collection_id"] == "fixed-collection-id"
+        assert result[0]["page_content"] == "fixed collection chunk"
+
+        literature_rag._RAG_STATE["collection_ids"].clear()
+        result = await literature_rag.search_fulltext_rag(
+            "ICAM1 fibrosis",
+            "uncached model supplied key",
+            limit=5,
+        )
+
+        assert agentic.calls[1]["collection_id"] == "fixed-collection-id"
+        assert result[0]["page_content"] == "fixed collection chunk"
+        audit_records = [
+            json.loads(line)
+            for line in (tmp_path / "rag-audit.jsonl").read_text().splitlines()
+        ]
+        assert [record["collection_uuid"] for record in audit_records] == [
+            "fixed-collection-id",
+            "fixed-collection-id",
+        ]
+
+    @pytest.mark.asyncio
+    async def test_search_fulltext_rag_required_agentic_returns_empty_before_fallback(
+        self, monkeypatch
+    ):
+        literature_rag.reset_rag_state()
+        literature_rag._RAG_STATE["collection_ids"]["all"] = "collection-id"
+        monkeypatch.setenv("DEEP_INTERPRETER_REQUIRE_AGENTIC_RAG", "true")
+
+        class EmptyAgenticTool:
+            name = "agentic_search"
+
+            async def ainvoke(self, args):
+                return {"sources": []}
+
+        async def fake_tools():
+            return [EmptyAgenticTool()]
+
+        async def fallback_must_not_run(query, num_queries=5):
+            raise AssertionError("multi-query fallback should not run")
+
+        monkeypatch.setattr(literature_rag, "_get_cci_rag_tools", fake_tools)
+        monkeypatch.setattr(literature_rag, "generate_multi_query", fallback_must_not_run)
+
+        result = await literature_rag.search_fulltext_rag(
+            "ICAM1 fibrosis", "all", limit=5
+        )
+
+        assert result == []
+
+    @pytest.mark.asyncio
+    async def test_search_fulltext_rag_required_agentic_raises_on_invalid_sources(
+        self, monkeypatch
+    ):
+        literature_rag.reset_rag_state()
+        literature_rag._RAG_STATE["collection_ids"]["all"] = "collection-id"
+        monkeypatch.setenv("DEEP_INTERPRETER_REQUIRE_AGENTIC_RAG", "true")
+
+        class InvalidAgenticTool:
+            name = "agentic_search"
+
+            async def ainvoke(self, args):
+                return {"sources": "none"}
+
+        async def fake_tools():
+            return [InvalidAgenticTool()]
+
+        async def fallback_must_not_run(query, num_queries=5):
+            raise AssertionError("multi-query fallback should not run")
+
+        monkeypatch.setattr(literature_rag, "_get_cci_rag_tools", fake_tools)
+        monkeypatch.setattr(literature_rag, "generate_multi_query", fallback_must_not_run)
+
+        with pytest.raises(literature_rag.RAGSearchError):
+            await literature_rag.search_fulltext_rag("ICAM1 fibrosis", "all", limit=5)
+
+    @pytest.mark.asyncio
+    async def test_search_fulltext_rag_required_agentic_raises_on_transport_error(
+        self, monkeypatch
+    ):
+        literature_rag.reset_rag_state()
+        literature_rag._RAG_STATE["collection_ids"]["all"] = "collection-id"
+        monkeypatch.setenv("DEEP_INTERPRETER_REQUIRE_AGENTIC_RAG", "true")
+
+        class FailingAgenticTool:
+            name = "agentic_search"
+
+            async def ainvoke(self, args):
+                raise RuntimeError("agentic unavailable")
+
+        async def fake_tools():
+            return [FailingAgenticTool()]
+
+        async def fallback_must_not_run(query, num_queries=5):
+            raise AssertionError("multi-query fallback should not run")
+
+        monkeypatch.setattr(literature_rag, "_get_cci_rag_tools", fake_tools)
+        monkeypatch.setattr(literature_rag, "generate_multi_query", fallback_must_not_run)
+
+        with pytest.raises(literature_rag.RAGSearchError):
+            await literature_rag.search_fulltext_rag("ICAM1 fibrosis", "all", limit=5)
+
+    @pytest.mark.asyncio
+    async def test_search_fulltext_rag_audit_write_failure_keeps_agentic_result(
+        self, tmp_path, monkeypatch
+    ):
+        literature_rag.reset_rag_state()
+        literature_rag._RAG_STATE["collection_ids"]["all"] = "collection-id"
+        not_a_dir = tmp_path / "not-a-dir"
+        not_a_dir.write_text("file blocks audit directory creation")
+        monkeypatch.setenv("DEEP_INTERPRETER_RAG_AUDIT_PATH", str(not_a_dir / "audit.jsonl"))
+
+        class FakeTool:
+            name = "agentic_search"
+
+            async def ainvoke(self, args):
+                return {
+                    "sources": [
+                        {
+                            "content": "agentic chunk survives audit failure",
+                            "metadata": {"filename": "pmid_12345678.txt"},
+                            "score": 0.91,
+                        }
+                    ]
+                }
+
+        async def fake_tools():
+            return [FakeTool()]
+
+        async def fallback_must_not_run(query, num_queries=5):
+            raise AssertionError("multi-query fallback should not run")
+
+        monkeypatch.setattr(literature_rag, "_get_cci_rag_tools", fake_tools)
+        monkeypatch.setattr(literature_rag, "generate_multi_query", fallback_must_not_run)
+
+        result = await literature_rag.search_fulltext_rag(
+            "ICAM1 fibrosis",
+            "all",
+            limit=5,
+        )
+
+        assert result[0]["page_content"] == "agentic chunk survives audit failure"
 
     @pytest.mark.asyncio
     async def test_search_fulltext_rag_falls_back_when_agentic_search_fails(

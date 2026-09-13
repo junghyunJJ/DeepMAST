@@ -1,0 +1,78 @@
+{
+  "body": {
+    "error": null,
+    "generation": "Based on the provided context, BMP ligands (BMP2\u2013BMP8) mediate cell-cell communication by binding to a heteromeric complex of type I and type II receptors, such as ACVR2A, ACVR2B, and BMPR2. This interaction primarily activates the Smad signaling pathway, but can also trigger the p38 MAP kinase pathway depending on the order of receptor recruitment. Additionally, BMPs are known to crosstalk with and activate other signaling pathways, including MAP kinase, JAK-STAT, and Wnt. The text notes that while BMPR1B expression correlates with poor prognosis, specific ligand-receptor pairs beyond the general BMP-receptor complex are not detailed for other pathways in this excerpt.",
+    "no_context_found": false,
+    "query_rewrites": [
+      "What are the specific ligand-receptor pairs known to mediate cell-cell communication in breast cancer, and which signaling pathways do they activate?"
+    ],
+    "relevant_documents": [
+      {
+        "id": "d112613d-fe44-4b97-b81e-b42ea7d167f3",
+        "metadata": {
+          "chunk_count": 21,
+          "chunk_index": 11,
+          "created_at": "2026-07-29T14:39:10.880163",
+          "file_id": "ace84794-6e2f-4793-8844-164325487395",
+          "filename": "pmid_30171384.txt",
+          "mime_type": "text/plain",
+          "source": "pmid_30171384.txt"
+        },
+        "page_content": "to different cognate receptors (e.g., RYK, FZD), mediates downstream signaling cascades and how these affect proliferation, migration and invasion in breast cancer cells. The red up-arrow symbol refers to upregulation or activation of the indicated proteins, whereas the black down-arrow symbol refers to downregulation or inactivation of the indicated signaling molecules. The blue horizontal arrow refers to activation of a signaling molecule, whereas the blue broken arrow indicates undefined signaling mechanisms. Finally, the red stop symbol indicates inhibition of proliferation or migration/invasion",
+        "score": 0.5051636191234559
+      },
+      {
+        "id": "06fc83f4-b100-41dc-b0e9-31fc09ee4749",
+        "metadata": {
+          "chunk_count": 27,
+          "chunk_index": 4,
+          "created_at": "2026-07-29T14:40:13.878290",
+          "file_id": "085ccb63-fbd4-4b45-9079-b81ffe1b6b8f",
+          "filename": "pmid_17004110.txt",
+          "mime_type": "text/plain",
+          "source": "pmid_17004110.txt"
+        },
+        "page_content": "type IIA, ACVR2A (ActR-II), and ACVR2B (ActR-                primary breast cancer [19, 20]. The other BMP ligands\nIIB). In addition, BMPR2 has two naturally occurring         have not been adequately studied in breast cancer and\nfunctional splice variants: the long form, which has a       BMP specific receptors have been explored even less.\nlong cytoplasmic C-terminal tail and a short form,           However, it has been recently shown that BMPR1B\nwhich lacks this tail [5].                                   expression positively correlates with high tumor grade,\n   The BMPs bind to a heteromeric complex of type I          high tumor proliferation, cytogenetic instability and\nand type II receptors and the signal specificity is mainly   poor prognosis in estrogen positive breast cancer [21].\ndictated by the type I receptor [6]. The activated           Blocking of the BMPR2 receptor in turn was shown to\nreceptor complex phosphorylates cytosolic Smad pro-          lead to growth arrest in T-47D breast cancer cell line\nteins that translocate to nucleus and regulate target        [22].\ngene transcription. In addition to Smad proteins, BMPs          Taken together, we can conclude that the current\nare known to activate and crosstalk with other signal-       information on BMPs in breast cancer is very re-\ning pathways such as MAP kinase, JAK-STAT and                stricted. In this study we performed a systematic survey\nWnt pathways [7]. Furthermore, there is evidence that        of BMP ligand and receptor mRNA expression levels\nthe mode of receptor complex oligomerization defines         in 22 breast cancer cell lines and 39 primary breast\nwhich downstream signaling molecule is activated.            tumors. We studied seven different BMP ligands,\nBMP binding to a preformed heteromeric receptor              BMP2\u2013BMP8, and all six receptors that are able to\ncomplex activates the Smad pathway, whereas BMP              specifically mediate BMP signals.\nbinding first to the type I receptor leading to the\nrecruitment of the type II receptor activates p38 MAP\nkinase pathway [8].\n   Because of their versatile functions during devel-        Materials and methods\nopment, especially in regulation of proliferation, dif-\nferentiation, and apoptosis, BMPs have been also of          Breast cancer cell lines and primary breast tumors\ninterest in cancer. Breast and prostate cancers\u2019 pro-\npensity to form bone metastases makes BMPs partic-           Twenty-two breast cancer cell lines were included in\nularly interesting. In prostate cancer, BMP signaling        this study. BT-474, CAMA-1, DU4475, HCC38,\nhas recently been shown to affect the formation of           HCC1419, HCC1954, MCF7, MDA-MB-134, MDA-\nosteolytic metastases [9]. However, the role of BMPs in      MB-231, MDA-MB-361, MDA-MB-415, MDA-\ncancer development is still paradoxical. Separate can-       MB-436, MDA-MB-453, SK-BR-3, T-47D, UACC732,",
+        "score": 0.47664363305078944
+      }
+    ],
+    "retrieved_document_ids": [
+      "d112613d-fe44-4b97-b81e-b42ea7d167f3",
+      "06fc83f4-b100-41dc-b0e9-31fc09ee4749"
+    ],
+    "rewrite_count": 1,
+    "selected_wiki_pages": [],
+    "steps": [
+      "retrieve: found 1 documents",
+      "grade_documents: 1/1 relevant",
+      "generate: answer produced",
+      "grade_generation: FAILED answer quality check",
+      "rewrite_query: 'Which ligand-receptor interactions are implicated in breast cancer cell-cell communication?' -> 'What are the specific ligand-receptor pairs known to mediate cell-cell communication in breast cancer, and which signaling pathways do they activate?'",
+      "retrieve: found 2 documents",
+      "grade_documents: 2/2 relevant",
+      "generate: answer produced",
+      "grade_generation: PASSED both checks"
+    ],
+    "wiki_context_status": "disabled",
+    "wiki_promoted_document_ids": [],
+    "wiki_promotion_status": "disabled",
+    "wiki_source_refs": []
+  },
+  "completed_at": "2026-08-09T09:05:17.330821+00:00",
+  "curl_returncode": 0,
+  "headers": "HTTP/1.1 200 OK\ndate: Sun, 09 Aug 2026 09:04:58 GMT\nserver: uvicorn\ncontent-length: 5942\ncontent-type: application/json\n\n",
+  "http_status": 200,
+  "raw_body": "{\"generation\":\"Based on the provided context, BMP ligands (BMP2\u2013BMP8) mediate cell-cell communication by binding to a heteromeric complex of type I and type II receptors, such as ACVR2A, ACVR2B, and BMPR2. This interaction primarily activates the Smad signaling pathway, but can also trigger the p38 MAP kinase pathway depending on the order of receptor recruitment. Additionally, BMPs are known to crosstalk with and activate other signaling pathways, including MAP kinase, JAK-STAT, and Wnt. The text notes that while BMPR1B expression correlates with poor prognosis, specific ligand-receptor pairs beyond the general BMP-receptor complex are not detailed for other pathways in this excerpt.\",\"relevant_documents\":[{\"id\":\"d112613d-fe44-4b97-b81e-b42ea7d167f3\",\"page_content\":\"to different cognate receptors (e.g., RYK, FZD), mediates downstream signaling cascades and how these affect proliferation, migration and invasion in breast cancer cells. The red up-arrow symbol refers to upregulation or activation of the indicated proteins, whereas the black down-arrow symbol refers to downregulation or inactivation of the indicated signaling molecules. The blue horizontal arrow refers to activation of a signaling molecule, whereas the blue broken arrow indicates undefined signaling mechanisms. Finally, the red stop symbol indicates inhibition of proliferation or migration/invasion\",\"metadata\":{\"source\":\"pmid_30171384.txt\",\"file_id\":\"ace84794-6e2f-4793-8844-164325487395\",\"filename\":\"pmid_30171384.txt\",\"mime_type\":\"text/plain\",\"created_at\":\"2026-07-29T14:39:10.880163\",\"chunk_count\":21,\"chunk_index\":11},\"score\":0.5051636191234559},{\"id\":\"06fc83f4-b100-41dc-b0e9-31fc09ee4749\",\"page_content\":\"type IIA, ACVR2A (ActR-II), and ACVR2B (ActR-                primary breast cancer [19, 20]. The other BMP ligands\\nIIB). In addition, BMPR2 has two naturally occurring         have not been adequately studied in breast cancer and\\nfunctional splice variants: the long form, which has a       BMP specific receptors have been explored even less.\\nlong cytoplasmic C-terminal tail and a short form,           However, it has been recently shown that BMPR1B\\nwhich lacks this tail [5].                                   expression positively correlates with high tumor grade,\\n   The BMPs bind to a heteromeric complex of type I          high tumor proliferation, cytogenetic instability and\\nand type II receptors and the signal specificity is mainly   poor prognosis in estrogen positive breast cancer [21].\\ndictated by the type I receptor [6]. The activated           Blocking of the BMPR2 receptor in turn was shown to\\nreceptor complex phosphorylates cytosolic Smad pro-          lead to growth arrest in T-47D breast cancer cell line\\nteins that translocate to nucleus and regulate target        [22].\\ngene transcription. In addition to Smad proteins, BMPs          Taken together, we can conclude that the current\\nare known to activate and crosstalk with other signal-       information on BMPs in breast cancer is very re-\\ning pathways such as MAP kinase, JAK-STAT and                stricted. In this study we performed a systematic survey\\nWnt pathways [7]. Furthermore, there is evidence that        of BMP ligand and receptor mRNA expression levels\\nthe mode of receptor complex oligomerization defines         in 22 breast cancer cell lines and 39 primary breast\\nwhich downstream signaling molecule is activated.            tumors. We studied seven different BMP ligands,\\nBMP binding to a preformed heteromeric receptor              BMP2\u2013BMP8, and all six receptors that are able to\\ncomplex activates the Smad pathway, whereas BMP              specifically mediate BMP signals.\\nbinding first to the type I receptor leading to the\\nrecruitment of the type II receptor activates p38 MAP\\nkinase pathway [8].\\n   Because of their versatile functions during devel-        Materials and methods\\nopment, especially in regulation of proliferation, dif-\\nferentiation, and apoptosis, BMPs have been also of          Breast cancer cell lines and primary breast tumors\\ninterest in cancer. Breast and prostate cancers\u2019 pro-\\npensity to form bone metastases makes BMPs partic-           Twenty-two breast cancer cell lines were included in\\nularly interesting. In prostate cancer, BMP signaling        this study. BT-474, CAMA-1, DU4475, HCC38,\\nhas recently been shown to affect the formation of           HCC1419, HCC1954, MCF7, MDA-MB-134, MDA-\\nosteolytic metastases [9]. However, the role of BMPs in      MB-231, MDA-MB-361, MDA-MB-415, MDA-\\ncancer development is still paradoxical. Separate can-       MB-436, MDA-MB-453, SK-BR-3, T-47D, UACC732,\",\"metadata\":{\"source\":\"pmid_17004110.txt\",\"file_id\":\"085ccb63-fbd4-4b45-9079-b81ffe1b6b8f\",\"filename\":\"pmid_17004110.txt\",\"mime_type\":\"text/plain\",\"created_at\":\"2026-07-29T14:40:13.878290\",\"chunk_count\":27,\"chunk_index\":4},\"score\":0.47664363305078944}],\"steps\":[\"retrieve: found 1 documents\",\"grade_documents: 1/1 relevant\",\"generate: answer produced\",\"grade_generation: FAILED answer quality check\",\"rewrite_query: 'Which ligand-receptor interactions are implicated in breast cancer cell-cell communication?' -> 'What are the specific ligand-receptor pairs known to mediate cell-cell communication in breast cancer, and which signaling pathways do they activate?'\",\"retrieve: found 2 documents\",\"grade_documents: 2/2 relevant\",\"generate: answer produced\",\"grade_generation: PASSED both checks\"],\"query_rewrites\":[\"What are the specific ligand-receptor pairs known to mediate cell-cell communication in breast cancer, and which signaling pathways do they activate?\"],\"rewrite_count\":1,\"error\":null,\"no_context_found\":false,\"selected_wiki_pages\":[],\"wiki_context_status\":\"disabled\",\"wiki_source_refs\":[],\"wiki_promotion_status\":\"disabled\",\"wiki_promoted_document_ids\":[],\"retrieved_document_ids\":[\"d112613d-fe44-4b97-b81e-b42ea7d167f3\",\"06fc83f4-b100-41dc-b0e9-31fc09ee4749\"]}",
+  "request": {
+    "llm_model": "qwen3.5:122b",
+    "llm_provider": "ollama",
+    "max_rewrites": 3,
+    "question": "Which ligand-receptor interactions are implicated in breast cancer cell-cell communication?",
+    "search_limit": 5,
+    "search_type": "hybrid",
+    "use_wiki_context": false
+  },
+  "started_at": "2026-08-09T09:04:59.219539+00:00",
+  "stderr": "",
+  "url": "http://localhost:8888/collections/a208e916-bd32-405a-9eee-de4cd82b2a3b/agentic-search"
+}

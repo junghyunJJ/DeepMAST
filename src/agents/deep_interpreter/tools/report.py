@@ -1185,6 +1185,84 @@ def _ensure_reporter_artifacts(
     }
 
 
+_REPORTER_DERIVED_OUTPUTS = (
+    "synthesis_validation.json",
+    "synthesis_targets.json",
+    "CCI_Analysis_Report.html",
+)
+
+
+def _finalize_reporter_artifacts(
+    *,
+    parts: dict,
+    output_path: str,
+    data_dir: str,
+    required_refresh: tuple[str, ...],
+) -> dict[str, Any]:
+    resolved_data_dir = str(Path(data_dir).expanduser().resolve())
+    resolved_output = output_path
+    if not os.path.isabs(resolved_output):
+        resolved_output = os.path.join(resolved_data_dir, resolved_output)
+
+    _materialize_synthesis_for_guardrail(parts, resolved_data_dir)
+    synthesis_path = Path(resolved_data_dir) / "synthesis.md"
+    before_synthesis = synthesis_path.read_bytes() if synthesis_path.is_file() else None
+    guardrail_result = _run_synthesis_guardrail_before_html(resolved_data_dir)
+    refresh = list(required_refresh)
+
+    if guardrail_result is None or guardrail_result.get("status") in {"failed", "skipped"}:
+        return {
+            "status": "guardrail_failed",
+            "guardrail": guardrail_result,
+            "required_refresh": refresh,
+            "refreshed_outputs": [],
+            "preserved_outputs": [],
+            "render_message": None,
+        }
+
+    after_synthesis = synthesis_path.read_bytes() if synthesis_path.is_file() else None
+    if before_synthesis != after_synthesis:
+        refresh = list(_REPORTER_DERIVED_OUTPUTS)
+
+    base = Path(resolved_data_dir)
+    for name in refresh:
+        if name != "CCI_Analysis_Report.html":
+            (base / name).unlink(missing_ok=True)
+    reporter_artifacts = _ensure_reporter_artifacts(resolved_data_dir, guardrail_result)
+
+    render_message = None
+    if "CCI_Analysis_Report.html" in refresh:
+        render_parts = parts
+        if parts.get("template_mode") != "comprehensive" and synthesis_path.is_file():
+            render_parts = {**parts, "synthesis": synthesis_path.read_text(encoding="utf-8")}
+            render_parts.pop("summary_html", None)
+        Path(resolved_output).unlink(missing_ok=True)
+        render_message = _generate_html_report_impl(
+            parts=render_parts,
+            output_path=resolved_output,
+            data_dir=resolved_data_dir,
+        )
+    render_failed = (
+        render_message is not None
+        and (
+            render_message.startswith("Error generating report:")
+            or not Path(resolved_output).is_file()
+            or Path(resolved_output).stat().st_size == 0
+        )
+    )
+    return {
+        "status": "render_failed" if render_failed else "passed",
+        "guardrail": guardrail_result,
+        "required_refresh": refresh,
+        "refreshed_outputs": refresh,
+        "preserved_outputs": [
+            name for name in _REPORTER_DERIVED_OUTPUTS if name not in refresh
+        ],
+        "reporter_artifacts": reporter_artifacts,
+        "render_message": render_message,
+    }
+
+
 def _generate_html_report_impl(
     parts: dict,
     output_path: str,
@@ -1367,9 +1445,12 @@ def _generate_html_report_impl(
         therapeutic_data = parts.get("therapeutic")
         if therapeutic_data and isinstance(therapeutic_data, dict):
             # Build from structured therapeutic data
-            druggable = therapeutic_data.get("druggable_targets", [])
-            drugs = therapeutic_data.get("known_drugs", [])
-            novel = therapeutic_data.get("novel_targets", [])
+            def mapping_items(value: Any) -> list[dict[str, Any]]:
+                return [item for item in value if isinstance(item, dict)] if isinstance(value, list) else []
+
+            druggable = mapping_items(therapeutic_data.get("druggable_targets"))
+            drugs = mapping_items(therapeutic_data.get("known_drugs"))
+            novel = mapping_items(therapeutic_data.get("novel_targets"))
             summary = therapeutic_data.get("summary", {})
 
             druggable_html = ""
@@ -1588,31 +1669,36 @@ def generate_html_report(
     if not os.path.isabs(output_path):
         if resolved_data_dir:
             output_path = os.path.join(resolved_data_dir, output_path)
-    _materialize_synthesis_for_guardrail(parts, resolved_data_dir)
-    guardrail_result = _run_synthesis_guardrail_before_html(resolved_data_dir)
-    if guardrail_result is not None and guardrail_result.get("status") in {"failed", "skipped"}:
+    if not resolved_data_dir:
+        return _generate_html_report_impl(
+            parts=parts,
+            output_path=output_path,
+            data_dir=resolved_data_dir,
+        )
+    requested = tuple(
+        name
+        for name in ("synthesis_validation.json", "synthesis_targets.json")
+        if not (Path(resolved_data_dir) / name).is_file()
+    ) + ("CCI_Analysis_Report.html",)
+    finalization = _finalize_reporter_artifacts(
+        parts=parts,
+        output_path=output_path,
+        data_dir=resolved_data_dir,
+        required_refresh=requested,
+    )
+    guardrail_result = finalization.get("guardrail")
+    if finalization["status"] == "guardrail_failed":
         return (
             "Error generating report: synthesis guardrail failed before HTML rendering: "
             f"{json.dumps(guardrail_result, sort_keys=True)}"
         )
-    reporter_artifacts = _ensure_reporter_artifacts(resolved_data_dir, guardrail_result)
-    render_parts = parts
-    if guardrail_result is not None and parts.get("template_mode") != "comprehensive":
-        synthesis_path = Path(resolved_data_dir) / "synthesis.md"
-        if synthesis_path.is_file():
-            render_parts = {**parts, "synthesis": synthesis_path.read_text(encoding="utf-8")}
-            render_parts.pop("summary_html", None)
-    result = _generate_html_report_impl(
-        parts=render_parts,
-        output_path=output_path,
-        data_dir=resolved_data_dir,
-    )
+    result = finalization["render_message"] or ""
     if guardrail_result is None:
         return result
     return (
         f"{result}\n"
         f"Synthesis guardrail: {json.dumps(guardrail_result, sort_keys=True)}\n"
-        f"Reporter artifacts: {json.dumps(reporter_artifacts, sort_keys=True)}"
+        f"Reporter artifacts: {json.dumps(finalization.get('reporter_artifacts', {}), sort_keys=True)}"
     )
 
 

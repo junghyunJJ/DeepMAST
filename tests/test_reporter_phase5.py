@@ -2,8 +2,8 @@
 
 Resumes from existing synthesis.md and therapeutic_targets.json to:
 1. Add Therapeutic Implications section to synthesis.md (Phase 4.7 Step 3-4)
-2. Let generate_html_report create synthesis_targets.json when missing
-3. Generate CCI_Analysis_Report.html (Phase 5)
+2. Let deterministic finalizer create synthesis_targets.json when missing
+3. Hand off CCI_Analysis_Report.html generation to code (Phase 5)
 
 Prerequisites:
 - res_bc/synthesis.md (written by REPORTER Phase 1-4.5)
@@ -72,24 +72,20 @@ PHASE5_MESSAGE = {
                 "#### Novel Opportunities\n"
                 "#### Safety Considerations\n"
                 "Then write_file('/synthesis.md', ...) with the COMPLETE updated content.\n\n"
-                "### Step 4: Hand off source tracking to report tool\n"
-                "Do not write /synthesis_targets.json manually. generate_html_report detects\n"
+                "### Step 4: Hand off source tracking to deterministic code\n"
+                "Do not write /synthesis_targets.json manually. Deterministic code detects\n"
                 "part4_therapeutic_synthesis.md, drug.md, and therapeutic_targets.json and\n"
                 "creates synthesis_targets.json when it is missing.\n\n"
-                "### Step 5: Generate HTML Report (Phase 5)\n"
-                "Call generate_html_report with:\n"
-                "- parts dict containing template_mode='comprehensive', title, subtitle, executive_summary\n"
-                "- synthesis (full updated synthesis.md content)\n"
-                "- quality_score, references\n"
-                "- output_path='CCI_Analysis_Report.html'\n"
-                "- data_dir from /data_path.txt\n\n"
+                "### Step 5: Hand Off to Deterministic Finalization (Phase 5)\n"
+                "Confirm /synthesis.md is complete, then stop after synthesis.md.\n"
+                "The deterministic finalizer runs validation, writes targets, and renders HTML.\n\n"
                 "## CRITICAL RULES:\n"
                 "- MUST call write_file('/synthesis.md', ...) with updated content\n"
-                "- MUST call generate_html_report to create CCI_Analysis_Report.html\n"
-                "- generate_html_report creates synthesis_validation.json and synthesis_targets.json when missing\n"
+                "- MUST NOT call the HTML report tool\n"
+                "- Deterministic code creates synthesis_validation.json, synthesis_targets.json, and HTML when missing\n"
                 "- Do NOT re-run literature search or assess_therapeutic_potential\n"
                 "- Do NOT hand-author part1_html, part2_html, part3_html, summary_html, or therapeutic_html\n"
-                "- Do NOT skip the HTML report generation\n\n"
+                "- Do NOT write HTML yourself\n\n"
                 "Begin now."
             ),
         }
@@ -100,7 +96,8 @@ PHASE5_MESSAGE = {
 def test_phase5_message_delegates_bookkeeping_artifacts_to_report_tool():
     content = PHASE5_MESSAGE["messages"][0]["content"]
 
-    assert "generate_html_report creates synthesis_validation.json and synthesis_targets.json" in content
+    assert "deterministic finalizer runs validation, writes targets, and renders HTML" in content
+    assert "generate_html_report" not in content
     assert not re.search(r"write_file\(['\"]/synthesis_targets\.json", content)
     assert "therapeutic_html (LLM-generated HTML" not in content
 

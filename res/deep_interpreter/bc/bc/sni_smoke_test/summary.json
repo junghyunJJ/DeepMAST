@@ -1,0 +1,133 @@
+{
+  "summary_type": "bc_sni_mechanism_smoke_test",
+  "scope_note": "Mechanism smoke test only; not repair-quality or replicate evidence.",
+  "collection": {
+    "uuid": "a208e916-bd32-405a-9eee-de4cd82b2a3b",
+    "name": "deep_interpreter_bc_cfd96ddb_all",
+    "document_count_before": 100,
+    "document_count_after": 100,
+    "chunk_count_before": 1553,
+    "chunk_count_after": 1553,
+    "same_uuid": true,
+    "same_document_count": true,
+    "same_chunk_count": true
+  },
+  "selected_model": {
+    "llm_provider": "ollama",
+    "llm_model": "qwen3.5:122b"
+  },
+  "sni_rebuild_attempts": [
+    {
+      "label": "initial_stale_container_failure",
+      "http_status": 500,
+      "curl_returncode": 0,
+      "raw_body": "Internal Server Error",
+      "elapsed_seconds": 0.7203994589999638,
+      "utc_start": "2026-08-09T08:33:52.406519Z",
+      "utc_end": "2026-08-09T08:33:53.127121Z"
+    },
+    {
+      "label": "successful_after_env_reload",
+      "http_status": 200,
+      "status": "rebuilt",
+      "collection_id": "a208e916-bd32-405a-9eee-de4cd82b2a3b",
+      "chunk_count": 1553,
+      "source_page_count": 100,
+      "concept_page_count": 10,
+      "page_count": 110,
+      "pack_path": "llm_wiki/collections/a208e916-bd32-405a-9eee-de4cd82b2a3b.json",
+      "elapsed_seconds": 506.383493458,
+      "utc_start": "2026-08-09T08:45:46.656561Z",
+      "utc_end": "2026-08-09T08:54:13.039147Z"
+    }
+  ],
+  "paired_results": [
+    {
+      "pair": "01",
+      "question": "What evidence supports EGF-ERBB2 signaling in the breast cancer tumor microenvironment?",
+      "sni_off": {
+        "http_status": 200,
+        "use_wiki_context": false,
+        "wiki_context_status": "disabled",
+        "wiki_promotion_status": "disabled",
+        "retrieved_document_count": 5,
+        "relevant_document_count": 3,
+        "selected_wiki_page_count": 0,
+        "wiki_source_ref_count": 0,
+        "rewrite_count": 0,
+        "error": null
+      },
+      "sni_on": {
+        "http_status": 200,
+        "use_wiki_context": true,
+        "wiki_context_status": "selected",
+        "wiki_promotion_status": "promoted",
+        "retrieved_document_count": 13,
+        "relevant_document_count": 4,
+        "selected_wiki_page_count": 3,
+        "wiki_source_ref_count": 8,
+        "wiki_promoted_document_count": 8,
+        "rewrite_count": 0,
+        "error": null
+      }
+    },
+    {
+      "pair": "02",
+      "question": "Which ligand-receptor interactions are implicated in breast cancer cell-cell communication?",
+      "sni_off": {
+        "http_status": 200,
+        "use_wiki_context": false,
+        "wiki_context_status": "disabled",
+        "wiki_promotion_status": "disabled",
+        "retrieved_document_count": 2,
+        "relevant_document_count": 2,
+        "selected_wiki_page_count": 0,
+        "wiki_source_ref_count": 0,
+        "rewrite_count": 1,
+        "error": null
+      },
+      "sni_on": {
+        "http_status": 200,
+        "use_wiki_context": true,
+        "wiki_context_status": "selected",
+        "wiki_promotion_status": "promoted",
+        "retrieved_document_count": 9,
+        "relevant_document_count": 4,
+        "selected_wiki_page_count": 3,
+        "wiki_source_ref_count": 8,
+        "wiki_promoted_document_count": 8,
+        "rewrite_count": 0,
+        "error": null
+      }
+    },
+    {
+      "pair": "03",
+      "question": "What stromal or vascular signaling programs are reported in the breast cancer microenvironment?",
+      "sni_off": {
+        "http_status": 200,
+        "use_wiki_context": false,
+        "wiki_context_status": "disabled",
+        "wiki_promotion_status": "disabled",
+        "retrieved_document_count": 1,
+        "relevant_document_count": 1,
+        "selected_wiki_page_count": 0,
+        "wiki_source_ref_count": 0,
+        "rewrite_count": 0,
+        "error": null
+      },
+      "sni_on": {
+        "http_status": 200,
+        "use_wiki_context": true,
+        "wiki_context_status": "selected",
+        "wiki_promotion_status": "promoted",
+        "retrieved_document_count": 13,
+        "relevant_document_count": 8,
+        "selected_wiki_page_count": 3,
+        "wiki_source_ref_count": 8,
+        "wiki_promoted_document_count": 8,
+        "rewrite_count": 1,
+        "error": null
+      }
+    }
+  ]
+}

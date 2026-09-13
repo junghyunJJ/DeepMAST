@@ -40,6 +40,7 @@ def _write_synthesis_required_files(data_dir: Path) -> None:
         encoding="utf-8",
     )
     (data_dir / "synthesis.md").write_text(
+        "# Synthesis Report\n\n"
         "## Executive Summary\n\n"
         "MISTy spatial evidence drives a therapy-resistant subpopulation (PMID: 87654321).\n",
         encoding="utf-8",
@@ -67,7 +68,27 @@ def _write_consistency_guardrail_fixture(data_dir: Path, synthesis: str) -> None
         "- Score profile: combined 16 = validated 10 + exploratory 6.\n",
         encoding="utf-8",
     )
-    (data_dir / "synthesis.md").write_text(synthesis, encoding="utf-8")
+    (data_dir / "synthesis.md").write_text(
+        f"# Synthesis Report\n\n{synthesis}",
+        encoding="utf-8",
+    )
+
+
+class StructuredRepairModel:
+    def __init__(self, replacement_text: str, action: str = "replace") -> None:
+        self.replacement_text = replacement_text
+        self.action = action
+        self.schema = None
+        self.prompts: list[str] = []
+
+    def with_structured_output(self, schema: Any, **_kwargs: Any) -> "StructuredRepairModel":
+        self.schema = schema
+        return self
+
+    def invoke(self, prompt: str) -> Any:
+        assert self.schema is not None
+        self.prompts.append(prompt)
+        return self.schema(action=self.action, replacement_text=self.replacement_text)
 
 
 def test_run_report_guardrail_skips_when_parts_are_incomplete(
@@ -89,6 +110,36 @@ def test_run_report_guardrail_skips_when_parts_are_incomplete(
     assert result["missing"] == ["part2_final.md", "part3_final.md"]
     assert not (tmp_path / "report_validation_initial.json").exists()
     assert not (tmp_path / "report_validation_final.json").exists()
+
+
+def test_run_report_guardrail_accepts_explicit_part12_scope_without_part3(
+    tmp_path: Path,
+) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    (tmp_path / "papers.json").write_text('{"papers": []}', encoding="utf-8")
+    (tmp_path / "part1_final.md").write_text("## Part 1\n", encoding="utf-8")
+    (tmp_path / "part2_final.md").write_text("## Part 2\n", encoding="utf-8")
+
+    result = report_guardrails.run_report_guardrail(
+        tmp_path,
+        filenames=("part1_final.md", "part2_final.md"),
+    )
+
+    assert result["status"] == "passed"
+    assert result["final_error_count"] == 0
+
+
+def test_run_report_guardrail_default_still_requires_part3(tmp_path: Path) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    (tmp_path / "papers.json").write_text('{"papers": []}', encoding="utf-8")
+    (tmp_path / "part1_final.md").write_text("## Part 1\n", encoding="utf-8")
+    (tmp_path / "part2_final.md").write_text("## Part 2\n", encoding="utf-8")
+
+    result = report_guardrails.run_report_guardrail(tmp_path)
+
+    assert result == {"status": "skipped", "missing": ["part3_final.md"]}
 
 
 def test_run_report_guardrail_fails_when_papers_json_is_missing(
@@ -121,6 +172,95 @@ def test_run_report_guardrail_fails_when_papers_json_is_missing(
     assert final["claim_validation"] == []
 
 
+def test_parts_guardrail_defers_claim_rag_until_deterministic_errors_clear(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    _write_required_files(tmp_path)
+    events: list[str] = []
+    deterministic_calls = 0
+
+    def fake_deterministic(_data_dir: Path) -> list[dict[str, str]]:
+        nonlocal deterministic_calls
+        deterministic_calls += 1
+        events.append("deterministic")
+        if deterministic_calls == 1:
+            return [{"severity": "error", "code": "local_error", "file": "part1_final.md"}]
+        return []
+
+    def fake_rag(*_args: Any, **_kwargs: Any) -> dict[str, Any]:
+        events.append("rag")
+        return {"claims": [], "issues": []}
+
+    def fake_repair(*_args: Any, **_kwargs: Any) -> int:
+        events.append("repair")
+        return 1
+
+    monkeypatch.setattr(report_guardrails.validate_report_script, "validate_report", fake_deterministic)
+    monkeypatch.setattr(report_guardrails.claim_rag_validation, "validate_claims", fake_rag)
+    monkeypatch.setattr(report_guardrails.repair_report_script, "repair_report", fake_repair)
+
+    result = report_guardrails.run_report_guardrail(tmp_path, provider="ollama")
+
+    assert result["status"] == "passed"
+    assert events == ["deterministic", "repair", "deterministic", "rag"]
+
+
+def test_report_guardrail_preserves_deterministic_and_semantic_initial_error_counts(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    _write_required_files(tmp_path)
+    deterministic = {
+        "severity": "error",
+        "code": "local_error",
+        "file": "part1_final.md",
+    }
+    semantic = [
+        {
+            "severity": "error",
+            "code": "claim_rag_unsupported",
+            "file": "part1_final.md",
+        },
+        {
+            "severity": "error",
+            "code": "claim_rag_overclaimed",
+            "file": "part2_final.md",
+        },
+    ]
+    validations = [
+        ([deterministic], [], None, None, "deterministic"),
+        (semantic, [{"status": "unsupported"}], None, None, "semantic"),
+        ([], [], None, None, "semantic"),
+    ]
+
+    monkeypatch.setattr(
+        report_guardrails,
+        "_validate_part_reports",
+        lambda *_args, **_kwargs: validations.pop(0),
+    )
+    monkeypatch.setattr(
+        report_guardrails.repair_report_script,
+        "repair_report",
+        lambda *_args, **_kwargs: 1,
+    )
+
+    result = report_guardrails.run_report_guardrail(tmp_path, provider="ollama")
+
+    assert result["status"] == "passed"
+    assert result["deterministic_initial_error_count"] == 1
+    assert result["semantic_initial_error_count"] == 2
+    assert result["initial_error_count"] == 3
+    semantic_initial = json.loads(
+        (tmp_path / "report_validation_semantic_initial.json").read_text(encoding="utf-8")
+    )
+    assert len([issue for issue in semantic_initial["issues"] if issue["severity"] == "error"]) == 2
+
+
 def test_run_synthesis_guardrail_skips_until_synthesis_ready(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -141,12 +281,118 @@ def test_run_synthesis_guardrail_skips_until_synthesis_ready(
     assert not (tmp_path / "synthesis_guardrail_final.json").exists()
 
 
-def test_run_synthesis_guardrail_repairs_invalid_pmid_and_softens_overclaim(
+def test_synthesis_guardrail_defers_claim_rag_until_deterministic_errors_clear(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    (tmp_path / "papers.json").write_text('{"papers": []}', encoding="utf-8")
+    (tmp_path / "synthesis.md").write_text(
+        "## Summary\n\nSpatial plots confirm a mechanism.\n",
+        encoding="utf-8",
+    )
+    events: list[str] = []
+    deterministic_calls = 0
+
+    def fake_deterministic(_data_dir: Path) -> list[dict[str, str]]:
+        nonlocal deterministic_calls
+        deterministic_calls += 1
+        events.append("deterministic")
+        if deterministic_calls == 1:
+            return [{"severity": "error", "code": "local_error", "file": "synthesis.md"}]
+        return []
+
+    def fake_consistency(_data_dir: Path) -> dict[str, list[dict[str, Any]]]:
+        events.append("consistency")
+        return {"issues": [], "results": []}
+
+    def fake_rag(*_args: Any, **_kwargs: Any) -> dict[str, Any]:
+        events.append("rag")
+        return {"claims": [], "issues": []}
+
+    def fake_repair(*_args: Any, **_kwargs: Any) -> int:
+        events.append("repair")
+        return 1
+
+    monkeypatch.setattr(report_guardrails, "validate_synthesis_report", fake_deterministic)
+    monkeypatch.setattr(
+        report_guardrails.synthesis_consistency_validation,
+        "validate_synthesis_consistency",
+        fake_consistency,
+    )
+    monkeypatch.setattr(report_guardrails.claim_rag_validation, "validate_claims", fake_rag)
+    monkeypatch.setattr(report_guardrails, "repair_synthesis_report", fake_repair)
+
+    result = report_guardrails.run_synthesis_guardrail(tmp_path, provider="ollama")
+
+    assert result["status"] == "passed"
+    assert events == [
+        "deterministic",
+        "consistency",
+        "repair",
+        "deterministic",
+        "consistency",
+        "rag",
+    ]
+
+
+def test_synthesis_guardrail_preserves_deterministic_and_semantic_initial_error_counts(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    (tmp_path / "papers.json").write_text('{"papers": []}', encoding="utf-8")
+    (tmp_path / "synthesis.md").write_text("## Summary\n\nClaim.\n", encoding="utf-8")
+    deterministic = {"severity": "error", "code": "local", "file": "synthesis.md"}
+    semantic = {
+        "severity": "error",
+        "code": "claim_rag_unsupported",
+        "file": "synthesis.md",
+    }
+    empty_consistency = {"issues": [], "results": []}
+    validations = [
+        ([deterministic], [], empty_consistency, None, None, "deterministic"),
+        ([semantic], [{"status": "unsupported"}], empty_consistency, None, None, "semantic"),
+        ([], [], empty_consistency, None, None, "semantic"),
+    ]
+
+    monkeypatch.setattr(
+        report_guardrails,
+        "_validate_synthesis_guardrails",
+        lambda *_args, **_kwargs: validations.pop(0),
+    )
+    monkeypatch.setattr(
+        report_guardrails,
+        "repair_synthesis_report",
+        lambda *_args, **_kwargs: 1,
+    )
+
+    result = report_guardrails.run_synthesis_guardrail(tmp_path, provider="ollama")
+
+    assert result["status"] == "passed"
+    assert result["deterministic_initial_error_count"] == 1
+    assert result["semantic_initial_error_count"] == 1
+    assert result["initial_error_count"] == 2
+    assert (tmp_path / "synthesis_guardrail_semantic_initial.json").is_file()
+
+
+def test_run_synthesis_guardrail_repairs_invalid_pmid_and_keeps_semantic_warning_soft(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from src.agents.deep_interpreter import report_guardrails
 
     _write_synthesis_required_files(tmp_path)
+    repair_model = StructuredRepairModel(
+        "MISTy spatial evidence is associated with a candidate subpopulation "
+        "(PMID: 87654321). This remains a hypothesis requiring validation."
+    )
+    monkeypatch.setattr(
+        report_guardrails.repair_report_script,
+        "_create_model",
+        lambda *_: repair_model,
+    )
 
     result = report_guardrails.run_synthesis_guardrail(tmp_path)
 
@@ -158,13 +404,403 @@ def test_run_synthesis_guardrail_repairs_invalid_pmid_and_softens_overclaim(
     assert result["artifact"] == "synthesis.md"
     assert result["initial_error_count"] >= 1
     assert result["repair_attempt_count"] == 1
-    assert result["changed_claims"] >= 1
+    assert result["changed_claims"] == 1
     assert result["final_error_count"] == 0
     assert "87654321" not in synthesis
-    assert "hypothesis requiring validation" in synthesis.lower()
     assert initial["issue_count"] >= 1
     assert final["issue_count"] >= 1
     assert all(issue["severity"] != "error" for issue in final["issues"])
+    assert any(issue["code"] == "synthesis_overclaim_warning" for issue in final["issues"])
+
+
+def test_synthesis_unhedged_overclaim_is_warning_without_repair_target(tmp_path: Path) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    claim = "MISTy spatial evidence drives a therapy-resistant subpopulation."
+    (tmp_path / "papers.json").write_text('{"papers": []}', encoding="utf-8")
+    (tmp_path / "synthesis.md").write_text(
+        f"# Synthesis Report\n\n## Executive Summary\n\n{claim}\n",
+        encoding="utf-8",
+    )
+
+    [issue] = report_guardrails.validate_synthesis_report(tmp_path)
+
+    assert issue["code"] == "synthesis_overclaim_warning"
+    assert issue["severity"] == "warning"
+    assert "target_text" not in issue
+    assert "replacement_text" not in issue
+
+
+def test_synthesis_requires_first_non_empty_line_h1_title(tmp_path: Path) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    title = "## Integrated Biological Narrative"
+    (tmp_path / "papers.json").write_text('{"papers": []}', encoding="utf-8")
+    (tmp_path / "synthesis.md").write_text(
+        f"\n{title}\n\nStable association summary.\n",
+        encoding="utf-8",
+    )
+
+    [issue] = report_guardrails.validate_synthesis_report(tmp_path)
+
+    assert issue["severity"] == "error"
+    assert issue["code"] == "synthesis_title_not_h1"
+    assert issue["target_text"] == title
+    assert issue["replacement_text"] == "# Integrated Biological Narrative"
+
+
+def test_synthesis_guardrail_promotes_first_heading_to_h1_idempotently(
+    tmp_path: Path,
+) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    original = (
+        "\n## Integrated Biological Narrative\n\n"
+        "Stable association summary.\n\n"
+        "### Preserved Subheading\n\n"
+        "No mechanistic claim here.\n"
+    )
+    expected = original.replace(
+        "## Integrated Biological Narrative",
+        "# Integrated Biological Narrative",
+        1,
+    )
+    (tmp_path / "papers.json").write_text('{"papers": []}', encoding="utf-8")
+    (tmp_path / "synthesis.md").write_text(original, encoding="utf-8")
+
+    first = report_guardrails.run_synthesis_guardrail(tmp_path, provider="ollama")
+    after_first = (tmp_path / "synthesis.md").read_bytes()
+    second = report_guardrails.run_synthesis_guardrail(tmp_path, provider="ollama")
+
+    assert first["status"] == "passed"
+    assert first["initial_error_count"] == 1
+    assert first["final_error_count"] == 0
+    assert first["changed_claims"] == 1
+    assert after_first == expected.encode("utf-8")
+    assert "### Preserved Subheading" in after_first.decode("utf-8")
+    assert second["status"] == "passed"
+    assert second["initial_error_count"] == 0
+    assert second["repair_attempt_count"] == 0
+    assert second["changed_claims"] == 0
+    assert (tmp_path / "synthesis.md").read_bytes() == after_first
+
+
+def test_synthesis_table_overclaim_warning_keeps_offending_row_as_value(tmp_path: Path) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    safe_row = "| Spatial Association | Strong | Factor3 loadings exceed 0.5 |"
+    unsafe_row = (
+        "| Tumor-Vascular Spatial Association | Strong | "
+        "Spatial plots confirm epithelial-vascular co-localization. "
+        "Moran's R = 0.4767 |"
+    )
+    (tmp_path / "papers.json").write_text('{"papers": []}', encoding="utf-8")
+    (tmp_path / "synthesis.md").write_text(
+        "# Synthesis Report\n\n"
+        "## Emergent Themes Summary\n\n"
+        "| Theme | Strength | Supporting Evidence |\n"
+        "|---|---|---|\n"
+        f"{safe_row}\n"
+        f"{unsafe_row}\n",
+        encoding="utf-8",
+    )
+
+    warnings = [
+        issue
+        for issue in report_guardrails.validate_synthesis_report(tmp_path)
+        if issue["code"] == "synthesis_overclaim_warning"
+    ]
+
+    assert len(warnings) == 1
+    assert warnings[0]["severity"] == "warning"
+    assert warnings[0]["value"] == unsafe_row
+    assert "target_text" not in warnings[0]
+
+
+def test_synthesis_guardrail_leaves_table_overclaim_warning_unrepaired(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    unsafe_row = (
+        "| Tumor-Vascular Spatial Association | Strong | "
+        "Spatial plots confirm epithelial-vascular co-localization |"
+    )
+    original = (
+        "# Synthesis Report\n\n"
+        "## Emergent Themes Summary\n\n"
+        "| Theme | Strength | Supporting Evidence |\n"
+        "|---|---|---|\n"
+        f"{unsafe_row}\n"
+    )
+    (tmp_path / "papers.json").write_text('{"papers": []}', encoding="utf-8")
+    (tmp_path / "synthesis.md").write_text(original, encoding="utf-8")
+    caveat_only = (
+        f"{unsafe_row}\n\n"
+        "*Note: All themes are dataset-derived associations, not established mechanisms.*"
+    )
+    model = StructuredRepairModel(caveat_only)
+    monkeypatch.setattr(report_guardrails.repair_report_script, "_create_model", lambda *_: model)
+
+    result = report_guardrails.run_synthesis_guardrail(tmp_path, provider="ollama")
+
+    assert result["status"] == "passed"
+    assert result["repair_attempt_count"] == 0
+    assert result["changed_claims"] == 0
+    assert result["final_error_count"] == 0
+    retained = (tmp_path / "synthesis.md").read_text(encoding="utf-8")
+    assert retained == original
+    assert "*Note:" not in retained
+
+
+def test_parts_guardrail_restores_all_files_after_no_progress_repair(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    _write_required_files(tmp_path)
+    originals = {
+        name: (tmp_path / name).read_text(encoding="utf-8")
+        for name in ("part1_final.md", "part2_final.md", "part3_final.md")
+    }
+
+    monkeypatch.setattr(
+        report_guardrails.validate_report_script,
+        "validate_report",
+        lambda _data_dir: [
+            {"severity": "error", "code": "persistent", "file": "part1_final.md"}
+        ],
+    )
+
+    def append_without_progress(data_dir: Path, *_args: Any, **_kwargs: Any) -> int:
+        path = data_dir / "part1_final.md"
+        path.write_text(path.read_text(encoding="utf-8") + "Unhelpful caveat.\n", encoding="utf-8")
+        return 1
+
+    monkeypatch.setattr(
+        report_guardrails.repair_report_script,
+        "repair_report",
+        append_without_progress,
+    )
+
+    result = report_guardrails.run_report_guardrail(tmp_path, provider="ollama")
+
+    assert result["status"] == "failed"
+    assert result["repair_attempt_count"] == 3
+    assert result["changed_sections"] == 0
+    assert {
+        name: (tmp_path / name).read_text(encoding="utf-8")
+        for name in originals
+    } == originals
+
+
+def test_parts_guardrail_rolls_back_no_progress_repair_byte_exact(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    _write_required_files(tmp_path)
+    original = b"## Part 1\r\n\r\nCRLF report body.\r\n"
+    (tmp_path / "part1_final.md").write_bytes(original)
+
+    monkeypatch.setattr(
+        report_guardrails.validate_report_script,
+        "validate_report",
+        lambda _data_dir: [
+            {"severity": "error", "code": "persistent", "file": "part1_final.md"}
+        ],
+    )
+
+    def append_without_progress(data_dir: Path, *_args: Any, **_kwargs: Any) -> int:
+        path = data_dir / "part1_final.md"
+        path.write_bytes(path.read_bytes() + b"Unhelpful caveat.\n")
+        return 1
+
+    monkeypatch.setattr(
+        report_guardrails.repair_report_script,
+        "repair_report",
+        append_without_progress,
+    )
+
+    result = report_guardrails.run_report_guardrail(tmp_path, provider="ollama")
+
+    assert result["status"] == "failed"
+    assert result["changed_sections"] == 0
+    assert (tmp_path / "part1_final.md").read_bytes() == original
+
+
+def test_synthesis_table_overclaim_warning_is_idempotent(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    unsafe_row = (
+        "| Tumor-Vascular Spatial Association | Strong | "
+        "Spatial plots confirm epithelial-vascular co-localization |"
+    )
+    (tmp_path / "papers.json").write_text('{"papers": []}', encoding="utf-8")
+    (tmp_path / "synthesis.md").write_text(
+        "# Synthesis Report\n\n"
+        "## Emergent Themes Summary\n\n"
+        "| Theme | Strength | Supporting Evidence |\n"
+        "|---|---|---|\n"
+        f"{unsafe_row}\n",
+        encoding="utf-8",
+    )
+    model = StructuredRepairModel("unused")
+    monkeypatch.setattr(report_guardrails.repair_report_script, "_create_model", lambda *_: model)
+
+    first = report_guardrails.run_synthesis_guardrail(tmp_path, provider="ollama")
+    after_first = (tmp_path / "synthesis.md").read_bytes()
+    second = report_guardrails.run_synthesis_guardrail(tmp_path, provider="ollama")
+
+    assert first["status"] == "passed"
+    assert first["initial_error_count"] == 0
+    assert first["final_error_count"] == 0
+    assert first["changed_claims"] == 0
+    assert second["status"] == "passed"
+    assert second["initial_error_count"] == 0
+    assert second["repair_attempt_count"] == 0
+    assert second["changed_claims"] == 0
+    assert (tmp_path / "synthesis.md").read_bytes() == after_first
+    assert unsafe_row in after_first.decode("utf-8")
+
+
+def test_strict_phase_progress_accepts_only_safe_phase_transitions() -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    deterministic_error = [{"severity": "error", "code": "local"}]
+    semantic_errors = [
+        {"severity": "error", "code": "claim_rag_unsupported"},
+        {"severity": "error", "code": "claim_rag_overclaimed"},
+    ]
+
+    assert report_guardrails._strict_phase_progress(
+        deterministic_error,
+        "deterministic",
+        semantic_errors,
+        "semantic",
+    )
+    assert not report_guardrails._strict_phase_progress(
+        semantic_errors,
+        "semantic",
+        deterministic_error,
+        "deterministic",
+    )
+    assert report_guardrails._strict_phase_progress(
+        semantic_errors,
+        "semantic",
+        semantic_errors[:1],
+        "semantic",
+    )
+    assert not report_guardrails._strict_phase_progress(
+        semantic_errors,
+        "semantic",
+        semantic_errors,
+        "semantic",
+    )
+
+    old_a = {
+        "severity": "error",
+        "code": "claim_rag_unsupported",
+        "file": "part1_final.md",
+        "section": "## Old",
+        "value": "Old A",
+    }
+    old_b = {**old_a, "value": "Old B"}
+    new_a = {**old_a, "section": "## New", "value": "New A"}
+    new_b = {**new_a, "value": "New B"}
+    assert not report_guardrails._strict_phase_progress(
+        [old_a, old_b],
+        "semantic",
+        [new_a, new_b],
+        "semantic",
+    )
+    assert not report_guardrails._strict_phase_progress(
+        [old_a, old_b],
+        "semantic",
+        [old_a, new_b],
+        "semantic",
+    )
+
+
+def test_strict_phase_progress_allows_only_disjoint_repairable_inline_same_count() -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    def inline_issue(value: str, section: str = "## Cross-Part Themes") -> dict[str, str]:
+        return {
+            "severity": "error",
+            "code": "inline_citation_overclaimed",
+            "file": "synthesis.md",
+            "section": section,
+            "value": value,
+        }
+
+    reference = inline_issue(
+        "PMID: 18922900 - LRIG1 suppression in ErbB2+ tumors",
+        "## References",
+    )
+    prose = inline_issue(
+        "Literature support (PMID: 28174229, 26148232, 39753722) confirms an ErbB mechanism."
+    )
+    other = inline_issue("A second inline target.")
+    generic = {
+        "severity": "error",
+        "code": "synthesis_consistency_unresolved",
+        "file": "synthesis.md",
+        "section": "## Cross-Part Themes",
+        "value": "A generic semantic target.",
+    }
+
+    assert report_guardrails._strict_phase_progress(
+        [reference], "semantic", [prose], "semantic"
+    )
+    assert not report_guardrails._strict_phase_progress(
+        [reference], "semantic", [reference], "semantic"
+    )
+    assert not report_guardrails._strict_phase_progress(
+        [reference, other], "semantic", [other, prose], "semantic"
+    )
+    assert not report_guardrails._strict_phase_progress(
+        [reference], "semantic", [prose, other], "semantic"
+    )
+    assert not report_guardrails._strict_phase_progress(
+        [reference, other], "semantic", [prose, generic], "semantic"
+    )
+    assert not report_guardrails._strict_phase_progress(
+        [generic], "semantic", [{**generic, "value": "Another generic target."}], "semantic"
+    )
+    assert not report_guardrails._strict_phase_progress(
+        [reference], "semantic", [prose], "deterministic"
+    )
+    assert not report_guardrails._strict_phase_progress(
+        [], "semantic", [], "semantic"
+    )
+
+
+def test_synthesis_warning_issue_has_no_generic_repair_fields(tmp_path: Path) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    claim = (
+        "MISTy spatial evidence drives a therapy-resistant subpopulation. "
+        "This remains a hypothesis requiring validation."
+    )
+    (tmp_path / "papers.json").write_text('{"papers": []}', encoding="utf-8")
+    (tmp_path / "synthesis.md").write_text(
+        f"# Synthesis Report\n\n## Executive Summary\n\n{claim}\n",
+        encoding="utf-8",
+    )
+
+    [issue] = report_guardrails.validate_synthesis_report(tmp_path)
+
+    assert issue["code"] == "synthesis_overclaim_warning"
+    assert issue["severity"] == "warning"
+    assert "target_text" not in issue
+    assert "replacement_text" not in issue
 
 
 def test_run_synthesis_guardrail_validates_synthesis_claim_rag_artifacts(
@@ -178,7 +814,7 @@ def test_run_synthesis_guardrail_validates_synthesis_claim_rag_artifacts(
     )
     claim = "MISTy spatial evidence is associated with fibrosis (PMID: 11111111)."
     (tmp_path / "synthesis.md").write_text(
-        f"## Cross-Part Themes\n\n{claim}\n",
+        f"# Synthesis Report\n\n## Cross-Part Themes\n\n{claim}\n",
         encoding="utf-8",
     )
     called_filenames: list[tuple[str, ...]] = []
@@ -262,7 +898,7 @@ def test_run_synthesis_guardrail_removes_only_unsupported_sibling_citation(
     )
     claim = "TGFB is associated with fibrosis (PMID: 11111111; PMID: 22222222)."
     (tmp_path / "synthesis.md").write_text(
-        f"## Cross-Part Themes\n\n{claim}\n",
+        f"# Synthesis Report\n\n## Cross-Part Themes\n\n{claim}\n",
         encoding="utf-8",
     )
 
@@ -342,7 +978,225 @@ def test_run_synthesis_guardrail_removes_only_unsupported_sibling_citation(
     assert final["inline_citation_coverage"]["coverage_complete"] is True
 
 
-def test_run_synthesis_guardrail_hedges_sole_unsupported_inline_citation(
+def test_run_synthesis_guardrail_removes_grouped_non_supported_inline_pmids(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    pmids = ("11111111", "22222222", "33333333")
+    claim = "**Integration**: Mechanism A directly drives response (PMID: 11111111; PMID: 22222222; PMID: 33333333)."
+    (tmp_path / "papers.json").write_text(
+        json.dumps({"papers": [{"pmid": pmid, "abstract": "association-only evidence"} for pmid in pmids]}),
+        encoding="utf-8",
+    )
+    (tmp_path / "synthesis.md").write_text(
+        f"# Synthesis Report\n\n## Cross-Part Themes\n\n{claim}\n", encoding="utf-8"
+    )
+
+    validate_calls = 0
+
+    def fake_validate(_data_dir: Path, filenames: tuple[str, ...], **_kwargs: Any) -> dict[str, Any]:
+        nonlocal validate_calls
+        validate_calls += 1
+        assert filenames == ("synthesis.md",)
+        text = (tmp_path / "synthesis.md").read_text(encoding="utf-8")
+        remaining = [pmid for pmid in pmids if pmid in text]
+        claims = [{
+            "file": "synthesis.md", "section": "## Cross-Part Themes", "source_claim_index": 0,
+            "inline_pmid": pmid, "claim": claim, "status": "overclaimed" if pmid == "11111111" else "unverifiable",
+        } for pmid in remaining]
+        issues = [{
+            "code": "inline_citation_overclaimed", "severity": "error", "file": "synthesis.md",
+            "section": "## Cross-Part Themes", "source_claim_index": 0, "inline_pmid": remaining[0],
+            "value": claim, "target_text": claim,
+        }] if remaining else [{
+            "code": "claim_rag_overclaimed", "severity": "warning", "file": "synthesis.md",
+            "section": "## Cross-Part Themes", "value": "Mechanism A directly drives response.",
+        }]
+        return {
+            "claims": claims, "issues": issues,
+            "selection": {"selected_claim_count": len(claims)},
+            "inline_citation_coverage": {"expected_count": len(remaining), "evaluated_count": len(remaining),
+                                         "supported_count": 0, "coverage_complete": not remaining, "citations": claims},
+        }
+
+    monkeypatch.setattr(report_guardrails.claim_rag_validation, "validate_claims", fake_validate)
+    monkeypatch.setattr(
+        report_guardrails.repair_report_script, "_create_model",
+        lambda *_: (_ for _ in ()).throw(AssertionError("model must not be called")),
+    )
+
+    result = report_guardrails.run_synthesis_guardrail(tmp_path, provider="ollama")
+
+    repaired = (tmp_path / "synthesis.md").read_text(encoding="utf-8")
+    assert result["status"] == "passed"
+    assert result["repair_attempt_count"] == 1
+    assert result["changed_claims"] == 1
+    assert result["final_error_count"] == 0
+    assert all(pmid not in repaired for pmid in pmids)
+    assert validate_calls == 2
+    assert " ." not in repaired
+    assert "()" not in repaired
+
+
+def test_run_synthesis_guardrail_repairs_pair16_disjoint_inline_frontier(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    reference = (
+        "PMID: 18922900 - LRIG1 suppression in ErbB2+ tumors creates "
+        "feed-forward loop contributing to overexpression"
+    )
+    compound = (
+        "Literature support (PMID: 28174229, 26148232, 39753722) confirms "
+        "ErbB2 overexpression alters cellular phenotype, LRIG1 negatively "
+        "regulates ErbB3, and NRG1-ERBB3 signaling drives CTC survival."
+    )
+    pmids = ("18922900", "28174229", "26148232", "39753722")
+    (tmp_path / "papers.json").write_text(
+        json.dumps(
+            {
+                "papers": [
+                    {"pmid": pmid, "abstract": "captured Pair-16 evidence"}
+                    for pmid in pmids
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / "synthesis.md").write_text(
+        "# Synthesis Report\n\n"
+        f"## Cross-Part Themes\n\n{compound}\n\n"
+        f"## References\n\n{reference}\n",
+        encoding="utf-8",
+    )
+
+    validate_calls = 0
+
+    def citation(
+        *,
+        section: str,
+        index: int,
+        pmid: str,
+        claim: str,
+        status: str,
+    ) -> dict[str, Any]:
+        return {
+            "file": "synthesis.md",
+            "section": section,
+            "source_claim_index": index,
+            "inline_pmid": pmid,
+            "claim": claim,
+            "status": status,
+            "supporting_pmids": [pmid] if status == "supported" else [],
+            "evidence_quote": "captured Pair-16 evidence",
+            "reason": "captured Pair-16 judgment",
+        }
+
+    def hard_issue(row: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "code": "inline_citation_overclaimed",
+            "severity": "error",
+            "file": row["file"],
+            "section": row["section"],
+            "source_claim_index": row["source_claim_index"],
+            "inline_pmid": row["inline_pmid"],
+            "value": row["claim"],
+            "target_text": row["claim"],
+        }
+
+    def fake_validate(
+        _data_dir: Path,
+        filenames: tuple[str, ...],
+        **_kwargs: Any,
+    ) -> dict[str, Any]:
+        nonlocal validate_calls
+        validate_calls += 1
+        assert filenames == ("synthesis.md",)
+        text = (tmp_path / "synthesis.md").read_text(encoding="utf-8")
+        if reference in text:
+            claims = [
+                citation(
+                    section="## References",
+                    index=4,
+                    pmid="18922900",
+                    claim=reference,
+                    status="overclaimed",
+                )
+            ]
+            issues = [hard_issue(claims[0])]
+        elif "28174229" in text:
+            claims = [
+                citation(
+                    section="## Cross-Part Themes",
+                    index=13,
+                    pmid=pmid,
+                    claim=compound,
+                    status="overclaimed" if pmid == "28174229" else "supported",
+                )
+                for pmid in ("28174229", "26148232", "39753722")
+            ]
+            issues = [hard_issue(claims[0])]
+        else:
+            claims = [
+                citation(
+                    section="## Cross-Part Themes",
+                    index=13,
+                    pmid=pmid,
+                    claim=compound,
+                    status="supported",
+                )
+                for pmid in ("26148232", "39753722")
+            ]
+            issues = []
+        return {
+            "claims": claims,
+            "issues": issues,
+            "selection": {"selected_claim_count": len(claims)},
+            "inline_citation_coverage": {
+                "expected_count": len(claims),
+                "evaluated_count": len(claims),
+                "supported_count": sum(
+                    row["status"] == "supported" for row in claims
+                ),
+                "coverage_complete": not issues,
+                "citations": claims,
+            },
+        }
+
+    monkeypatch.setattr(
+        report_guardrails.claim_rag_validation,
+        "validate_claims",
+        fake_validate,
+    )
+    monkeypatch.setattr(
+        report_guardrails.repair_report_script,
+        "_create_model",
+        lambda *_: (_ for _ in ()).throw(AssertionError("model must not be called")),
+    )
+
+    result = report_guardrails.run_synthesis_guardrail(
+        tmp_path,
+        provider="ollama",
+    )
+
+    repaired = (tmp_path / "synthesis.md").read_text(encoding="utf-8")
+    assert result["status"] == "passed"
+    assert result["initial_error_count"] == 1
+    assert result["repair_attempt_count"] == 2
+    assert result["terminal_repair_count"] == 0
+    assert result["changed_claims"] == 2
+    assert result["final_error_count"] == 0
+    assert reference not in repaired
+    assert "28174229" not in repaired
+    assert "26148232" in repaired
+    assert "39753722" in repaired
+    assert validate_calls == 3
+
+
+def test_run_synthesis_guardrail_removes_sole_failed_inline_pmid_without_model(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from src.agents.deep_interpreter import report_guardrails
@@ -353,7 +1207,7 @@ def test_run_synthesis_guardrail_hedges_sole_unsupported_inline_citation(
     )
     claim = "TGFB drives fibrosis (PMID: 22222222)."
     (tmp_path / "synthesis.md").write_text(
-        f"## Cross-Part Themes\n\n{claim}\n",
+        f"# Synthesis Report\n\n## Cross-Part Themes\n\n{claim}\n",
         encoding="utf-8",
     )
 
@@ -364,22 +1218,31 @@ def test_run_synthesis_guardrail_hedges_sole_unsupported_inline_citation(
     ) -> dict[str, Any]:
         assert filenames == ("synthesis.md",)
         text = (tmp_path / "synthesis.md").read_text(encoding="utf-8")
-        hedged = "hypothesis requiring validation" in text.lower()
+        has_failed_pmid = "PMID: 22222222" in text
         citation = {
             "file": "synthesis.md",
             "section": "## Cross-Part Themes",
             "source_claim_index": 0,
-            "inline_pmid": "22222222",
-            "claim": claim,
-            "status": "overclaimed" if not hedged else "supported",
+            "inline_pmid": "22222222" if has_failed_pmid else "",
+            "claim": claim if has_failed_pmid else "TGFB drives fibrosis.",
+            "status": "overclaimed",
             "supporting_pmids": [],
             "evidence_quote": "association only",
             "reason": "paper supports association only",
         }
         return {
             "claims": [citation],
-            "issues": []
-            if hedged
+            "issues": [
+                {
+                    "code": "claim_rag_overclaimed",
+                    "severity": "warning",
+                    "file": "synthesis.md",
+                    "section": "## Cross-Part Themes",
+                    "source_claim_index": 0,
+                    "value": "TGFB drives fibrosis.",
+                }
+            ]
+            if not has_failed_pmid
             else [
                 {
                     "code": "inline_citation_overclaimed",
@@ -389,14 +1252,15 @@ def test_run_synthesis_guardrail_hedges_sole_unsupported_inline_citation(
                     "source_claim_index": 0,
                     "inline_pmid": "22222222",
                     "value": claim,
+                    "target_text": claim,
                 }
             ],
             "selection": {"selected_claim_count": 1},
             "inline_citation_coverage": {
                 "expected_count": 1,
                 "evaluated_count": 1,
-                "supported_count": 1 if hedged else 0,
-                "coverage_complete": hedged,
+                "supported_count": 0,
+                "coverage_complete": not has_failed_pmid,
                 "citations": [citation],
             },
         }
@@ -404,16 +1268,30 @@ def test_run_synthesis_guardrail_hedges_sole_unsupported_inline_citation(
     monkeypatch.setattr(
         report_guardrails.claim_rag_validation, "validate_claims", fake_claim_validate
     )
+    monkeypatch.setattr(
+        report_guardrails.repair_report_script,
+        "_create_model",
+        lambda *_: (_ for _ in ()).throw(AssertionError("model should not be called")),
+    )
 
     result = report_guardrails.run_synthesis_guardrail(tmp_path, provider="ollama")
 
     synthesis = (tmp_path / "synthesis.md").read_text(encoding="utf-8")
+    final = json.loads(
+        (tmp_path / "synthesis_guardrail_final.json").read_text(encoding="utf-8")
+    )
     assert result["status"] == "passed"
-    assert "PMID: 22222222" in synthesis
-    assert "hypothesis requiring validation" in synthesis.lower()
+    assert result["final_error_count"] == 0
+    assert "TGFB drives fibrosis" in synthesis
+    assert "22222222" not in synthesis
+    assert "()" not in synthesis
+    assert not [issue for issue in final["issues"] if issue["severity"] == "error"]
+    warnings = [issue for issue in final["issues"] if issue["code"] == "claim_rag_overclaimed"]
+    assert warnings
+    assert all("target_text" not in issue for issue in warnings)
 
 
-def test_repair_synthesis_report_rewrites_explicit_inline_contradiction(
+def test_repair_synthesis_report_uses_exact_evidence_fallback_for_explicit_inline_contradiction(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from src.agents.deep_interpreter import report_guardrails
@@ -435,17 +1313,19 @@ def test_repair_synthesis_report_rewrites_explicit_inline_contradiction(
         }
     ]
 
-    model = SimpleNamespace(
-        invoke=lambda _prompt: (
-            "Higher LAMA5 expression was associated with better recurrence-free "
-            "survival (PMID: 40694271). This remains a hypothesis requiring validation."
-        )
-    )
-    monkeypatch.setattr(report_guardrails.repair_report_script, "_create_model", lambda *_: model)
+    model_call_count = 0
+
+    def create_model(*_args: Any) -> Any:
+        nonlocal model_call_count
+        model_call_count += 1
+        return SimpleNamespace(invoke=lambda _prompt: "unreachable")
+
+    monkeypatch.setattr(report_guardrails.repair_report_script, "_create_model", create_model)
 
     assert report_guardrails.repair_synthesis_report(tmp_path, issues) == 1
     text = (tmp_path / "synthesis.md").read_text(encoding="utf-8")
-    assert "better recurrence-free survival (PMID: 40694271)" in text
+    assert model_call_count == 0
+    assert "Higher LAMA5 expression was associated with better recurrence-free survival" in text
     assert "This remains a hypothesis requiring validation." in text
     assert "worse recurrence-free survival" not in text
 
@@ -481,6 +1361,190 @@ def test_repair_synthesis_report_falls_back_when_contradiction_rewrite_omits_pmi
     assert "worse recurrence-free survival" not in text
 
 
+def test_repair_synthesis_report_runs_generic_repair_after_trusted_handlers(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    sibling_claim = "TGFB is associated with fibrosis (PMID: 11111111; PMID: 22222222)."
+    generic_claim = "CXCL12 drives immune migration."
+    (tmp_path / "synthesis.md").write_text(
+        f"## Cross-Part Themes\n\n{sibling_claim}\n{generic_claim}\n",
+        encoding="utf-8",
+    )
+    issues = [
+        {
+            "code": "inline_citation_unsupported",
+            "severity": "error",
+            "file": "synthesis.md",
+            "section": "## Cross-Part Themes",
+            "source_claim_index": 0,
+            "inline_pmid": "22222222",
+            "value": sibling_claim,
+            "target_text": sibling_claim,
+        },
+        {
+            "code": "claim_rag_unsupported",
+            "severity": "error",
+            "file": "synthesis.md",
+            "section": "## Cross-Part Themes",
+            "value": generic_claim,
+            "target_text": generic_claim,
+        },
+    ]
+    claims = [
+        {
+            "file": "synthesis.md",
+            "section": "## Cross-Part Themes",
+            "source_claim_index": 0,
+            "inline_pmid": "11111111",
+            "status": "supported",
+        }
+    ]
+    generic_batches: list[list[dict[str, Any]]] = []
+
+    def fake_repair_issues(
+        data_dir: Path,
+        repair_issues: list[dict[str, Any]],
+        *,
+        llm: Any | None = None,
+        provider: str | None = None,
+        claim_validation: list[dict[str, Any]] | None = None,
+    ) -> int:
+        _ = llm, provider, claim_validation
+        generic_batches.append(repair_issues)
+        assert "22222222" not in (data_dir / "synthesis.md").read_text(encoding="utf-8")
+        repaired = (data_dir / "synthesis.md").read_text(encoding="utf-8").replace(
+            generic_claim,
+            "CXCL12 is associated with immune migration.",
+        )
+        (data_dir / "synthesis.md").write_text(repaired, encoding="utf-8")
+        return 1
+
+    monkeypatch.setattr(
+        report_guardrails.repair_report_script,
+        "repair_issues",
+        fake_repair_issues,
+    )
+
+    assert report_guardrails.repair_synthesis_report(tmp_path, issues, claims) == 2
+    assert [[issue["code"] for issue in batch] for batch in generic_batches] == [
+        ["claim_rag_unsupported"]
+    ]
+    text = (tmp_path / "synthesis.md").read_text(encoding="utf-8")
+    assert "11111111" in text
+    assert "22222222" not in text
+    assert "CXCL12 is associated with immune migration." in text
+
+
+def test_repair_synthesis_report_routes_targeted_overclaim_to_generic_repair(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    claim = "MISTy spatial evidence drives a therapy-resistant subpopulation."
+    replacement = "MISTy spatial evidence is associated with a candidate subpopulation."
+    (tmp_path / "synthesis.md").write_text(
+        f"## Executive Summary\n\n{claim}\n",
+        encoding="utf-8",
+    )
+    issues = [
+        {
+            "code": "unsupported_synthesis_overclaim",
+            "severity": "error",
+            "file": "synthesis.md",
+            "section": "## Executive Summary",
+            "value": claim,
+            "target_text": claim,
+            "evidence": "No direct therapeutic validation was provided.",
+            "repair_instruction": "Rewrite as association or hypothesis.",
+        }
+    ]
+    generic_batches: list[list[dict[str, Any]]] = []
+
+    def fake_repair_issues(
+        data_dir: Path,
+        repair_issues: list[dict[str, Any]],
+        *,
+        llm: Any | None = None,
+        provider: str | None = None,
+        claim_validation: list[dict[str, Any]] | None = None,
+    ) -> int:
+        _ = llm, provider, claim_validation
+        generic_batches.append(repair_issues)
+        text = (data_dir / "synthesis.md").read_text(encoding="utf-8")
+        (data_dir / "synthesis.md").write_text(
+            text.replace(claim, replacement),
+            encoding="utf-8",
+        )
+        return 1
+
+    monkeypatch.setattr(
+        report_guardrails.repair_report_script,
+        "repair_issues",
+        fake_repair_issues,
+    )
+
+    assert report_guardrails.repair_synthesis_report(tmp_path, issues) == 1
+    assert [[issue["code"] for issue in batch] for batch in generic_batches] == [
+        ["unsupported_synthesis_overclaim"]
+    ]
+    assert (tmp_path / "synthesis.md").read_text(encoding="utf-8") == (
+        f"## Executive Summary\n\n{replacement}\n"
+    )
+
+
+def test_repair_synthesis_report_uses_structured_delete_for_targeted_issue(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    target = "CXCL12 directly drives immune migration."
+    original = f"## Cross-Part Themes\n\nKeep before.\n{target}\nKeep after.\n"
+    synthesis = tmp_path / "synthesis.md"
+    synthesis.write_text(original, encoding="utf-8")
+    issues = [{
+        "severity": "error",
+        "code": "claim_rag_unsupported",
+        "file": synthesis.name,
+        "section": "## Cross-Part Themes",
+        "value": target,
+        "target_text": target,
+        "evidence": "No retrieved evidence supports the causal assertion.",
+        "repair_instruction": "Remove the unsupported assertion.",
+    }]
+
+    class DeleteDecisionLLM:
+        def with_structured_output(self, schema, **_kwargs):
+            self.schema = schema
+            return self
+
+        def invoke(self, _prompt: str):
+            return self.schema(action="delete", replacement_text="")
+
+    monkeypatch.setattr(
+        report_guardrails.repair_report_script,
+        "_create_model",
+        lambda _provider: DeleteDecisionLLM(),
+    )
+
+    changed = report_guardrails.repair_synthesis_report(
+        tmp_path,
+        issues,
+        provider="ollama",
+    )
+
+    repaired = synthesis.read_text(encoding="utf-8")
+    assert changed == 1
+    assert target not in repaired
+    assert "Keep before." in repaired
+    assert "Keep after." in repaired
+    assert [line for line in repaired.splitlines() if line.startswith("#")] == [
+        line for line in original.splitlines() if line.startswith("#")
+    ]
+
+
 def test_run_synthesis_guardrail_repairs_claim_rag_inline_contradiction(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -499,7 +1563,7 @@ def test_run_synthesis_guardrail_repairs_claim_rag_inline_contradiction(
         encoding="utf-8",
     )
     (tmp_path / "synthesis.md").write_text(
-        f"## Integrated Biological Narrative\n\n{claim}\n",
+        f"# Synthesis Report\n\n## Integrated Biological Narrative\n\n{claim}\n",
         encoding="utf-8",
     )
 
@@ -573,16 +1637,21 @@ def test_run_synthesis_guardrail_repairs_claim_rag_inline_contradiction(
 
     result = report_guardrails.run_synthesis_guardrail(tmp_path, provider="ollama")
 
-    initial = json.loads(
-        (tmp_path / "synthesis_guardrail_initial.json").read_text(encoding="utf-8")
+    semantic_initial = json.loads(
+        (tmp_path / "synthesis_guardrail_semantic_initial.json").read_text(
+            encoding="utf-8"
+        )
     )
     text = (tmp_path / "synthesis.md").read_text(encoding="utf-8")
-    assert repair_model_call_count == 1
-    assert repair_model_providers == ["ollama"]
+    assert repair_model_call_count == 0
+    assert repair_model_providers == []
     assert result["status"] == "passed"
-    assert result["repair_attempt_count"] == 2
-    assert initial["issues"][0]["reason"].startswith("The claim incorrectly states")
-    assert initial["issues"][0]["evidence_quote"] == evidence_quote
+    assert result["repair_attempt_count"] == 1
+    contradiction = next(
+        issue for issue in semantic_initial["issues"] if issue["code"] == "inline_citation_overclaimed"
+    )
+    assert contradiction["reason"].startswith("The claim incorrectly states")
+    assert contradiction["evidence_quote"] == evidence_quote
     assert "better recurrence-free survival (PMID: 40694271)" in text
     assert "worse recurrence-free survival" not in text
 
@@ -619,6 +1688,7 @@ def test_run_synthesis_guardrail_fails_unresolved_consistency_issue(
     from src.agents.deep_interpreter import report_guardrails
 
     synthesis = "### 1. EGFR (Combined Score: 15)\n"
+    expected = f"# Synthesis Report\n\n{synthesis}"
     _write_consistency_guardrail_fixture(tmp_path, synthesis)
 
     result = report_guardrails.run_synthesis_guardrail(tmp_path)
@@ -626,7 +1696,7 @@ def test_run_synthesis_guardrail_fails_unresolved_consistency_issue(
     final = json.loads(
         (tmp_path / "synthesis_guardrail_final.json").read_text(encoding="utf-8")
     )
-    assert (tmp_path / "synthesis.md").read_text(encoding="utf-8") == synthesis
+    assert (tmp_path / "synthesis.md").read_text(encoding="utf-8") == expected
     assert result["status"] == "failed"
     assert result["repair_attempt_count"] == 1
     assert final["issues"][-1]["code"] == "synthesis_consistency_unresolved"
@@ -634,8 +1704,23 @@ def test_run_synthesis_guardrail_fails_unresolved_consistency_issue(
 
 def test_run_synthesis_guardrail_rejects_html_fragment_synthesis(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from src.agents.deep_interpreter import report_guardrails
+
+    def fail_if_called(*_args: Any, **_kwargs: Any) -> Any:
+        raise AssertionError("semantic validation must wait for valid Markdown")
+
+    monkeypatch.setattr(
+        report_guardrails.claim_rag_validation,
+        "validate_claims",
+        fail_if_called,
+    )
+    monkeypatch.setattr(
+        report_guardrails.synthesis_consistency_validation,
+        "validate_synthesis_consistency",
+        fail_if_called,
+    )
 
     (tmp_path / "papers.json").write_text('{"papers": []}', encoding="utf-8")
     (tmp_path / "synthesis.md").write_text(
@@ -662,6 +1747,7 @@ def test_run_synthesis_guardrail_allows_neutral_clinical_context(
         encoding="utf-8",
     )
     synthesis = (
+        "# Synthesis Report\n\n"
         "## Executive Summary\n\n"
         "MISTy spatial analysis used clinical metadata from the treatment cohort "
         "(PMID: 12345678).\n"
@@ -678,8 +1764,8 @@ def test_run_synthesis_guardrail_allows_neutral_clinical_context(
     assert (tmp_path / "synthesis.md").read_text(encoding="utf-8") == synthesis
 
 
-def test_run_synthesis_guardrail_repairs_duplicate_overclaims_once_each(
-    tmp_path: Path,
+def test_run_synthesis_guardrail_leaves_duplicate_semantic_overclaims_as_warnings(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from src.agents.deep_interpreter import report_guardrails
 
@@ -689,17 +1775,26 @@ def test_run_synthesis_guardrail_repairs_duplicate_overclaims_once_each(
     )
     claim = "MISTy spatial evidence drives a therapy-resistant subpopulation (PMID: 12345678)."
     (tmp_path / "synthesis.md").write_text(
-        f"## Executive Summary\n\n{claim}\n\n{claim}\n",
+        f"# Synthesis Report\n\n## Executive Summary\n\n{claim}\n\n{claim}\n",
         encoding="utf-8",
+    )
+    repair_model = StructuredRepairModel(
+        "MISTy spatial evidence is associated with a candidate subpopulation "
+        "(PMID: 12345678). This remains a hypothesis requiring validation."
+    )
+    monkeypatch.setattr(
+        report_guardrails.repair_report_script,
+        "_create_model",
+        lambda *_: repair_model,
     )
 
     result = report_guardrails.run_synthesis_guardrail(tmp_path)
     synthesis = (tmp_path / "synthesis.md").read_text(encoding="utf-8")
 
     assert result["status"] == "passed"
-    assert result["changed_claims"] == 2
-    assert synthesis.count("hypothesis requiring validation") == 2
-    assert f"{claim} this remains a hypothesis requiring validation. this remains" not in synthesis
+    assert result["repair_attempt_count"] == 0
+    assert result["changed_claims"] == 0
+    assert synthesis.count(claim) == 2
 
 
 def test_run_synthesis_guardrail_allows_negated_therapeutic_limitation(
@@ -712,6 +1807,7 @@ def test_run_synthesis_guardrail_allows_negated_therapeutic_limitation(
         encoding="utf-8",
     )
     synthesis = (
+        "# Synthesis Report\n\n"
         "## Limitations\n\n"
         "MISTy spatial evidence does not establish a therapeutic vulnerability "
         "(PMID: 12345678).\n"
@@ -737,6 +1833,7 @@ def test_run_synthesis_guardrail_allows_negated_therapeutic_proof_limitation(
         encoding="utf-8",
     )
     synthesis = (
+        "# Synthesis Report\n\n"
         "## Limitations\n\n"
         "MISTy spatial evidence does not prove therapeutic vulnerability "
         "(PMID: 12345678).\n"
@@ -790,7 +1887,7 @@ def test_run_synthesis_guardrail_retries_up_to_three_repairs(
     assert repair_count == 3
     assert result["status"] == "passed"
     assert result["repair_attempt_count"] == 3
-    assert result["changed_claims"] == 3
+    assert result["changed_claims"] == 1
     assert result["final_error_count"] == 0
 
 
@@ -801,19 +1898,21 @@ def test_run_synthesis_guardrail_terminally_repairs_new_final_error(
     from src.agents.deep_interpreter import report_guardrails
 
     _write_synthesis_required_files(tmp_path)
-    persistent = {
+    old_a = {
         "severity": "error",
-        "code": "existing_error",
+        "code": "old_a",
         "file": "synthesis.md",
-        "section": "## Existing",
-        "value": "Existing error",
+        "section": "## Summary",
+        "value": "Old A",
     }
+    old_b = {**old_a, "code": "old_b", "value": "Old B"}
+    old_c = {**old_a, "code": "old_c", "value": "Old C"}
     latent = {
         "severity": "warning",
         "code": "claim_rag_unverifiable",
         "file": "synthesis.md",
-        "section": "## Clinical/Biological Implications",
-        "value": "Analysis-derived claim",
+        "section": "## Summary",
+        "value": "New semantic claim",
     }
     promoted = {
         **latent,
@@ -825,9 +1924,9 @@ def test_run_synthesis_guardrail_terminally_repairs_new_final_error(
         "code": "claim_rag_hypothesis_warning",
     }
     validations = [
-        [persistent, latent],
-        [persistent, latent],
-        [persistent, latent],
+        [old_a, old_b, old_c, latent],
+        [old_a, old_b, latent],
+        [old_a, old_b, latent],
         [promoted],
         [repaired],
     ]
@@ -845,12 +1944,13 @@ def test_run_synthesis_guardrail_terminally_repairs_new_final_error(
         dict[str, list[dict[str, Any]]],
         None,
         None,
+        str,
     ]:
         nonlocal validate_count
         _ = provider, claim_cache
         issues = validations[validate_count]
         validate_count += 1
-        return issues, [], {"issues": [], "results": []}, None, None
+        return issues, [], {"issues": [], "results": []}, None, None, "semantic"
 
     def fake_repair(
         _data_dir: Path,
@@ -858,12 +1958,9 @@ def test_run_synthesis_guardrail_terminally_repairs_new_final_error(
         _claim_validation: list[dict[str, Any]] | None = None,
         *,
         provider: str | None = None,
-        deterministic_contradictions: bool = False,
     ) -> int:
         _ = provider
         repaired_issue_batches.append(issues)
-        if len(repaired_issue_batches) == 4:
-            assert deterministic_contradictions is True
         return 1
 
     monkeypatch.setattr(report_guardrails, "_validate_synthesis_guardrails", fake_validate)
@@ -908,11 +2005,12 @@ def test_run_synthesis_guardrail_does_not_terminally_retry_persistent_error(
         dict[str, list[dict[str, Any]]],
         None,
         None,
+        str,
     ]:
         nonlocal validate_count
         _ = provider, claim_cache
         validate_count += 1
-        return [persistent], [], {"issues": [], "results": []}, None, None
+        return [persistent], [], {"issues": [], "results": []}, None, None, "semantic"
 
     def fake_repair(
         _data_dir: Path,
@@ -937,6 +2035,7 @@ def test_run_synthesis_guardrail_does_not_terminally_retry_persistent_error(
     assert result["status"] == "failed"
     assert result["repair_attempt_count"] == 3
     assert result["terminal_repair_count"] == 0
+    assert result["changed_claims"] == 0
     assert result["final_error_count"] == 1
 
 
@@ -995,8 +2094,11 @@ def test_run_report_guardrail_stops_after_first_successful_repair(
     assert result == {
         "status": "passed",
         "initial_issue_count": 1,
+        "deterministic_initial_error_count": 1,
+        "semantic_initial_error_count": 0,
         "initial_error_count": 1,
         "repair_attempt_count": 1,
+        "terminal_repair_count": 0,
         "changed_sections": 1,
         "final_issue_count": 1,
         "final_error_count": 0,
@@ -1187,8 +2289,8 @@ def test_run_report_guardrail_preserves_claim_selection_after_repair(
     )
     assert result["status"] == "passed"
     assert result["repair_attempt_count"] == 1
-    assert claim_calls == 2
-    assert final["claim_selection"] == selections[1]
+    assert claim_calls == 1
+    assert final["claim_selection"] == selections[0]
 
 
 def test_run_report_guardrail_retries_up_to_three_repairs(
@@ -1237,8 +2339,148 @@ def test_run_report_guardrail_retries_up_to_three_repairs(
     ]
     assert result["status"] == "passed"
     assert result["repair_attempt_count"] == 3
-    assert result["changed_sections"] == 3
+    assert result["changed_sections"] == 1
     assert result["final_error_count"] == 0
+
+
+def test_run_report_guardrail_terminally_repairs_new_final_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    _write_required_files(tmp_path)
+    old_a = {
+        "severity": "error",
+        "code": "old_a",
+        "file": "part2_final.md",
+        "section": "## Existing",
+        "value": "Old A",
+    }
+    old_b = {**old_a, "code": "old_b", "value": "Old B"}
+    old_c = {**old_a, "code": "old_c", "value": "Old C"}
+    latent = {
+        "severity": "warning",
+        "code": "claim_rag_unverifiable",
+        "file": "part2_final.md",
+        "section": "## Analysis",
+        "value": "Lrig1 directionality claim.",
+    }
+    promoted = {
+        **latent,
+        "severity": "error",
+        "code": "claim_rag_unsupported",
+    }
+    repaired = {
+        **latent,
+        "code": "claim_rag_hypothesis_warning",
+    }
+    validations = [
+        [old_a, old_b, old_c, latent],
+        [old_a, old_b, latent],
+        [old_a, old_b, latent],
+        [promoted],
+        [repaired],
+    ]
+    validate_count = 0
+    repaired_issue_batches: list[list[dict[str, str]]] = []
+
+    def fake_validate(
+        _data_dir: Path,
+        *,
+        provider: str | None,
+        claim_cache: dict[str, list[dict[str, Any]]],
+        filenames: tuple[str, ...],
+    ) -> tuple[list[dict[str, str]], list[dict[str, Any]], None, None, str]:
+        nonlocal validate_count
+        _ = provider, claim_cache, filenames
+        issues = validations[validate_count]
+        validate_count += 1
+        return issues, [], None, None, "semantic"
+
+    def fake_repair(
+        _data_dir: Path,
+        issues_path: Path,
+        *,
+        provider: str | None = None,
+        llm=None,
+        claim_validation: list[dict[str, Any]] | None = None,
+    ) -> int:
+        _ = provider, llm, claim_validation
+        payload = json.loads(issues_path.read_text(encoding="utf-8"))
+        repaired_issue_batches.append(payload["issues"])
+        return 1
+
+    monkeypatch.setattr(report_guardrails, "_validate_part_reports", fake_validate)
+    monkeypatch.setattr(report_guardrails.repair_report_script, "repair_report", fake_repair)
+
+    result = report_guardrails.run_report_guardrail(tmp_path, provider="ollama")
+    terminal = json.loads(
+        (tmp_path / "report_validation_terminal.json").read_text(encoding="utf-8")
+    )
+
+    assert validate_count == 5
+    assert len(repaired_issue_batches) == 4
+    assert repaired_issue_batches[-1] == [promoted]
+    assert terminal["phase"] == "semantic"
+    assert result["status"] == "passed"
+    assert result["repair_attempt_count"] == 3
+    assert result["terminal_repair_count"] == 1
+    assert result["final_error_count"] == 0
+
+
+def test_run_report_guardrail_does_not_terminally_retry_persistent_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from src.agents.deep_interpreter import report_guardrails
+
+    _write_required_files(tmp_path)
+    persistent = {
+        "severity": "error",
+        "code": "claim_rag_unsupported",
+        "file": "part2_final.md",
+        "section": "## Analysis",
+        "value": "Persistent unsupported claim.",
+    }
+    validate_count = 0
+    repair_count = 0
+
+    def fake_validate(
+        _data_dir: Path,
+        *,
+        provider: str | None,
+        claim_cache: dict[str, list[dict[str, Any]]],
+        filenames: tuple[str, ...],
+    ) -> tuple[list[dict[str, str]], list[dict[str, Any]], None, None, str]:
+        nonlocal validate_count
+        _ = provider, claim_cache, filenames
+        validate_count += 1
+        return [persistent], [], None, None, "semantic"
+
+    def fake_repair(
+        _data_dir: Path,
+        _issues_path: Path,
+        *,
+        provider: str | None = None,
+        llm=None,
+        claim_validation: list[dict[str, Any]] | None = None,
+    ) -> int:
+        nonlocal repair_count
+        _ = provider, llm, claim_validation
+        repair_count += 1
+        return 1
+
+    monkeypatch.setattr(report_guardrails, "_validate_part_reports", fake_validate)
+    monkeypatch.setattr(report_guardrails.repair_report_script, "repair_report", fake_repair)
+
+    result = report_guardrails.run_report_guardrail(tmp_path)
+
+    assert validate_count == 4
+    assert repair_count == 3
+    assert result["status"] == "failed"
+    assert result["repair_attempt_count"] == 3
+    assert result["terminal_repair_count"] == 0
+    assert result["changed_sections"] == 0
+    assert result["final_error_count"] == 1
 
 
 def test_run_report_guardrail_records_remaining_errors_without_raising(
@@ -1273,7 +2515,7 @@ def test_run_report_guardrail_records_remaining_errors_without_raising(
 
     result = report_guardrails.run_report_guardrail(tmp_path)
 
-    assert validate_count == 2
+    assert validate_count == 1
     assert repair_count == 1
     assert result["status"] == "failed"
     assert result["repair_attempt_count"] == 1

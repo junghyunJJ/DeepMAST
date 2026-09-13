@@ -7,6 +7,7 @@ import re
 import pytest
 
 from src.agents.deep_interpreter.subagents.prompts import SUBAGENT_PROMPTS
+from src.agents.deep_interpreter.subagents.configs import SUBAGENT_CONFIGS
 
 
 REPORTER_PROMPT = SUBAGENT_PROMPTS["reporter"]
@@ -80,7 +81,7 @@ def test_reporter_think_tool_is_available_not_runtime_enforced():
 
 def _extract_phase47_block() -> str:
     match = re.search(
-        r"### Phase 4\.7:.*?(?=### Phase 5\.0:)",
+        r"### Phase 4\.7:.*?(?=### Phase 5(?:\.0)?:)",
         REPORTER_PROMPT,
         flags=re.DOTALL,
     )
@@ -90,11 +91,11 @@ def _extract_phase47_block() -> str:
 
 def _extract_phase5_block() -> str:
     match = re.search(
-        r"### Phase 5\.0:.*?(?=### Phase 6:)",
+        r"### Phase 5(?:\.0)?:.*?(?=### Phase 6:)",
         REPORTER_PROMPT,
         flags=re.DOTALL,
     )
-    assert match, "Could not locate Phase 5.0 block in REPORTER prompt"
+    assert match, "Could not locate Phase 5 block in REPORTER prompt"
     return match.group(0)
 
 
@@ -124,16 +125,15 @@ def test_reporter_phase47_treats_part4_as_canonical_and_drug_md_as_supporting():
     assert "do not duplicate" in block
 
 
-def test_reporter_template_mode_uses_part4_synthesis_source():
+def test_reporter_finalizer_uses_part4_synthesis_source():
     prompt = REPORTER_PROMPT
 
-    assert '"template_mode": "comprehensive"' in prompt
     assert "part4_therapeutic_synthesis.md" in prompt
-    assert "Therapeutic Implications tab" in prompt
+    assert "Therapeutic Implications section" in prompt
 
 
-def test_reporter_phase5_uses_comprehensive_template_mode():
-    assert '"template_mode": "comprehensive"' in REPORTER_PROMPT
+def test_reporter_phase5_leaves_template_mode_to_code():
+    assert '"template_mode": "comprehensive"' not in REPORTER_PROMPT
     assert '"part1_html":' not in REPORTER_PROMPT
     assert '"part2_html":' not in REPORTER_PROMPT
     assert '"part3_html":' not in REPORTER_PROMPT
@@ -163,21 +163,33 @@ def test_reporter_rag_validation_passes_explicit_data_dir():
     ), "REPORTER validate_claim_fulltext calls must pass explicit data_dir"
 
 
-def test_reporter_phase5_states_synthesis_guardrail_runs_before_html():
+def test_reporter_hands_finalization_to_wrapper_code():
     block = _extract_phase5_block()
 
-    assert "synthesis guardrail" in block.lower()
-    assert "generate_html_report" in block
-    assert block.lower().index("synthesis guardrail") < block.index("generate_html_report")
+    assert "deterministic finalizer" in block.lower()
+    assert "stop after" in block.lower()
+    assert "synthesis.md" in block
+    assert "generate_html_report(" not in block
 
 
-def test_reporter_phase5_delegates_bookkeeping_artifacts_to_report_tool():
+def test_reporter_tool_list_excludes_html_orchestration():
+    names = {
+        getattr(tool, "name", getattr(tool, "__name__", ""))
+        for tool in SUBAGENT_CONFIGS["reporter"]["tools"]
+    }
+    assert "generate_html_report" not in names
+
+
+def test_reporter_phase5_omits_manual_html_authoring_policy():
     block = _extract_phase5_block()
 
-    assert "generate_html_report" in block
-    assert "writes `/synthesis_validation.json` and `/synthesis_targets.json`" in block
-    assert 'write_file("/synthesis_validation.json"' not in block
-    assert 'write_file("/synthesis_targets.json"' not in block
+    assert "generate_html_report(" not in block
+    assert "parts={" not in block
+    assert "```html" not in block
+    assert "Blueprint" not in block
+    assert "Citation Conversion Rules" not in block
+    assert "Semantic Highlighting Rules" not in block
+    assert "Table Formatting Rules" not in block
 
 
 def test_reporter_never_hand_writes_reporter_bookkeeping_artifacts():
