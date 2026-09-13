@@ -500,7 +500,7 @@ async def test_reporter_recovery_retains_all_invalid_retry_error_codes(
 
 
 @pytest.mark.asyncio
-async def test_reporter_finalization_renders_missing_html_without_rewriting_valid_sidecars(
+async def test_reporter_finalization_revalidates_sidecars_when_html_is_missing(
     tmp_path: Path,
 ) -> None:
     _write_valid_synthesis(tmp_path)
@@ -516,6 +516,7 @@ async def test_reporter_finalization_renders_missing_html_without_rewriting_vali
 
     async def finalize(root: Path, required: tuple[str, ...]) -> dict[str, Any]:
         finalizer_calls.append(required)
+        _write_reporter_outputs_by_name(root, required)
         (root / "CCI_Analysis_Report.html").write_text(
             "<!DOCTYPE html><html><body>ok</body></html>",
             encoding="utf-8",
@@ -541,7 +542,7 @@ async def test_reporter_finalization_renders_missing_html_without_rewriting_vali
 
     assert result == {"content": "done"}
     assert prompts == ["report"]
-    assert finalizer_calls == [("CCI_Analysis_Report.html",)]
+    assert finalizer_calls == [("synthesis_validation.json", "synthesis_targets.json", "CCI_Analysis_Report.html")]
     after = _reporter_output_state(tmp_path)
     for name in ("synthesis.md", "synthesis_validation.json", "synthesis_targets.json"):
         assert after[name] == before[name]
@@ -590,7 +591,7 @@ async def test_reporter_finalization_refreshes_all_sidecars_for_valid_synthesis_
 
 
 @pytest.mark.asyncio
-async def test_reporter_finalization_skips_when_all_artifacts_are_valid(
+async def test_reporter_finalization_rejects_noop_even_when_old_artifacts_are_valid(
     tmp_path: Path,
 ) -> None:
     _write_reporter_outputs(tmp_path, status="passed", errors=0)
@@ -605,17 +606,15 @@ async def test_reporter_finalization_skips_when_all_artifacts_are_valid(
         finalizer_calls.append(required)
         return {}
 
-    await run_reporter_with_recovery(
-        invoke=invoke,
-        finalize=finalize,
-        initial_description="normal reporter request",
-        data_dir=tmp_path,
-        timeout_seconds=1,
-    )
-
-    assert prompts == ["normal reporter request"]
-    assert finalizer_calls == []
-    _single_attempt_audit(tmp_path)
+    with pytest.raises(ReporterRecoveryError):
+        await run_reporter_with_recovery(
+            invoke=invoke,
+            finalize=finalize,
+            initial_description="normal reporter request",
+            data_dir=tmp_path,
+            timeout_seconds=1,
+        )
+    assert finalizer_calls
 
 
 @pytest.mark.asyncio
@@ -696,7 +695,7 @@ async def test_reporter_finalization_refreshes_from_invalid_targets(
 
     assert prompts == ["normal reporter request"]
     assert finalizer_calls == [
-        ("synthesis_targets.json", "CCI_Analysis_Report.html")
+        ("synthesis_validation.json", "synthesis_targets.json", "CCI_Analysis_Report.html")
     ]
     _single_attempt_audit(tmp_path)
 
@@ -736,7 +735,7 @@ async def test_reporter_finalization_refreshes_invalid_html(
     )
 
     assert prompts == ["normal reporter request"]
-    assert finalizer_calls == [("CCI_Analysis_Report.html",)]
+    assert finalizer_calls == [("synthesis_validation.json", "synthesis_targets.json", "CCI_Analysis_Report.html")]
     _single_attempt_audit(tmp_path)
 
 
@@ -998,12 +997,46 @@ async def test_reporter_recovery_accepts_preserved_valid_outputs_when_no_refresh
 
     await run_reporter_with_recovery(
         invoke=invoke,
+        finalize=_fake_reporter_finalizer,
         initial_description="normal reporter request",
         data_dir=tmp_path,
         timeout_seconds=1,
     )
 
     assert len(prompts) == 1
+
+
+@pytest.mark.asyncio
+async def test_reporter_recovery_refreshes_valid_downstream_outputs_after_reporter_runs(
+    tmp_path: Path,
+) -> None:
+    _write_reporter_outputs(tmp_path, status="passed", errors=0)
+    (tmp_path / "part1_final.md").write_text("# Updated upstream evidence\n")
+    (tmp_path / "papers.json").write_text('{"papers": []}')
+    _write_valid_synthesis(tmp_path, text="# Synthesis\n\nChanged before invocation.\n")
+    finalized: list[tuple[str, ...]] = []
+
+    async def invoke(_description: str) -> dict[str, list[dict[str, str]]]:
+        return {"messages": [{"role": "assistant", "content": "done"}]}
+
+    async def finalize(root: Path, required: tuple[str, ...]) -> dict[str, Any]:
+        finalized.append(required)
+        # Deterministic regeneration may produce byte-identical sidecars.
+        _write_reporter_outputs_by_name(root, required)
+        return {"status": "passed", "required_refresh": list(required)}
+
+    await run_reporter_with_recovery(
+        invoke=invoke,
+        finalize=finalize,
+        initial_description="normal reporter request",
+        data_dir=tmp_path,
+        timeout_seconds=1,
+    )
+
+    assert finalized == [("synthesis_validation.json", "synthesis_targets.json", "CCI_Analysis_Report.html")]
+    audit = json.loads((tmp_path / "reporter_recovery.json").read_text(encoding="utf-8"))
+    assert audit["status"] == "passed"
+    assert audit["attempts"][0]["completion"]["complete"] is True
 
 
 def test_reporter_task_recovery_middleware_waits_for_timed_out_sync_reporter(

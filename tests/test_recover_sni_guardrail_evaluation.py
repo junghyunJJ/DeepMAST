@@ -66,8 +66,8 @@ def test_resume_rejects_stale_assessment_when_report_bytes_change(tmp_path, monk
     path.parent.mkdir()
     path.write_text(json.dumps({"usable": True, "working_copy": str(working)}))
     ((working if change_copy else source) / "part1_final.md").write_text("changed")
-    monkeypatch.setattr(recovery.experiment, "verify_frozen_inputs", lambda cohort: None)
-    monkeypatch.setattr(recovery.experiment, "service_preflight", lambda: {"models": {}})
+    monkeypatch.setattr(recovery.experiment, "verify_frozen_inputs", lambda cohort, **kwargs: None)
+    monkeypatch.setattr(recovery.experiment, "service_preflight", lambda source: {"models": {}})
     with pytest.raises(RuntimeError, match="report|copy"):
         recovery.run(original, output)
 

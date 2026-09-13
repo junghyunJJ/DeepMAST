@@ -799,6 +799,9 @@ def validate_claims(
     fallback_model: Any | None = None
     checkpoint_path = data_dir / CLAIM_RAG_CHECKPOINT_FILENAME
     checkpoint = _load_checkpoint(checkpoint_path)
+    # ponytail: the remote corpus has no content revision; refresh searches per
+    # validation call. Persist judgments keyed to actual evidence, not collection ID.
+    checkpoint["retrievals"] = {}
     stats = {
         "checkpoint_hits": 0,
         "retrieval_cache_hits": 0,

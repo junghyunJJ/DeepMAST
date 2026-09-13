@@ -398,6 +398,7 @@ async def run_reporter_with_recovery(
         async def run_attempt(
             description: str = description,
             previous_state: ReporterOutputState = previous_state,
+            attempt_number: int = attempt_number,
         ) -> T:
             nonlocal completion_previous_state, finalization, required_refresh
             timed_out_with_result = False
@@ -414,10 +415,14 @@ async def run_reporter_with_recovery(
             if _valid_existing_synthesis(root):
                 required_refresh = _required_reporter_refresh(
                     root,
-                    synthesis_changed=synthesis_changed,
+                    # Existing sidecars do not record the upstream content they validated.
+                    synthesis_changed=attempt_number == 1 or synthesis_changed,
                 )
-                completion_previous_state = _reporter_output_state(root)
                 if required_refresh:
+                    # Require recreation even when deterministic bytes stay identical.
+                    for name in required_refresh:
+                        (root / name).unlink(missing_ok=True)
+                    completion_previous_state = _reporter_output_state(root)
                     finalizer_task = asyncio.create_task(finalizer(root, required_refresh))
                     try:
                         finalization = await asyncio.shield(finalizer_task)

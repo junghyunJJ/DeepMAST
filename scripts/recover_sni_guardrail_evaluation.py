@@ -237,8 +237,9 @@ def run(original: Path, output: Path, limit: int | None = None) -> int:
     manifest_path = output / "manifest.json"
     rows = experiment.read_json(manifest_path)["rows"] if manifest_path.exists() else prepare(original, output)
     frozen = experiment.read_json(original / "experiment_manifest.json")
-    experiment.verify_frozen_inputs(frozen["cohort"])
-    if experiment.service_preflight()["models"] != frozen["preflight"]["models"]:
+    source = Path(frozen.get("frozen", {}).get("source", experiment.SOURCE))
+    experiment.verify_frozen_inputs(frozen["cohort"], source=source)
+    if experiment.service_preflight(source)["models"] != frozen["preflight"]["models"]:
         raise RuntimeError("model weights changed since generation")
     for row in rows:
         if experiment.report_hashes(Path(row["data_dir"])) != row["original_report_hashes"]:
@@ -259,7 +260,7 @@ def run(original: Path, output: Path, limit: int | None = None) -> int:
         experiment.write_json(output / "status.json", {"status": "running", "current": label, "updated_at": experiment.now(), "pid": os.getpid()})
         attempt_records = row.get("evaluation", {}).get("recovery_attempts", [])
         for attempt in range(3):
-            if experiment.service_preflight()["models"] != frozen["preflight"]["models"]:
+            if experiment.service_preflight(source)["models"] != frozen["preflight"]["models"]:
                 raise RuntimeError("model weights changed before evaluation attempt")
             result = assess_row(row, output, original)
             attempt_records.append({"status": result["status"], "usable": result["usable"], "elapsed_seconds": result["elapsed_seconds"]})

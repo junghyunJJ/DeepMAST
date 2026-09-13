@@ -1,9 +1,107 @@
 import json
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
 
 from scripts import run_sni_guardrail_ablation as experiment
+
+
+def test_current_committed_code_can_be_frozen_and_later_drift_is_rejected(tmp_path, monkeypatch):
+    repo = tmp_path / "checkout"
+    (repo / "src").mkdir(parents=True)
+    (repo / "src/code.py").write_text("original = True\n")
+    def git(*args):
+        return subprocess.check_output(
+            ["git", "-c", "user.name=Test", "-c", "user.email=test@example.invalid", *args],
+            cwd=repo, text=True,
+        ).strip()
+    git("init", "-q")
+    git("add", ".")
+    git("commit", "-qm", "Freeze code for revision-drift verification")
+    monkeypatch.setattr(experiment, "REPO_ROOT", repo)
+    source = tmp_path / "source"
+    source.mkdir()
+    for name in experiment.baseline.INPUT_FILES:
+        (source / name).write_text("{}")
+    monkeypatch.setattr(experiment, "SOURCE", source)
+    frozen = experiment.verify_frozen_inputs([])
+    assert frozen["code_head"] == git("rev-parse", "HEAD")
+    assert frozen["input_sha256"]
+    (repo / "README.md").write_text("Documentation only\n")
+    git("add", ".")
+    git("commit", "-qm", "Document the frozen fixture")
+    experiment.verify_frozen_inputs([], code_ref=frozen["code_head"])
+    (repo / "src/code.py").write_text("original = False\n")
+    with pytest.raises(RuntimeError, match="code changed"):
+        experiment.verify_frozen_inputs([], code_ref=frozen["code_head"])
+
+
+def test_prepare_cli_accepts_portable_source_and_archive(tmp_path, monkeypatch):
+    source, archive, root = (tmp_path / name for name in ("source", "archive", "run"))
+    observed = []
+    monkeypatch.setattr(experiment, "prepare", lambda root, **kwargs: observed.append((root, kwargs)))
+    monkeypatch.setattr(sys, "argv", ["runner", "prepare", "--root", str(root), "--source", str(source), "--archive", str(archive)])
+    assert experiment.main() == 0
+    assert observed == [(root, {"source": source, "archive": archive})]
+
+
+def test_historical_archive_paths_are_rebased_after_copy(tmp_path):
+    for number, name in enumerate(experiment.HISTORICAL_ROOTS):
+        root = tmp_path / name
+        root.mkdir()
+        entries = []
+        if number == 1:
+            for pair in range(16, 26):
+                for sequence in ("AB", "BA"):
+                    relative = Path("sequences") / sequence / "pairs"
+                    directory = root / relative / f"pair-{pair}" / "wiki-on"
+                    directory.mkdir(parents=True)
+                    (directory / "run_manifest.json").write_text('{"condition_label":"SNI","return_status":"passed"}')
+                    entries.append({"pair_id": str(pair), "sequence": sequence, "status": "passed", "condition": "SNI",
+                                    "output_root": str(Path("/old/checkout") / name / relative)})
+        (root / "sequence_status.json").write_text(json.dumps({"runs": entries}))
+    cohort = experiment.build_cohort(tmp_path)
+    assert len(cohort) == 20
+    assert all(Path(row["historical_dir"]).is_relative_to(tmp_path) for row in cohort)
+
+
+def test_interrupted_evaluation_reuses_copy_and_rejects_changed_report(tmp_path, monkeypatch):
+    from scripts import sni_guardrail_ablation_support as support
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "part1_final.md").write_text("# Frozen report\n")
+    row = {"pair_id": "16", "sequence": "AB", "arm": "on", "data_dir": str(source)}
+    destination = tmp_path / "evaluation/pair-16-AB/on"
+    experiment.prepare_evaluation_copy(source, destination)
+    monkeypatch.setattr(experiment.baseline, "_bind_read_only_collection", lambda _: None)
+    monkeypatch.setattr(support, "evaluate_report", lambda directory, **kwargs: {"status": "evaluated", "usable": False})
+    assert experiment.worker_evaluate(tmp_path, row) == 0
+    assert (destination.parent / "on.json").is_file()
+    (destination / "part1_final.md").write_text("changed")
+    with pytest.raises(RuntimeError, match="copy.*changed|copy.*differs"):
+        experiment.worker_evaluate(tmp_path, row)
+    assert (source / "part1_final.md").read_text() == "# Frozen report\n"
+
+
+def test_interrupted_copy_does_not_publish_partial_destination(tmp_path, monkeypatch):
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "part1_final.md").write_text("# Frozen report\n")
+    destination = tmp_path / "evaluation"
+    original_copytree = experiment.shutil.copytree
+    def interrupted(source, destination, **kwargs):
+        destination.mkdir(parents=True)
+        (destination / "part1_final.md").write_text("partial")
+        raise OSError("simulated copy interruption")
+    monkeypatch.setattr(experiment.shutil, "copytree", interrupted)
+    with pytest.raises(OSError, match="copy interruption"):
+        experiment.prepare_evaluation_copy(source, destination)
+    assert not destination.exists()
+    monkeypatch.setattr(experiment.shutil, "copytree", original_copytree)
+    experiment.prepare_evaluation_copy(source, destination)
+    assert experiment.report_hashes(destination) == experiment.report_hashes(source)
 
 
 def test_primary_yield_keeps_failures_and_does_not_treat_pending_as_pass():
@@ -78,7 +176,8 @@ def test_off_generation_records_disabled_validation_in_real_run_manifest(tmp_pat
     (source / "targets.json").write_text('{"sel_factor":"Factor3"}')
     (source / "interpretation_guide.md").write_text("guide")
     (source / "part4_candidate_selection.json").write_text("{}")
-    monkeypatch.setattr(experiment, "SOURCE", source)
+    (tmp_path / "experiment_manifest.json").write_text(json.dumps({"frozen": {"source": str(source)}}))
+    monkeypatch.setattr(experiment, "SOURCE", tmp_path / "unused-default")
     monkeypatch.setattr(experiment.baseline, "_default_collection_snapshot", lambda url: dict(experiment.baseline.BC_COLLECTION_SNAPSHOT))
     monkeypatch.setattr(experiment.baseline, "_collection_pmids", lambda url: pmids)
 

@@ -1,4 +1,10 @@
-"""Run the approved SNI-only guardrail ablation against frozen historical controls."""
+"""Run an SNI-only guardrail ablation against frozen historical controls.
+
+Prepare with --root NEW_RUN --source BC_INPUTS --archive HISTORICAL_ARCHIVE;
+then run with --root NEW_RUN. Preparation freezes the current committed code
+and input paths for all workers. Historical ON controls retain BASE_HEAD;
+a new run on newer code is not an exact reproduction of the archived benchmark.
+"""
 from __future__ import annotations
 
 import argparse
@@ -9,6 +15,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from collections import Counter
 from datetime import datetime, timezone
@@ -22,7 +29,12 @@ from scripts import run_bc_sni_repair_ablation as baseline
 
 BASE_HEAD = "e78c7af80012d2dd15df093147fd8fb02d4782b1"
 ARCHIVE = REPO_ROOT / "res/deep_interpreter/bc/sni_repair_ablation"
-SOURCE = Path("/Users/jungj2/Dropbox/Metadata/aiagent/DeepMAST/res/deep_interpreter/bc/bc")
+SOURCE = REPO_ROOT / "res/deep_interpreter/bc/bc"
+FROZEN_CODE_PATHS = (
+    "src", "skills", "scripts/run_bc_sni_repair_ablation.py",
+    "scripts/run_deep_interpreter_agent.py", "scripts/run_sni_guardrail_ablation.py",
+    "scripts/sni_guardrail_ablation_support.py",
+)
 HISTORICAL_ROOTS = (
     "post_repair_integrity_pair15r2_pair20_sequential_20260830T095354Z",
     "post_repair_integrity_counterbalanced_pair16_pair25_20260831T182417Z",
@@ -78,7 +90,9 @@ def build_cohort(archive: Path = ARCHIVE) -> list[dict]:
             else:
                 if entry["condition"] != "SNI":
                     continue
-                directory = Path(entry["output_root"]) / f"pair-{pair}" / "wiki-on"
+                recorded_root = Path(entry["output_root"])
+                relative_root = Path(*recorded_root.parts[recorded_root.parts.index(name) + 1:])
+                directory = root / relative_root / f"pair-{pair}" / "wiki-on"
                 sequence = entry["sequence"].split("-")[0]
             manifest = read_json(directory / "run_manifest.json")
             if manifest["condition_label"] != "SNI":
@@ -101,13 +115,17 @@ def reports_complete(directory: Path) -> bool:
     return all((directory / name).is_file() and (directory / name).stat().st_size > 0 for name in REPORTS)
 
 
-def source_hashes() -> dict:
+def source_hashes(source: Path | None = None) -> dict:
+    source = source if source is not None else SOURCE
+    missing = [name for name in baseline.INPUT_FILES if not (source / name).is_file()]
+    if missing:
+        raise RuntimeError(f"missing benchmark source inputs at {source}: {missing}")
     names = set(INPUT_NAMES)
     for pattern in ("*.csv", "*.h5ad", "*.png"):
-        names.update(p.name for p in SOURCE.glob(pattern))
+        names.update(p.name for p in source.glob(pattern))
     for directory in ("papers", "evidence"):
-        names.update(str(p.relative_to(SOURCE)) for p in (SOURCE / directory).rglob("*") if p.is_file())
-    return {name: baseline.sha256(SOURCE / name) for name in sorted(names) if (SOURCE / name).is_file()}
+        names.update(str(p.relative_to(source)) for p in (source / directory).rglob("*") if p.is_file())
+    return {name: baseline.sha256(source / name) for name in sorted(names) if (source / name).is_file()}
 
 
 def fetch_json(url: str) -> dict:
@@ -115,7 +133,8 @@ def fetch_json(url: str) -> dict:
         return json.load(response)
 
 
-def service_preflight() -> dict:
+def service_preflight(source: Path | None = None) -> dict:
+    source = source if source is not None else SOURCE
     models = {}
     for port in (6000, 4000):
         available = fetch_json(f"http://localhost:{port}/api/tags")["models"]
@@ -128,24 +147,24 @@ def service_preflight() -> dict:
         raise RuntimeError(f"RAG unhealthy: {health}")
     collection = baseline._default_collection_snapshot("http://localhost:8883")
     pmids = baseline._collection_pmids("http://localhost:8883")
-    source_pmids = baseline._papers_pmids(SOURCE / "papers.json")
+    source_pmids = baseline._papers_pmids(source / "papers.json")
     if collection != baseline.BC_COLLECTION_SNAPSHOT or pmids != source_pmids or len(pmids) != 100:
         raise RuntimeError("fixed RAG collection/PMID identity changed")
     return {"checked_at": now(), "models": models, "collection": collection,
             "pmid_identity": baseline._pmid_identity(source_pmids, pmids)}
 
 
-def verify_frozen_inputs(cohort: list[dict]) -> dict:
+def verify_frozen_inputs(cohort: list[dict], *, source: Path | None = None, code_ref: str | None = None) -> dict:
+    source = source if source is not None else SOURCE
     head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=REPO_ROOT, text=True).strip()
-    if head != BASE_HEAD:
-        raise RuntimeError(f"expected baseline HEAD {BASE_HEAD}, got {head}")
+    reference = code_ref or head
     changed = subprocess.check_output(
-        ["git", "diff", "--name-only", BASE_HEAD, "--", "src", "skills", "scripts/run_bc_sni_repair_ablation.py", "scripts/run_deep_interpreter_agent.py"],
+        ["git", "diff", "--name-only", reference, "--", *FROZEN_CODE_PATHS],
         cwd=REPO_ROOT, text=True,
     ).strip()
     if changed:
         raise RuntimeError(f"baseline generation code changed: {changed}")
-    hashes = source_hashes()
+    hashes = source_hashes(source)
     for row in cohort:
         directory = Path(row["historical_dir"])
         manifest = read_json(directory / "run_manifest.json")
@@ -170,7 +189,7 @@ def verify_frozen_inputs(cohort: list[dict]) -> dict:
         if "historical_report_hashes" in row and row["historical_report_hashes"] != observed_reports:
             raise RuntimeError(f"historical report changed: {directory}")
         row["historical_report_hashes"] = observed_reports
-    return {"code_head": head, "source": str(SOURCE), "input_sha256": hashes}
+    return {"code_head": head, "historical_generation_commit": BASE_HEAD, "source": str(source), "input_sha256": hashes}
 
 
 def generation_pending(row: dict) -> bool:
@@ -236,12 +255,13 @@ def elapsed(manifest: dict) -> float | None:
     return (datetime.fromisoformat(manifest["finished_at"]) - datetime.fromisoformat(manifest["started_at"])).total_seconds()
 
 
-def prepare(root: Path) -> None:
+def prepare(root: Path, *, source: Path | None = None, archive: Path = ARCHIVE) -> None:
+    source = (source if source is not None else SOURCE).expanduser().resolve()
     if root.exists():
         raise FileExistsError(f"refusing to replace experiment: {root}")
-    cohort = build_cohort()
-    frozen = verify_frozen_inputs(cohort)
-    services = service_preflight()
+    cohort = build_cohort(archive)
+    frozen = verify_frozen_inputs(cohort, source=source)
+    services = service_preflight(source)
     root.mkdir(parents=True)
     code_paths = [Path(__file__), REPO_ROOT / "scripts/sni_guardrail_ablation_support.py"]
     write_json(root / "experiment_manifest.json", {
@@ -265,18 +285,25 @@ def prepare(root: Path) -> None:
 
 
 def prepare_evaluation_copy(source: Path, destination: Path) -> Path:
-    shutil.copytree(source, destination, ignore=shutil.ignore_patterns(
+    if destination.exists():
+        raise FileExistsError(f"refusing to replace evaluation copy: {destination}")
+    ignored = (
         "logs", "before", "after", "diffs", "large_tool_results", "claim_rag_checkpoint.json",
         "report_validation*.json", "synthesis_guardrail*.json", "parts_guardrail_result.json",
         "synthesis_validation.json", "synthesis_raw_validation.json", "rag_audit.jsonl", "*.trace", "trace.jsonl",
-    ))
-    for name in ("targets.json", "run_targets.json"):
-        path = destination / name
-        if path.exists():
-            targets = read_json(path)
-            targets["data_directory"] = str(destination)
-            write_json(path, targets)
-    (destination / "data_path.txt").write_text(str(destination), encoding="utf-8")
+    )
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix=f".{destination.name}-copy-", dir=destination.parent) as temporary:
+        staged = Path(temporary) / "report"
+        shutil.copytree(source, staged, ignore=shutil.ignore_patterns(*ignored))
+        for name in ("targets.json", "run_targets.json"):
+            path = staged / name
+            if path.exists():
+                targets = read_json(path)
+                targets["data_directory"] = str(destination)
+                write_json(path, targets)
+        (staged / "data_path.txt").write_text(str(destination), encoding="utf-8")
+        staged.rename(destination)
     return destination
 
 
@@ -284,6 +311,7 @@ def worker_generate(root: Path, row: dict) -> int:
     from scripts.sni_guardrail_ablation_support import without_report_guardrails
 
     directory = Path(row["data_dir"])
+    source = Path(read_json(root / "experiment_manifest.json")["frozen"]["source"])
     pair = {"pair_id": row["pair_id"], **API, "rag_backend_port": 4000, "condition_order": ["SNI"]}
     started = time.monotonic()
     disabled = {"status": "disabled", "reason": "guardrail_ablation", "validation_performed": False}
@@ -300,9 +328,10 @@ def worker_generate(root: Path, row: dict) -> int:
 
     with without_report_guardrails():
         code = baseline.run_condition(
-            source=SOURCE, output_root=directory.parents[1], pair=pair,
+            source=source, output_root=directory.parents[1], pair=pair,
             condition=baseline.CONDITION_BY_LABEL["SNI"], stage_runner=stage_runner,
             collection_snapshot=baseline._default_collection_snapshot, collection_pmids=baseline._collection_pmids,
+            validate_report_guardrails=False,
         )
     manifest = read_json(directory / "run_manifest.json")
     manifest["report_guardrails"] = disabled
@@ -325,11 +354,15 @@ def worker_evaluate(root: Path, row: dict) -> int:
     source = Path(row["data_dir"])
     destination = root / "evaluation" / f"pair-{row['pair_id']}-{row['sequence']}" / row["arm"]
     original_hashes = report_hashes(source)
-    if source.is_dir():
+    if destination.exists():
+        directory = destination
+    elif source.is_dir():
         directory = prepare_evaluation_copy(source, destination)
     else:
         destination.mkdir(parents=True)
         directory = destination
+    if report_hashes(directory) != original_hashes:
+        raise RuntimeError("evaluation copy differs from original reports")
     env = baseline._condition_env(directory, API, baseline.CONDITION_BY_LABEL["SNI"])
 
     def evaluate() -> int:
@@ -347,7 +380,8 @@ def worker_evaluate(root: Path, row: dict) -> int:
 
 def run_worker(root: Path, state: dict, row: dict, mode: str) -> int:
     frozen = read_json(root / "experiment_manifest.json")
-    verify_frozen_inputs(frozen["cohort"])
+    source = Path(frozen["frozen"]["source"])
+    verify_frozen_inputs(frozen["cohort"], source=source, code_ref=frozen["frozen"]["code_head"])
     for relative, digest in frozen["adapter_sha256"].items():
         if baseline.sha256(REPO_ROOT / relative) != digest:
             raise RuntimeError(f"experiment implementation changed: {relative}")
@@ -362,7 +396,7 @@ def run_worker(root: Path, state: dict, row: dict, mode: str) -> int:
         label = f"pair-{row['pair_id']} {row['sequence']} {row['arm'].upper()} {mode}"
         print(f"[{now()}] Started {label}; pid={process.pid}; log={log}", flush=True)
         return_code = process.wait()
-        verify_frozen_inputs(frozen["cohort"])
+        verify_frozen_inputs(frozen["cohort"], source=source, code_ref=frozen["frozen"]["code_head"])
         print(f"[{now()}] Finished {label}; exit={return_code}", flush=True)
         return return_code
 
@@ -384,8 +418,9 @@ def run_queue(root: Path) -> int:
     with (root / "queue.lock").open("w") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         manifest = read_json(root / "experiment_manifest.json")
-        verify_frozen_inputs(manifest["cohort"])
-        if source_hashes() != manifest["frozen"]["input_sha256"]:
+        source = Path(manifest["frozen"]["source"])
+        verify_frozen_inputs(manifest["cohort"], source=source, code_ref=manifest["frozen"]["code_head"])
+        if source_hashes(source) != manifest["frozen"]["input_sha256"]:
             raise RuntimeError("source changed since preparation")
         for relative, digest in manifest["adapter_sha256"].items():
             if baseline.sha256(REPO_ROOT / relative) != digest:
@@ -399,7 +434,7 @@ def run_queue(root: Path) -> int:
                 if off["generation_status"] == "running":
                     raise RuntimeError("interrupted generation requires explicit reconciliation; refusing to replace first attempt")
                 if generation_pending(off):
-                    if service_preflight()["models"] != manifest["preflight"]["models"]:
+                    if service_preflight(source)["models"] != manifest["preflight"]["models"]:
                         raise RuntimeError("model digest changed since preparation")
                     off["generation_status"] = "running"
                     persist(root, state)
@@ -414,7 +449,7 @@ def run_queue(root: Path) -> int:
                 for row in (r for r in state["runs"] if r["index"] == index):
                     if "evaluation" in row:
                         continue
-                    if service_preflight()["models"] != manifest["preflight"]["models"]:
+                    if service_preflight(source)["models"] != manifest["preflight"]["models"]:
                         raise RuntimeError("model digest changed since preparation")
                     code = run_worker(root, state, row, "_evaluate")
                     result_path = root / "evaluation" / f"pair-{row['pair_id']}-{row['sequence']}" / f"{row['arm']}.json"
@@ -441,12 +476,17 @@ def main() -> int:
     parser.add_argument("mode", choices=("prepare", "run", "summarize", "_generate", "_evaluate"))
     parser.add_argument("--root", required=True, type=Path)
     parser.add_argument("--row", type=int)
+    parser.add_argument("--source", type=Path, help="BC input directory (prepare only; persisted for workers)")
+    parser.add_argument("--archive", type=Path, help="Historical control archive (prepare only)")
     args = parser.parse_args()
     root = args.root.expanduser().resolve()
     if args.mode == "prepare":
-        prepare(root)
+        prepare(root, source=(args.source or SOURCE).expanduser().resolve(),
+                archive=(args.archive or ARCHIVE).expanduser().resolve())
         print(root)
         return 0
+    if args.source is not None or args.archive is not None:
+        parser.error("--source and --archive are preparation options; later commands use the manifest")
     if args.mode == "run":
         return run_queue(root)
     state = read_json(root / "status.json")

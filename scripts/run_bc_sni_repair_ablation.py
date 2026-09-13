@@ -578,14 +578,18 @@ def _default_part12_stage_runner(data_dir: Path, env: dict[str, str]) -> int:
     return _with_env(env, run)
 
 
-def _severity_counts(path: Path, artifact: str) -> dict[str, int]:
-    counts = {"error": 0, "warning": 0}
-    for issue in read_json(path).get("issues", []):
+def _severity_counts(path: Path, artifact: str) -> dict[str, int | None]:
+    payload = read_json(path)
+    issues = payload.get("issues")
+    if not path.is_file() or not isinstance(issues, list):
+        return {"error": None, "warning": None}
+    counts: dict[str, int | None] = {"error": 0, "warning": 0}
+    for issue in issues:
         if not isinstance(issue, dict) or issue.get("file") != artifact:
             continue
         severity = str(issue.get("severity") or issue.get("level") or "").lower()
         if severity in counts:
-            counts[severity] += 1
+            counts[severity] = int(counts[severity] or 0) + 1
     return counts
 
 
@@ -719,12 +723,28 @@ def _validate_rag_audit(data_dir: Path, condition: Condition) -> None:
         raise RuntimeError(f"invalid RAG audit record: {bad[0]}")
 
 
-def _validate_final_guardrails(data_dir: Path) -> None:
+def _validate_final_guardrails(
+    data_dir: Path,
+    report_files: tuple[str, ...] = REPORT_FILES,
+) -> None:
+    expected_parts = tuple(name for name in report_files if name != "synthesis.md")
+    final_report = read_json(data_dir / "report_validation_final.json")
+    if expected_parts and not isinstance(final_report.get("issues"), list):
+        raise RuntimeError("missing final guardrail evidence: report_validation_final.json")
+    if "synthesis.md" in report_files:
+        synthesis_guardrail = read_json(data_dir / "synthesis_validation.json").get("synthesis_guardrail")
+        if (
+            not isinstance(synthesis_guardrail, dict)
+            or synthesis_guardrail.get("status") != "passed"
+            or synthesis_guardrail.get("final_error_count") != 0
+        ):
+            raise RuntimeError("missing final guardrail evidence: synthesis_validation.json")
     metrics = extract_metrics(data_dir)
     final_errors = [
         artifact
         for artifact, counts in metrics["artifacts"].items()
-        if counts.get("final_error_count") not in (0, None)
+        if artifact in report_files
+        if counts.get("final_error_count") != 0
     ]
     if final_errors:
         raise RuntimeError(f"final guardrail errors remain: {final_errors}")
@@ -755,6 +775,8 @@ def run_condition(
     stage_runner: StageRunner,
     collection_snapshot: CollectionSnapshot,
     collection_pmids: CollectionPmids = _collection_pmids,
+    validate_report_guardrails: bool = True,
+    report_files: tuple[str, ...] = REPORT_FILES,
 ) -> int:
     api = {"api_port": pair["api_port"], "backend_port": pair["backend_port"]}
     pair_id = pair["pair_id"]
@@ -763,12 +785,14 @@ def run_condition(
     status = "failed"
     error = None
     started_at = utc_now()
-    collection_before = collection_snapshot(env["CCI_RAG_BASE_URL"])
-    source_pmids = _papers_pmids(data_dir / "papers.json")
-    observed_pmids = collection_pmids(env["CCI_RAG_BASE_URL"])
-    pmid_identity = _pmid_identity(source_pmids, observed_pmids)
-    write_json(data_dir / "collection_before.json", collection_before | {"pmid_identity": pmid_identity})
+    collection_before: dict[str, Any] = {}
+    pmid_identity: dict[str, Any] = {}
     try:
+        collection_before = collection_snapshot(env["CCI_RAG_BASE_URL"])
+        source_pmids = _papers_pmids(data_dir / "papers.json")
+        observed_pmids = collection_pmids(env["CCI_RAG_BASE_URL"])
+        pmid_identity = _pmid_identity(source_pmids, observed_pmids)
+        write_json(data_dir / "collection_before.json", collection_before | {"pmid_identity": pmid_identity})
         if collection_before != BC_COLLECTION_SNAPSHOT:
             raise RuntimeError(f"BC collection snapshot drift before run: {collection_before}")
         if len(source_pmids) != BC_PMID_COUNT or len(observed_pmids) != BC_PMID_COUNT:
@@ -784,7 +808,8 @@ def run_condition(
             raise RuntimeError(f"BC collection changed during run: {collection_after}")
         _verify_source_manifest(data_dir)
         _validate_rag_audit(data_dir, condition)
-        _validate_final_guardrails(data_dir)
+        if validate_report_guardrails:
+            _validate_final_guardrails(data_dir, report_files)
         status = "passed"
         return 0
     except Exception as exc:  # noqa: BLE001
@@ -792,7 +817,10 @@ def run_condition(
         return 1
     finally:
         _write_diffs(data_dir)
-        metrics = extract_metrics(data_dir)
+        try:
+            metrics = extract_metrics(data_dir)
+        except Exception as exc:  # noqa: BLE001
+            metrics = {"error": {"type": type(exc).__name__, "message": str(exc)}}
         write_json(
             data_dir / "run_manifest.json",
             {
@@ -967,6 +995,7 @@ def main(
                 stage_runner=_default_part12_stage_runner,
                 collection_snapshot=collection_snapshot,
                 collection_pmids=collection_pmids,
+                report_files=PART12_FILES,
             )
         return run_pair(
             pair,

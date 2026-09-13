@@ -1597,11 +1597,11 @@ def test_validate_claims_persists_completed_batches_before_keyboard_interrupt(
         tmp_path, ("part1_final.md",), llm=successful
     )
 
-    assert searched == []
+    assert len(searched) == 2  # Recheck current corpus; only the unfinished judgment reruns.
     assert successful.batch_sizes == [1]
     assert [item["status"] for item in result["claims"]] == ["supported", "supported"]
     assert result["selection"]["checkpoint_hits"] == 1
-    assert result["selection"]["retrieval_cache_hits"] == 2
+    assert result["selection"]["retrieval_cache_hits"] == 0
 
 
 def test_validate_claims_maps_overclaim_to_repairable_issue(
@@ -1893,7 +1893,7 @@ def test_validate_claims_does_not_fallback_to_abstract_or_cache_when_strict_sear
     assert cache == {}
 
 
-def test_validate_claims_reuses_persisted_retrieval_across_fresh_calls(
+def test_validate_claims_refreshes_retrieval_but_reuses_judgment_for_identical_evidence(
     tmp_path: Path, monkeypatch
 ) -> None:
     _write_papers(tmp_path / "papers.json")
@@ -1930,14 +1930,66 @@ def test_validate_claims_reuses_persisted_retrieval_across_fresh_calls(
     )
 
     assert first["claims"] == second["claims"]
-    assert retrieval_calls == 1
-    assert second["selection"]["retrieval_cache_hits"] == 1
+    assert retrieval_calls == 2
+    assert second["selection"]["checkpoint_hits"] == 1
     checkpoint = json.loads(
         (tmp_path / claim_rag_validation.CLAIM_RAG_CHECKPOINT_FILENAME).read_text(
             encoding="utf-8"
         )
     )
     assert checkpoint["retrievals"]
+
+
+@pytest.mark.parametrize("change_local_papers", [True, False])
+def test_validate_claims_invalidates_retrieval_cache_when_corpus_changes(
+    tmp_path: Path, monkeypatch, change_local_papers
+) -> None:
+    (tmp_path / "papers.json").write_text(
+        json.dumps(
+            {"papers": [{"pmid": "11111111", "abstract": "TGFB is associated with fibrosis."}]}
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / "part1_final.md").write_text(
+        "## Analysis 1-1\n"
+        "### Biological Interpretation\n"
+        "TGFB drives fibrosis (PMID: 11111111).\n"
+        "### References\n"
+        "- PMID: 11111111\n",
+        encoding="utf-8",
+    )
+    retrieval_calls = 0
+
+    def fake_search(_args):
+        nonlocal retrieval_calls
+        retrieval_calls += 1
+        return [
+            {
+                "page_content": f"Evidence version {retrieval_calls}.",
+                "metadata": {"filename": "pmid_11111111.txt"},
+                "score": 0.8,
+            }
+        ]
+
+    monkeypatch.setattr(
+        claim_rag_validation.search_literature_fulltext, "invoke", fake_search
+    )
+
+    claim_rag_validation.validate_claims(
+        tmp_path, ("part1_final.md",), llm=FakeStructuredModel(), cache={}
+    )
+    if change_local_papers:
+        (tmp_path / "papers.json").write_text(
+            json.dumps(
+                {"papers": [{"pmid": "11111111", "abstract": "TGFB directly drives fibrosis."}]}
+            ),
+            encoding="utf-8",
+        )
+    claim_rag_validation.validate_claims(
+        tmp_path, ("part1_final.md",), llm=FakeStructuredModel(), cache={}
+    )
+
+    assert retrieval_calls == 2
 
 
 def test_validate_claims_normalizes_list_retrieval_checkpoint(

@@ -617,6 +617,7 @@ def _successful_condition_artifacts(data_dir: Path) -> None:
         json.dumps(
             {
                 "synthesis_guardrail": {
+                    "status": "passed",
                     "initial_error_count": 3,
                     "final_error_count": 0,
                     "repair_attempt_count": 3,
@@ -694,6 +695,39 @@ def test_bc_runner_rejects_empty_matching_pmid_sets_before_stage(tmp_path: Path)
 
     assert rc == 1
     assert stage_called is False
+
+
+def test_bc_runner_writes_manifest_when_collection_preflight_fails(tmp_path: Path) -> None:
+    source = _minimal_source(tmp_path)
+    (source / "papers.json").write_text(
+        json.dumps({"papers": [{"pmid": str(i)} for i in range(100)]}),
+        encoding="utf-8",
+    )
+
+    rc = bc_runner.run_condition(
+        source=source,
+        output_root=tmp_path / "runs",
+        pair={
+            "pair_id": "01",
+            "api_port": 8882,
+            "backend_port": 5000,
+            "rag_backend_port": 4000,
+            "condition_order": ["no-SNI", "SNI"],
+        },
+        condition=bc_runner.CONDITION_BY_LABEL["no-SNI"],
+        stage_runner=lambda _data_dir, _env: 0,
+        collection_snapshot=lambda _url: (_ for _ in ()).throw(RuntimeError("rag unavailable")),
+        collection_pmids=lambda _url: {str(i) for i in range(100)},
+    )
+
+    manifest = json.loads(
+        (tmp_path / "runs" / "pair-01" / "wiki-off" / "run_manifest.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert rc == 1
+    assert manifest["return_status"] == "failed"
+    assert manifest["error"]["message"] == "rag unavailable"
 
 
 def test_bc_runner_copies_each_condition_without_source_mutation(tmp_path: Path) -> None:
@@ -1278,6 +1312,61 @@ def test_bc_runner_metrics_count_terminal_synthesis_repair(tmp_path: Path) -> No
     assert metrics["artifacts"]["synthesis.md"]["initial_error_count"] == 3
 
 
+def test_bc_runner_rejects_missing_final_guardrail_evidence(tmp_path: Path) -> None:
+    data_dir = tmp_path / "condition"
+    data_dir.mkdir()
+    (data_dir / "part1_final.md").write_text("part 1", encoding="utf-8")
+    (data_dir / "part2_final.md").write_text("part 2", encoding="utf-8")
+    (data_dir / "part3_final.md").write_text("part 3", encoding="utf-8")
+    (data_dir / "synthesis.md").write_text("synthesis", encoding="utf-8")
+
+    with pytest.raises(RuntimeError, match="missing final guardrail evidence"):
+        bc_runner._validate_final_guardrails(data_dir)
+
+
+def test_bc_runner_rejects_disabled_guardrail_evidence_as_pass(tmp_path: Path) -> None:
+    data_dir = tmp_path / "condition"
+    data_dir.mkdir()
+    (data_dir / "parts_guardrail_result.json").write_text(
+        json.dumps({"status": "disabled", "validation_performed": False}),
+        encoding="utf-8",
+    )
+    (data_dir / "synthesis_validation.json").write_text(
+        json.dumps(
+            {"synthesis_guardrail": {"status": "disabled", "validation_performed": False}}
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(RuntimeError, match="missing final guardrail evidence"):
+        bc_runner._validate_final_guardrails(data_dir)
+
+
+def test_bc_runner_can_skip_final_guardrail_validation_for_explicit_off_run(tmp_path: Path) -> None:
+    source = _minimal_source(tmp_path)
+    manifest_path, output_root = _manifest_output_root(tmp_path)
+    pair = bc_runner.load_experiment_manifest(manifest_path)["pairs"][0]
+
+    def fake_stage(data_dir: Path, env: dict[str, str]) -> int:
+        _successful_condition_artifacts(data_dir)
+        (data_dir / "report_validation_final.json").unlink()
+        (data_dir / "synthesis_validation.json").unlink()
+        return 0
+
+    rc = bc_runner.run_condition(
+        source=source,
+        output_root=output_root,
+        pair=pair,
+        condition=bc_runner.CONDITION_BY_LABEL["no-SNI"],
+        stage_runner=fake_stage,
+        collection_snapshot=lambda _api_url: stack.BC_COLLECTION_SNAPSHOT,
+        collection_pmids=lambda _api_url: _pmids_100(),
+        validate_report_guardrails=False,
+    )
+
+    assert rc == 0
+
+
 def test_bc_runner_metrics_aggregate_rag_observability(tmp_path: Path) -> None:
     data_dir = tmp_path / "condition"
     data_dir.mkdir()
@@ -1609,6 +1698,99 @@ def test_bc_runner_fails_when_final_guardrail_errors_remain(tmp_path: Path) -> N
     )
 
     assert rc == 1
+
+
+def test_bc_runner_fails_when_final_guardrail_evidence_is_missing(tmp_path: Path) -> None:
+    source = _minimal_source(tmp_path)
+    manifest_path, output_root = _manifest_output_root(tmp_path)
+
+    def fake_stage(data_dir: Path, env: dict[str, str]) -> int:
+        _successful_condition_artifacts(data_dir)
+        (data_dir / "report_validation_final.json").unlink()
+        (data_dir / "synthesis_validation.json").unlink()
+        return 0
+
+    rc = bc_runner.main(
+        [
+            "--pair",
+            "1",
+            "--output-root",
+            str(output_root),
+            "--manifest",
+            str(manifest_path),
+            "--source",
+            str(source),
+        ],
+        stage_runner=fake_stage,
+        collection_snapshot=lambda _api_url: stack.BC_COLLECTION_SNAPSHOT,
+        collection_pmids=lambda _api_url: _pmids_100(),
+    )
+
+    failed_dir = output_root / "pair-01" / "wiki-off"
+    manifest = json.loads((failed_dir / "run_manifest.json").read_text(encoding="utf-8"))
+    assert rc == 1
+    assert manifest["return_status"] == "failed"
+    assert "missing final guardrail evidence" in manifest["error"]["message"]
+
+
+def test_bc_runner_records_manifest_when_preflight_snapshot_fails(tmp_path: Path) -> None:
+    source = _minimal_source(tmp_path)
+    manifest_path, output_root = _manifest_output_root(tmp_path)
+
+    rc = bc_runner.main(
+        [
+            "--pair",
+            "1",
+            "--output-root",
+            str(output_root),
+            "--manifest",
+            str(manifest_path),
+            "--source",
+            str(source),
+        ],
+        stage_runner=lambda data_dir, env: 0,
+        collection_snapshot=lambda _api_url: (_ for _ in ()).throw(RuntimeError("snapshot down")),
+        collection_pmids=lambda _api_url: _pmids_100(),
+    )
+
+    failed_dir = output_root / "pair-01" / "wiki-off"
+    manifest = json.loads((failed_dir / "run_manifest.json").read_text(encoding="utf-8"))
+    assert rc == 1
+    assert manifest["return_status"] == "failed"
+    assert manifest["error"] == {"type": "RuntimeError", "message": "snapshot down"}
+
+
+def test_bc_runner_records_manifest_when_final_guardrail_json_is_malformed(tmp_path: Path) -> None:
+    source = _minimal_source(tmp_path)
+    manifest_path, output_root = _manifest_output_root(tmp_path)
+
+    def fake_stage(data_dir: Path, env: dict[str, str]) -> int:
+        _successful_condition_artifacts(data_dir)
+        (data_dir / "report_validation_final.json").write_text("{", encoding="utf-8")
+        return 0
+
+    rc = bc_runner.main(
+        [
+            "--pair",
+            "1",
+            "--output-root",
+            str(output_root),
+            "--manifest",
+            str(manifest_path),
+            "--source",
+            str(source),
+        ],
+        stage_runner=fake_stage,
+        collection_snapshot=lambda _api_url: stack.BC_COLLECTION_SNAPSHOT,
+        collection_pmids=lambda _api_url: _pmids_100(),
+    )
+
+    failed_dir = output_root / "pair-01" / "wiki-off"
+    manifest = json.loads((failed_dir / "run_manifest.json").read_text(encoding="utf-8"))
+    assert rc == 1
+    assert manifest["return_status"] == "failed"
+    assert manifest["error"]["type"] == "JSONDecodeError"
+    assert manifest["metrics"]["error"]["type"] == "JSONDecodeError"
 
 
 def test_bc_runner_smoke_is_dry_manifest_preflight(tmp_path: Path, capsys) -> None:
