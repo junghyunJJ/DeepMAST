@@ -1,0 +1,37 @@
+Traceback (most recent call last):
+  File "/Users/jungj2/Dropbox/Metadata/aiagent/DeepMAST/worktrees/fix/post-repair-integrity/scripts/run_deep_interpreter_agent.py", line 321, in run
+    result = await agent.ainvoke(
+             ^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jungj2/Dropbox/Metadata/aiagent/DeepMAST/worktrees/fix/post-repair-integrity/.venv/lib/python3.12/site-packages/langgraph/pregel/main.py", line 3535, in ainvoke
+    async for chunk in self.astream(
+  File "/Users/jungj2/Dropbox/Metadata/aiagent/DeepMAST/worktrees/fix/post-repair-integrity/.venv/lib/python3.12/site-packages/langgraph/pregel/main.py", line 3181, in astream
+    async for _ in runner.atick(
+  File "/Users/jungj2/Dropbox/Metadata/aiagent/DeepMAST/worktrees/fix/post-repair-integrity/.venv/lib/python3.12/site-packages/langgraph/pregel/_runner.py", line 304, in atick
+    await arun_with_retry(
+  File "/Users/jungj2/Dropbox/Metadata/aiagent/DeepMAST/worktrees/fix/post-repair-integrity/.venv/lib/python3.12/site-packages/langgraph/pregel/_retry.py", line 242, in arun_with_retry
+    return await task.proc.ainvoke(task.input, config)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jungj2/Dropbox/Metadata/aiagent/DeepMAST/worktrees/fix/post-repair-integrity/.venv/lib/python3.12/site-packages/langgraph/_internal/_runnable.py", line 705, in ainvoke
+    input = await asyncio.create_task(
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jungj2/Dropbox/Metadata/aiagent/DeepMAST/worktrees/fix/post-repair-integrity/.venv/lib/python3.12/site-packages/langgraph/_internal/_runnable.py", line 473, in ainvoke
+    ret = await self.afunc(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jungj2/Dropbox/Metadata/aiagent/DeepMAST/worktrees/fix/post-repair-integrity/src/agents/deep_interpreter/middleware/report_guardrail.py", line 66, in aafter_agent
+    return await asyncio.to_thread(self._run)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jungj2/.local/share/uv/python/cpython-3.12.10-macos-aarch64-none/lib/python3.12/asyncio/threads.py", line 25, in to_thread
+    return await loop.run_in_executor(None, func_call)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jungj2/.local/share/uv/python/cpython-3.12.10-macos-aarch64-none/lib/python3.12/concurrent/futures/thread.py", line 59, in run
+    result = self.fn(*self.args, **self.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jungj2/Dropbox/Metadata/aiagent/DeepMAST/worktrees/fix/post-repair-integrity/src/agents/deep_interpreter/middleware/report_guardrail.py", line 41, in _run
+    raise RuntimeError(
+RuntimeError: Report guardrail failed with 1 hard error(s); see /Users/jungj2/Dropbox/Metadata/aiagent/DeepMAST/worktrees/fix/post-repair-integrity/res/deep_interpreter/bc/sni_repair_ablation/post_repair_integrity_counterbalanced_pair16_pair25_20260831T182417Z/sequences/pair-16/01-ba/pairs/pair-16/wiki-on/report_validation_final.json
+During task with name 'ReportGuardrailMiddleware.after_agent' and id 'b0237048-c0b0-28f6-e170-1c60598c8108'
+{
+  "event": "invoke_error",
+  "exception_repr": "RuntimeError('Report guardrail failed with 1 hard error(s); see /Users/jungj2/Dropbox/Metadata/aiagent/DeepMAST/worktrees/fix/post-repair-integrity/res/deep_interpreter/bc/sni_repair_ablation/post_repair_integrity_counterbalanced_pair16_pair25_20260831T182417Z/sequences/pair-16/01-ba/pairs/pair-16/wiki-on/report_validation_final.json')",
+  "exception_type": "RuntimeError"
+}

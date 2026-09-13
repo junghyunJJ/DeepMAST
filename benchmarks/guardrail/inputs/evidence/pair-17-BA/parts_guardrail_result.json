@@ -1,0 +1,12 @@
+{
+  "changed_sections": 18,
+  "deterministic_initial_error_count": 4,
+  "final_error_count": 1,
+  "final_issue_count": 51,
+  "initial_error_count": 16,
+  "initial_issue_count": 14,
+  "repair_attempt_count": 3,
+  "semantic_initial_error_count": 12,
+  "status": "failed",
+  "terminal_repair_count": 1
+}

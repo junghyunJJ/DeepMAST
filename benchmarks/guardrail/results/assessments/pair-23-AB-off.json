@@ -1,0 +1,872 @@
+{
+  "complete": true,
+  "deterministic_issues": [
+    {
+      "code": "lr_metric_alignment_ambiguous",
+      "evidence": "Multiple LR pairs share metric text without an explicit one-to-one mapping.",
+      "file": "part2_final.md",
+      "repair_instruction": "Leave unchanged or rewrite with one metric next to each pair.",
+      "section": "## Analysis 2-6: LIANA Moran's R - Spatially Co-localized L-R Pairs",
+      "severity": "warning",
+      "value": "- **RET-PTPRF** and **PTPRF-RET** bidirectional pairs both show combined score 0.7149 with Moran's R = 0.2573 (p < 0.001)"
+    },
+    {
+      "code": "lr_metric_value_mismatch",
+      "evidence": "sig_liana.csv has morans=0.4213 for LRIG1^ERBB2.",
+      "file": "part3_final.md",
+      "repair_instruction": "Use the metric value from sig_liana.csv or relabel the claim to the correct LR metric.",
+      "replacement_text": "LRIG1-ERBB2 exhibits moderate spatial co-localization (Moran's R score: 0.4213",
+      "section": "## Selected Gene L-R Spatial Evidence (3-10 & 3-11 Integrated)",
+      "severity": "error",
+      "target_text": "LRIG1-ERBB2 exhibits moderate spatial co-localization (Moran's R score: 0.6366",
+      "value": "LRIG1^ERBB2 morans=0.6366"
+    },
+    {
+      "code": "factor_pathway_direction_ambiguous",
+      "evidence": "Mixed or multi-pathway wording prevents a high-confidence direction verdict.",
+      "file": "part2_final.md",
+      "repair_instruction": "Leave unchanged and retain as an audit warning.",
+      "section": "## Analysis 2-7: NMF Factor Spatial Distribution",
+      "severity": "warning",
+      "value": "Factor3: EGFR estimate=-2.8971509571226797"
+    },
+    {
+      "code": "factor_pathway_direction_ambiguous",
+      "evidence": "Mixed or multi-pathway wording prevents a high-confidence direction verdict.",
+      "file": "part2_final.md",
+      "repair_instruction": "Leave unchanged and retain as an audit warning.",
+      "section": "## Analysis 2-7: NMF Factor Spatial Distribution",
+      "severity": "warning",
+      "value": "Factor3: Estrogen estimate=-5.479801410924036"
+    },
+    {
+      "code": "factor_pathway_direction_ambiguous",
+      "evidence": "Mixed or multi-pathway wording prevents a high-confidence direction verdict.",
+      "file": "part2_final.md",
+      "repair_instruction": "Leave unchanged and retain as an audit warning.",
+      "section": "## Analysis 2-7: NMF Factor Spatial Distribution",
+      "severity": "warning",
+      "value": "Factor3: NFkB estimate=-2.589492475601927"
+    },
+    {
+      "code": "factor_pathway_direction_ambiguous",
+      "evidence": "Mixed or multi-pathway wording prevents a high-confidence direction verdict.",
+      "file": "part2_final.md",
+      "repair_instruction": "Leave unchanged and retain as an audit warning.",
+      "section": "## Analysis 2-8: Pathway-Factor Enrichment",
+      "severity": "warning",
+      "value": "Factor3: EGFR estimate=-2.8971509571226797"
+    },
+    {
+      "code": "factor_pathway_direction_ambiguous",
+      "evidence": "Mixed or multi-pathway wording prevents a high-confidence direction verdict.",
+      "file": "part2_final.md",
+      "repair_instruction": "Leave unchanged and retain as an audit warning.",
+      "section": "## Analysis 2-8: Pathway-Factor Enrichment",
+      "severity": "warning",
+      "value": "Factor3: Estrogen estimate=-5.479801410924036"
+    },
+    {
+      "code": "factor_pathway_direction_ambiguous",
+      "evidence": "Mixed or multi-pathway wording prevents a high-confidence direction verdict.",
+      "file": "part2_final.md",
+      "repair_instruction": "Leave unchanged and retain as an audit warning.",
+      "section": "## Analysis 2-8: Pathway-Factor Enrichment",
+      "severity": "warning",
+      "value": "Factor3: NFkB estimate=-2.589492475601927"
+    },
+    {
+      "code": "unsupported_pathway_factor_significance",
+      "evidence": "sig_liana_pathway_factor.csv lacks the claimed factor-pathway support.",
+      "file": "part2_final.md",
+      "repair_instruction": "Rephrase as an LR-annotation-based hypothesis, not measured pathway-factor significance.",
+      "section": "## Analysis 2-8: Pathway-Factor Enrichment",
+      "severity": "error",
+      "target_text": "- Factor3's negative enrichment for Estrogen, EGFR, and NFkB pathways represents a novel molecular signature of proliferative invasive tumor regions, distinguishing them from hypoxic or TGFb-active tumor subpopulations",
+      "value": "Factor3: TGFb"
+    },
+    {
+      "code": "factor_pathway_direction_ambiguous",
+      "evidence": "Mixed or multi-pathway wording prevents a high-confidence direction verdict.",
+      "file": "part2_final.md",
+      "repair_instruction": "Leave unchanged and retain as an audit warning.",
+      "section": "## Analysis 2-8: Pathway-Factor Enrichment",
+      "severity": "warning",
+      "value": "Factor3: EGFR estimate=-2.8971509571226797"
+    },
+    {
+      "code": "factor_pathway_direction_ambiguous",
+      "evidence": "Mixed or multi-pathway wording prevents a high-confidence direction verdict.",
+      "file": "part2_final.md",
+      "repair_instruction": "Leave unchanged and retain as an audit warning.",
+      "section": "## Analysis 2-8: Pathway-Factor Enrichment",
+      "severity": "warning",
+      "value": "Factor3: Estrogen estimate=-5.479801410924036"
+    },
+    {
+      "code": "factor_pathway_direction_ambiguous",
+      "evidence": "Mixed or multi-pathway wording prevents a high-confidence direction verdict.",
+      "file": "part2_final.md",
+      "repair_instruction": "Leave unchanged and retain as an audit warning.",
+      "section": "## Analysis 2-8: Pathway-Factor Enrichment",
+      "severity": "warning",
+      "value": "Factor3: NFkB estimate=-2.589492475601927"
+    },
+    {
+      "code": "factor_pathway_direction_ambiguous",
+      "evidence": "Mixed or multi-pathway wording prevents a high-confidence direction verdict.",
+      "file": "part2_final.md",
+      "repair_instruction": "Leave unchanged and retain as an audit warning.",
+      "section": "## Analysis 2-8: Pathway-Factor Enrichment",
+      "severity": "warning",
+      "value": "Factor3: EGFR estimate=-2.8971509571226797"
+    },
+    {
+      "code": "unsupported_pathway_factor_significance",
+      "evidence": "sig_liana_pathway_factor.csv lacks the claimed factor-pathway support.",
+      "file": "part2_final.md",
+      "repair_instruction": "Rephrase as an LR-annotation-based hypothesis, not measured pathway-factor significance.",
+      "section": "## Part 2 Summary",
+      "severity": "error",
+      "target_text": "**Factor3 shows negative enrichment** for Estrogen (estimate = -5.48, p = 4.98e-08), EGFR (estimate = -2.90, p = 0.0038), and NFkB (estimate = -2.59, p = 0.0097) pathways, distinguishing it from hypoxic or TGFb-active tumor subpopulations",
+      "value": "Factor3: TGFb"
+    },
+    {
+      "code": "factor_pathway_direction_ambiguous",
+      "evidence": "Mixed or multi-pathway wording prevents a high-confidence direction verdict.",
+      "file": "part2_final.md",
+      "repair_instruction": "Leave unchanged and retain as an audit warning.",
+      "section": "## Part 2 Summary",
+      "severity": "warning",
+      "value": "Factor3: EGFR estimate=-2.8971509571226797"
+    },
+    {
+      "code": "factor_pathway_direction_ambiguous",
+      "evidence": "Mixed or multi-pathway wording prevents a high-confidence direction verdict.",
+      "file": "part2_final.md",
+      "repair_instruction": "Leave unchanged and retain as an audit warning.",
+      "section": "## Part 2 Summary",
+      "severity": "warning",
+      "value": "Factor3: Estrogen estimate=-5.479801410924036"
+    },
+    {
+      "code": "factor_pathway_direction_ambiguous",
+      "evidence": "Mixed or multi-pathway wording prevents a high-confidence direction verdict.",
+      "file": "part2_final.md",
+      "repair_instruction": "Leave unchanged and retain as an audit warning.",
+      "section": "## Part 2 Summary",
+      "severity": "warning",
+      "value": "Factor3: NFkB estimate=-2.589492475601927"
+    },
+    {
+      "code": "factor_pathway_direction_ambiguous",
+      "evidence": "Mixed or multi-pathway wording prevents a high-confidence direction verdict.",
+      "file": "part2_final.md",
+      "repair_instruction": "Leave unchanged and retain as an audit warning.",
+      "section": "## Part 2 Summary",
+      "severity": "warning",
+      "value": "Factor3: EGFR estimate=-2.8971509571226797"
+    },
+    {
+      "code": "mechanistic_interpretation_warning",
+      "evidence": "Report-derived spatial/statistical evidence was written as a mechanistic or causal claim.",
+      "file": "part1_final.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence is cited for this exact report-derived claim.",
+      "section": "## Analysis 1-1: Spatial Clustering",
+      "severity": "warning",
+      "value": "Clusters 17, 4, and 14 are particularly notable as they show significant enrichment for Prolif Invasive Tumor cells, representing the proliferative invasive tumor compartment that drives tumor progression."
+    },
+    {
+      "code": "mechanistic_interpretation_warning",
+      "evidence": "Report-derived spatial/statistical evidence was written as a mechanistic or causal claim.",
+      "file": "part1_final.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence is cited for this exact report-derived claim.",
+      "section": "## Analysis 1-1: Spatial Clustering",
+      "severity": "warning",
+      "value": "The enrichment of Prolif Invasive Tumor in specific clusters (17, 4, 14) suggests regional specialization within the invasive front, potentially reflecting gradients of oxygen, nutrients, or signaling molecules that drive proliferative states."
+    },
+    {
+      "code": "mechanistic_interpretation_warning",
+      "evidence": "Report-derived spatial/statistical evidence was written as a mechanistic or causal claim.",
+      "file": "part1_final.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence is cited for this exact report-derived claim.",
+      "section": "## Analysis 1-2: Cell Type Composition",
+      "severity": "warning",
+      "value": "The three target clusters (17, 4, 14) show significant enrichment for Prolif Invasive Tumor cells, representing the proliferative invasive compartment that drives tumor progression."
+    },
+    {
+      "code": "mechanistic_interpretation_warning",
+      "evidence": "Report-derived spatial/statistical evidence was written as a mechanistic or causal claim.",
+      "file": "part1_final.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence is cited for this exact report-derived claim.",
+      "section": "## Analysis 1-3: Neighborhood Enrichment",
+      "severity": "warning",
+      "value": "The neighborhood enrichment analysis reveals critical spatial relationships that may drive cell-cell communication and tumor progression."
+    },
+    {
+      "code": "mechanistic_interpretation_warning",
+      "evidence": "Report-derived spatial/statistical evidence was written as a mechanistic or causal claim.",
+      "file": "part1_final.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence is cited for this exact report-derived claim.",
+      "section": "## Analysis 1-3: Neighborhood Enrichment",
+      "severity": "warning",
+      "value": "The spatial proximity of tumor and stromal cells enables direct cell-cell contact and paracrine signaling that can drive tumor progression and therapeutic resistance."
+    },
+    {
+      "code": "mechanistic_interpretation_warning",
+      "evidence": "Report-derived spatial/statistical evidence was written as a mechanistic or causal claim.",
+      "file": "part1_final.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence is cited for this exact report-derived claim.",
+      "section": "## Analysis 1-4: Decoupler Pathway",
+      "severity": "warning",
+      "value": "The MAPK pathway stat of 47.86 in cluster 4 represents one of the strongest pathway activations observed across all clusters, indicating robust ERK signaling that drives cell cycle progression and proliferation."
+    },
+    {
+      "code": "mechanistic_interpretation_warning",
+      "evidence": "Report-derived spatial/statistical evidence was written as a mechanistic or causal claim.",
+      "file": "part1_final.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence is cited for this exact report-derived claim.",
+      "section": "## Analysis 1-4: Decoupler Pathway",
+      "severity": "warning",
+      "value": "PI3K pathway activation is particularly notable in the Prolif Invasive Tumor clusters, as this pathway is known to cooperate with MAPK signaling to drive tumor progression."
+    },
+    {
+      "code": "mechanistic_interpretation_warning",
+      "evidence": "Report-derived spatial/statistical evidence was written as a mechanistic or causal claim.",
+      "file": "part1_final.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence is cited for this exact report-derived claim.",
+      "section": "## Analysis 1-4: Decoupler Pathway",
+      "severity": "warning",
+      "value": "The literature demonstrates that ErbB3 is a potent activator of PI3K signaling, and the enrichment of ERBB3 in breast cancer subtypes supports its role in driving PI3K pathway activation in these clusters."
+    },
+    {
+      "code": "mechanistic_interpretation_warning",
+      "evidence": "Report-derived spatial/statistical evidence was written as a mechanistic or causal claim.",
+      "file": "part1_final.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence is cited for this exact report-derived claim.",
+      "section": "## Analysis 1-4: Decoupler Pathway",
+      "severity": "warning",
+      "value": "The co-activation of MAPK, PI3K, and Androgen pathways in cluster 4 suggests a complex signaling network that drives the aggressive phenotype of Prolif Invasive Tumor cells."
+    },
+    {
+      "code": "mechanistic_interpretation_warning",
+      "evidence": "Report-derived spatial/statistical evidence was written as a mechanistic or causal claim.",
+      "file": "part1_final.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence is cited for this exact report-derived claim.",
+      "section": "## Analysis 1-5: MISTy",
+      "severity": "warning",
+      "value": "The spatial association between hypoxia and Prolif Invasive Tumor suggests these cells occupy hypoxic niches that may drive their aggressive behavior."
+    },
+    {
+      "code": "part3_therapeutic_spillover",
+      "evidence": "Part3 should interpret selected L-R spatial evidence only; Part4 owns therapeutic synthesis.",
+      "file": "part3_final.md",
+      "repair_instruction": "Remove therapeutic prioritization language and keep the section to spatial/statistical LR evidence.",
+      "section": "## 3-9 NMF Quadrant with GenePT",
+      "severity": "error",
+      "target_text": "This pattern is consistent with the known role of ERBB3 as a critical co-receptor in breast cancer progression, particularly in ER-negative and triple-negative contexts where it drives PI3K/mTOR signaling and therapeutic resistance (PMID: 26148232).",
+      "value": "This pattern is consistent with the known role of ERBB3 as a critical co-receptor in breast cancer progression, particularly in ER-negative and triple-negative contexts where it drives PI3K/mTOR signaling and therapeutic resistance (PMID: 26148232)."
+    },
+    {
+      "code": "part3_therapeutic_spillover",
+      "evidence": "Part3 should interpret selected L-R spatial evidence only; Part4 owns therapeutic synthesis.",
+      "file": "part3_final.md",
+      "repair_instruction": "Remove therapeutic prioritization language and keep the section to spatial/statistical LR evidence.",
+      "section": "## 3-9 NMF Quadrant with GenePT",
+      "severity": "error",
+      "target_text": "NECTIN4, a cell adhesion molecule, has emerged as a therapeutic target in breast cancer with approved antibody-drug conjugates (PMID: 39753722).",
+      "value": "NECTIN4, a cell adhesion molecule, has emerged as a therapeutic target in breast cancer with approved antibody-drug conjugates (PMID: 39753722)."
+    },
+    {
+      "code": "part3_therapeutic_spillover",
+      "evidence": "Part3 should interpret selected L-R spatial evidence only; Part4 owns therapeutic synthesis.",
+      "file": "part3_final.md",
+      "repair_instruction": "Remove therapeutic prioritization language and keep the section to spatial/statistical LR evidence.",
+      "section": "## Selected Gene L-R Spatial Evidence (3-10 & 3-11 Integrated)",
+      "severity": "error",
+      "target_text": "Once activated, the ERBB2-ERBB3 heterodimer potently activates the PI3K/AKT/mTOR pathway, driving cell survival, proliferation, and therapeutic resistance (PMID: 26148232).",
+      "value": "Once activated, the ERBB2-ERBB3 heterodimer potently activates the PI3K/AKT/mTOR pathway, driving cell survival, proliferation, and therapeutic resistance (PMID: 26148232)."
+    },
+    {
+      "code": "part3_therapeutic_spillover",
+      "evidence": "Part3 should interpret selected L-R spatial evidence only; Part4 owns therapeutic synthesis.",
+      "file": "part3_final.md",
+      "repair_instruction": "Remove therapeutic prioritization language and keep the section to spatial/statistical LR evidence.",
+      "section": "## Selected Gene L-R Spatial Evidence (3-10 & 3-11 Integrated)",
+      "severity": "error",
+      "target_text": "When LRIG1 is downregulated (as occurs in fulvestrant-treated cells), ErbB3 levels increase, leading to enhanced PI3K/mTOR signaling and therapeutic resistance.",
+      "value": "When LRIG1 is downregulated (as occurs in fulvestrant-treated cells), ErbB3 levels increase, leading to enhanced PI3K/mTOR signaling and therapeutic resistance."
+    },
+    {
+      "code": "part3_therapeutic_spillover",
+      "evidence": "Part3 should interpret selected L-R spatial evidence only; Part4 owns therapeutic synthesis.",
+      "file": "part3_final.md",
+      "repair_instruction": "Remove therapeutic prioritization language and keep the section to spatial/statistical LR evidence.",
+      "section": "## Selected Gene L-R Spatial Evidence (3-10 & 3-11 Integrated)",
+      "severity": "error",
+      "target_text": "This study demonstrates that ERBB3 activation confers resistance to FGFR1 inhibition, suggesting that targeting the ERBB3 axis may be critical for preventing metastasis and overcoming therapeutic resistance.",
+      "value": "This study demonstrates that ERBB3 activation confers resistance to FGFR1 inhibition, suggesting that targeting the ERBB3 axis may be critical for preventing metastasis and overcoming therapeutic resistance."
+    },
+    {
+      "code": "part3_therapeutic_spillover",
+      "evidence": "Part3 should interpret selected L-R spatial evidence only; Part4 owns therapeutic synthesis.",
+      "file": "part3_final.md",
+      "repair_instruction": "Remove therapeutic prioritization language and keep the section to spatial/statistical LR evidence.",
+      "section": "## Selected Gene L-R Spatial Evidence (3-10 & 3-11 Integrated)",
+      "severity": "error",
+      "target_text": "The downregulation of LRIG1, as observed in ErbB2-positive breast tumors, leads to increased ERBB2 levels and enhanced signaling, creating a feed-forward loop that drives tumor growth and therapeutic resistance (PMID: 18922900).",
+      "value": "The downregulation of LRIG1, as observed in ErbB2-positive breast tumors, leads to increased ERBB2 levels and enhanced signaling, creating a feed-forward loop that drives tumor growth and therapeutic resistance (PMID: 18922900)."
+    },
+    {
+      "code": "part3_therapeutic_spillover",
+      "evidence": "Part3 should interpret selected L-R spatial evidence only; Part4 owns therapeutic synthesis.",
+      "file": "part3_final.md",
+      "repair_instruction": "Remove therapeutic prioritization language and keep the section to spatial/statistical LR evidence.",
+      "section": "## Selected Gene L-R Spatial Evidence (3-10 & 3-11 Integrated)",
+      "severity": "error",
+      "target_text": "The clinical relevance of ERBB2 is underscored by its status as a validated therapeutic target with 58 approved drugs and extensive clinical trial activity.",
+      "value": "The clinical relevance of ERBB2 is underscored by its status as a validated therapeutic target with 58 approved drugs and extensive clinical trial activity."
+    },
+    {
+      "code": "part3_therapeutic_spillover",
+      "evidence": "Part3 should interpret selected L-R spatial evidence only; Part4 owns therapeutic synthesis.",
+      "file": "part3_final.md",
+      "repair_instruction": "Remove therapeutic prioritization language and keep the section to spatial/statistical LR evidence.",
+      "section": "## Selected Gene L-R Spatial Evidence (3-10 & 3-11 Integrated)",
+      "severity": "error",
+      "target_text": "In breast cancer, NECTIN4 has emerged as a therapeutic target due to its overexpression in tumor cells and its role in immune evasion (PMID: 39753722).",
+      "value": "In breast cancer, NECTIN4 has emerged as a therapeutic target due to its overexpression in tumor cells and its role in immune evasion (PMID: 39753722)."
+    },
+    {
+      "code": "part3_therapeutic_spillover",
+      "evidence": "Part3 should interpret selected L-R spatial evidence only; Part4 owns therapeutic synthesis.",
+      "file": "part3_final.md",
+      "repair_instruction": "Remove therapeutic prioritization language and keep the section to spatial/statistical LR evidence.",
+      "section": "## Selected Gene L-R Spatial Evidence (3-10 & 3-11 Integrated)",
+      "severity": "error",
+      "target_text": "PMID: 39753722 highlights the role of NECTIN4 as a therapeutic target in breast cancer, with approved antibody-drug conjugates showing clinical efficacy.",
+      "value": "PMID: 39753722 highlights the role of NECTIN4 as a therapeutic target in breast cancer, with approved antibody-drug conjugates showing clinical efficacy."
+    },
+    {
+      "code": "part3_therapeutic_spillover",
+      "evidence": "Part3 should interpret selected L-R spatial evidence only; Part4 owns therapeutic synthesis.",
+      "file": "part3_final.md",
+      "repair_instruction": "Remove therapeutic prioritization language and keep the section to spatial/statistical LR evidence.",
+      "section": "## Selected Gene L-R Spatial Evidence (3-10 & 3-11 Integrated)",
+      "severity": "error",
+      "target_text": "While NECTIN4 has been recognized as a therapeutic target in various solid tumors, its specific spatial organization with NECTIN2 in breast cancer has not been previously reported.",
+      "value": "While NECTIN4 has been recognized as a therapeutic target in various solid tumors, its specific spatial organization with NECTIN2 in breast cancer has not been previously reported."
+    },
+    {
+      "code": "part3_therapeutic_spillover",
+      "evidence": "Part3 should interpret selected L-R spatial evidence only; Part4 owns therapeutic synthesis.",
+      "file": "part3_final.md",
+      "repair_instruction": "Remove therapeutic prioritization language and keep the section to spatial/statistical LR evidence.",
+      "section": "## Part 3 Summary",
+      "severity": "error",
+      "target_text": "**NECTIN4 represents a novel therapeutic target** (combined_rank_score: 13.0) with the NECTIN2-NECTIN4 adhesion axis (0.6959), featuring high novelty opportunity and 30 biological evidence entries",
+      "value": "**NECTIN4 represents a novel therapeutic target** (combined_rank_score: 13.0) with the NECTIN2-NECTIN4 adhesion axis (0.6959), featuring high novelty opportunity and 30 biological evidence entries"
+    },
+    {
+      "code": "part3_therapeutic_spillover",
+      "evidence": "Part3 should interpret selected L-R spatial evidence only; Part4 owns therapeutic synthesis.",
+      "file": "part3_final.md",
+      "repair_instruction": "Remove therapeutic prioritization language and keep the section to spatial/statistical LR evidence.",
+      "section": "## Part 3 Summary",
+      "severity": "error",
+      "target_text": "- The safety profile concerns for ERBB2 (-2) and NECTIN4 (-2) highlight the need for careful consideration of therapeutic targeting strategies",
+      "value": "- The safety profile concerns for ERBB2 (-2) and NECTIN4 (-2) highlight the need for careful consideration of therapeutic targeting strategies"
+    },
+    {
+      "code": "part3_therapeutic_spillover",
+      "evidence": "Part3 should interpret selected L-R spatial evidence only; Part4 owns therapeutic synthesis.",
+      "file": "part3_final.md",
+      "repair_instruction": "Remove therapeutic prioritization language and keep the section to spatial/statistical LR evidence.",
+      "section": "## Part 3 Summary",
+      "severity": "error",
+      "target_text": "Therapeutic synthesis, druggability scoring, and clinical prioritization are addressed in Part 4.*",
+      "value": "Therapeutic synthesis, druggability scoring, and clinical prioritization are addressed in Part 4.*"
+    },
+    {
+      "code": "synthesis_overclaim_warning",
+      "evidence": "Synthesis report-derived spatial/statistical evidence was written as a mechanistic or therapeutic claim.",
+      "file": "synthesis.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence supports this exact claim.",
+      "section": "## Executive Summary",
+      "severity": "warning",
+      "value": "This integrated analysis synthesizes spatial transcriptomics, cell-cell interaction (CCI), and therapeutic target assessment findings from breast cancer tissue."
+    },
+    {
+      "code": "synthesis_overclaim_warning",
+      "evidence": "Synthesis report-derived spatial/statistical evidence was written as a mechanistic or therapeutic claim.",
+      "file": "synthesis.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence supports this exact claim.",
+      "section": "## Executive Summary",
+      "severity": "warning",
+      "value": "The analysis reveals a coherent malignant cell-intrinsic signaling program centered on ErbB family receptors (ERBB2, ERBB3) and adhesion molecules (CDH1, NECTIN4), with strong spatial organization and validated therapeutic tractability."
+    },
+    {
+      "code": "synthesis_overclaim_warning",
+      "evidence": "Synthesis report-derived spatial/statistical evidence was written as a mechanistic or therapeutic claim.",
+      "file": "synthesis.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence supports this exact claim.",
+      "section": "## Cross-Part Themes",
+      "severity": "warning",
+      "value": "- Stage 1 filter confirms same-cell coexpression enrichment in malignant cell populations"
+    }
+  ],
+  "elapsed_seconds": 1.55030366696883,
+  "evaluation_complete": false,
+  "hard_error_count": 16,
+  "hard_error_count_complete": false,
+  "hashes_after": {
+    "CCI_Analysis_Report.html": "e37bf96d05459442d656e2adfb0dd15bbde81a5c438bd995dcab6d23eb27ed13",
+    "part1_final.md": "9e1d3e44525a955fb58a15656a4ec48d5bb61587a97b69c96dac2026afe9f56d",
+    "part2_final.md": "f4592db22c0dcd40aea9c9ede070fe8c3e4a128d29e9ecdfc1b9c5ba8ca5b666",
+    "part3_final.md": "4dd2b8e6959e0ae6792733f571fb1c4e0228f04dc9b47e188336c2ed97ddc1fd",
+    "synthesis.md": "f2d1013a857484d08c35b83c350e1ce75cd415f70ae0ff4a92a5a73d4cf4a169"
+  },
+  "hashes_before": {
+    "CCI_Analysis_Report.html": "e37bf96d05459442d656e2adfb0dd15bbde81a5c438bd995dcab6d23eb27ed13",
+    "part1_final.md": "9e1d3e44525a955fb58a15656a4ec48d5bb61587a97b69c96dac2026afe9f56d",
+    "part2_final.md": "f4592db22c0dcd40aea9c9ede070fe8c3e4a128d29e9ecdfc1b9c5ba8ca5b666",
+    "part3_final.md": "4dd2b8e6959e0ae6792733f571fb1c4e0228f04dc9b47e188336c2ed97ddc1fd",
+    "synthesis.md": "f2d1013a857484d08c35b83c350e1ce75cd415f70ae0ff4a92a5a73d4cf4a169"
+  },
+  "issues": [
+    {
+      "code": "lr_metric_alignment_ambiguous",
+      "evidence": "Multiple LR pairs share metric text without an explicit one-to-one mapping.",
+      "file": "part2_final.md",
+      "repair_instruction": "Leave unchanged or rewrite with one metric next to each pair.",
+      "section": "## Analysis 2-6: LIANA Moran's R - Spatially Co-localized L-R Pairs",
+      "severity": "warning",
+      "value": "- **RET-PTPRF** and **PTPRF-RET** bidirectional pairs both show combined score 0.7149 with Moran's R = 0.2573 (p < 0.001)"
+    },
+    {
+      "code": "lr_metric_value_mismatch",
+      "evidence": "sig_liana.csv has morans=0.4213 for LRIG1^ERBB2.",
+      "file": "part3_final.md",
+      "repair_instruction": "Use the metric value from sig_liana.csv or relabel the claim to the correct LR metric.",
+      "replacement_text": "LRIG1-ERBB2 exhibits moderate spatial co-localization (Moran's R score: 0.4213",
+      "section": "## Selected Gene L-R Spatial Evidence (3-10 & 3-11 Integrated)",
+      "severity": "error",
+      "target_text": "LRIG1-ERBB2 exhibits moderate spatial co-localization (Moran's R score: 0.6366",
+      "value": "LRIG1^ERBB2 morans=0.6366"
+    },
+    {
+      "code": "factor_pathway_direction_ambiguous",
+      "evidence": "Mixed or multi-pathway wording prevents a high-confidence direction verdict.",
+      "file": "part2_final.md",
+      "repair_instruction": "Leave unchanged and retain as an audit warning.",
+      "section": "## Analysis 2-7: NMF Factor Spatial Distribution",
+      "severity": "warning",
+      "value": "Factor3: EGFR estimate=-2.8971509571226797"
+    },
+    {
+      "code": "factor_pathway_direction_ambiguous",
+      "evidence": "Mixed or multi-pathway wording prevents a high-confidence direction verdict.",
+      "file": "part2_final.md",
+      "repair_instruction": "Leave unchanged and retain as an audit warning.",
+      "section": "## Analysis 2-7: NMF Factor Spatial Distribution",
+      "severity": "warning",
+      "value": "Factor3: Estrogen estimate=-5.479801410924036"
+    },
+    {
+      "code": "factor_pathway_direction_ambiguous",
+      "evidence": "Mixed or multi-pathway wording prevents a high-confidence direction verdict.",
+      "file": "part2_final.md",
+      "repair_instruction": "Leave unchanged and retain as an audit warning.",
+      "section": "## Analysis 2-7: NMF Factor Spatial Distribution",
+      "severity": "warning",
+      "value": "Factor3: NFkB estimate=-2.589492475601927"
+    },
+    {
+      "code": "factor_pathway_direction_ambiguous",
+      "evidence": "Mixed or multi-pathway wording prevents a high-confidence direction verdict.",
+      "file": "part2_final.md",
+      "repair_instruction": "Leave unchanged and retain as an audit warning.",
+      "section": "## Analysis 2-8: Pathway-Factor Enrichment",
+      "severity": "warning",
+      "value": "Factor3: EGFR estimate=-2.8971509571226797"
+    },
+    {
+      "code": "factor_pathway_direction_ambiguous",
+      "evidence": "Mixed or multi-pathway wording prevents a high-confidence direction verdict.",
+      "file": "part2_final.md",
+      "repair_instruction": "Leave unchanged and retain as an audit warning.",
+      "section": "## Analysis 2-8: Pathway-Factor Enrichment",
+      "severity": "warning",
+      "value": "Factor3: Estrogen estimate=-5.479801410924036"
+    },
+    {
+      "code": "factor_pathway_direction_ambiguous",
+      "evidence": "Mixed or multi-pathway wording prevents a high-confidence direction verdict.",
+      "file": "part2_final.md",
+      "repair_instruction": "Leave unchanged and retain as an audit warning.",
+      "section": "## Analysis 2-8: Pathway-Factor Enrichment",
+      "severity": "warning",
+      "value": "Factor3: NFkB estimate=-2.589492475601927"
+    },
+    {
+      "code": "unsupported_pathway_factor_significance",
+      "evidence": "sig_liana_pathway_factor.csv lacks the claimed factor-pathway support.",
+      "file": "part2_final.md",
+      "repair_instruction": "Rephrase as an LR-annotation-based hypothesis, not measured pathway-factor significance.",
+      "section": "## Analysis 2-8: Pathway-Factor Enrichment",
+      "severity": "error",
+      "target_text": "- Factor3's negative enrichment for Estrogen, EGFR, and NFkB pathways represents a novel molecular signature of proliferative invasive tumor regions, distinguishing them from hypoxic or TGFb-active tumor subpopulations",
+      "value": "Factor3: TGFb"
+    },
+    {
+      "code": "factor_pathway_direction_ambiguous",
+      "evidence": "Mixed or multi-pathway wording prevents a high-confidence direction verdict.",
+      "file": "part2_final.md",
+      "repair_instruction": "Leave unchanged and retain as an audit warning.",
+      "section": "## Analysis 2-8: Pathway-Factor Enrichment",
+      "severity": "warning",
+      "value": "Factor3: EGFR estimate=-2.8971509571226797"
+    },
+    {
+      "code": "factor_pathway_direction_ambiguous",
+      "evidence": "Mixed or multi-pathway wording prevents a high-confidence direction verdict.",
+      "file": "part2_final.md",
+      "repair_instruction": "Leave unchanged and retain as an audit warning.",
+      "section": "## Analysis 2-8: Pathway-Factor Enrichment",
+      "severity": "warning",
+      "value": "Factor3: Estrogen estimate=-5.479801410924036"
+    },
+    {
+      "code": "factor_pathway_direction_ambiguous",
+      "evidence": "Mixed or multi-pathway wording prevents a high-confidence direction verdict.",
+      "file": "part2_final.md",
+      "repair_instruction": "Leave unchanged and retain as an audit warning.",
+      "section": "## Analysis 2-8: Pathway-Factor Enrichment",
+      "severity": "warning",
+      "value": "Factor3: NFkB estimate=-2.589492475601927"
+    },
+    {
+      "code": "factor_pathway_direction_ambiguous",
+      "evidence": "Mixed or multi-pathway wording prevents a high-confidence direction verdict.",
+      "file": "part2_final.md",
+      "repair_instruction": "Leave unchanged and retain as an audit warning.",
+      "section": "## Analysis 2-8: Pathway-Factor Enrichment",
+      "severity": "warning",
+      "value": "Factor3: EGFR estimate=-2.8971509571226797"
+    },
+    {
+      "code": "unsupported_pathway_factor_significance",
+      "evidence": "sig_liana_pathway_factor.csv lacks the claimed factor-pathway support.",
+      "file": "part2_final.md",
+      "repair_instruction": "Rephrase as an LR-annotation-based hypothesis, not measured pathway-factor significance.",
+      "section": "## Part 2 Summary",
+      "severity": "error",
+      "target_text": "**Factor3 shows negative enrichment** for Estrogen (estimate = -5.48, p = 4.98e-08), EGFR (estimate = -2.90, p = 0.0038), and NFkB (estimate = -2.59, p = 0.0097) pathways, distinguishing it from hypoxic or TGFb-active tumor subpopulations",
+      "value": "Factor3: TGFb"
+    },
+    {
+      "code": "factor_pathway_direction_ambiguous",
+      "evidence": "Mixed or multi-pathway wording prevents a high-confidence direction verdict.",
+      "file": "part2_final.md",
+      "repair_instruction": "Leave unchanged and retain as an audit warning.",
+      "section": "## Part 2 Summary",
+      "severity": "warning",
+      "value": "Factor3: EGFR estimate=-2.8971509571226797"
+    },
+    {
+      "code": "factor_pathway_direction_ambiguous",
+      "evidence": "Mixed or multi-pathway wording prevents a high-confidence direction verdict.",
+      "file": "part2_final.md",
+      "repair_instruction": "Leave unchanged and retain as an audit warning.",
+      "section": "## Part 2 Summary",
+      "severity": "warning",
+      "value": "Factor3: Estrogen estimate=-5.479801410924036"
+    },
+    {
+      "code": "factor_pathway_direction_ambiguous",
+      "evidence": "Mixed or multi-pathway wording prevents a high-confidence direction verdict.",
+      "file": "part2_final.md",
+      "repair_instruction": "Leave unchanged and retain as an audit warning.",
+      "section": "## Part 2 Summary",
+      "severity": "warning",
+      "value": "Factor3: NFkB estimate=-2.589492475601927"
+    },
+    {
+      "code": "factor_pathway_direction_ambiguous",
+      "evidence": "Mixed or multi-pathway wording prevents a high-confidence direction verdict.",
+      "file": "part2_final.md",
+      "repair_instruction": "Leave unchanged and retain as an audit warning.",
+      "section": "## Part 2 Summary",
+      "severity": "warning",
+      "value": "Factor3: EGFR estimate=-2.8971509571226797"
+    },
+    {
+      "code": "mechanistic_interpretation_warning",
+      "evidence": "Report-derived spatial/statistical evidence was written as a mechanistic or causal claim.",
+      "file": "part1_final.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence is cited for this exact report-derived claim.",
+      "section": "## Analysis 1-1: Spatial Clustering",
+      "severity": "warning",
+      "value": "Clusters 17, 4, and 14 are particularly notable as they show significant enrichment for Prolif Invasive Tumor cells, representing the proliferative invasive tumor compartment that drives tumor progression."
+    },
+    {
+      "code": "mechanistic_interpretation_warning",
+      "evidence": "Report-derived spatial/statistical evidence was written as a mechanistic or causal claim.",
+      "file": "part1_final.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence is cited for this exact report-derived claim.",
+      "section": "## Analysis 1-1: Spatial Clustering",
+      "severity": "warning",
+      "value": "The enrichment of Prolif Invasive Tumor in specific clusters (17, 4, 14) suggests regional specialization within the invasive front, potentially reflecting gradients of oxygen, nutrients, or signaling molecules that drive proliferative states."
+    },
+    {
+      "code": "mechanistic_interpretation_warning",
+      "evidence": "Report-derived spatial/statistical evidence was written as a mechanistic or causal claim.",
+      "file": "part1_final.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence is cited for this exact report-derived claim.",
+      "section": "## Analysis 1-2: Cell Type Composition",
+      "severity": "warning",
+      "value": "The three target clusters (17, 4, 14) show significant enrichment for Prolif Invasive Tumor cells, representing the proliferative invasive compartment that drives tumor progression."
+    },
+    {
+      "code": "mechanistic_interpretation_warning",
+      "evidence": "Report-derived spatial/statistical evidence was written as a mechanistic or causal claim.",
+      "file": "part1_final.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence is cited for this exact report-derived claim.",
+      "section": "## Analysis 1-3: Neighborhood Enrichment",
+      "severity": "warning",
+      "value": "The neighborhood enrichment analysis reveals critical spatial relationships that may drive cell-cell communication and tumor progression."
+    },
+    {
+      "code": "mechanistic_interpretation_warning",
+      "evidence": "Report-derived spatial/statistical evidence was written as a mechanistic or causal claim.",
+      "file": "part1_final.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence is cited for this exact report-derived claim.",
+      "section": "## Analysis 1-3: Neighborhood Enrichment",
+      "severity": "warning",
+      "value": "The spatial proximity of tumor and stromal cells enables direct cell-cell contact and paracrine signaling that can drive tumor progression and therapeutic resistance."
+    },
+    {
+      "code": "mechanistic_interpretation_warning",
+      "evidence": "Report-derived spatial/statistical evidence was written as a mechanistic or causal claim.",
+      "file": "part1_final.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence is cited for this exact report-derived claim.",
+      "section": "## Analysis 1-4: Decoupler Pathway",
+      "severity": "warning",
+      "value": "The MAPK pathway stat of 47.86 in cluster 4 represents one of the strongest pathway activations observed across all clusters, indicating robust ERK signaling that drives cell cycle progression and proliferation."
+    },
+    {
+      "code": "mechanistic_interpretation_warning",
+      "evidence": "Report-derived spatial/statistical evidence was written as a mechanistic or causal claim.",
+      "file": "part1_final.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence is cited for this exact report-derived claim.",
+      "section": "## Analysis 1-4: Decoupler Pathway",
+      "severity": "warning",
+      "value": "PI3K pathway activation is particularly notable in the Prolif Invasive Tumor clusters, as this pathway is known to cooperate with MAPK signaling to drive tumor progression."
+    },
+    {
+      "code": "mechanistic_interpretation_warning",
+      "evidence": "Report-derived spatial/statistical evidence was written as a mechanistic or causal claim.",
+      "file": "part1_final.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence is cited for this exact report-derived claim.",
+      "section": "## Analysis 1-4: Decoupler Pathway",
+      "severity": "warning",
+      "value": "The literature demonstrates that ErbB3 is a potent activator of PI3K signaling, and the enrichment of ERBB3 in breast cancer subtypes supports its role in driving PI3K pathway activation in these clusters."
+    },
+    {
+      "code": "mechanistic_interpretation_warning",
+      "evidence": "Report-derived spatial/statistical evidence was written as a mechanistic or causal claim.",
+      "file": "part1_final.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence is cited for this exact report-derived claim.",
+      "section": "## Analysis 1-4: Decoupler Pathway",
+      "severity": "warning",
+      "value": "The co-activation of MAPK, PI3K, and Androgen pathways in cluster 4 suggests a complex signaling network that drives the aggressive phenotype of Prolif Invasive Tumor cells."
+    },
+    {
+      "code": "mechanistic_interpretation_warning",
+      "evidence": "Report-derived spatial/statistical evidence was written as a mechanistic or causal claim.",
+      "file": "part1_final.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence is cited for this exact report-derived claim.",
+      "section": "## Analysis 1-5: MISTy",
+      "severity": "warning",
+      "value": "The spatial association between hypoxia and Prolif Invasive Tumor suggests these cells occupy hypoxic niches that may drive their aggressive behavior."
+    },
+    {
+      "code": "part3_therapeutic_spillover",
+      "evidence": "Part3 should interpret selected L-R spatial evidence only; Part4 owns therapeutic synthesis.",
+      "file": "part3_final.md",
+      "repair_instruction": "Remove therapeutic prioritization language and keep the section to spatial/statistical LR evidence.",
+      "section": "## 3-9 NMF Quadrant with GenePT",
+      "severity": "error",
+      "target_text": "This pattern is consistent with the known role of ERBB3 as a critical co-receptor in breast cancer progression, particularly in ER-negative and triple-negative contexts where it drives PI3K/mTOR signaling and therapeutic resistance (PMID: 26148232).",
+      "value": "This pattern is consistent with the known role of ERBB3 as a critical co-receptor in breast cancer progression, particularly in ER-negative and triple-negative contexts where it drives PI3K/mTOR signaling and therapeutic resistance (PMID: 26148232)."
+    },
+    {
+      "code": "part3_therapeutic_spillover",
+      "evidence": "Part3 should interpret selected L-R spatial evidence only; Part4 owns therapeutic synthesis.",
+      "file": "part3_final.md",
+      "repair_instruction": "Remove therapeutic prioritization language and keep the section to spatial/statistical LR evidence.",
+      "section": "## 3-9 NMF Quadrant with GenePT",
+      "severity": "error",
+      "target_text": "NECTIN4, a cell adhesion molecule, has emerged as a therapeutic target in breast cancer with approved antibody-drug conjugates (PMID: 39753722).",
+      "value": "NECTIN4, a cell adhesion molecule, has emerged as a therapeutic target in breast cancer with approved antibody-drug conjugates (PMID: 39753722)."
+    },
+    {
+      "code": "part3_therapeutic_spillover",
+      "evidence": "Part3 should interpret selected L-R spatial evidence only; Part4 owns therapeutic synthesis.",
+      "file": "part3_final.md",
+      "repair_instruction": "Remove therapeutic prioritization language and keep the section to spatial/statistical LR evidence.",
+      "section": "## Selected Gene L-R Spatial Evidence (3-10 & 3-11 Integrated)",
+      "severity": "error",
+      "target_text": "Once activated, the ERBB2-ERBB3 heterodimer potently activates the PI3K/AKT/mTOR pathway, driving cell survival, proliferation, and therapeutic resistance (PMID: 26148232).",
+      "value": "Once activated, the ERBB2-ERBB3 heterodimer potently activates the PI3K/AKT/mTOR pathway, driving cell survival, proliferation, and therapeutic resistance (PMID: 26148232)."
+    },
+    {
+      "code": "part3_therapeutic_spillover",
+      "evidence": "Part3 should interpret selected L-R spatial evidence only; Part4 owns therapeutic synthesis.",
+      "file": "part3_final.md",
+      "repair_instruction": "Remove therapeutic prioritization language and keep the section to spatial/statistical LR evidence.",
+      "section": "## Selected Gene L-R Spatial Evidence (3-10 & 3-11 Integrated)",
+      "severity": "error",
+      "target_text": "When LRIG1 is downregulated (as occurs in fulvestrant-treated cells), ErbB3 levels increase, leading to enhanced PI3K/mTOR signaling and therapeutic resistance.",
+      "value": "When LRIG1 is downregulated (as occurs in fulvestrant-treated cells), ErbB3 levels increase, leading to enhanced PI3K/mTOR signaling and therapeutic resistance."
+    },
+    {
+      "code": "part3_therapeutic_spillover",
+      "evidence": "Part3 should interpret selected L-R spatial evidence only; Part4 owns therapeutic synthesis.",
+      "file": "part3_final.md",
+      "repair_instruction": "Remove therapeutic prioritization language and keep the section to spatial/statistical LR evidence.",
+      "section": "## Selected Gene L-R Spatial Evidence (3-10 & 3-11 Integrated)",
+      "severity": "error",
+      "target_text": "This study demonstrates that ERBB3 activation confers resistance to FGFR1 inhibition, suggesting that targeting the ERBB3 axis may be critical for preventing metastasis and overcoming therapeutic resistance.",
+      "value": "This study demonstrates that ERBB3 activation confers resistance to FGFR1 inhibition, suggesting that targeting the ERBB3 axis may be critical for preventing metastasis and overcoming therapeutic resistance."
+    },
+    {
+      "code": "part3_therapeutic_spillover",
+      "evidence": "Part3 should interpret selected L-R spatial evidence only; Part4 owns therapeutic synthesis.",
+      "file": "part3_final.md",
+      "repair_instruction": "Remove therapeutic prioritization language and keep the section to spatial/statistical LR evidence.",
+      "section": "## Selected Gene L-R Spatial Evidence (3-10 & 3-11 Integrated)",
+      "severity": "error",
+      "target_text": "The downregulation of LRIG1, as observed in ErbB2-positive breast tumors, leads to increased ERBB2 levels and enhanced signaling, creating a feed-forward loop that drives tumor growth and therapeutic resistance (PMID: 18922900).",
+      "value": "The downregulation of LRIG1, as observed in ErbB2-positive breast tumors, leads to increased ERBB2 levels and enhanced signaling, creating a feed-forward loop that drives tumor growth and therapeutic resistance (PMID: 18922900)."
+    },
+    {
+      "code": "part3_therapeutic_spillover",
+      "evidence": "Part3 should interpret selected L-R spatial evidence only; Part4 owns therapeutic synthesis.",
+      "file": "part3_final.md",
+      "repair_instruction": "Remove therapeutic prioritization language and keep the section to spatial/statistical LR evidence.",
+      "section": "## Selected Gene L-R Spatial Evidence (3-10 & 3-11 Integrated)",
+      "severity": "error",
+      "target_text": "The clinical relevance of ERBB2 is underscored by its status as a validated therapeutic target with 58 approved drugs and extensive clinical trial activity.",
+      "value": "The clinical relevance of ERBB2 is underscored by its status as a validated therapeutic target with 58 approved drugs and extensive clinical trial activity."
+    },
+    {
+      "code": "part3_therapeutic_spillover",
+      "evidence": "Part3 should interpret selected L-R spatial evidence only; Part4 owns therapeutic synthesis.",
+      "file": "part3_final.md",
+      "repair_instruction": "Remove therapeutic prioritization language and keep the section to spatial/statistical LR evidence.",
+      "section": "## Selected Gene L-R Spatial Evidence (3-10 & 3-11 Integrated)",
+      "severity": "error",
+      "target_text": "In breast cancer, NECTIN4 has emerged as a therapeutic target due to its overexpression in tumor cells and its role in immune evasion (PMID: 39753722).",
+      "value": "In breast cancer, NECTIN4 has emerged as a therapeutic target due to its overexpression in tumor cells and its role in immune evasion (PMID: 39753722)."
+    },
+    {
+      "code": "part3_therapeutic_spillover",
+      "evidence": "Part3 should interpret selected L-R spatial evidence only; Part4 owns therapeutic synthesis.",
+      "file": "part3_final.md",
+      "repair_instruction": "Remove therapeutic prioritization language and keep the section to spatial/statistical LR evidence.",
+      "section": "## Selected Gene L-R Spatial Evidence (3-10 & 3-11 Integrated)",
+      "severity": "error",
+      "target_text": "PMID: 39753722 highlights the role of NECTIN4 as a therapeutic target in breast cancer, with approved antibody-drug conjugates showing clinical efficacy.",
+      "value": "PMID: 39753722 highlights the role of NECTIN4 as a therapeutic target in breast cancer, with approved antibody-drug conjugates showing clinical efficacy."
+    },
+    {
+      "code": "part3_therapeutic_spillover",
+      "evidence": "Part3 should interpret selected L-R spatial evidence only; Part4 owns therapeutic synthesis.",
+      "file": "part3_final.md",
+      "repair_instruction": "Remove therapeutic prioritization language and keep the section to spatial/statistical LR evidence.",
+      "section": "## Selected Gene L-R Spatial Evidence (3-10 & 3-11 Integrated)",
+      "severity": "error",
+      "target_text": "While NECTIN4 has been recognized as a therapeutic target in various solid tumors, its specific spatial organization with NECTIN2 in breast cancer has not been previously reported.",
+      "value": "While NECTIN4 has been recognized as a therapeutic target in various solid tumors, its specific spatial organization with NECTIN2 in breast cancer has not been previously reported."
+    },
+    {
+      "code": "part3_therapeutic_spillover",
+      "evidence": "Part3 should interpret selected L-R spatial evidence only; Part4 owns therapeutic synthesis.",
+      "file": "part3_final.md",
+      "repair_instruction": "Remove therapeutic prioritization language and keep the section to spatial/statistical LR evidence.",
+      "section": "## Part 3 Summary",
+      "severity": "error",
+      "target_text": "**NECTIN4 represents a novel therapeutic target** (combined_rank_score: 13.0) with the NECTIN2-NECTIN4 adhesion axis (0.6959), featuring high novelty opportunity and 30 biological evidence entries",
+      "value": "**NECTIN4 represents a novel therapeutic target** (combined_rank_score: 13.0) with the NECTIN2-NECTIN4 adhesion axis (0.6959), featuring high novelty opportunity and 30 biological evidence entries"
+    },
+    {
+      "code": "part3_therapeutic_spillover",
+      "evidence": "Part3 should interpret selected L-R spatial evidence only; Part4 owns therapeutic synthesis.",
+      "file": "part3_final.md",
+      "repair_instruction": "Remove therapeutic prioritization language and keep the section to spatial/statistical LR evidence.",
+      "section": "## Part 3 Summary",
+      "severity": "error",
+      "target_text": "- The safety profile concerns for ERBB2 (-2) and NECTIN4 (-2) highlight the need for careful consideration of therapeutic targeting strategies",
+      "value": "- The safety profile concerns for ERBB2 (-2) and NECTIN4 (-2) highlight the need for careful consideration of therapeutic targeting strategies"
+    },
+    {
+      "code": "part3_therapeutic_spillover",
+      "evidence": "Part3 should interpret selected L-R spatial evidence only; Part4 owns therapeutic synthesis.",
+      "file": "part3_final.md",
+      "repair_instruction": "Remove therapeutic prioritization language and keep the section to spatial/statistical LR evidence.",
+      "section": "## Part 3 Summary",
+      "severity": "error",
+      "target_text": "Therapeutic synthesis, druggability scoring, and clinical prioritization are addressed in Part 4.*",
+      "value": "Therapeutic synthesis, druggability scoring, and clinical prioritization are addressed in Part 4.*"
+    },
+    {
+      "code": "synthesis_overclaim_warning",
+      "evidence": "Synthesis report-derived spatial/statistical evidence was written as a mechanistic or therapeutic claim.",
+      "file": "synthesis.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence supports this exact claim.",
+      "section": "## Executive Summary",
+      "severity": "warning",
+      "value": "This integrated analysis synthesizes spatial transcriptomics, cell-cell interaction (CCI), and therapeutic target assessment findings from breast cancer tissue."
+    },
+    {
+      "code": "synthesis_overclaim_warning",
+      "evidence": "Synthesis report-derived spatial/statistical evidence was written as a mechanistic or therapeutic claim.",
+      "file": "synthesis.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence supports this exact claim.",
+      "section": "## Executive Summary",
+      "severity": "warning",
+      "value": "The analysis reveals a coherent malignant cell-intrinsic signaling program centered on ErbB family receptors (ERBB2, ERBB3) and adhesion molecules (CDH1, NECTIN4), with strong spatial organization and validated therapeutic tractability."
+    },
+    {
+      "code": "synthesis_overclaim_warning",
+      "evidence": "Synthesis report-derived spatial/statistical evidence was written as a mechanistic or therapeutic claim.",
+      "file": "synthesis.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence supports this exact claim.",
+      "section": "## Cross-Part Themes",
+      "severity": "warning",
+      "value": "- Stage 1 filter confirms same-cell coexpression enrichment in malignant cell populations"
+    }
+  ],
+  "original_report_hashes": {
+    "CCI_Analysis_Report.html": "e37bf96d05459442d656e2adfb0dd15bbde81a5c438bd995dcab6d23eb27ed13",
+    "part1_final.md": "9e1d3e44525a955fb58a15656a4ec48d5bb61587a97b69c96dac2026afe9f56d",
+    "part2_final.md": "f4592db22c0dcd40aea9c9ede070fe8c3e4a128d29e9ecdfc1b9c5ba8ca5b666",
+    "part3_final.md": "4dd2b8e6959e0ae6792733f571fb1c4e0228f04dc9b47e188336c2ed97ddc1fd",
+    "synthesis.md": "f2d1013a857484d08c35b83c350e1ce75cd415f70ae0ff4a92a5a73d4cf4a169"
+  },
+  "phases": {
+    "parts": "deterministic",
+    "synthesis": "deterministic"
+  },
+  "recovery_attempts": [
+    {
+      "elapsed_seconds": 1.55030366696883,
+      "status": "deterministic_only",
+      "usable": false
+    }
+  ],
+  "status": "deterministic_only",
+  "usable": false,
+  "working_copy": "res/deep_interpreter/bc/sni_repair_ablation/guardrail_posthoc_recovered_20260908T055100Z/work/pair-23-AB/off"
+}

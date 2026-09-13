@@ -1,0 +1,370 @@
+{
+  "complete": true,
+  "deterministic_issues": [
+    {
+      "code": "factor_pathway_direction_ambiguous",
+      "evidence": "Mixed or multi-pathway wording prevents a high-confidence direction verdict.",
+      "file": "part2_final.md",
+      "repair_instruction": "Leave unchanged and retain as an audit warning.",
+      "section": "## Analysis 2-7: NMF Factor Spatial Distribution",
+      "severity": "warning",
+      "value": "Factor3: EGFR estimate=-2.8971509571226797"
+    },
+    {
+      "code": "factor_pathway_direction_ambiguous",
+      "evidence": "Mixed or multi-pathway wording prevents a high-confidence direction verdict.",
+      "file": "part2_final.md",
+      "repair_instruction": "Leave unchanged and retain as an audit warning.",
+      "section": "## Analysis 2-8: Pathway-Factor Enrichment",
+      "severity": "warning",
+      "value": "Factor3: Estrogen estimate=-5.479801410924036"
+    },
+    {
+      "code": "factor_pathway_direction_ambiguous",
+      "evidence": "Mixed or multi-pathway wording prevents a high-confidence direction verdict.",
+      "file": "part2_final.md",
+      "repair_instruction": "Leave unchanged and retain as an audit warning.",
+      "section": "## Analysis 2-8: Pathway-Factor Enrichment",
+      "severity": "warning",
+      "value": "Factor3: EGFR estimate=-2.8971509571226797"
+    },
+    {
+      "code": "mechanistic_interpretation_warning",
+      "evidence": "Report-derived spatial/statistical evidence was written as a mechanistic or causal claim.",
+      "file": "part1_final.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence is cited for this exact report-derived claim.",
+      "section": "## Analysis 1-3: Neighborhood Enrichment",
+      "severity": "warning",
+      "value": "The neighborhood enrichment analysis reveals critical spatial relationships that may drive tumor-stroma interactions and angiogenic processes."
+    },
+    {
+      "code": "part3_therapeutic_spillover",
+      "evidence": "Part3 should interpret selected L-R spatial evidence only; Part4 owns therapeutic synthesis.",
+      "file": "part3_final.md",
+      "repair_instruction": "Remove therapeutic prioritization language and keep the section to spatial/statistical LR evidence.",
+      "section": "## Selected Gene L-R Spatial Evidence (3-10 & 3-11 Integrated)",
+      "severity": "error",
+      "target_text": "While ERBB3 itself is a well-characterized therapeutic target (combined_rank_score: 18.0, validated_target classification), the specific spatial organization of CDH1-ERBB3 interactions in the Prolif Invasive Tumor context appears to be a novel finding.",
+      "value": "While ERBB3 itself is a well-characterized therapeutic target (combined_rank_score: 18.0, validated_target classification), the specific spatial organization of CDH1-ERBB3 interactions in the Prolif Invasive Tumor context appears to be a novel finding."
+    },
+    {
+      "code": "part3_therapeutic_spillover",
+      "evidence": "Part3 should interpret selected L-R spatial evidence only; Part4 owns therapeutic synthesis.",
+      "file": "part3_final.md",
+      "repair_instruction": "Remove therapeutic prioritization language and keep the section to spatial/statistical LR evidence.",
+      "section": "## Selected Gene L-R Spatial Evidence (3-10 & 3-11 Integrated)",
+      "severity": "error",
+      "target_text": "The combined rank score of 16.0 for ERBB2 (rank 2) reflects its established role as a therapeutic target, but the spatial transcriptomics data reveals the specific spatial organization of LRIG1-ERBB2 regulatory interactions.",
+      "value": "The combined rank score of 16.0 for ERBB2 (rank 2) reflects its established role as a therapeutic target, but the spatial transcriptomics data reveals the specific spatial organization of LRIG1-ERBB2 regulatory interactions."
+    },
+    {
+      "code": "part3_therapeutic_spillover",
+      "evidence": "Part3 should interpret selected L-R spatial evidence only; Part4 owns therapeutic synthesis.",
+      "file": "part3_final.md",
+      "repair_instruction": "Remove therapeutic prioritization language and keep the section to spatial/statistical LR evidence.",
+      "section": "## Selected Gene L-R Spatial Evidence (3-10 & 3-11 Integrated)",
+      "severity": "error",
+      "target_text": "The spatial co-localization suggests that LRIG1-expressing cells may create a regulatory niche that modulates ERBB2 signaling in neighboring tumor cells, potentially influencing tumor growth and therapeutic response.",
+      "value": "The spatial co-localization suggests that LRIG1-expressing cells may create a regulatory niche that modulates ERBB2 signaling in neighboring tumor cells, potentially influencing tumor growth and therapeutic response."
+    },
+    {
+      "code": "part3_therapeutic_spillover",
+      "evidence": "Part3 should interpret selected L-R spatial evidence only; Part4 owns therapeutic synthesis.",
+      "file": "part3_final.md",
+      "repair_instruction": "Remove therapeutic prioritization language and keep the section to spatial/statistical LR evidence.",
+      "section": "## Selected Gene L-R Spatial Evidence (3-10 & 3-11 Integrated)",
+      "severity": "error",
+      "target_text": "NECTIN4 has emerged as a therapeutic target in breast cancer, with antibody-drug conjugates (ADCs) targeting NECTIN4 showing clinical activity.",
+      "value": "NECTIN4 has emerged as a therapeutic target in breast cancer, with antibody-drug conjugates (ADCs) targeting NECTIN4 showing clinical activity."
+    },
+    {
+      "code": "part3_therapeutic_spillover",
+      "evidence": "Part3 should interpret selected L-R spatial evidence only; Part4 owns therapeutic synthesis.",
+      "file": "part3_final.md",
+      "repair_instruction": "Remove therapeutic prioritization language and keep the section to spatial/statistical LR evidence.",
+      "section": "## Selected Gene L-R Spatial Evidence (3-10 & 3-11 Integrated)",
+      "severity": "error",
+      "target_text": "The combined rank score of 13.0 for NECTIN4 (rank 3 among featured candidates) reflects its emerging role as a therapeutic target with high novelty opportunity (2) and substantial biological evidence (count 30).",
+      "value": "The combined rank score of 13.0 for NECTIN4 (rank 3 among featured candidates) reflects its emerging role as a therapeutic target with high novelty opportunity (2) and substantial biological evidence (count 30)."
+    },
+    {
+      "code": "part3_therapeutic_spillover",
+      "evidence": "Part3 should interpret selected L-R spatial evidence only; Part4 owns therapeutic synthesis.",
+      "file": "part3_final.md",
+      "repair_instruction": "Remove therapeutic prioritization language and keep the section to spatial/statistical LR evidence.",
+      "section": "## Selected Gene L-R Spatial Evidence (3-10 & 3-11 Integrated)",
+      "severity": "error",
+      "target_text": "While NECTIN4 is an established therapeutic target (with ADCs in clinical use), the spatial transcriptomics data reveals the specific spatial organization of NECTIN2-NECTIN4 regulatory interactions in breast cancer.",
+      "value": "While NECTIN4 is an established therapeutic target (with ADCs in clinical use), the spatial transcriptomics data reveals the specific spatial organization of NECTIN2-NECTIN4 regulatory interactions in breast cancer."
+    },
+    {
+      "code": "part3_therapeutic_spillover",
+      "evidence": "Part3 should interpret selected L-R spatial evidence only; Part4 owns therapeutic synthesis.",
+      "file": "part3_final.md",
+      "repair_instruction": "Remove therapeutic prioritization language and keep the section to spatial/statistical LR evidence.",
+      "section": "## Selected Gene L-R Spatial Evidence (3-10 & 3-11 Integrated)",
+      "severity": "error",
+      "target_text": "The spatial co-localization suggests that this adhesion axis may play a role in tumor cell aggregation and invasion in the Prolif Invasive Tumor context, potentially influencing metastatic potential and therapeutic response.",
+      "value": "The spatial co-localization suggests that this adhesion axis may play a role in tumor cell aggregation and invasion in the Prolif Invasive Tumor context, potentially influencing metastatic potential and therapeutic response."
+    },
+    {
+      "code": "part3_therapeutic_spillover",
+      "evidence": "Part3 should interpret selected L-R spatial evidence only; Part4 owns therapeutic synthesis.",
+      "file": "part3_final.md",
+      "repair_instruction": "Remove therapeutic prioritization language and keep the section to spatial/statistical LR evidence.",
+      "section": "## Part 3 Summary",
+      "severity": "error",
+      "target_text": "**NECTIN2-NECTIN4** shows significant spatial co-localization (combined score: 0.6959) with high STRING validation score (0.933), representing an emerging therapeutic target in breast cancer with high novelty opportunity",
+      "value": "**NECTIN2-NECTIN4** shows significant spatial co-localization (combined score: 0.6959) with high STRING validation score (0.933), representing an emerging therapeutic target in breast cancer with high novelty opportunity"
+    },
+    {
+      "code": "part3_therapeutic_spillover",
+      "evidence": "Part3 should interpret selected L-R spatial evidence only; Part4 owns therapeutic synthesis.",
+      "file": "part3_final.md",
+      "repair_instruction": "Remove therapeutic prioritization language and keep the section to spatial/statistical LR evidence.",
+      "section": "## Part 3 Summary",
+      "severity": "error",
+      "target_text": "Therapeutic synthesis, druggability scoring, and clinical prioritization are addressed in Part 4.*",
+      "value": "Therapeutic synthesis, druggability scoring, and clinical prioritization are addressed in Part 4.*"
+    },
+    {
+      "code": "synthesis_overclaim_warning",
+      "evidence": "Synthesis report-derived spatial/statistical evidence was written as a mechanistic or therapeutic claim.",
+      "file": "synthesis.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence supports this exact claim.",
+      "section": "## Cross-Part Themes",
+      "severity": "warning",
+      "value": "- **Part 2 evidence**: Factor3 NMF analysis confirms spatial restriction of the communication program to clusters 4, 17, and 14 (loadings 0.51-0.60 vs < 0.36 in other clusters), demonstrating biologically coherent spatial organization."
+    },
+    {
+      "code": "synthesis_overclaim_warning",
+      "evidence": "Synthesis report-derived spatial/statistical evidence was written as a mechanistic or therapeutic claim.",
+      "file": "synthesis.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence supports this exact claim.",
+      "section": "## Cross-Part Themes",
+      "severity": "warning",
+      "value": "- **Part 3 evidence**: The spatial organization of CDH1-ERBB3 and LRIG1-ERBB2 interactions in hypoxic niches may drive aggressive tumor behavior."
+    },
+    {
+      "code": "synthesis_overclaim_warning",
+      "evidence": "Synthesis report-derived spatial/statistical evidence was written as a mechanistic or therapeutic claim.",
+      "file": "synthesis.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence supports this exact claim.",
+      "section": "## Clinical/Biological Implications",
+      "severity": "warning",
+      "value": "The spatial organization of CDH1-ERBB3 interactions suggests that targeting ERBB3 may disrupt the dominant communication axis driving tumor progression."
+    },
+    {
+      "code": "synthesis_overclaim_warning",
+      "evidence": "Synthesis report-derived spatial/statistical evidence was written as a mechanistic or therapeutic claim.",
+      "file": "synthesis.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence supports this exact claim.",
+      "section": "## Clinical/Biological Implications",
+      "severity": "warning",
+      "value": "The NECTIN2-NECTIN4 interaction shows strong spatial co-localization (combined score: 0.6959) and is supported by literature evidence for NECTIN4 as a therapeutic target in breast cancer (PMID: 41444310)."
+    }
+  ],
+  "elapsed_seconds": 1.516153333010152,
+  "evaluation_complete": false,
+  "hard_error_count": 9,
+  "hard_error_count_complete": false,
+  "hashes_after": {
+    "CCI_Analysis_Report.html": "c28abc3a992aecc1c56fdb2d055cb5eec37dc97f4b8ebd89aae4e7572e79366c",
+    "part1_final.md": "1f0cd20b505a8269b5413a907aa366488846666de766abed6499f838a1f6b3c0",
+    "part2_final.md": "dbc32851b8c01d4fe6a72981970de533aadbb3512058b2901489b5e346818574",
+    "part3_final.md": "9e49899d14b1ab674985749f1a45f6fe196328d65af098c8f197bb9820f84247",
+    "synthesis.md": "f61de889f83367edf9b450a671608873777a02da9c168d43c9d6254d3efe7440"
+  },
+  "hashes_before": {
+    "CCI_Analysis_Report.html": "c28abc3a992aecc1c56fdb2d055cb5eec37dc97f4b8ebd89aae4e7572e79366c",
+    "part1_final.md": "1f0cd20b505a8269b5413a907aa366488846666de766abed6499f838a1f6b3c0",
+    "part2_final.md": "dbc32851b8c01d4fe6a72981970de533aadbb3512058b2901489b5e346818574",
+    "part3_final.md": "9e49899d14b1ab674985749f1a45f6fe196328d65af098c8f197bb9820f84247",
+    "synthesis.md": "f61de889f83367edf9b450a671608873777a02da9c168d43c9d6254d3efe7440"
+  },
+  "issues": [
+    {
+      "code": "factor_pathway_direction_ambiguous",
+      "evidence": "Mixed or multi-pathway wording prevents a high-confidence direction verdict.",
+      "file": "part2_final.md",
+      "repair_instruction": "Leave unchanged and retain as an audit warning.",
+      "section": "## Analysis 2-7: NMF Factor Spatial Distribution",
+      "severity": "warning",
+      "value": "Factor3: EGFR estimate=-2.8971509571226797"
+    },
+    {
+      "code": "factor_pathway_direction_ambiguous",
+      "evidence": "Mixed or multi-pathway wording prevents a high-confidence direction verdict.",
+      "file": "part2_final.md",
+      "repair_instruction": "Leave unchanged and retain as an audit warning.",
+      "section": "## Analysis 2-8: Pathway-Factor Enrichment",
+      "severity": "warning",
+      "value": "Factor3: Estrogen estimate=-5.479801410924036"
+    },
+    {
+      "code": "factor_pathway_direction_ambiguous",
+      "evidence": "Mixed or multi-pathway wording prevents a high-confidence direction verdict.",
+      "file": "part2_final.md",
+      "repair_instruction": "Leave unchanged and retain as an audit warning.",
+      "section": "## Analysis 2-8: Pathway-Factor Enrichment",
+      "severity": "warning",
+      "value": "Factor3: EGFR estimate=-2.8971509571226797"
+    },
+    {
+      "code": "mechanistic_interpretation_warning",
+      "evidence": "Report-derived spatial/statistical evidence was written as a mechanistic or causal claim.",
+      "file": "part1_final.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence is cited for this exact report-derived claim.",
+      "section": "## Analysis 1-3: Neighborhood Enrichment",
+      "severity": "warning",
+      "value": "The neighborhood enrichment analysis reveals critical spatial relationships that may drive tumor-stroma interactions and angiogenic processes."
+    },
+    {
+      "code": "part3_therapeutic_spillover",
+      "evidence": "Part3 should interpret selected L-R spatial evidence only; Part4 owns therapeutic synthesis.",
+      "file": "part3_final.md",
+      "repair_instruction": "Remove therapeutic prioritization language and keep the section to spatial/statistical LR evidence.",
+      "section": "## Selected Gene L-R Spatial Evidence (3-10 & 3-11 Integrated)",
+      "severity": "error",
+      "target_text": "While ERBB3 itself is a well-characterized therapeutic target (combined_rank_score: 18.0, validated_target classification), the specific spatial organization of CDH1-ERBB3 interactions in the Prolif Invasive Tumor context appears to be a novel finding.",
+      "value": "While ERBB3 itself is a well-characterized therapeutic target (combined_rank_score: 18.0, validated_target classification), the specific spatial organization of CDH1-ERBB3 interactions in the Prolif Invasive Tumor context appears to be a novel finding."
+    },
+    {
+      "code": "part3_therapeutic_spillover",
+      "evidence": "Part3 should interpret selected L-R spatial evidence only; Part4 owns therapeutic synthesis.",
+      "file": "part3_final.md",
+      "repair_instruction": "Remove therapeutic prioritization language and keep the section to spatial/statistical LR evidence.",
+      "section": "## Selected Gene L-R Spatial Evidence (3-10 & 3-11 Integrated)",
+      "severity": "error",
+      "target_text": "The combined rank score of 16.0 for ERBB2 (rank 2) reflects its established role as a therapeutic target, but the spatial transcriptomics data reveals the specific spatial organization of LRIG1-ERBB2 regulatory interactions.",
+      "value": "The combined rank score of 16.0 for ERBB2 (rank 2) reflects its established role as a therapeutic target, but the spatial transcriptomics data reveals the specific spatial organization of LRIG1-ERBB2 regulatory interactions."
+    },
+    {
+      "code": "part3_therapeutic_spillover",
+      "evidence": "Part3 should interpret selected L-R spatial evidence only; Part4 owns therapeutic synthesis.",
+      "file": "part3_final.md",
+      "repair_instruction": "Remove therapeutic prioritization language and keep the section to spatial/statistical LR evidence.",
+      "section": "## Selected Gene L-R Spatial Evidence (3-10 & 3-11 Integrated)",
+      "severity": "error",
+      "target_text": "The spatial co-localization suggests that LRIG1-expressing cells may create a regulatory niche that modulates ERBB2 signaling in neighboring tumor cells, potentially influencing tumor growth and therapeutic response.",
+      "value": "The spatial co-localization suggests that LRIG1-expressing cells may create a regulatory niche that modulates ERBB2 signaling in neighboring tumor cells, potentially influencing tumor growth and therapeutic response."
+    },
+    {
+      "code": "part3_therapeutic_spillover",
+      "evidence": "Part3 should interpret selected L-R spatial evidence only; Part4 owns therapeutic synthesis.",
+      "file": "part3_final.md",
+      "repair_instruction": "Remove therapeutic prioritization language and keep the section to spatial/statistical LR evidence.",
+      "section": "## Selected Gene L-R Spatial Evidence (3-10 & 3-11 Integrated)",
+      "severity": "error",
+      "target_text": "NECTIN4 has emerged as a therapeutic target in breast cancer, with antibody-drug conjugates (ADCs) targeting NECTIN4 showing clinical activity.",
+      "value": "NECTIN4 has emerged as a therapeutic target in breast cancer, with antibody-drug conjugates (ADCs) targeting NECTIN4 showing clinical activity."
+    },
+    {
+      "code": "part3_therapeutic_spillover",
+      "evidence": "Part3 should interpret selected L-R spatial evidence only; Part4 owns therapeutic synthesis.",
+      "file": "part3_final.md",
+      "repair_instruction": "Remove therapeutic prioritization language and keep the section to spatial/statistical LR evidence.",
+      "section": "## Selected Gene L-R Spatial Evidence (3-10 & 3-11 Integrated)",
+      "severity": "error",
+      "target_text": "The combined rank score of 13.0 for NECTIN4 (rank 3 among featured candidates) reflects its emerging role as a therapeutic target with high novelty opportunity (2) and substantial biological evidence (count 30).",
+      "value": "The combined rank score of 13.0 for NECTIN4 (rank 3 among featured candidates) reflects its emerging role as a therapeutic target with high novelty opportunity (2) and substantial biological evidence (count 30)."
+    },
+    {
+      "code": "part3_therapeutic_spillover",
+      "evidence": "Part3 should interpret selected L-R spatial evidence only; Part4 owns therapeutic synthesis.",
+      "file": "part3_final.md",
+      "repair_instruction": "Remove therapeutic prioritization language and keep the section to spatial/statistical LR evidence.",
+      "section": "## Selected Gene L-R Spatial Evidence (3-10 & 3-11 Integrated)",
+      "severity": "error",
+      "target_text": "While NECTIN4 is an established therapeutic target (with ADCs in clinical use), the spatial transcriptomics data reveals the specific spatial organization of NECTIN2-NECTIN4 regulatory interactions in breast cancer.",
+      "value": "While NECTIN4 is an established therapeutic target (with ADCs in clinical use), the spatial transcriptomics data reveals the specific spatial organization of NECTIN2-NECTIN4 regulatory interactions in breast cancer."
+    },
+    {
+      "code": "part3_therapeutic_spillover",
+      "evidence": "Part3 should interpret selected L-R spatial evidence only; Part4 owns therapeutic synthesis.",
+      "file": "part3_final.md",
+      "repair_instruction": "Remove therapeutic prioritization language and keep the section to spatial/statistical LR evidence.",
+      "section": "## Selected Gene L-R Spatial Evidence (3-10 & 3-11 Integrated)",
+      "severity": "error",
+      "target_text": "The spatial co-localization suggests that this adhesion axis may play a role in tumor cell aggregation and invasion in the Prolif Invasive Tumor context, potentially influencing metastatic potential and therapeutic response.",
+      "value": "The spatial co-localization suggests that this adhesion axis may play a role in tumor cell aggregation and invasion in the Prolif Invasive Tumor context, potentially influencing metastatic potential and therapeutic response."
+    },
+    {
+      "code": "part3_therapeutic_spillover",
+      "evidence": "Part3 should interpret selected L-R spatial evidence only; Part4 owns therapeutic synthesis.",
+      "file": "part3_final.md",
+      "repair_instruction": "Remove therapeutic prioritization language and keep the section to spatial/statistical LR evidence.",
+      "section": "## Part 3 Summary",
+      "severity": "error",
+      "target_text": "**NECTIN2-NECTIN4** shows significant spatial co-localization (combined score: 0.6959) with high STRING validation score (0.933), representing an emerging therapeutic target in breast cancer with high novelty opportunity",
+      "value": "**NECTIN2-NECTIN4** shows significant spatial co-localization (combined score: 0.6959) with high STRING validation score (0.933), representing an emerging therapeutic target in breast cancer with high novelty opportunity"
+    },
+    {
+      "code": "part3_therapeutic_spillover",
+      "evidence": "Part3 should interpret selected L-R spatial evidence only; Part4 owns therapeutic synthesis.",
+      "file": "part3_final.md",
+      "repair_instruction": "Remove therapeutic prioritization language and keep the section to spatial/statistical LR evidence.",
+      "section": "## Part 3 Summary",
+      "severity": "error",
+      "target_text": "Therapeutic synthesis, druggability scoring, and clinical prioritization are addressed in Part 4.*",
+      "value": "Therapeutic synthesis, druggability scoring, and clinical prioritization are addressed in Part 4.*"
+    },
+    {
+      "code": "synthesis_overclaim_warning",
+      "evidence": "Synthesis report-derived spatial/statistical evidence was written as a mechanistic or therapeutic claim.",
+      "file": "synthesis.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence supports this exact claim.",
+      "section": "## Cross-Part Themes",
+      "severity": "warning",
+      "value": "- **Part 2 evidence**: Factor3 NMF analysis confirms spatial restriction of the communication program to clusters 4, 17, and 14 (loadings 0.51-0.60 vs < 0.36 in other clusters), demonstrating biologically coherent spatial organization."
+    },
+    {
+      "code": "synthesis_overclaim_warning",
+      "evidence": "Synthesis report-derived spatial/statistical evidence was written as a mechanistic or therapeutic claim.",
+      "file": "synthesis.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence supports this exact claim.",
+      "section": "## Cross-Part Themes",
+      "severity": "warning",
+      "value": "- **Part 3 evidence**: The spatial organization of CDH1-ERBB3 and LRIG1-ERBB2 interactions in hypoxic niches may drive aggressive tumor behavior."
+    },
+    {
+      "code": "synthesis_overclaim_warning",
+      "evidence": "Synthesis report-derived spatial/statistical evidence was written as a mechanistic or therapeutic claim.",
+      "file": "synthesis.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence supports this exact claim.",
+      "section": "## Clinical/Biological Implications",
+      "severity": "warning",
+      "value": "The spatial organization of CDH1-ERBB3 interactions suggests that targeting ERBB3 may disrupt the dominant communication axis driving tumor progression."
+    },
+    {
+      "code": "synthesis_overclaim_warning",
+      "evidence": "Synthesis report-derived spatial/statistical evidence was written as a mechanistic or therapeutic claim.",
+      "file": "synthesis.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence supports this exact claim.",
+      "section": "## Clinical/Biological Implications",
+      "severity": "warning",
+      "value": "The NECTIN2-NECTIN4 interaction shows strong spatial co-localization (combined score: 0.6959) and is supported by literature evidence for NECTIN4 as a therapeutic target in breast cancer (PMID: 41444310)."
+    }
+  ],
+  "original_report_hashes": {
+    "CCI_Analysis_Report.html": "c28abc3a992aecc1c56fdb2d055cb5eec37dc97f4b8ebd89aae4e7572e79366c",
+    "part1_final.md": "1f0cd20b505a8269b5413a907aa366488846666de766abed6499f838a1f6b3c0",
+    "part2_final.md": "dbc32851b8c01d4fe6a72981970de533aadbb3512058b2901489b5e346818574",
+    "part3_final.md": "9e49899d14b1ab674985749f1a45f6fe196328d65af098c8f197bb9820f84247",
+    "synthesis.md": "f61de889f83367edf9b450a671608873777a02da9c168d43c9d6254d3efe7440"
+  },
+  "phases": {
+    "parts": "deterministic",
+    "synthesis": "deterministic"
+  },
+  "recovery_attempts": [
+    {
+      "elapsed_seconds": 1.516153333010152,
+      "status": "deterministic_only",
+      "usable": false
+    }
+  ],
+  "status": "deterministic_only",
+  "usable": false,
+  "working_copy": "res/deep_interpreter/bc/sni_repair_ablation/guardrail_posthoc_recovered_20260908T055100Z/work/pair-19-BA/off"
+}

@@ -1,0 +1,1194 @@
+{
+  "complete": true,
+  "deterministic_issues": [
+    {
+      "code": "lr_metric_alignment_ambiguous",
+      "evidence": "Multiple LR pairs share metric text without an explicit one-to-one mapping.",
+      "file": "part2_final.md",
+      "repair_instruction": "Leave unchanged or rewrite with one metric next to each pair.",
+      "section": "## Analysis 2-6: LIANA Moran's R - Spatially Co-localized L-R Pairs",
+      "severity": "warning",
+      "value": "The LAMA5-ITGB4 and LAMA5-BCAM interactions (Moran's R = 0.327 and 0.415) highlight the importance of basement membrane and extracellular matrix interactions in tumor architecture."
+    },
+    {
+      "code": "factor_pathway_direction_ambiguous",
+      "evidence": "Mixed or multi-pathway wording prevents a high-confidence direction verdict.",
+      "file": "part2_final.md",
+      "repair_instruction": "Leave unchanged and retain as an audit warning.",
+      "section": "## Analysis 2-7: NMF Factor Spatial Distribution",
+      "severity": "warning",
+      "value": "Factor3: EGFR estimate=-2.8971509571226797"
+    },
+    {
+      "code": "factor_pathway_direction_ambiguous",
+      "evidence": "Mixed or multi-pathway wording prevents a high-confidence direction verdict.",
+      "file": "part2_final.md",
+      "repair_instruction": "Leave unchanged and retain as an audit warning.",
+      "section": "## Analysis 2-7: NMF Factor Spatial Distribution",
+      "severity": "warning",
+      "value": "Factor3: Estrogen estimate=-5.479801410924036"
+    },
+    {
+      "code": "factor_pathway_direction_ambiguous",
+      "evidence": "Mixed or multi-pathway wording prevents a high-confidence direction verdict.",
+      "file": "part2_final.md",
+      "repair_instruction": "Leave unchanged and retain as an audit warning.",
+      "section": "## Analysis 2-7: NMF Factor Spatial Distribution",
+      "severity": "warning",
+      "value": "Factor3: NFkB estimate=-2.589492475601927"
+    },
+    {
+      "code": "factor_pathway_direction_ambiguous",
+      "evidence": "Mixed or multi-pathway wording prevents a high-confidence direction verdict.",
+      "file": "part2_final.md",
+      "repair_instruction": "Leave unchanged and retain as an audit warning.",
+      "section": "## Analysis 2-8: Pathway-Factor Enrichment",
+      "severity": "warning",
+      "value": "Factor3: Estrogen estimate=-5.479801410924036"
+    },
+    {
+      "code": "factor_pathway_direction_ambiguous",
+      "evidence": "Mixed or multi-pathway wording prevents a high-confidence direction verdict.",
+      "file": "part2_final.md",
+      "repair_instruction": "Leave unchanged and retain as an audit warning.",
+      "section": "## Part 2 Summary",
+      "severity": "warning",
+      "value": "Factor3: EGFR estimate=-2.8971509571226797"
+    },
+    {
+      "code": "factor_pathway_direction_ambiguous",
+      "evidence": "Mixed or multi-pathway wording prevents a high-confidence direction verdict.",
+      "file": "part2_final.md",
+      "repair_instruction": "Leave unchanged and retain as an audit warning.",
+      "section": "## Part 2 Summary",
+      "severity": "warning",
+      "value": "Factor3: Estrogen estimate=-5.479801410924036"
+    },
+    {
+      "code": "factor_pathway_direction_ambiguous",
+      "evidence": "Mixed or multi-pathway wording prevents a high-confidence direction verdict.",
+      "file": "part2_final.md",
+      "repair_instruction": "Leave unchanged and retain as an audit warning.",
+      "section": "## Part 2 Summary",
+      "severity": "warning",
+      "value": "Factor3: NFkB estimate=-2.589492475601927"
+    },
+    {
+      "code": "mechanistic_interpretation_warning",
+      "evidence": "Report-derived spatial/statistical evidence was written as a mechanistic or causal claim.",
+      "file": "part1_final.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence is cited for this exact report-derived claim.",
+      "section": "## Analysis 1-4: Decoupler Pathway",
+      "severity": "warning",
+      "value": "The strong enrichment for EGFR;MAPK;PI3K combination pathways in these clusters indicates coordinated activation of receptor tyrosine kinase signaling networks that drive cell cycle progression, survival, and motility."
+    },
+    {
+      "code": "mechanistic_interpretation_warning",
+      "evidence": "Report-derived spatial/statistical evidence was written as a mechanistic or causal claim.",
+      "file": "part1_final.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence is cited for this exact report-derived claim.",
+      "section": "## Analysis 1-5: MISTy",
+      "severity": "warning",
+      "value": "The strong spatial correlation between EGFR;MAPK;PI3K pathway activity and Prolif Invasive Tumor enrichment confirms that these signaling pathways are the primary drivers of the proliferative tumor phenotype observed in clusters 17, 4, and 14."
+    },
+    {
+      "code": "mechanistic_interpretation_warning",
+      "evidence": "Report-derived spatial/statistical evidence was written as a mechanistic or causal claim.",
+      "file": "part2_final.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence is cited for this exact report-derived claim.",
+      "section": "## Analysis 2-6: LIANA Moran's R - Spatially Co-localized L-R Pairs",
+      "severity": "warning",
+      "value": "(PMID: 28174229) demonstrates that ErbB2 overexpression in mammary luminal epithelial cells alters phosphosignaling cascades triggered via EGFR and ErbB3, leading to enhanced motility and reduced adhesion\u2014findings that align with the observed spatial pattern of CDH1-ERBB3 co-localization in proliferative invasive tumor regions."
+    },
+    {
+      "code": "synthesis_overclaim_warning",
+      "evidence": "Synthesis report-derived spatial/statistical evidence was written as a mechanistic or therapeutic claim.",
+      "file": "synthesis.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence supports this exact claim.",
+      "section": "## Executive Summary",
+      "severity": "warning",
+      "value": "This integrated analysis of breast cancer spatial transcriptomics reveals a dominant ErbB family signaling axis centered on ERBB3 and ERBB2 that drives the proliferative invasive tumor phenotype."
+    },
+    {
+      "code": "synthesis_overclaim_warning",
+      "evidence": "Synthesis report-derived spatial/statistical evidence was written as a mechanistic or therapeutic claim.",
+      "file": "synthesis.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence supports this exact claim.",
+      "section": "## Executive Summary",
+      "severity": "warning",
+      "value": "The NMF Factor3 analysis reveals a distinct transcriptional program characterized by ERBB3/ERBB2 signaling with negative associations to Estrogen, EGFR, and NFkB pathways, suggesting a therapy-resistant, immune-evasive state."
+    },
+    {
+      "code": "synthesis_overclaim_warning",
+      "evidence": "Synthesis report-derived spatial/statistical evidence was written as a mechanistic or therapeutic claim.",
+      "file": "synthesis.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence supports this exact claim.",
+      "section": "## Cross-Part Themes",
+      "severity": "warning",
+      "value": "- **Part 2 evidence**: Factor3 spatial distribution confirms clusters 17, 4, 14 as highest scoring (0.538, 0.601, 0.511 respectively), defining a distinct transcriptional program."
+    },
+    {
+      "code": "synthesis_overclaim_warning",
+      "evidence": "Synthesis report-derived spatial/statistical evidence was written as a mechanistic or therapeutic claim.",
+      "file": "synthesis.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence supports this exact claim.",
+      "section": "## Cross-Part Themes",
+      "severity": "warning",
+      "value": "Literature support from PMID: 28174229 demonstrates that ErbB2 overexpression alters ErbB3 phosphosignaling and reduces adhesion, consistent with observed spatial patterns."
+    },
+    {
+      "code": "synthesis_overclaim_warning",
+      "evidence": "Synthesis report-derived spatial/statistical evidence was written as a mechanistic or therapeutic claim.",
+      "file": "synthesis.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence supports this exact claim.",
+      "section": "## Cross-Part Themes",
+      "severity": "warning",
+      "value": "- **Integration**: The Factor3 program represents a distinct signaling state characterized by suppression of canonical hormone receptor and inflammatory pathways, potentially reflecting a therapy-resistant state where ErbB3 signaling compensates for lost estrogen receptor function."
+    },
+    {
+      "code": "synthesis_overclaim_warning",
+      "evidence": "Synthesis report-derived spatial/statistical evidence was written as a mechanistic or therapeutic claim.",
+      "file": "synthesis.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence supports this exact claim.",
+      "section": "## Emergent Themes Summary",
+      "severity": "warning",
+      "value": "| **Therapy-Resistant State via ErbB Compensation** | Emerging | Part 2-8: Factor3 negative Estrogen/EGFR/NFkB associations, Part 3-10: ERBB3/ERBB2 Stage 1 Census support, Part 4: ERBB3 safety_profile = 0 vs ERBB2 = -2 |"
+    },
+    {
+      "code": "synthesis_overclaim_warning",
+      "evidence": "Synthesis report-derived spatial/statistical evidence was written as a mechanistic or therapeutic claim.",
+      "file": "synthesis.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence supports this exact claim.",
+      "section": "## Emergent Themes Summary",
+      "severity": "warning",
+      "value": "| **NECTIN4 as Novel Therapeutic Target** | Unexpected | Part 2-6: NECTIN2-NECTIN4 moderate spatial co-localization (0.202), Part 3-9: NECTIN4 ranked #3 (combined_score = 13.0), Part 4: NECTIN4 exploratory-dominant (7 exploratory vs 4 validated) |"
+    },
+    {
+      "code": "synthesis_overclaim_warning",
+      "evidence": "Synthesis report-derived spatial/statistical evidence was written as a mechanistic or therapeutic claim.",
+      "file": "synthesis.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence supports this exact claim.",
+      "section": "## Clinical/Biological Implications",
+      "severity": "warning",
+      "value": "**Therapy Resistance Mechanism**: The Factor3 program's negative associations with Estrogen, EGFR, and NFkB pathways suggest that proliferative invasive tumor cells may represent a therapy-resistant state where ErbB3 signaling compensates for lost canonical pathways."
+    },
+    {
+      "code": "synthesis_overclaim_warning",
+      "evidence": "Synthesis report-derived spatial/statistical evidence was written as a mechanistic or therapeutic claim.",
+      "file": "synthesis.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence supports this exact claim.",
+      "section": "## Clinical/Biological Implications",
+      "severity": "warning",
+      "value": "**Spatial Organization as Biomarker**: The spatial clustering patterns (clusters 17, 4, 14) and Factor3 program could serve as biomarkers for identifying aggressive, therapy-resistant tumor subpopulations."
+    },
+    {
+      "code": "synthesis_overclaim_warning",
+      "evidence": "Synthesis report-derived spatial/statistical evidence was written as a mechanistic or therapeutic claim.",
+      "file": "synthesis.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence supports this exact claim.",
+      "section": "## Validation Against Existing RAG Corpus",
+      "severity": "warning",
+      "value": "**ErbB Family Signaling**: Literature support from PMID: 28174229 demonstrates that ErbB2 overexpression alters ErbB3 phosphosignaling and reduces adhesion, consistent with observed spatial patterns of CDH1-ERBB3 co-localization."
+    },
+    {
+      "code": "synthesis_overclaim_warning",
+      "evidence": "Synthesis report-derived spatial/statistical evidence was written as a mechanistic or therapeutic claim.",
+      "file": "synthesis.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence supports this exact claim.",
+      "section": "## Validation Against Existing RAG Corpus",
+      "severity": "warning",
+      "value": "The identification of clusters 17, 4, and 14 as most aggressive subpopulations aligns with literature showing that proliferative invasive tumor cells represent a distinct, therapy-resistant state."
+    },
+    {
+      "code": "synthesis_overclaim_warning",
+      "evidence": "Synthesis report-derived spatial/statistical evidence was written as a mechanistic or therapeutic claim.",
+      "file": "synthesis.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence supports this exact claim.",
+      "section": "## Limitations and Future Directions",
+      "severity": "warning",
+      "value": "**Integration with Multi-Omics**: Future analyses should integrate spatial transcriptomics with proteomics, metabolomics, and epigenomics to provide a more comprehensive understanding of the molecular mechanisms driving breast cancer progression."
+    },
+    {
+      "code": "synthesis_overclaim_warning",
+      "evidence": "Synthesis report-derived spatial/statistical evidence was written as a mechanistic or therapeutic claim.",
+      "file": "synthesis.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence supports this exact claim.",
+      "section": "## Conclusion",
+      "severity": "warning",
+      "value": "The spatial organization of tumor clusters, cell-cell communication networks, and pathway activity converge on this network, defining a distinct, therapy-resistant state."
+    }
+  ],
+  "elapsed_seconds": 131.94607866700971,
+  "evaluation_complete": true,
+  "hard_error_count": 0,
+  "hard_error_count_complete": true,
+  "hashes_after": {
+    "CCI_Analysis_Report.html": "5c73b5c7ac9b984f9e2be4d56518ec03325920a7f482d74e55967cc366f7d189",
+    "part1_final.md": "59a0b5f5477de43c189e77faa41aacffe602c4e407ac5252813ae5cb43cba0b7",
+    "part2_final.md": "31ec5ca9cfcb0d4358ddd3fe820fb29fcbbd78999987297c2aa064242e7fdf1d",
+    "part3_final.md": "59e24d28b6098151aeda326b09e7aac1631d238fb17f255aaadd7644976b5fa9",
+    "synthesis.md": "f9b311ed737e7240e57ea7b084e5050b3835c13d2161dbd16822841f50904216"
+  },
+  "hashes_before": {
+    "CCI_Analysis_Report.html": "5c73b5c7ac9b984f9e2be4d56518ec03325920a7f482d74e55967cc366f7d189",
+    "part1_final.md": "59a0b5f5477de43c189e77faa41aacffe602c4e407ac5252813ae5cb43cba0b7",
+    "part2_final.md": "31ec5ca9cfcb0d4358ddd3fe820fb29fcbbd78999987297c2aa064242e7fdf1d",
+    "part3_final.md": "59e24d28b6098151aeda326b09e7aac1631d238fb17f255aaadd7644976b5fa9",
+    "synthesis.md": "f9b311ed737e7240e57ea7b084e5050b3835c13d2161dbd16822841f50904216"
+  },
+  "issues": [
+    {
+      "code": "lr_metric_alignment_ambiguous",
+      "evidence": "Multiple LR pairs share metric text without an explicit one-to-one mapping.",
+      "file": "part2_final.md",
+      "repair_instruction": "Leave unchanged or rewrite with one metric next to each pair.",
+      "section": "## Analysis 2-6: LIANA Moran's R - Spatially Co-localized L-R Pairs",
+      "severity": "warning",
+      "value": "The LAMA5-ITGB4 and LAMA5-BCAM interactions (Moran's R = 0.327 and 0.415) highlight the importance of basement membrane and extracellular matrix interactions in tumor architecture."
+    },
+    {
+      "code": "factor_pathway_direction_ambiguous",
+      "evidence": "Mixed or multi-pathway wording prevents a high-confidence direction verdict.",
+      "file": "part2_final.md",
+      "repair_instruction": "Leave unchanged and retain as an audit warning.",
+      "section": "## Analysis 2-7: NMF Factor Spatial Distribution",
+      "severity": "warning",
+      "value": "Factor3: EGFR estimate=-2.8971509571226797"
+    },
+    {
+      "code": "factor_pathway_direction_ambiguous",
+      "evidence": "Mixed or multi-pathway wording prevents a high-confidence direction verdict.",
+      "file": "part2_final.md",
+      "repair_instruction": "Leave unchanged and retain as an audit warning.",
+      "section": "## Analysis 2-7: NMF Factor Spatial Distribution",
+      "severity": "warning",
+      "value": "Factor3: Estrogen estimate=-5.479801410924036"
+    },
+    {
+      "code": "factor_pathway_direction_ambiguous",
+      "evidence": "Mixed or multi-pathway wording prevents a high-confidence direction verdict.",
+      "file": "part2_final.md",
+      "repair_instruction": "Leave unchanged and retain as an audit warning.",
+      "section": "## Analysis 2-7: NMF Factor Spatial Distribution",
+      "severity": "warning",
+      "value": "Factor3: NFkB estimate=-2.589492475601927"
+    },
+    {
+      "code": "factor_pathway_direction_ambiguous",
+      "evidence": "Mixed or multi-pathway wording prevents a high-confidence direction verdict.",
+      "file": "part2_final.md",
+      "repair_instruction": "Leave unchanged and retain as an audit warning.",
+      "section": "## Analysis 2-8: Pathway-Factor Enrichment",
+      "severity": "warning",
+      "value": "Factor3: Estrogen estimate=-5.479801410924036"
+    },
+    {
+      "code": "factor_pathway_direction_ambiguous",
+      "evidence": "Mixed or multi-pathway wording prevents a high-confidence direction verdict.",
+      "file": "part2_final.md",
+      "repair_instruction": "Leave unchanged and retain as an audit warning.",
+      "section": "## Part 2 Summary",
+      "severity": "warning",
+      "value": "Factor3: EGFR estimate=-2.8971509571226797"
+    },
+    {
+      "code": "factor_pathway_direction_ambiguous",
+      "evidence": "Mixed or multi-pathway wording prevents a high-confidence direction verdict.",
+      "file": "part2_final.md",
+      "repair_instruction": "Leave unchanged and retain as an audit warning.",
+      "section": "## Part 2 Summary",
+      "severity": "warning",
+      "value": "Factor3: Estrogen estimate=-5.479801410924036"
+    },
+    {
+      "code": "factor_pathway_direction_ambiguous",
+      "evidence": "Mixed or multi-pathway wording prevents a high-confidence direction verdict.",
+      "file": "part2_final.md",
+      "repair_instruction": "Leave unchanged and retain as an audit warning.",
+      "section": "## Part 2 Summary",
+      "severity": "warning",
+      "value": "Factor3: NFkB estimate=-2.589492475601927"
+    },
+    {
+      "code": "mechanistic_interpretation_warning",
+      "evidence": "Report-derived spatial/statistical evidence was written as a mechanistic or causal claim.",
+      "file": "part1_final.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence is cited for this exact report-derived claim.",
+      "section": "## Analysis 1-4: Decoupler Pathway",
+      "severity": "warning",
+      "value": "The strong enrichment for EGFR;MAPK;PI3K combination pathways in these clusters indicates coordinated activation of receptor tyrosine kinase signaling networks that drive cell cycle progression, survival, and motility."
+    },
+    {
+      "code": "mechanistic_interpretation_warning",
+      "evidence": "Report-derived spatial/statistical evidence was written as a mechanistic or causal claim.",
+      "file": "part1_final.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence is cited for this exact report-derived claim.",
+      "section": "## Analysis 1-5: MISTy",
+      "severity": "warning",
+      "value": "The strong spatial correlation between EGFR;MAPK;PI3K pathway activity and Prolif Invasive Tumor enrichment confirms that these signaling pathways are the primary drivers of the proliferative tumor phenotype observed in clusters 17, 4, and 14."
+    },
+    {
+      "code": "mechanistic_interpretation_warning",
+      "evidence": "Report-derived spatial/statistical evidence was written as a mechanistic or causal claim.",
+      "file": "part2_final.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence is cited for this exact report-derived claim.",
+      "section": "## Analysis 2-6: LIANA Moran's R - Spatially Co-localized L-R Pairs",
+      "severity": "warning",
+      "value": "(PMID: 28174229) demonstrates that ErbB2 overexpression in mammary luminal epithelial cells alters phosphosignaling cascades triggered via EGFR and ErbB3, leading to enhanced motility and reduced adhesion\u2014findings that align with the observed spatial pattern of CDH1-ERBB3 co-localization in proliferative invasive tumor regions."
+    },
+    {
+      "code": "claim_rag_hypothesis_warning",
+      "evidence": "The supplied evidence discusses ErbB3, LRIG1, and ErbB2 signaling pathways in breast cancer, focusing on molecular mechanisms of cell survival, resistance, and proliferation. None of the provided texts mention or describe the spatial organization of tumor cells, clustering in favorable microenvironments, vascularization patterns, or growth factor availability in the context of breast cancer progression as described in the claim. PMIDs: none. Evidence: ErbB3, a member of the ErbB family of receptor tyrosine kinases, is a potent activator of phosphatidyl inositol-3 kinase (PI3K) and mTOR signaling, driving tumor cell survival and therapeutic resistance in breast cancers.",
+      "evidence_quote": "ErbB3, a member of the ErbB family of receptor tyrosine kinases, is a potent activator of phosphatidyl inositol-3 kinase (PI3K) and mTOR signaling, driving tumor cell survival and therapeutic resistance in breast cancers.",
+      "file": "part1_final.md",
+      "reason": "The supplied evidence discusses ErbB3, LRIG1, and ErbB2 signaling pathways in breast cancer, focusing on molecular mechanisms of cell survival, resistance, and proliferation. None of the provided texts mention or describe the spatial organization of tumor cells, clustering in favorable microenvironments, vascularization patterns, or growth factor availability in the context of breast cancer progression as described in the claim.",
+      "repair_instruction": "Leave this claim unchanged and record the evidence gap.",
+      "section": "## Analysis 1-1: Spatial Clustering",
+      "severity": "warning",
+      "value": "This spatial organization is consistent with the known biology of breast cancer progression, where proliferative tumor cells tend to cluster in regions with favorable microenvironmental conditions, including adequate vascularization and growth factor availability."
+    },
+    {
+      "code": "claim_rag_hypothesis_warning",
+      "evidence": "The evidence confirms the ErbB family is a complex signaling network and that ErbB2 is overexpressed in breast cancer, but it does not support the specific claim that spatial segregation of proliferative clusters reflects differential activation of these networks, nor does it link this specific spatial pattern to cell cycle progression and motility in the context described. PMIDs: none. Evidence: The ErbB family of receptor tyrosine kinases, which includes EGF receptor, ErbB2/Her2/Neu, ErbB3, and ErbB4, forms a complex signaling network driven by ligand stimulated receptor heterodimerization. ErbB2 is overexpressed in 20 \u2013 30% of human breast cancers and correlates with poor patient prognosi",
+      "evidence_quote": "The ErbB family of receptor tyrosine kinases, which includes EGF receptor, ErbB2/Her2/Neu, ErbB3, and ErbB4, forms a complex signaling network driven by ligand stimulated receptor heterodimerization. ErbB2 is overexpressed in 20 \u2013 30% of human breast cancers and correlates with poor patient prognosi",
+      "file": "part1_final.md",
+      "reason": "The evidence confirms the ErbB family is a complex signaling network and that ErbB2 is overexpressed in breast cancer, but it does not support the specific claim that spatial segregation of proliferative clusters reflects differential activation of these networks, nor does it link this specific spatial pattern to cell cycle progression and motility in the context described.",
+      "repair_instruction": "Leave this claim unchanged and record the evidence gap.",
+      "section": "## Analysis 1-1: Spatial Clustering",
+      "severity": "warning",
+      "value": "The spatial segregation of proliferative clusters from more differentiated tumor regions may reflect differential activation of receptor tyrosine kinase networks, particularly the EGFR/ErbB family signaling axis that is known to regulate cell cycle progression and motility in breast cancer."
+    },
+    {
+      "code": "claim_rag_hypothesis_warning",
+      "evidence": "Claim judge supplied PMID or quote outside retrieved evidence. PMIDs: none.",
+      "evidence_quote": "",
+      "file": "part1_final.md",
+      "reason": "Claim judge supplied PMID or quote outside retrieved evidence.",
+      "repair_instruction": "Leave this claim unchanged and record the evidence gap.",
+      "section": "## Analysis 1-2: Cell Type Composition",
+      "severity": "warning",
+      "value": "This finding is consistent with the known biology of breast cancer, where proliferative tumor cells often occupy central tumor regions with access to nutrients and growth factors, while more differentiated or quiescent cells populate peripheral zones."
+    },
+    {
+      "code": "claim_rag_hypothesis_warning",
+      "evidence": "Claim judge supplied PMID or quote outside retrieved evidence. PMIDs: none.",
+      "evidence_quote": "",
+      "file": "part1_final.md",
+      "reason": "Claim judge supplied PMID or quote outside retrieved evidence.",
+      "repair_instruction": "Leave this claim unchanged and record the evidence gap.",
+      "section": "## Analysis 1-2: Cell Type Composition",
+      "severity": "warning",
+      "value": "This spatial-temporal relationship is consistent with clinical observations that DCIS can progress to invasive breast cancer through the acquisition of additional genetic and epigenetic alterations that enable basement membrane invasion."
+    },
+    {
+      "code": "claim_rag_unverifiable",
+      "evidence": "Claim judge supplied PMID or quote outside retrieved evidence. PMIDs: none.",
+      "evidence_quote": "",
+      "file": "part1_final.md",
+      "reason": "Claim judge supplied PMID or quote outside retrieved evidence.",
+      "repair_instruction": "Leave this claim unchanged and record the evidence gap.",
+      "section": "## Analysis 1-2: Cell Type Composition",
+      "severity": "warning",
+      "value": "Macrophages 1 and 2 likely represent M2-polarized tumor-associated macrophages (TAMs) that promote tumor growth and invasion through cytokine secretion and extracellular matrix remodeling."
+    },
+    {
+      "code": "claim_rag_hypothesis_warning",
+      "evidence": "Claim judge supplied PMID or quote outside retrieved evidence. PMIDs: none.",
+      "evidence_quote": "",
+      "file": "part1_final.md",
+      "reason": "Claim judge supplied PMID or quote outside retrieved evidence.",
+      "repair_instruction": "Leave this claim unchanged and record the evidence gap.",
+      "section": "## Analysis 1-2: Cell Type Composition",
+      "severity": "warning",
+      "value": "This spatial organization of immune cells is consistent with the concept of immune desert or immune-excluded tumor phenotypes, which have prognostic and therapeutic implications in breast cancer."
+    },
+    {
+      "code": "claim_rag_hypothesis_warning",
+      "evidence": "The evidence describes reduced adhesion and enhanced motility in ErbB2-overexpressing breast cancer cells, but does not support the claim that these cells maintain cell-cell adhesion through cadherin-mediated junctions. The claim adds specific mechanistic details (cadherin-mediated junctions) not present in the evidence, and the evidence actually suggests reduced adhesion rather than maintained adhesion. PMIDs: 28174229.",
+      "evidence_quote": "",
+      "file": "part1_final.md",
+      "reason": "The evidence describes reduced adhesion and enhanced motility in ErbB2-overexpressing breast cancer cells, but does not support the claim that these cells maintain cell-cell adhesion through cadherin-mediated junctions. The claim adds specific mechanistic details (cadherin-mediated junctions) not present in the evidence, and the evidence actually suggests reduced adhesion rather than maintained adhesion.",
+      "repair_instruction": "Leave this claim unchanged and record the evidence gap.",
+      "section": "## Analysis 1-3: Neighborhood Enrichment",
+      "severity": "warning",
+      "value": "This pattern is consistent with the known biology of epithelial tumor cells that maintain cell-cell adhesion through cadherin-mediated junctions while simultaneously acquiring invasive capabilities."
+    },
+    {
+      "code": "claim_rag_unverifiable",
+      "evidence": "Claim judge supplied PMID or quote outside retrieved evidence. PMIDs: none.",
+      "evidence_quote": "",
+      "file": "part1_final.md",
+      "reason": "Claim judge supplied PMID or quote outside retrieved evidence.",
+      "repair_instruction": "Leave this claim unchanged and record the evidence gap.",
+      "section": "## Analysis 1-3: Neighborhood Enrichment",
+      "severity": "warning",
+      "value": "Stromal fibroblasts can secrete growth factors (e.g., HGF, TGF-\u03b2) that activate receptor tyrosine kinases on tumor cells, promoting proliferation and invasion."
+    },
+    {
+      "code": "claim_rag_unverifiable",
+      "evidence": "Claim judge supplied PMID or quote outside retrieved evidence. PMIDs: none.",
+      "evidence_quote": "",
+      "file": "part1_final.md",
+      "reason": "Claim judge supplied PMID or quote outside retrieved evidence.",
+      "repair_instruction": "Leave this claim unchanged and record the evidence gap.",
+      "section": "## Analysis 1-3: Neighborhood Enrichment",
+      "severity": "warning",
+      "value": "This reciprocal interaction is particularly relevant in breast cancer, where stromal-epithelial crosstalk drives tumor growth and therapeutic resistance."
+    },
+    {
+      "code": "claim_rag_unverifiable",
+      "evidence": "The supplied evidence discusses ErbB family signaling and EGF-induced phosphotyrosine/ERK1/2 signaling but does not mention the specific enrichment of EGFR;MAPK;PI3K combination pathways in clusters, nor does it explicitly link these pathways to coordinated activation driving cell cycle progression, survival, and motility in the context described. PMIDs: none. Evidence: Generally, there was a greater magnitude in the response to EGFversusHRG treatment for both cell lines (Table IA). This likely reflects a higher potency of EGF in triggering downstream phosphotyrosine and ERK1/2 signaling in these cells (16).",
+      "evidence_quote": "Generally, there was a greater magnitude in the response to EGFversusHRG treatment for both cell lines (Table IA). This likely reflects a higher potency of EGF in triggering downstream phosphotyrosine and ERK1/2 signaling in these cells (16).",
+      "file": "part1_final.md",
+      "reason": "The supplied evidence discusses ErbB family signaling and EGF-induced phosphotyrosine/ERK1/2 signaling but does not mention the specific enrichment of EGFR;MAPK;PI3K combination pathways in clusters, nor does it explicitly link these pathways to coordinated activation driving cell cycle progression, survival, and motility in the context described.",
+      "repair_instruction": "Leave this claim unchanged and record the evidence gap.",
+      "section": "## Analysis 1-4: Decoupler Pathway",
+      "severity": "warning",
+      "value": "The strong enrichment for EGFR;MAPK;PI3K combination pathways in these clusters indicates coordinated activation of receptor tyrosine kinase signaling networks that drive cell cycle progression, survival, and motility."
+    },
+    {
+      "code": "inline_citation_unverifiable",
+      "evidence": "Claim judge supplied PMID or quote outside retrieved evidence. PMIDs: none.",
+      "evidence_quote": "",
+      "file": "part1_final.md",
+      "inline_pmid": "28174229",
+      "reason": "Claim judge supplied PMID or quote outside retrieved evidence.",
+      "repair_instruction": "Leave this claim unchanged and record the evidence gap.",
+      "section": "## Analysis 1-4: Decoupler Pathway",
+      "severity": "warning",
+      "source_claim_index": 2,
+      "value": "This pattern is consistent with the known biology of ErbB family signaling in breast cancer, where ligand-induced receptor heterodimerization (particularly EGFR-ErbB2-ErbB3 complexes) activates downstream MAPK and PI3K-AKT pathways that promote tumor growth and invasion (PMID: 28174229)."
+    },
+    {
+      "code": "claim_rag_hypothesis_warning",
+      "evidence": "The supplied evidence discusses NRG1-HER3 signaling and FGFR1 signaling in circulating tumor cells but does not mention PI3K pathway activation or its role in maintaining the proliferative phenotype. PMIDs: none. Evidence: Here, we established a method for the long-term expansion of MBCP-derived CTCs from multiple liquid biopsy sources. Using this platform, we identified NRG1 as a key factor that promotes HER3+CTC survival, facilitating metastatic growth. Moreover, we uncovered FGFR1 signaling as a compensatory mechan",
+      "evidence_quote": "Here, we established a method for the long-term expansion of MBCP-derived CTCs from multiple liquid biopsy sources. Using this platform, we identified NRG1 as a key factor that promotes HER3+CTC survival, facilitating metastatic growth. Moreover, we uncovered FGFR1 signaling as a compensatory mechan",
+      "file": "part1_final.md",
+      "reason": "The supplied evidence discusses NRG1-HER3 signaling and FGFR1 signaling in circulating tumor cells but does not mention PI3K pathway activation or its role in maintaining the proliferative phenotype.",
+      "repair_instruction": "Leave this claim unchanged and record the evidence gap.",
+      "section": "## Analysis 1-4: Decoupler Pathway",
+      "severity": "warning",
+      "value": "The constitutive activation of PI3K pathway across all proliferative clusters suggests this pathway plays a fundamental role in maintaining the proliferative phenotype."
+    },
+    {
+      "code": "claim_rag_unverifiable",
+      "evidence": "The supplied evidence text is an incomplete fragment discussing breast cancer metastasis and does not contain any information about PI3K-AKT signaling, cell cycle regulation, cyclin D1, p21, p27, apoptosis, BAD, or FOXO transcription factors. PMIDs: none. Evidence: Full Text:\n\n## Main\n\nBreast cancer (BC) treatment and prognosis have been greatly improved in recent years. Nevertheless, metastatic BC (MBC) remains incurable. BC cells spread mainly to the lungs, liver, bones, lymph nodes and brain, and the source of these metastases has been suggested to be circu",
+      "evidence_quote": "Full Text:\n\n## Main\n\nBreast cancer (BC) treatment and prognosis have been greatly improved in recent years. Nevertheless, metastatic BC (MBC) remains incurable. BC cells spread mainly to the lungs, liver, bones, lymph nodes and brain, and the source of these metastases has been suggested to be circu",
+      "file": "part1_final.md",
+      "reason": "The supplied evidence text is an incomplete fragment discussing breast cancer metastasis and does not contain any information about PI3K-AKT signaling, cell cycle regulation, cyclin D1, p21, p27, apoptosis, BAD, or FOXO transcription factors.",
+      "repair_instruction": "Leave this claim unchanged and record the evidence gap.",
+      "section": "## Analysis 1-4: Decoupler Pathway",
+      "severity": "warning",
+      "value": "PI3K-AKT signaling is a critical survival pathway that promotes cell cycle progression through regulation of cyclin D1, p21, and p27, and inhibits apoptosis through BAD and FOXO transcription factors."
+    },
+    {
+      "code": "claim_rag_unverifiable",
+      "evidence": "Claim judge supplied PMID or quote outside retrieved evidence. PMIDs: none.",
+      "evidence_quote": "",
+      "file": "part1_final.md",
+      "reason": "Claim judge supplied PMID or quote outside retrieved evidence.",
+      "repair_instruction": "Leave this claim unchanged and record the evidence gap.",
+      "section": "## Analysis 1-4: Decoupler Pathway",
+      "severity": "warning",
+      "value": "In breast cancer, PI3K pathway activation can occur through multiple mechanisms, including ErbB receptor overexpression, PTEN loss, or PIK3CA mutations."
+    },
+    {
+      "code": "claim_rag_hypothesis_warning",
+      "evidence": "Claim judge supplied PMID or quote outside retrieved evidence. PMIDs: none.",
+      "evidence_quote": "",
+      "file": "part1_final.md",
+      "reason": "Claim judge supplied PMID or quote outside retrieved evidence.",
+      "repair_instruction": "Leave this claim unchanged and record the evidence gap.",
+      "section": "## Analysis 1-4: Decoupler Pathway",
+      "severity": "warning",
+      "value": "Similarly, hypoxia-related pathway enrichment may reflect oxygen gradients within the tumor, with clusters 4 and 14 potentially occupying more hypoxic niches that induce HIF-1\u03b1-dependent transcription programs promoting angiogenesis and metabolic adaptation."
+    },
+    {
+      "code": "inline_citation_unverifiable",
+      "evidence": "Claim judge supplied PMID or quote outside retrieved evidence. PMIDs: none.",
+      "evidence_quote": "",
+      "file": "part1_final.md",
+      "inline_pmid": "28174229",
+      "reason": "Claim judge supplied PMID or quote outside retrieved evidence.",
+      "repair_instruction": "Leave this claim unchanged and record the evidence gap.",
+      "section": "## Analysis 1-5: MISTy",
+      "severity": "warning",
+      "source_claim_index": 2,
+      "value": "This finding is consistent with the established role of ErbB family signaling in breast cancer, where ligand-induced receptor activation triggers downstream MAPK and PI3K-AKT cascades that promote cell cycle progression, survival, and motility (PMID: 28174229)."
+    },
+    {
+      "code": "claim_rag_unverifiable",
+      "evidence": "Claim judge supplied PMID or quote outside retrieved evidence. PMIDs: none.",
+      "evidence_quote": "",
+      "file": "part1_final.md",
+      "reason": "Claim judge supplied PMID or quote outside retrieved evidence.",
+      "repair_instruction": "Leave this claim unchanged and record the evidence gap.",
+      "section": "## Analysis 1-5: MISTy",
+      "severity": "warning",
+      "value": "TGFb is a pleiotropic cytokine that can act on both tumor cells and stromal fibroblasts, inducing EMT in tumor cells while activating fibroblasts into cancer-associated fibroblasts (CAFs)."
+    },
+    {
+      "code": "claim_rag_hypothesis_warning",
+      "evidence": "Claim judge supplied PMID or quote outside retrieved evidence. PMIDs: none.",
+      "evidence_quote": "",
+      "file": "part1_final.md",
+      "reason": "Claim judge supplied PMID or quote outside retrieved evidence.",
+      "repair_instruction": "Leave this claim unchanged and record the evidence gap.",
+      "section": "## Analysis 1-5: MISTy",
+      "severity": "warning",
+      "value": "The spatial relationship observed in this analysis may reflect TGFb secretion by tumor cells that activates stromal fibroblasts in neighboring regions, which in turn secrete growth factors (e.g., HGF, IGF-1) that further activate ErbB signaling in tumor cells."
+    },
+    {
+      "code": "claim_rag_unverifiable",
+      "evidence": "Claim judge supplied PMID or quote outside retrieved evidence. PMIDs: none.",
+      "evidence_quote": "",
+      "file": "part1_final.md",
+      "reason": "Claim judge supplied PMID or quote outside retrieved evidence.",
+      "repair_instruction": "Leave this claim unchanged and record the evidence gap.",
+      "section": "## Analysis 1-5: MISTy",
+      "severity": "warning",
+      "value": "This reciprocal TGFb-ErbB crosstalk is a well-documented mechanism of tumor-stroma communication in breast cancer that promotes invasion and therapeutic resistance."
+    },
+    {
+      "code": "claim_rag_unverifiable",
+      "evidence": "Claim judge supplied PMID or quote outside retrieved evidence. PMIDs: none.",
+      "evidence_quote": "",
+      "file": "part1_final.md",
+      "reason": "Claim judge supplied PMID or quote outside retrieved evidence.",
+      "repair_instruction": "Leave this claim unchanged and record the evidence gap.",
+      "section": "## Analysis 1-5: MISTy",
+      "severity": "warning",
+      "value": "Hypoxia induces HIF-1\u03b1-dependent transcription that promotes angiogenesis, metabolic reprogramming, and immune modulation."
+    },
+    {
+      "code": "claim_rag_hypothesis_warning",
+      "evidence": "Claim judge supplied PMID or quote outside retrieved evidence. PMIDs: none.",
+      "evidence_quote": "",
+      "file": "part1_final.md",
+      "reason": "Claim judge supplied PMID or quote outside retrieved evidence.",
+      "repair_instruction": "Leave this claim unchanged and record the evidence gap.",
+      "section": "## Analysis 1-5: MISTy",
+      "severity": "warning",
+      "value": "Macrophages in hypoxic regions may adopt M2-like phenotypes that promote tumor growth and suppress anti-tumor immunity."
+    },
+    {
+      "code": "claim_rag_hypothesis_warning",
+      "evidence": "Claim judge supplied PMID or quote outside retrieved evidence. PMIDs: none.",
+      "evidence_quote": "",
+      "file": "part1_final.md",
+      "reason": "Claim judge supplied PMID or quote outside retrieved evidence.",
+      "repair_instruction": "Leave this claim unchanged and record the evidence gap.",
+      "section": "## Analysis 1-5: MISTy",
+      "severity": "warning",
+      "value": "The observed spatial correlation may reflect hypoxic tumor regions secreting chemokines (e.g., CCL2, CCL5) that recruit macrophages, while hypoxic macrophages secrete factors (e.g., VEGF, TGFb) that further promote tumor progression."
+    },
+    {
+      "code": "claim_rag_unverifiable",
+      "evidence": "Claim judge supplied PMID or quote outside retrieved evidence. PMIDs: none.",
+      "evidence_quote": "",
+      "file": "part1_final.md",
+      "reason": "Claim judge supplied PMID or quote outside retrieved evidence.",
+      "repair_instruction": "Leave this claim unchanged and record the evidence gap.",
+      "section": "## Analysis 1-5: MISTy",
+      "severity": "warning",
+      "value": "This hypoxia-immune-tumor axis represents a critical microenvironmental determinant of breast cancer progression and therapeutic response."
+    },
+    {
+      "code": "claim_rag_hypothesis_warning",
+      "evidence": "Claim judge supplied PMID or quote outside retrieved evidence. PMIDs: none.",
+      "evidence_quote": "",
+      "file": "part2_final.md",
+      "reason": "Claim judge supplied PMID or quote outside retrieved evidence.",
+      "repair_instruction": "Leave this claim unchanged and record the evidence gap.",
+      "section": "## Analysis 2-6: LIANA Moran's R - Spatially Co-localized L-R Pairs",
+      "severity": "warning",
+      "value": "CDH1-ERBB3 exhibits the strongest spatial co-localization (Moran's R = 0.477), consistent with the established role of E-cadherin in mediating epithelial cell-cell adhesion and its modulation of ErbB3 signaling."
+    },
+    {
+      "code": "claim_rag_overclaimed",
+      "evidence": "The evidence supports that LRIG1 regulates ErbB2 and is suppressed in ErbB2+ breast cancer, but does not provide data on the specific interaction strengths (Moran's R values) or explicitly state that these interactions reflect a 'critical regulatory axis in breast cancer progression' as claimed. The claim adds specific quantitative metrics and a definitive conclusion about the regulatory axis that are not present in the supplied evidence. PMIDs: none. Evidence: Lrig1 is the founding member of the Lrig family and has been implicated in the negative regulation of several oncogenic receptor tyrosine kinases including ErbB2.",
+      "evidence_quote": "Lrig1 is the founding member of the Lrig family and has been implicated in the negative regulation of several oncogenic receptor tyrosine kinases including ErbB2.",
+      "file": "part2_final.md",
+      "reason": "The evidence supports that LRIG1 regulates ErbB2 and is suppressed in ErbB2+ breast cancer, but does not provide data on the specific interaction strengths (Moran's R values) or explicitly state that these interactions reflect a 'critical regulatory axis in breast cancer progression' as claimed. The claim adds specific quantitative metrics and a definitive conclusion about the regulatory axis that are not present in the supplied evidence.",
+      "repair_instruction": "Leave this claim unchanged and record the evidence gap.",
+      "section": "## Analysis 2-6: LIANA Moran's R - Spatially Co-localized L-R Pairs",
+      "severity": "warning",
+      "value": "The prominence of LRIG1-ERBB2 and LRIG1-ERBB3 interactions (Moran's R = 0.421 and 0.363, respectively) reflects a critical regulatory axis in breast cancer progression."
+    },
+    {
+      "code": "claim_rag_unverifiable",
+      "evidence": "Claim judge supplied PMID or quote outside retrieved evidence. PMIDs: none.",
+      "evidence_quote": "",
+      "file": "part2_final.md",
+      "reason": "Claim judge supplied PMID or quote outside retrieved evidence.",
+      "repair_instruction": "Leave this claim unchanged and record the evidence gap.",
+      "section": "## Analysis 2-6: LIANA Moran's R - Spatially Co-localized L-R Pairs",
+      "severity": "warning",
+      "value": "LRIG1 functions as a negative regulator of ErbB receptors, and its suppression has been shown to contribute to ErbB2 overexpression and therapeutic resistance."
+    },
+    {
+      "code": "inline_citation_unverifiable",
+      "evidence": "Claim judge supplied PMID or quote outside retrieved evidence. PMIDs: none.",
+      "evidence_quote": "",
+      "file": "part2_final.md",
+      "inline_pmid": "18922900",
+      "reason": "Claim judge supplied PMID or quote outside retrieved evidence.",
+      "repair_instruction": "Leave this claim unchanged and record the evidence gap.",
+      "section": "## Analysis 2-6: LIANA Moran's R - Spatially Co-localized L-R Pairs",
+      "severity": "warning",
+      "source_claim_index": 6,
+      "value": "(PMID: 18922900) demonstrated that LRIG1 protein levels are significantly suppressed in ErbB2-induced mammary tumors, creating a feed-forward loop where aberrant ErbB2 signaling further suppresses LRIG1, exacerbating receptor overexpression."
+    },
+    {
+      "code": "claim_rag_hypothesis_warning",
+      "evidence": "The evidence states that LRIG1 is inversely correlated with ErbB3 and negatively regulates ErbB2, but does not support the claim that LRIG1 co-localizes with both ERBB2 and ERBB3 or that this defines tissue-level boundaries between proliferative and less aggressive tumor regions. The claim asserts spatial co-localization and a specific tissue-level regulatory mechanism that is not mentioned in the provided evidence. PMIDs: none. Evidence: Among these, only LRIG1 correlated positively with ERalpha, but inversely with ErbB3 in clinical breast cancer datasets.",
+      "evidence_quote": "Among these, only LRIG1 correlated positively with ERalpha, but inversely with ErbB3 in clinical breast cancer datasets.",
+      "file": "part2_final.md",
+      "reason": "The evidence states that LRIG1 is inversely correlated with ErbB3 and negatively regulates ErbB2, but does not support the claim that LRIG1 co-localizes with both ERBB2 and ERBB3 or that this defines tissue-level boundaries between proliferative and less aggressive tumor regions. The claim asserts spatial co-localization and a specific tissue-level regulatory mechanism that is not mentioned in the provided evidence.",
+      "repair_instruction": "Leave this claim unchanged and record the evidence gap.",
+      "section": "## Analysis 2-6: LIANA Moran's R - Spatially Co-localized L-R Pairs",
+      "severity": "warning",
+      "value": "The spatial co-localization of LRIG1 with both ERBB2 and ERBB3 suggests that this regulatory mechanism operates at the tissue level, potentially defining boundaries between proliferative and less aggressive tumor regions."
+    },
+    {
+      "code": "claim_rag_hypothesis_warning",
+      "evidence": "Claim judge supplied PMID or quote outside retrieved evidence. PMIDs: none.",
+      "evidence_quote": "",
+      "file": "part2_final.md",
+      "reason": "Claim judge supplied PMID or quote outside retrieved evidence.",
+      "repair_instruction": "Leave this claim unchanged and record the evidence gap.",
+      "section": "## Analysis 2-7: NMF Factor Spatial Distribution",
+      "severity": "warning",
+      "value": "The balanced Factor1/Factor3 ratios in these clusters suggest co-activation of complementary programs, possibly reflecting epithelial-mesenchymal transition (EMT) states where both proliferative and invasive signatures are maintained."
+    },
+    {
+      "code": "inline_citation_unverifiable",
+      "evidence": "Inline citation PMID 28174229 was not included in supporting_pmids. PMIDs: none.",
+      "evidence_quote": "",
+      "file": "part2_final.md",
+      "inline_pmid": "28174229",
+      "reason": "Inline citation PMID 28174229 was not included in supporting_pmids.",
+      "repair_instruction": "Leave this claim unchanged and record the evidence gap.",
+      "section": "## Analysis 2-7: NMF Factor Spatial Distribution",
+      "severity": "warning",
+      "source_claim_index": 5,
+      "value": "(PMID: 28174229) demonstrated that ErbB2 overexpression in luminal epithelial cells triggers alternative phosphosignaling cascades via EGFR and ErbB3, promoting hyper-proliferation and enhanced motility\u2014precisely the phenotype captured by Factor3."
+    },
+    {
+      "code": "claim_rag_hypothesis_warning",
+      "evidence": "Claim judge supplied PMID or quote outside retrieved evidence. PMIDs: none.",
+      "evidence_quote": "",
+      "file": "part2_final.md",
+      "reason": "Claim judge supplied PMID or quote outside retrieved evidence.",
+      "repair_instruction": "Leave this claim unchanged and record the evidence gap.",
+      "section": "## Analysis 2-7: NMF Factor Spatial Distribution",
+      "severity": "warning",
+      "value": "The NFkB negative association with Factor3 (estimate = -2.59, p = 0.0097) further supports a distinct inflammatory state, potentially indicating reduced immune activation in the proliferative invasive compartment."
+    },
+    {
+      "code": "claim_rag_unverifiable",
+      "evidence": "Claim judge supplied PMID or quote outside retrieved evidence. PMIDs: none.",
+      "evidence_quote": "",
+      "file": "part2_final.md",
+      "reason": "Claim judge supplied PMID or quote outside retrieved evidence.",
+      "repair_instruction": "Leave this claim unchanged and record the evidence gap.",
+      "section": "## Analysis 2-8: Pathway-Factor Enrichment",
+      "severity": "warning",
+      "value": "This finding contrasts with Factor1 and Factor2, which show positive TGFb and Hypoxia associations\u2014pathways often linked to immune activation and stromal remodeling."
+    },
+    {
+      "code": "claim_rag_unverifiable",
+      "evidence": "Claim judge supplied PMID or quote outside retrieved evidence. PMIDs: none.",
+      "evidence_quote": "",
+      "file": "part3_final.md",
+      "reason": "Claim judge supplied PMID or quote outside retrieved evidence.",
+      "repair_instruction": "Leave this claim unchanged and record the evidence gap.",
+      "section": "## 3-9 NMF Quadrant with GenePT",
+      "severity": "warning",
+      "value": "The NMF Quadrant + GenePT analysis identifies a distinct cluster of genes centered on the ErbB receptor family (ERBB2, ERBB3) and their regulatory ligands (CDH1, LRIG1, NECTIN2)."
+    },
+    {
+      "code": "claim_rag_unsupported",
+      "evidence": "The supplied evidence discusses miRNA-218-5p targeting LRIG1 to upregulate ErbB2 and EGFR (PMID 39491279), and LRIG1's inverse correlation with ErbB3 (PMID 26148232), but none of the evidence supports the specific claim that co-expression of CDH1 (E-cadherin) and ERBB3 in adjacent cells facilitates signaling hubs driving proliferation and invasion. The claim introduces CDH1 and a specific intercellular mechanism not mentioned in the provided texts. PMIDs: 39491279. Evidence: miRNA-218-5p up-regulated ErbB2 and EGFR expression by targeting LRIG1",
+      "evidence_quote": "miRNA-218-5p up-regulated ErbB2 and EGFR expression by targeting LRIG1",
+      "file": "part3_final.md",
+      "reason": "The supplied evidence discusses miRNA-218-5p targeting LRIG1 to upregulate ErbB2 and EGFR (PMID 39491279), and LRIG1's inverse correlation with ErbB3 (PMID 26148232), but none of the evidence supports the specific claim that co-expression of CDH1 (E-cadherin) and ERBB3 in adjacent cells facilitates signaling hubs driving proliferation and invasion. The claim introduces CDH1 and a specific intercellular mechanism not mentioned in the provided texts.",
+      "repair_instruction": "Leave this claim unchanged and record the evidence gap.",
+      "section": "## 3-9 NMF Quadrant with GenePT",
+      "severity": "warning",
+      "value": "In breast cancer, the co-expression of CDH1 (E-cadherin) and ERBB3 in adjacent cells facilitates the formation of signaling hubs that drive proliferation and invasion."
+    },
+    {
+      "code": "inline_citation_unverifiable",
+      "evidence": "Inline citation PMID 21821674 was not included in supporting_pmids. PMIDs: none.",
+      "evidence_quote": "",
+      "file": "part3_final.md",
+      "inline_pmid": "21821674",
+      "reason": "Inline citation PMID 21821674 was not included in supporting_pmids.",
+      "repair_instruction": "Leave this claim unchanged and record the evidence gap.",
+      "section": "## Selected Gene L-R Spatial Evidence (3-10 & 3-11 Integrated)",
+      "severity": "warning",
+      "source_claim_index": 6,
+      "value": "PMID: 21821674 demonstrates that LRIG1 is an estrogen-regulated growth suppressor that correlates with longer relapse-free survival in ERalpha-positive breast cancer, suggesting that the LRIG1-ERBB2 axis can be targeted to overcome endocrine resistance."
+    },
+    {
+      "code": "synthesis_overclaim_warning",
+      "evidence": "Synthesis report-derived spatial/statistical evidence was written as a mechanistic or therapeutic claim.",
+      "file": "synthesis.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence supports this exact claim.",
+      "section": "## Executive Summary",
+      "severity": "warning",
+      "value": "This integrated analysis of breast cancer spatial transcriptomics reveals a dominant ErbB family signaling axis centered on ERBB3 and ERBB2 that drives the proliferative invasive tumor phenotype."
+    },
+    {
+      "code": "synthesis_overclaim_warning",
+      "evidence": "Synthesis report-derived spatial/statistical evidence was written as a mechanistic or therapeutic claim.",
+      "file": "synthesis.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence supports this exact claim.",
+      "section": "## Executive Summary",
+      "severity": "warning",
+      "value": "The NMF Factor3 analysis reveals a distinct transcriptional program characterized by ERBB3/ERBB2 signaling with negative associations to Estrogen, EGFR, and NFkB pathways, suggesting a therapy-resistant, immune-evasive state."
+    },
+    {
+      "code": "synthesis_overclaim_warning",
+      "evidence": "Synthesis report-derived spatial/statistical evidence was written as a mechanistic or therapeutic claim.",
+      "file": "synthesis.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence supports this exact claim.",
+      "section": "## Cross-Part Themes",
+      "severity": "warning",
+      "value": "- **Part 2 evidence**: Factor3 spatial distribution confirms clusters 17, 4, 14 as highest scoring (0.538, 0.601, 0.511 respectively), defining a distinct transcriptional program."
+    },
+    {
+      "code": "synthesis_overclaim_warning",
+      "evidence": "Synthesis report-derived spatial/statistical evidence was written as a mechanistic or therapeutic claim.",
+      "file": "synthesis.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence supports this exact claim.",
+      "section": "## Cross-Part Themes",
+      "severity": "warning",
+      "value": "Literature support from PMID: 28174229 demonstrates that ErbB2 overexpression alters ErbB3 phosphosignaling and reduces adhesion, consistent with observed spatial patterns."
+    },
+    {
+      "code": "synthesis_overclaim_warning",
+      "evidence": "Synthesis report-derived spatial/statistical evidence was written as a mechanistic or therapeutic claim.",
+      "file": "synthesis.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence supports this exact claim.",
+      "section": "## Cross-Part Themes",
+      "severity": "warning",
+      "value": "- **Integration**: The Factor3 program represents a distinct signaling state characterized by suppression of canonical hormone receptor and inflammatory pathways, potentially reflecting a therapy-resistant state where ErbB3 signaling compensates for lost estrogen receptor function."
+    },
+    {
+      "code": "synthesis_overclaim_warning",
+      "evidence": "Synthesis report-derived spatial/statistical evidence was written as a mechanistic or therapeutic claim.",
+      "file": "synthesis.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence supports this exact claim.",
+      "section": "## Emergent Themes Summary",
+      "severity": "warning",
+      "value": "| **Therapy-Resistant State via ErbB Compensation** | Emerging | Part 2-8: Factor3 negative Estrogen/EGFR/NFkB associations, Part 3-10: ERBB3/ERBB2 Stage 1 Census support, Part 4: ERBB3 safety_profile = 0 vs ERBB2 = -2 |"
+    },
+    {
+      "code": "synthesis_overclaim_warning",
+      "evidence": "Synthesis report-derived spatial/statistical evidence was written as a mechanistic or therapeutic claim.",
+      "file": "synthesis.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence supports this exact claim.",
+      "section": "## Emergent Themes Summary",
+      "severity": "warning",
+      "value": "| **NECTIN4 as Novel Therapeutic Target** | Unexpected | Part 2-6: NECTIN2-NECTIN4 moderate spatial co-localization (0.202), Part 3-9: NECTIN4 ranked #3 (combined_score = 13.0), Part 4: NECTIN4 exploratory-dominant (7 exploratory vs 4 validated) |"
+    },
+    {
+      "code": "synthesis_overclaim_warning",
+      "evidence": "Synthesis report-derived spatial/statistical evidence was written as a mechanistic or therapeutic claim.",
+      "file": "synthesis.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence supports this exact claim.",
+      "section": "## Clinical/Biological Implications",
+      "severity": "warning",
+      "value": "**Therapy Resistance Mechanism**: The Factor3 program's negative associations with Estrogen, EGFR, and NFkB pathways suggest that proliferative invasive tumor cells may represent a therapy-resistant state where ErbB3 signaling compensates for lost canonical pathways."
+    },
+    {
+      "code": "synthesis_overclaim_warning",
+      "evidence": "Synthesis report-derived spatial/statistical evidence was written as a mechanistic or therapeutic claim.",
+      "file": "synthesis.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence supports this exact claim.",
+      "section": "## Clinical/Biological Implications",
+      "severity": "warning",
+      "value": "**Spatial Organization as Biomarker**: The spatial clustering patterns (clusters 17, 4, 14) and Factor3 program could serve as biomarkers for identifying aggressive, therapy-resistant tumor subpopulations."
+    },
+    {
+      "code": "synthesis_overclaim_warning",
+      "evidence": "Synthesis report-derived spatial/statistical evidence was written as a mechanistic or therapeutic claim.",
+      "file": "synthesis.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence supports this exact claim.",
+      "section": "## Validation Against Existing RAG Corpus",
+      "severity": "warning",
+      "value": "**ErbB Family Signaling**: Literature support from PMID: 28174229 demonstrates that ErbB2 overexpression alters ErbB3 phosphosignaling and reduces adhesion, consistent with observed spatial patterns of CDH1-ERBB3 co-localization."
+    },
+    {
+      "code": "synthesis_overclaim_warning",
+      "evidence": "Synthesis report-derived spatial/statistical evidence was written as a mechanistic or therapeutic claim.",
+      "file": "synthesis.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence supports this exact claim.",
+      "section": "## Validation Against Existing RAG Corpus",
+      "severity": "warning",
+      "value": "The identification of clusters 17, 4, and 14 as most aggressive subpopulations aligns with literature showing that proliferative invasive tumor cells represent a distinct, therapy-resistant state."
+    },
+    {
+      "code": "synthesis_overclaim_warning",
+      "evidence": "Synthesis report-derived spatial/statistical evidence was written as a mechanistic or therapeutic claim.",
+      "file": "synthesis.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence supports this exact claim.",
+      "section": "## Limitations and Future Directions",
+      "severity": "warning",
+      "value": "**Integration with Multi-Omics**: Future analyses should integrate spatial transcriptomics with proteomics, metabolomics, and epigenomics to provide a more comprehensive understanding of the molecular mechanisms driving breast cancer progression."
+    },
+    {
+      "code": "synthesis_overclaim_warning",
+      "evidence": "Synthesis report-derived spatial/statistical evidence was written as a mechanistic or therapeutic claim.",
+      "file": "synthesis.md",
+      "repair_instruction": "Rewrite as an association or hypothesis unless direct experimental evidence supports this exact claim.",
+      "section": "## Conclusion",
+      "severity": "warning",
+      "value": "The spatial organization of tumor clusters, cell-cell communication networks, and pathway activity converge on this network, defining a distinct, therapy-resistant state."
+    },
+    {
+      "code": "claim_rag_overclaimed",
+      "evidence": "The evidence supports that NRG1-ERBB2/ERBB3 signaling is key for CTC survival, growth, and dissemination in metastatic breast cancer, and that ErbB3 drives luminal breast cancer growth. However, the claim asserts a 'dominant ErbB family signaling axis centered on ERBB3 and ERBB2' that 'drives the proliferative invasive tumor phenotype' based on an 'integrated analysis of breast cancer spatial transcriptomics'. The supplied evidence does not mention spatial transcriptomics, does not establish the axis as 'dominant' across the tumor phenotype generally, and the specific mechanistic claims about driving the 'proliferative invasive tumor phenotype' are broader than the specific contexts (CTCs, luminal subtype) supported by the evidence. PMIDs: none. Evidence: Multiomics analysis of CTC-derived organoids along with preclinical modeling with xenografts identified neuregulin 1 (NRG1)-ERBB2 receptor tyrosine kinase 3 (ERBB3/HER3) signaling as a key pathway required for CTC survival, growth and dissemination.",
+      "evidence_quote": "Multiomics analysis of CTC-derived organoids along with preclinical modeling with xenografts identified neuregulin 1 (NRG1)-ERBB2 receptor tyrosine kinase 3 (ERBB3/HER3) signaling as a key pathway required for CTC survival, growth and dissemination.",
+      "file": "synthesis.md",
+      "reason": "The evidence supports that NRG1-ERBB2/ERBB3 signaling is key for CTC survival, growth, and dissemination in metastatic breast cancer, and that ErbB3 drives luminal breast cancer growth. However, the claim asserts a 'dominant ErbB family signaling axis centered on ERBB3 and ERBB2' that 'drives the proliferative invasive tumor phenotype' based on an 'integrated analysis of breast cancer spatial transcriptomics'. The supplied evidence does not mention spatial transcriptomics, does not establish the axis as 'dominant' across the tumor phenotype generally, and the specific mechanistic claims about driving the 'proliferative invasive tumor phenotype' are broader than the specific contexts (CTCs, luminal subtype) supported by the evidence.",
+      "repair_instruction": "Leave this claim unchanged and record the evidence gap.",
+      "section": "## Executive Summary",
+      "severity": "warning",
+      "value": "This integrated analysis of breast cancer spatial transcriptomics reveals a dominant ErbB family signaling axis centered on ERBB3 and ERBB2 that drives the proliferative invasive tumor phenotype."
+    },
+    {
+      "code": "claim_rag_unsupported",
+      "evidence": "The supplied evidence discusses LRIG1's role in regulating ErbB3 (not ErbB2) and does not mention NECTIN2-NECTIN4 interactions or the specific regulatory network described in the claim. The claim asserts LRIG1-ERBB2 interaction and NECTIN2-NECTIN4 interactions, but the evidence only supports LRIG1's inverse correlation with ErbB3 and its downregulation of ErbB3, not ErbB2. Additionally, there is no evidence provided for NECTIN2-NECTIN4 interactions or their role in modulating ErbB signaling while maintaining cell adhesion. PMIDs: none. Evidence: Among these, only LRIG1 correlated positively with ERalpha, but inversely with ErbB3 in clinical breast cancer datasets. LRIG1, an estrogen-inducible ErbB down-regulator, was decreased in a panel of fulvestrant-treated luminal breast cancer cells.",
+      "evidence_quote": "Among these, only LRIG1 correlated positively with ERalpha, but inversely with ErbB3 in clinical breast cancer datasets. LRIG1, an estrogen-inducible ErbB down-regulator, was decreased in a panel of fulvestrant-treated luminal breast cancer cells.",
+      "file": "synthesis.md",
+      "reason": "The supplied evidence discusses LRIG1's role in regulating ErbB3 (not ErbB2) and does not mention NECTIN2-NECTIN4 interactions or the specific regulatory network described in the claim. The claim asserts LRIG1-ERBB2 interaction and NECTIN2-NECTIN4 interactions, but the evidence only supports LRIG1's inverse correlation with ErbB3 and its downregulation of ErbB3, not ErbB2. Additionally, there is no evidence provided for NECTIN2-NECTIN4 interactions or their role in modulating ErbB signaling while maintaining cell adhesion.",
+      "repair_instruction": "Leave this claim unchanged and record the evidence gap.",
+      "section": "## Executive Summary",
+      "severity": "warning",
+      "value": "This is complemented by LRIG1-ERBB2 (Moran's R = 0.421) and NECTIN2-NECTIN4 (combined score = 0.696) interactions, establishing a regulatory network that modulates ErbB signaling while maintaining cell adhesion."
+    },
+    {
+      "code": "claim_rag_unsupported",
+      "evidence": "The supplied evidence does not support the claim's specific assertions about NMF Factor3 analysis, negative associations to Estrogen/EGFR/NFkB pathways, or the conclusion of a therapy-resistant, immune-evasive state. Evidence 39753722 discusses NRG1-ERBB2/ERBB3 signaling in CTCs but does not mention NMF analysis or negative associations with the specified pathways. Evidence 26686064 discusses RET/EGFR in breast cancer but does not support the specific negative associations or NMF context. Evidence 39491279 states miRNA-218-5p up-regulates ErbB2 and EGFR, which contradicts the claim's assertion of negative associations to these pathways. PMIDs: none. Evidence: miRNA-218-5p up-regulated ErbB2 and EGFR expression by targeting LRIG1",
+      "evidence_quote": "miRNA-218-5p up-regulated ErbB2 and EGFR expression by targeting LRIG1",
+      "file": "synthesis.md",
+      "reason": "The supplied evidence does not support the claim's specific assertions about NMF Factor3 analysis, negative associations to Estrogen/EGFR/NFkB pathways, or the conclusion of a therapy-resistant, immune-evasive state. Evidence 39753722 discusses NRG1-ERBB2/ERBB3 signaling in CTCs but does not mention NMF analysis or negative associations with the specified pathways. Evidence 26686064 discusses RET/EGFR in breast cancer but does not support the specific negative associations or NMF context. Evidence 39491279 states miRNA-218-5p up-regulates ErbB2 and EGFR, which contradicts the claim's assertion of negative associations to these pathways.",
+      "repair_instruction": "Leave this claim unchanged and record the evidence gap.",
+      "section": "## Executive Summary",
+      "severity": "warning",
+      "value": "The NMF Factor3 analysis reveals a distinct transcriptional program characterized by ERBB3/ERBB2 signaling with negative associations to Estrogen, EGFR, and NFkB pathways, suggesting a therapy-resistant, immune-evasive state."
+    },
+    {
+      "code": "claim_rag_unsupported",
+      "evidence": "The supplied evidence does not mention ERBB3, ERBB2, or NECTIN4 as top candidates, nor does it provide evidence scores (16 = 10 validated + 6 exploratory) or mention 22 compounds supporting ERBB3. The evidence discusses other genes (ORAI3, BCAM, CYP3A4, CYP2A6, Eph/ephrin family, CDH1) and different topics (chemotherapy resistance mechanisms, Eph/ephrin in breast cancer, CDH1 mutations in lobular breast cancer). PMIDs: none. Evidence: Approximately 30% of early-stage breast cancer (BC) patients experience recurrence after systemic chemotherapy; thus, understanding therapy resistance is crucial in developing more successful treatments. Here, we investigated the mechanisms underlying resistance to combined anthracycline-taxane treatment by comparing gene expression patterns with subsequent therapeutic responses. We established a cohort of 634 anthracycline-taxane-treated patients with pathological complete response (PCR) and a separate cohort of 187 patients with relapse-free survival (RFS) data, each having transcriptome-level expression data of 10,017 unique genes. Patients were categorized as responders and non-responders based on their PCR and RFS status, and the expression for each gene was compared between the two groups using a Mann-Whitney U-test. Statistical significance was set at p < 0.05, with fold change (FC) > 1.44. Altogether, 224 overexpressed genes were identified in the tumor samples derived from the patients without PCR; among these, the gene sets associated with xenobiotic metabolism (e.g., CYP3A4, CYP2A6) exhibited significant enrichment. The genes ORAI3 and BCAM differentiated non-responders",
+      "evidence_quote": "Approximately 30% of early-stage breast cancer (BC) patients experience recurrence after systemic chemotherapy; thus, understanding therapy resistance is crucial in developing more successful treatments. Here, we investigated the mechanisms underlying resistance to combined anthracycline-taxane treatment by comparing gene expression patterns with subsequent therapeutic responses. We established a cohort of 634 anthracycline-taxane-treated patients with pathological complete response (PCR) and a separate cohort of 187 patients with relapse-free survival (RFS) data, each having transcriptome-level expression data of 10,017 unique genes. Patients were categorized as responders and non-responders based on their PCR and RFS status, and the expression for each gene was compared between the two groups using a Mann-Whitney U-test. Statistical significance was set at p < 0.05, with fold change (FC) > 1.44. Altogether, 224 overexpressed genes were identified in the tumor samples derived from the patients without PCR; among these, the gene sets associated with xenobiotic metabolism (e.g., CYP3A4, CYP2A6) exhibited significant enrichment. The genes ORAI3 and BCAM differentiated non-responders",
+      "file": "synthesis.md",
+      "reason": "The supplied evidence does not mention ERBB3, ERBB2, or NECTIN4 as top candidates, nor does it provide evidence scores (16 = 10 validated + 6 exploratory) or mention 22 compounds supporting ERBB3. The evidence discusses other genes (ORAI3, BCAM, CYP3A4, CYP2A6, Eph/ephrin family, CDH1) and different topics (chemotherapy resistance mechanisms, Eph/ephrin in breast cancer, CDH1 mutations in lobular breast cancer).",
+      "repair_instruction": "Leave this claim unchanged and record the evidence gap.",
+      "section": "## Executive Summary",
+      "severity": "warning",
+      "value": "Therapeutic assessment prioritizes ERBB3, ERBB2, and NECTIN4 as top candidates, with ERBB3 showing the highest combined evidence score (16 = 10 validated + 6 exploratory) and extensive clinical drug support (22 compounds)."
+    },
+    {
+      "code": "claim_rag_unverifiable",
+      "evidence": "Claim judge supplied PMID or quote outside retrieved evidence. PMIDs: none.",
+      "evidence_quote": "",
+      "file": "synthesis.md",
+      "reason": "Claim judge supplied PMID or quote outside retrieved evidence.",
+      "repair_instruction": "Leave this claim unchanged and record the evidence gap.",
+      "section": "## Executive Summary",
+      "severity": "warning",
+      "value": "The CDH1-ERBB3 adhesion-signaling axis emerges as a key malignant cell-intrinsic follow-up candidate, while NECTIN4 represents an emerging target with strong exploratory support (7 = 4 validated + 7 exploratory) and novelty opportunity."
+    },
+    {
+      "code": "claim_rag_overclaimed",
+      "evidence": "The evidence discusses ErbB family signaling in breast cancer, Ret receptor interaction with ER, and E-cadherin's role in invasion, but does not support the specific claim that spatial clustering patterns directly correlate with transcriptional programs and cell-cell communication networks, nor does it confirm that proliferative invasive tumor regions represent a coherent biological entity defined by these specific factors. The claim adds specific spatial and network-level conclusions not present in the supplied evidence. PMIDs: none. Evidence: Aberrant regulation of the erythroblastosis oncogene B (ErbB) family of receptor tyrosine kinases (RTKs) and their ligands is common in human cancers. ErbB3 is required in luminal mammary epithelial cells (MECs) for growth and survival.",
+      "evidence_quote": "Aberrant regulation of the erythroblastosis oncogene B (ErbB) family of receptor tyrosine kinases (RTKs) and their ligands is common in human cancers. ErbB3 is required in luminal mammary epithelial cells (MECs) for growth and survival.",
+      "file": "synthesis.md",
+      "reason": "The evidence discusses ErbB family signaling in breast cancer, Ret receptor interaction with ER, and E-cadherin's role in invasion, but does not support the specific claim that spatial clustering patterns directly correlate with transcriptional programs and cell-cell communication networks, nor does it confirm that proliferative invasive tumor regions represent a coherent biological entity defined by these specific factors. The claim adds specific spatial and network-level conclusions not present in the supplied evidence.",
+      "repair_instruction": "Leave this claim unchanged and record the evidence gap.",
+      "section": "## Cross-Part Themes",
+      "severity": "warning",
+      "value": "**Integration**: The spatial clustering patterns directly correlate with transcriptional programs and cell-cell communication networks, confirming that proliferative invasive tumor regions represent a coherent biological entity defined by ErbB family signaling, specific L-R interactions, and pathway activation."
+    },
+    {
+      "code": "claim_rag_unsupported",
+      "evidence": "The supplied evidence titles indicate that LRIG1 is a negative regulator of ErbB2 and that LRIG1 suppresses ErbB2 overexpression, which contradicts the claim's assertion of a positive regulatory interaction (Moran's R = 0.421) reflecting a critical regulatory axis in the manner described. The evidence suggests an inverse relationship (suppression) rather than the positive correlation implied by the claim's context. PMIDs: none. Evidence: Suppression of the negative regulator LRIG1 contributes to ErbB2 overexpression in breast cancer",
+      "evidence_quote": "Suppression of the negative regulator LRIG1 contributes to ErbB2 overexpression in breast cancer",
+      "file": "synthesis.md",
+      "reason": "The supplied evidence titles indicate that LRIG1 is a negative regulator of ErbB2 and that LRIG1 suppresses ErbB2 overexpression, which contradicts the claim's assertion of a positive regulatory interaction (Moran's R = 0.421) reflecting a critical regulatory axis in the manner described. The evidence suggests an inverse relationship (suppression) rather than the positive correlation implied by the claim's context.",
+      "repair_instruction": "Leave this claim unchanged and record the evidence gap.",
+      "section": "## Cross-Part Themes",
+      "severity": "warning",
+      "value": "LRIG1-ERBB2 (Moran's R = 0.421) and LRIG1-ERBB3 (Moran's R = 0.363) interactions reflect critical regulatory axes."
+    },
+    {
+      "code": "claim_rag_unverifiable",
+      "evidence": "The supplied evidence discusses the role of ERBB3 and ERBB2 in breast cancer progression and drug resistance, but does not mention validated_target classification, priority levels, or safety_profile scores (clinical liability) for either gene. PMIDs: none. Evidence: The coexpression of erbB3 and erbB2 is frequently observed in breast cancer; and erbB3 has a critical role in erbB2 promotion of breast cancer progression and anti-estrogen resistance.",
+      "evidence_quote": "The coexpression of erbB3 and erbB2 is frequently observed in breast cancer; and erbB3 has a critical role in erbB2 promotion of breast cancer progression and anti-estrogen resistance.",
+      "file": "synthesis.md",
+      "reason": "The supplied evidence discusses the role of ERBB3 and ERBB2 in breast cancer progression and drug resistance, but does not mention validated_target classification, priority levels, or safety_profile scores (clinical liability) for either gene.",
+      "repair_instruction": "Leave this claim unchanged and record the evidence gap.",
+      "section": "## Cross-Part Themes",
+      "severity": "warning",
+      "value": "**Part 3 evidence**: ERBB3 and ERBB2 show validated_target classification with high priority, but ERBB2 has safety_profile = -2 (clinical liability) while ERBB3 has safety_profile = 0 (no known liability)."
+    },
+    {
+      "code": "claim_rag_hypothesis_warning",
+      "evidence": "The supplied evidence discusses LRIG1 as a negative regulator of RTK signaling and its role in EMT, NRG1-ERBB3 signaling in CTCs, and Ret alterations in breast cancer. None of the provided texts mention a 'Factor3 program', 'suppression of canonical hormone receptor and inflammatory pathways' as a distinct signaling state, or the specific compensatory mechanism where 'ErbB3 signaling compensates for lost estrogen receptor function' in the context of a therapy-resistant state defined as 'Factor3'. PMIDs: none. Evidence: LRIG1, a member of the LRIG family of transmembrane leucine rich repeat-containing proteins, is a negative regulator of receptor tyrosine kinase signaling and a tumor suppressor.",
+      "evidence_quote": "LRIG1, a member of the LRIG family of transmembrane leucine rich repeat-containing proteins, is a negative regulator of receptor tyrosine kinase signaling and a tumor suppressor.",
+      "file": "synthesis.md",
+      "reason": "The supplied evidence discusses LRIG1 as a negative regulator of RTK signaling and its role in EMT, NRG1-ERBB3 signaling in CTCs, and Ret alterations in breast cancer. None of the provided texts mention a 'Factor3 program', 'suppression of canonical hormone receptor and inflammatory pathways' as a distinct signaling state, or the specific compensatory mechanism where 'ErbB3 signaling compensates for lost estrogen receptor function' in the context of a therapy-resistant state defined as 'Factor3'.",
+      "repair_instruction": "Leave this claim unchanged and record the evidence gap.",
+      "section": "## Cross-Part Themes",
+      "severity": "warning",
+      "value": "**Integration**: The Factor3 program represents a distinct signaling state characterized by suppression of canonical hormone receptor and inflammatory pathways, potentially reflecting a therapy-resistant state where ErbB3 signaling compensates for lost estrogen receptor function."
+    },
+    {
+      "code": "claim_rag_unverifiable",
+      "evidence": "The supplied evidence discusses specific findings about ITGB4, TNBC subtypes, and RET signaling, but does not contain the specific text or a summary of 'integrated findings' that reveal 'several key implications for understanding breast cancer progression and therapeutic targeting' as stated in the claim. The claim appears to be a concluding summary statement not explicitly present in the provided abstracts. PMIDs: none.",
+      "evidence_quote": "",
+      "file": "synthesis.md",
+      "reason": "The supplied evidence discusses specific findings about ITGB4, TNBC subtypes, and RET signaling, but does not contain the specific text or a summary of 'integrated findings' that reveal 'several key implications for understanding breast cancer progression and therapeutic targeting' as stated in the claim. The claim appears to be a concluding summary statement not explicitly present in the provided abstracts.",
+      "repair_instruction": "Leave this claim unchanged and record the evidence gap.",
+      "section": "## Clinical/Biological Implications",
+      "severity": "warning",
+      "value": "The integrated findings reveal several key implications for understanding breast cancer progression and therapeutic targeting:"
+    },
+    {
+      "code": "claim_rag_unverifiable",
+      "evidence": "Claim judge supplied PMID or quote outside retrieved evidence. PMIDs: none.",
+      "evidence_quote": "",
+      "file": "synthesis.md",
+      "reason": "Claim judge supplied PMID or quote outside retrieved evidence.",
+      "repair_instruction": "Leave this claim unchanged and record the evidence gap.",
+      "section": "## Clinical/Biological Implications",
+      "severity": "warning",
+      "value": "**ErbB3 as Primary Therapeutic Target**: ERBB3 emerges as the highest-priority target with combined evidence score of 16 (10 validated + 6 exploratory), favorable safety profile (no known liability), and extensive clinical drug support (22 compounds)."
+    },
+    {
+      "code": "claim_rag_hypothesis_warning",
+      "evidence": "Claim judge supplied PMID or quote outside retrieved evidence. PMIDs: none.",
+      "evidence_quote": "",
+      "file": "synthesis.md",
+      "reason": "Claim judge supplied PMID or quote outside retrieved evidence.",
+      "repair_instruction": "Leave this claim unchanged and record the evidence gap.",
+      "section": "## Clinical/Biological Implications",
+      "severity": "warning",
+      "value": "The CDH1-ERBB3 adhesion-signaling axis represents a malignant cell-intrinsic mechanism that could be therapeutically exploited."
+    },
+    {
+      "code": "claim_rag_hypothesis_warning",
+      "evidence": "The evidence discusses LRIG1 as a negative regulator of RTK signaling and its role in EMT, and NRG1-ERBB3 signaling in CTC survival with FGFR1 compensation. However, the claim specifically asserts that the Factor3 program's negative associations with Estrogen, EGFR, and NFkB pathways suggest a therapy-resistant state where ErbB3 compensates for lost canonical pathways. The supplied evidence does not mention the Factor3 program, nor does it report negative associations with Estrogen, EGFR, or NFkB pathways, nor does it explicitly link these specific pathway losses to ErbB3 compensation in the context of therapy resistance as described. The evidence supports general concepts of pathway compensation and ErbB3 involvement in resistance, but does not support the specific mechanistic claim about Factor3 and the specific pathways mentioned. PMIDs: 26387542, 39753722, 28005837.",
+      "evidence_quote": "",
+      "file": "synthesis.md",
+      "reason": "The evidence discusses LRIG1 as a negative regulator of RTK signaling and its role in EMT, and NRG1-ERBB3 signaling in CTC survival with FGFR1 compensation. However, the claim specifically asserts that the Factor3 program's negative associations with Estrogen, EGFR, and NFkB pathways suggest a therapy-resistant state where ErbB3 compensates for lost canonical pathways. The supplied evidence does not mention the Factor3 program, nor does it report negative associations with Estrogen, EGFR, or NFkB pathways, nor does it explicitly link these specific pathway losses to ErbB3 compensation in the context of therapy resistance as described. The evidence supports general concepts of pathway compensation and ErbB3 involvement in resistance, but does not support the specific mechanistic claim about Factor3 and the specific pathways mentioned.",
+      "repair_instruction": "Leave this claim unchanged and record the evidence gap.",
+      "section": "## Clinical/Biological Implications",
+      "severity": "warning",
+      "value": "**Therapy Resistance Mechanism**: The Factor3 program's negative associations with Estrogen, EGFR, and NFkB pathways suggest that proliferative invasive tumor cells may represent a therapy-resistant state where ErbB3 signaling compensates for lost canonical pathways."
+    },
+    {
+      "code": "claim_rag_unsupported",
+      "evidence": "The supplied evidence discusses Ret (PMID 18483257), ITGB4 (PMID 42018338), and EphB4 (PMID 41023731) as therapeutic targets in breast cancer, but contains no mention of NECTIN4. The claim specifically asserts NECTIN4 is a novel target, which is not supported by the provided text. PMIDs: none. Evidence: A limited number of receptor tyrosine kinases (e.g., ErbB and fibroblast growth factor receptor families) have been genetically linked to breast cancer development. Here, we investigated the contribution of the Ret receptor tyrosine kinase to breast tumor biology.",
+      "evidence_quote": "A limited number of receptor tyrosine kinases (e.g., ErbB and fibroblast growth factor receptor families) have been genetically linked to breast cancer development. Here, we investigated the contribution of the Ret receptor tyrosine kinase to breast tumor biology.",
+      "file": "synthesis.md",
+      "reason": "The supplied evidence discusses Ret (PMID 18483257), ITGB4 (PMID 42018338), and EphB4 (PMID 41023731) as therapeutic targets in breast cancer, but contains no mention of NECTIN4. The claim specifically asserts NECTIN4 is a novel target, which is not supported by the provided text.",
+      "repair_instruction": "Leave this claim unchanged and record the evidence gap.",
+      "section": "## Clinical/Biological Implications",
+      "severity": "warning",
+      "value": "**NECTIN4 as Novel Target**: NECTIN4 represents an emerging therapeutic target with strong exploratory support (7 = 4 validated + 7 exploratory) and novelty opportunity."
+    },
+    {
+      "code": "claim_rag_hypothesis_warning",
+      "evidence": "The evidence states that clusters F and G (not 17, 4, 14) had significantly better outcomes, which contradicts the claim that these specific clusters identify aggressive, therapy-resistant subpopulations. Additionally, the evidence does not mention Factor3 program or the specific clusters 17, 4, and 14. PMIDs: none. Evidence: Survival analysis by cluster (Figure S11A inFile S1) showed that tumor clusters F and G had significantly better outcomes than the rest of the clusters.",
+      "evidence_quote": "Survival analysis by cluster (Figure S11A inFile S1) showed that tumor clusters F and G had significantly better outcomes than the rest of the clusters.",
+      "file": "synthesis.md",
+      "reason": "The evidence states that clusters F and G (not 17, 4, 14) had significantly better outcomes, which contradicts the claim that these specific clusters identify aggressive, therapy-resistant subpopulations. Additionally, the evidence does not mention Factor3 program or the specific clusters 17, 4, and 14.",
+      "repair_instruction": "Leave this claim unchanged and record the evidence gap.",
+      "section": "## Clinical/Biological Implications",
+      "severity": "warning",
+      "value": "**Spatial Organization as Biomarker**: The spatial clustering patterns (clusters 17, 4, 14) and Factor3 program could serve as biomarkers for identifying aggressive, therapy-resistant tumor subpopulations."
+    },
+    {
+      "code": "claim_rag_hypothesis_warning",
+      "evidence": "The supplied evidence consists only of titles and abstracts that do not contain information about disrupting tumor progression while preserving normal tissue architecture. PMIDs: none. Evidence: Title: Design and Evaluation ofEb4Mab\u20107\u2010mG2a: A Dual\u2010Action Anti\u2010EphB4Monoclonal Antibody for Targeted Breast Cancer Therapy",
+      "evidence_quote": "Title: Design and Evaluation ofEb4Mab\u20107\u2010mG2a: A Dual\u2010Action Anti\u2010EphB4Monoclonal Antibody for Targeted Breast Cancer Therapy",
+      "file": "synthesis.md",
+      "reason": "The supplied evidence consists only of titles and abstracts that do not contain information about disrupting tumor progression while preserving normal tissue architecture.",
+      "repair_instruction": "Leave this claim unchanged and record the evidence gap.",
+      "section": "## Clinical/Biological Implications",
+      "severity": "warning",
+      "value": "Targeting these interactions could disrupt tumor progression while preserving normal tissue architecture."
+    },
+    {
+      "code": "inline_citation_unverifiable",
+      "evidence": "Inline citation PMID 28174229 was not included in supporting_pmids. PMIDs: none.",
+      "evidence_quote": "",
+      "file": "synthesis.md",
+      "inline_pmid": "28174229",
+      "reason": "Inline citation PMID 28174229 was not included in supporting_pmids.",
+      "repair_instruction": "Leave this claim unchanged and record the evidence gap.",
+      "section": "## Validation Against Existing RAG Corpus",
+      "severity": "warning",
+      "source_claim_index": 1,
+      "value": "**ErbB Family Signaling**: Literature support from PMID: 28174229 demonstrates that ErbB2 overexpression alters ErbB3 phosphosignaling and reduces adhesion, consistent with observed spatial patterns of CDH1-ERBB3 co-localization."
+    },
+    {
+      "code": "claim_rag_unverifiable",
+      "evidence": "The supplied evidence discusses EPH/ephrin targets in breast cancer, secretome biomarkers for grade progression, and prognostic genes in luminal A breast cancer, but does not mention clusters 17, 4, or 14, nor does it describe proliferative invasive tumor cells as a distinct, therapy-resistant state in the context of these specific clusters. PMIDs: none. Evidence: Breast cancer (BC) is the most common malignant tumor in women. Erythropoietin-producing hepatocellular receptors (EPHs), receptor tyrosine kinases binding the membrane-bound proteins ephrins, are differentially expressed in BC, and correlate with carcinogenesis and tumor progression.",
+      "evidence_quote": "Breast cancer (BC) is the most common malignant tumor in women. Erythropoietin-producing hepatocellular receptors (EPHs), receptor tyrosine kinases binding the membrane-bound proteins ephrins, are differentially expressed in BC, and correlate with carcinogenesis and tumor progression.",
+      "file": "synthesis.md",
+      "reason": "The supplied evidence discusses EPH/ephrin targets in breast cancer, secretome biomarkers for grade progression, and prognostic genes in luminal A breast cancer, but does not mention clusters 17, 4, or 14, nor does it describe proliferative invasive tumor cells as a distinct, therapy-resistant state in the context of these specific clusters.",
+      "repair_instruction": "Leave this claim unchanged and record the evidence gap.",
+      "section": "## Validation Against Existing RAG Corpus",
+      "severity": "warning",
+      "value": "The identification of clusters 17, 4, and 14 as most aggressive subpopulations aligns with literature showing that proliferative invasive tumor cells represent a distinct, therapy-resistant state."
+    },
+    {
+      "code": "claim_rag_hypothesis_warning",
+      "evidence": "Claim judge supplied PMID or quote outside retrieved evidence. PMIDs: none.",
+      "evidence_quote": "",
+      "file": "synthesis.md",
+      "reason": "Claim judge supplied PMID or quote outside retrieved evidence.",
+      "repair_instruction": "Leave this claim unchanged and record the evidence gap.",
+      "section": "## Validation Against Existing RAG Corpus",
+      "severity": "warning",
+      "value": "**Therapeutic Targets**: The prioritization of ERBB3, ERBB2, and NECTIN4 as top candidates is consistent with existing clinical evidence."
+    },
+    {
+      "code": "claim_rag_unsupported",
+      "evidence": "The supplied evidence discusses the role of ErbB3 in breast cancer, its overexpression, and resistance mechanisms, but does not contain any information about the number of clinical drugs for ERBB3, ERBB2, or NECTIN4, nor does it mention CHEMBL3301589. The claim makes specific quantitative assertions about drug counts that are not addressed in the provided text. PMIDs: none. Evidence: An increasingly important role for the ErbB3 receptor in the genesis and progression of breast cancer is emerging. ErbB3 is frequently overexpressed in breast cancer and coexpression of ErbB2/3 is a poor prognostic indicator.",
+      "evidence_quote": "An increasingly important role for the ErbB3 receptor in the genesis and progression of breast cancer is emerging. ErbB3 is frequently overexpressed in breast cancer and coexpression of ErbB2/3 is a poor prognostic indicator.",
+      "file": "synthesis.md",
+      "reason": "The supplied evidence discusses the role of ErbB3 in breast cancer, its overexpression, and resistance mechanisms, but does not contain any information about the number of clinical drugs for ERBB3, ERBB2, or NECTIN4, nor does it mention CHEMBL3301589. The claim makes specific quantitative assertions about drug counts that are not addressed in the provided text.",
+      "repair_instruction": "Leave this claim unchanged and record the evidence gap.",
+      "section": "## Validation Against Existing RAG Corpus",
+      "severity": "warning",
+      "value": "ERBB3 has 22 clinical drugs, ERBB2 has 58 clinical drugs, and NECTIN4 has 1 clinical drug (CHEMBL3301589)."
+    },
+    {
+      "code": "claim_rag_unverifiable",
+      "evidence": "The supplied evidence consists only of titles and metadata for papers discussing ErbB2 overexpression and related mechanisms, but none of the text contains information about safety profiles, clinical liabilities, or specific scores (ERBB3 = 0, ERBB2 = -2, NECTIN4 = -2). PMIDs: none. Evidence: Title: Suppression of the negative regulator LRIG1 contributes to ErbB2 overexpression in breast cancer",
+      "evidence_quote": "Title: Suppression of the negative regulator LRIG1 contributes to ErbB2 overexpression in breast cancer",
+      "file": "synthesis.md",
+      "reason": "The supplied evidence consists only of titles and metadata for papers discussing ErbB2 overexpression and related mechanisms, but none of the text contains information about safety profiles, clinical liabilities, or specific scores (ERBB3 = 0, ERBB2 = -2, NECTIN4 = -2).",
+      "repair_instruction": "Leave this claim unchanged and record the evidence gap.",
+      "section": "## Validation Against Existing RAG Corpus",
+      "severity": "warning",
+      "value": "The safety profiles (ERBB3 = 0, ERBB2 = -2, NECTIN4 = -2) reflect known clinical liabilities."
+    },
+    {
+      "code": "claim_rag_unverifiable",
+      "evidence": "The supplied evidence is a fragment of a full-text article discussing CDH1 as a tumor suppressor in breast cancer, but it does not contain any statement regarding the establishment or lack of establishment of causal mechanisms for spatial co-localization and pathway associations. PMIDs: none. Evidence: CDH1 , as a tumor suppressor gene, contributes sporadic breast cancer (BC) progression.",
+      "evidence_quote": "CDH1 , as a tumor suppressor gene, contributes sporadic breast cancer (BC) progression.",
+      "file": "synthesis.md",
+      "reason": "The supplied evidence is a fragment of a full-text article discussing CDH1 as a tumor suppressor in breast cancer, but it does not contain any statement regarding the establishment or lack of establishment of causal mechanisms for spatial co-localization and pathway associations.",
+      "repair_instruction": "Leave this claim unchanged and record the evidence gap.",
+      "section": "## Limitations and Future Directions",
+      "severity": "warning",
+      "value": "**Causal Mechanism**: While the analysis identifies strong spatial co-localization and pathway associations, causal mechanisms remain to be established."
+    },
+    {
+      "code": "claim_rag_unverifiable",
+      "evidence": "Claim judge supplied PMID or quote outside retrieved evidence. PMIDs: none.",
+      "evidence_quote": "",
+      "file": "synthesis.md",
+      "reason": "Claim judge supplied PMID or quote outside retrieved evidence.",
+      "repair_instruction": "Leave this claim unchanged and record the evidence gap.",
+      "section": "## Limitations and Future Directions",
+      "severity": "warning",
+      "value": "Perturbation experiments are needed to validate whether CDH1-ERBB3 coexpression directly drives disease-relevant cellular readouts."
+    },
+    {
+      "code": "claim_rag_unverifiable",
+      "evidence": "Claim judge supplied PMID or quote outside retrieved evidence. PMIDs: none.",
+      "evidence_quote": "",
+      "file": "synthesis.md",
+      "reason": "Claim judge supplied PMID or quote outside retrieved evidence.",
+      "repair_instruction": "Leave this claim unchanged and record the evidence gap.",
+      "section": "## Limitations and Future Directions",
+      "severity": "warning",
+      "value": "**Therapeutic Validation**: While ERBB3, ERBB2, and NECTIN4 are prioritized as therapeutic targets, their efficacy in disrupting the observed spatial patterns and pathway activity remains to be tested."
+    },
+    {
+      "code": "claim_rag_unverifiable",
+      "evidence": "Claim judge supplied PMID or quote outside retrieved evidence. PMIDs: none.",
+      "evidence_quote": "",
+      "file": "synthesis.md",
+      "reason": "Claim judge supplied PMID or quote outside retrieved evidence.",
+      "repair_instruction": "Leave this claim unchanged and record the evidence gap.",
+      "section": "## Limitations and Future Directions",
+      "severity": "warning",
+      "value": "Longitudinal studies are needed to understand how the spatial organization and cell-cell communication networks evolve during tumor progression and treatment."
+    },
+    {
+      "code": "claim_rag_unverifiable",
+      "evidence": "Claim judge supplied PMID or quote outside retrieved evidence. PMIDs: none.",
+      "evidence_quote": "",
+      "file": "synthesis.md",
+      "reason": "Claim judge supplied PMID or quote outside retrieved evidence.",
+      "repair_instruction": "Leave this claim unchanged and record the evidence gap.",
+      "section": "## Limitations and Future Directions",
+      "severity": "warning",
+      "value": "**Integration with Multi-Omics**: Future analyses should integrate spatial transcriptomics with proteomics, metabolomics, and epigenomics to provide a more comprehensive understanding of the molecular mechanisms driving breast cancer progression."
+    },
+    {
+      "code": "claim_rag_unverifiable",
+      "evidence": "The supplied evidence contains only titles and partial text snippets that do not mention spatial organization of tumor clusters, cell-cell communication networks, or pathway activity converging to define a therapy-resistant state. The text cuts off before providing substantive findings. PMIDs: none. Evidence: Title: The interplay of HER2/HER3/PI3K and EGFR/HER2/PLC-\u03b31 signalling in breast cancer cell migration and dissemination.",
+      "evidence_quote": "Title: The interplay of HER2/HER3/PI3K and EGFR/HER2/PLC-\u03b31 signalling in breast cancer cell migration and dissemination.",
+      "file": "synthesis.md",
+      "reason": "The supplied evidence contains only titles and partial text snippets that do not mention spatial organization of tumor clusters, cell-cell communication networks, or pathway activity converging to define a therapy-resistant state. The text cuts off before providing substantive findings.",
+      "repair_instruction": "Leave this claim unchanged and record the evidence gap.",
+      "section": "## Conclusion",
+      "severity": "warning",
+      "value": "The spatial organization of tumor clusters, cell-cell communication networks, and pathway activity converge on this network, defining a distinct, therapy-resistant state."
+    },
+    {
+      "code": "claim_rag_unsupported",
+      "evidence": "The supplied evidence discusses Ret (PMID 18483257), EphB4 (PMID 41023731), and WNT5A (PMID 30171384) as therapeutic targets or pathways in breast cancer, but none of the provided texts mention CDH1-ERBB3 as the top-ranked L-R interaction or NECTIN4 as a novel therapeutic target. The claim asserts specific findings not present in the evidence. PMIDs: none. Evidence: A limited number of receptor tyrosine kinases (e.g., ErbB and fibroblast growth factor receptor families) have been genetically linked to breast cancer development. Here, we investigated the contribution of the Ret receptor tyrosine kinase to breast tumor biology.",
+      "evidence_quote": "A limited number of receptor tyrosine kinases (e.g., ErbB and fibroblast growth factor receptor families) have been genetically linked to breast cancer development. Here, we investigated the contribution of the Ret receptor tyrosine kinase to breast tumor biology.",
+      "file": "synthesis.md",
+      "reason": "The supplied evidence discusses Ret (PMID 18483257), EphB4 (PMID 41023731), and WNT5A (PMID 30171384) as therapeutic targets or pathways in breast cancer, but none of the provided texts mention CDH1-ERBB3 as the top-ranked L-R interaction or NECTIN4 as a novel therapeutic target. The claim asserts specific findings not present in the evidence.",
+      "repair_instruction": "Leave this claim unchanged and record the evidence gap.",
+      "section": "## Conclusion",
+      "severity": "warning",
+      "value": "The identification of CDH1-ERBB3 as the top-ranked L-R interaction and NECTIN4 as a novel therapeutic target provides actionable insights for therapeutic development."
+    },
+    {
+      "code": "claim_rag_hypothesis_warning",
+      "evidence": "The supplied evidence discusses the ErbB family signaling network, its role in breast cancer, and mentions pertuzumab, but does not contain any statement about future work, the need for perturbation experiments, or the therapeutic potential of targeting the ErbB family and associated adhesion-receptor interactions. PMIDs: none. Evidence: The ErbB family of receptor tyrosine kinases, which includes EGF receptor, ErbB2/Her2/Neu, ErbB3, and ErbB4, forms a complex signaling network driven by ligand stimulated receptor heterodimerization.",
+      "evidence_quote": "The ErbB family of receptor tyrosine kinases, which includes EGF receptor, ErbB2/Her2/Neu, ErbB3, and ErbB4, forms a complex signaling network driven by ligand stimulated receptor heterodimerization.",
+      "file": "synthesis.md",
+      "reason": "The supplied evidence discusses the ErbB family signaling network, its role in breast cancer, and mentions pertuzumab, but does not contain any statement about future work, the need for perturbation experiments, or the therapeutic potential of targeting the ErbB family and associated adhesion-receptor interactions.",
+      "repair_instruction": "Leave this claim unchanged and record the evidence gap.",
+      "section": "## Conclusion",
+      "severity": "warning",
+      "value": "Future work should focus on validating these findings through perturbation experiments and exploring the therapeutic potential of targeting the ErbB family signaling axis and associated adhesion-receptor interactions."
+    }
+  ],
+  "original_report_hashes": {
+    "CCI_Analysis_Report.html": "5c73b5c7ac9b984f9e2be4d56518ec03325920a7f482d74e55967cc366f7d189",
+    "part1_final.md": "59a0b5f5477de43c189e77faa41aacffe602c4e407ac5252813ae5cb43cba0b7",
+    "part2_final.md": "31ec5ca9cfcb0d4358ddd3fe820fb29fcbbd78999987297c2aa064242e7fdf1d",
+    "part3_final.md": "59e24d28b6098151aeda326b09e7aac1631d238fb17f255aaadd7644976b5fa9",
+    "synthesis.md": "f9b311ed737e7240e57ea7b084e5050b3835c13d2161dbd16822841f50904216"
+  },
+  "phases": {
+    "parts": "semantic",
+    "synthesis": "semantic"
+  },
+  "recovery_attempts": [
+    {
+      "elapsed_seconds": 131.94607866700971,
+      "status": "evaluated",
+      "usable": true
+    }
+  ],
+  "status": "evaluated",
+  "usable": true,
+  "working_copy": "res/deep_interpreter/bc/sni_repair_ablation/guardrail_posthoc_recovered_20260908T055100Z/work/pair-18-BA/on"
+}
