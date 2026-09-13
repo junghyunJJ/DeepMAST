@@ -1,0 +1,160 @@
+You are evaluating two anonymized generated biomedical therapeutic-target hypothesis reports for breast cancer.
+The generation settings and method labels are hidden. Judge only the visible scientific report content, not report length or inferred method.
+
+Score each output independently using integer scores from 0 to 5:
+- evidence_grounding: uses stated evidence references to support claims
+- biological_plausibility: mechanisms fit breast cancer biology and the named entities
+- therapeutic_relevance: target/intervention logic is useful without clinical overreach
+- claim_boundary_restraint: separates supported evidence from unknowns and avoids overclaiming
+- specificity_testability: predictions and validation plans are concrete and falsifiable
+- unsupported_claim_penalty: 0, -1, or -2 for unsupported mechanisms, invented evidence, disease mismatch, or overstated therapeutic conclusions
+- major_error: true only for a material factual or evidence-interpretation error
+
+Comparison ID: pair002
+
+Output A report:
+Disease: breast cancer
+Hypotheses generated/retained: 7 / 5
+Evidence coverage pct: 88.24
+Covered top genes: EFNB2, EPHB4, ERBB2, ERBB3, INSR, LAMA5, NECTIN4
+Missing top genes: -
+Prediction grounding summary: {"grounded": 0, "grounded_indices": [], "grounded_verified": 0, "qualitative": 5, "unverified": 0, "unverified_indices": []}
+Gap analysis: {"orphan_files": ["stage1_AFDN--NECTIN4.json", "stage1_LRIG1--ERBB2.json"], "referenced_files": 15, "total_evidence_files": 17}
+
+Hypotheses:
+H1: EFNB2-EPHB4 bidirectional signaling in breast cancer tumor microenvironment
+Category: Mechanism of Action
+Genes: EFNB2, EPHB4; cell types: -; pathways: Ephrin-Eph signaling, cell adhesion, cell migration; drugs: -
+Evidence refs: stage1_EFNB2--EPHB4.json, stage3_EFNB2.json, stage3_EPHB4.json, ot_EFNB2.json, ot_EPHB4.json
+Claim: EFNB2 and EPHB4 form a trans-interacting pair that enables contact-dependent bidirectional signaling. While coexpression is depleted in malignant cells, the pair shows strong enrichment in spatial niches, suggesting cross-cell communication between tumor and stromal compartments.
+Prediction: Test whether disrupting EFNB2-EPHB4 trans-interactions alters tumor-stroma boundary formation in breast cancer organoid co-cultures.
+Validation: Spatial transcriptomics and proximity ligation assays to map EFNB2-EPHB4 trans-interaction zones in breast cancer tissue sections. Functional assays in co-culture systems to assess migration and adhesion phenotypes upon pair disruption.
+Prediction grounding: qualitative
+
+H2: EGF-ERBB2 ligand-receptor axis as a therapeutic target in malignant cells
+Category: Therapeutic Strategy
+Genes: ERBB2; cell types: malignant cell; pathways: ERBB2 signaling, RTK signaling, PI3K-AKT pathway; drugs: -
+Evidence refs: stage1_EGF--ERBB2.json, stage3_ERBB2.json, ot_ERBB2.json
+Claim: EGF and ERBB2 show strong coexpression enrichment in malignant cells, supporting a ligand-receptor interaction that drives ERBB2 signaling. This axis represents a validated therapeutic target with multiple clinical-stage inhibitors.
+Prediction: Test whether EGF deprivation or ERBB2 inhibition produces additive growth suppression in breast cancer cell lines with high ERBB2 expression.
+Validation: Measure ERBB2 phosphorylation and downstream signaling (AKT, MAPK) in response to EGF stimulation and ERBB2-targeted inhibitors in malignant cell models. Assess proliferation and survival outcomes.
+Prediction grounding: qualitative
+
+H3: CDH1-ERBB3 coexpression network in malignant cell adhesion and signaling
+Category: Cross-Target Interaction
+Genes: ERBB3; cell types: malignant cell; pathways: ERBB3 signaling, cell adhesion, epithelial-mesenchymal transition; drugs: -
+Evidence refs: stage1_CDH1--ERBB3.json, stage3_ERBB3.json, ot_ERBB3.json
+Claim: CDH1 and ERBB3 show strong coexpression enrichment in malignant cells, suggesting coordinated regulation of cell adhesion and receptor tyrosine kinase signaling. This interaction may modulate ERBB3 activation in epithelial contexts.
+Prediction: Test whether CDH1 knockdown alters neuregulin-induced ERBB3 phosphorylation and downstream signaling in breast cancer epithelial cells.
+Validation: Co-immunoprecipitation and proximity ligation assays to assess CDH1-ERBB3 physical association. Functional assays measuring ERBB3 signaling output upon CDH1 modulation in malignant cell models.
+Prediction grounding: qualitative
+
+H4: LAMA5-mediated laminin-integrin signaling network in breast cancer
+Category: Novel Pathway
+Genes: LAMA5; cell types: malignant cell; pathways: laminin-integrin signaling, extracellular matrix organization, cell adhesion; drugs: -
+Evidence refs: stage1_LAMA5--BCAM.json, stage1_LAMA5--DAG1.json, stage1_LAMA5--ITGB4.json, stage3_LAMA5.json, ot_LAMA5.json
+Claim: LAMA5 forms coexpression-enriched pairs with BCAM, DAG1, and ITGB4 in malignant cells, suggesting a laminin-mediated adhesion signaling network. LAMA5 may serve as an extracellular matrix anchor coordinating multiple integrin and immunoglobulin superfamily receptors.
+Prediction: Test whether LAMA5 knockdown disrupts BCAM, DAG1, or ITGB4 localization and downstream signaling in breast cancer malignant cells.
+Validation: Assess LAMA5 protein secretion and matrix deposition. Measure BCAM, DAG1, and ITGB4 membrane localization and signaling output upon LAMA5 perturbation in malignant cell models.
+Prediction grounding: qualitative
+
+H5: PTPRF-INSR and NECTIN2-NECTIN4 regulatory pathways in breast cancer
+Category: Therapeutic Strategy
+Genes: INSR, NECTIN4; cell types: malignant cell; pathways: insulin receptor signaling, cell adhesion, immune checkpoint regulation; drugs: -
+Evidence refs: stage1_PTPRF--INSR.json, stage1_NECTIN2--NECTIN4.json, stage3_INSR.json, ot_INSR.json, stage3_NECTIN4.json, ot_NECTIN4.json
+Claim: Two distinct coexpression-enriched pairs in malignant cells: PTPRF-INSR suggests phosphatase regulation of insulin receptor signaling, while NECTIN2-NECTIN4 may regulate cell adhesion and immune checkpoint functions. These parallel pathways represent complementary therapeutic opportunities.
+Prediction: Test whether PTPRF inhibition enhances insulin-induced INSR signaling and metabolic responses in breast cancer cells. Assess whether NECTIN2 blockade alters NECTIN4-mediated adhesion or immune cell interactions.
+Validation: Measure INSR phosphorylation and downstream metabolic signaling upon PTPRF modulation. Evaluate NECTIN2-NECTIN4 interaction strength and functional consequences using co-culture and adhesion assays in malignant cell models.
+Prediction grounding: qualitative
+
+Output B report:
+Disease: breast cancer
+Hypotheses generated/retained: 6 / 6
+Evidence coverage pct: 76.47
+Covered top genes: EFNB2, EPHB4, ERBB2, ERBB3, INSR, LAMA5, NECTIN4
+Missing top genes: -
+Prediction grounding summary: {"grounded": 0, "grounded_indices": [], "grounded_verified": 0, "qualitative": 6, "unverified": 0, "unverified_indices": []}
+Gap analysis: {"orphan_files": ["stage1_LAMA5--DAG1.json", "stage1_LAMA5--ITGB4.json", "stage1_LRIG1--ERBB2.json", "stage1_NECTIN2--NECTIN4.json"], "referenced_files": 13, "total_evidence_files": 17}
+
+Hypotheses:
+H1: EGF-ERBB2 signaling axis drives malignant cell proliferation in breast cancer
+Category: Mechanism of Action
+Genes: EGF, ERBB2; cell types: malignant cell; pathways: EGF-ERBB2 signaling, RTK signaling; drugs: -
+Evidence refs: stage1_EGF--ERBB2.json, ot_ERBB2.json, stage3_ERBB2.json
+Claim: EGF ligand and ERBB2 receptor show enriched coexpression within malignant cells, suggesting a cell-autonomous signaling mechanism that may drive proliferative phenotypes in breast cancer.
+Prediction: Test whether EGF stimulation increases proliferation markers in malignant cell populations, and whether ERBB2 inhibition reduces this effect.
+Validation: Perform EGF stimulation assays on malignant cell populations with and without ERBB2 inhibition, measuring proliferation readouts such as Ki67 or EdU incorporation.
+Prediction grounding: qualitative
+
+H2: CDH1-ERBB3 coexpression pattern suggests therapeutic targeting opportunity in breast cancer
+Category: Therapeutic Strategy
+Genes: CDH1, ERBB3; cell types: malignant cell; pathways: ERBB3 signaling, RTK signaling; drugs: -
+Evidence refs: stage1_CDH1--ERBB3.json, ot_ERBB3.json, stage3_ERBB3.json
+Claim: CDH1 and ERBB3 show enriched coexpression within malignant cells, indicating ERBB3 may be a viable therapeutic target in breast cancer subtypes where this axis is active.
+Prediction: Test whether ERBB3 inhibition preferentially affects malignant cells exhibiting high CDH1-ERBB3 coexpression signatures.
+Validation: Stratify malignant cell populations by CDH1-ERBB3 coexpression levels and assess differential sensitivity to ERBB3-targeted therapeutics.
+Prediction grounding: qualitative
+
+H3: EFNB2-EPHB4 spatial niche interaction mediates cross-cell communication in breast cancer microenvironment
+Category: Cross-Target Interaction
+Genes: EFNB2, EPHB4; cell types: -; pathways: Ephrin signaling, cell-cell communication; drugs: -
+Evidence refs: stage1_EFNB2--EPHB4.json, ot_EFNB2.json, stage3_EFNB2.json, ot_EPHB4.json, stage3_EPHB4.json
+Claim: EFNB2 and EPHB4 show enriched expression in spatially distinct but adjacent cell populations, suggesting a cross-cell communication mechanism that may influence tumor microenvironment organization.
+Prediction: Test whether disrupting EFNB2-EPHB4 interaction alters spatial organization of malignant and stromal cell populations in breast cancer tissue.
+Validation: Use spatial transcriptomics or multiplex imaging to map EFNB2 and EPHB4 expression patterns, and assess changes in cell positioning after pathway inhibition.
+Prediction grounding: qualitative
+
+H4: AFDN-NECTIN4 adhesion complex represents a novel pathway for malignant cell cohesion in breast cancer
+Category: Novel Pathway
+Genes: AFDN, NECTIN4; cell types: malignant cell; pathways: cell adhesion, NECTIN signaling; drugs: -
+Evidence refs: stage1_AFDN--NECTIN4.json, ot_NECTIN4.json, stage3_NECTIN4.json
+Claim: AFDN and NECTIN4 show enriched coexpression within malignant cells, suggesting a novel adhesion mechanism that may contribute to malignant cell cohesion and invasion properties.
+Prediction: Test whether AFDN-NECTIN4 disruption alters malignant cell aggregation or invasion capacity in breast cancer models.
+Validation: Perform cell aggregation assays and invasion assays with AFDN or NECTIN4 perturbation to assess effects on malignant cell cohesion properties.
+Prediction grounding: qualitative
+
+H5: LAMA5-BCAM laminin adhesion axis prioritizes malignant cell-matrix interaction targets in breast cancer
+Category: Mechanism of Action
+Genes: LAMA5, BCAM; cell types: malignant cell; pathways: laminin adhesion, cell-matrix interaction; drugs: -
+Evidence refs: stage1_LAMA5--BCAM.json, ot_LAMA5.json, stage3_LAMA5.json
+Claim: LAMA5 and BCAM show enriched coexpression within malignant cells, suggesting a laminin-mediated adhesion mechanism that may influence malignant cell-matrix interactions and metastatic potential.
+Prediction: Test whether LAMA5-BCAM axis disruption alters malignant cell adhesion to laminin substrates or migration capacity.
+Validation: Perform adhesion assays on laminin-coated surfaces with LAMA5 or BCAM perturbation, and assess migration/invasion in 3D matrix models. Test in malignant cell context.
+Prediction grounding: qualitative
+
+H6: PTPRF-INSR phosphatase-insulin receptor interaction represents a metabolic regulation follow-up in breast cancer
+Category: Therapeutic Strategy
+Genes: PTPRF, INSR; cell types: malignant cell; pathways: insulin signaling, phosphatase regulation; drugs: -
+Evidence refs: stage1_PTPRF--INSR.json, ot_INSR.json, stage3_INSR.json
+Claim: PTPRF and INSR show enriched coexpression within malignant cells, suggesting PTPRF may modulate insulin receptor signaling in breast cancer malignant cells.
+Prediction: Test whether PTPRF perturbation alters insulin signaling readouts in malignant cell populations.
+Validation: Perform insulin stimulation assays with PTPRF knockdown or inhibition, measuring downstream insulin signaling markers such as p-AKT or p-ERK. Test in malignant cell context.
+Prediction grounding: qualitative
+
+Return exactly one valid JSON object. Do not include markdown or prose outside JSON. Use this schema:
+{
+  "output_a": {
+    "evidence_grounding": 0,
+    "biological_plausibility": 0,
+    "therapeutic_relevance": 0,
+    "claim_boundary_restraint": 0,
+    "specificity_testability": 0,
+    "unsupported_claim_penalty": 0,
+    "major_error": false,
+    "notes": "..."
+  },
+  "output_b": {
+    "evidence_grounding": 0,
+    "biological_plausibility": 0,
+    "therapeutic_relevance": 0,
+    "claim_boundary_restraint": 0,
+    "specificity_testability": 0,
+    "unsupported_claim_penalty": 0,
+    "major_error": false,
+    "notes": "..."
+  },
+  "judge_preference": "tie",
+  "confidence": "low",
+  "rationale": "...",
+  "key_differences": ["..."]
+}
