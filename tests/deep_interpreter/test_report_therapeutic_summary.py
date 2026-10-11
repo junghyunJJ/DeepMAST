@@ -136,3 +136,37 @@ def test_generate_simple_report_ignores_non_mapping_therapeutic_entries():
         assert "invalid target" not in html
         assert "invalid drug" not in html
         assert "invalid novel target" not in html
+
+
+def test_generate_simple_report_accepts_dict_known_drugs():
+    from src.agents.deep_interpreter.tools.report import generate_simple_report
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        out_path = Path(tmpdir) / "report.html"
+        status = generate_simple_report(
+            title="Test Report",
+            content={
+                "summary": "Executive summary",
+                "part1": {},
+                "part2": {},
+                "part3": {},
+                "synthesis": "synthesis",
+                "therapeutic": {
+                    "known_drugs": {
+                        "ERBB2": [
+                            {
+                                "drug_name": "TRASTUZUMAB",
+                                "phase": 4,
+                                "mechanism_of_action": "ERBB2 inhibitor",
+                                "target_genes": ["ERBB2"],
+                            }
+                        ]
+                    },
+                    "summary": {"known_drugs_count": 1},
+                },
+            },
+            output_path=str(out_path),
+        )
+
+        assert "Report generated successfully" in status
+        assert "TRASTUZUMAB" in out_path.read_text(encoding="utf-8")

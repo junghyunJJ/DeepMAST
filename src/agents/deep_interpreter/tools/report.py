@@ -1446,7 +1446,20 @@ def _generate_html_report_impl(
         if therapeutic_data and isinstance(therapeutic_data, dict):
             # Build from structured therapeutic data
             def mapping_items(value: Any) -> list[dict[str, Any]]:
-                return [item for item in value if isinstance(item, dict)] if isinstance(value, list) else []
+                if isinstance(value, list):
+                    return [item for item in value if isinstance(item, dict)]
+                if not isinstance(value, dict):
+                    return []
+                if isinstance(value.get("rows"), list):
+                    return [item for item in value["rows"] if isinstance(item, dict)]
+                # Keyed form, e.g. {"ERBB2": [{...drug...}], ...}
+                items: list[dict[str, Any]] = []
+                for entry in value.values():
+                    if isinstance(entry, dict):
+                        items.append(entry)
+                    elif isinstance(entry, list):
+                        items.extend(item for item in entry if isinstance(item, dict))
+                return items
 
             druggable = mapping_items(therapeutic_data.get("druggable_targets"))
             drugs = mapping_items(therapeutic_data.get("known_drugs"))
