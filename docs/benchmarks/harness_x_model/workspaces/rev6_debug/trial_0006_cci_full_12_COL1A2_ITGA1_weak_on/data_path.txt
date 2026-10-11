@@ -1,1 +1,0 @@
-/Users/jungj2/Dropbox/Metadata/aiagent/DeepMAST/docs/benchmarks/harness_x_model/workspaces/rev6_debug/trial_0006_cci_full_12_COL1A2_ITGA1_weak_on

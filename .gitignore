@@ -57,20 +57,10 @@ CLAUDE.md
 
 CLAUDE.md
 docs/*
-!docs/benchmarks/
-docs/benchmarks/*
-!docs/benchmarks/drugtarget_skill_ablation/
-!docs/benchmarks/drugtarget_skill_ablation/**
-!docs/benchmarks/harness_x_model/
-!docs/benchmarks/harness_x_model/**
-docs/benchmarks/harness_x_model/__pycache__/
-!docs/benchmarks/hypothesis_generation_consistency/
-!docs/benchmarks/hypothesis_generation_consistency/**
-docs/benchmarks/hypothesis_generation_consistency/results/
-docs/benchmarks/hypothesis_generation_consistency/workspaces/
-# drug_target output contract — loaded at runtime by assessment_output.py
 !docs/drugtarget/
-!docs/drugtarget/**
+docs/drugtarget/*
+# drug_target output contract — loaded at runtime by assessment_output.py
+!docs/drugtarget/output_schema.json
 large_tool_results/
 conversation_history/
 workspace/
@@ -117,3 +107,30 @@ final_ipf/
 tmp/
 bc_interpreter/
 ipf_interpreter/
+
+# Non-agent material kept locally only (paper, benchmarks, dev notes)
+/benchmarks/
+/.superpowers/
+/notebook/
+/agent_architecture/
+/agent-chat-ui/
+/AGENTS.md
+/main.py
+/skills-lock.json
+/.Rhistory
+/scripts/benchmarks/
+/scripts/*sni*
+/scripts/generate_ipf_pseudobulk_s7.py
+/scripts/recreate_ipf_lrdata_b1.py
+/scripts/overlay_drug_target_figure.py
+/tests/benchmarks/
+/tests/*.ipynb
+/tests/test_*sni*.py
+/tests/test_lit_benchmark_scripts.py
+/tests/test_ipf_reproducibility_scripts.py
+/tests/agents/drug_target/test_report_writer_documentation.py
+/scripts/run_drug_target_traced.py
+/tests/scripts/test_run_drug_target_traced_budget.py
+/tests/test_run_drug_target_traced.py
+/tests/test_drugtarget_skill_ablation.py
+/tests/test_cci_skill_ablation.py

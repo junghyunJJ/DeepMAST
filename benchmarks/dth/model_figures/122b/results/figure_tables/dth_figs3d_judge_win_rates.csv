@@ -1,7 +1,0 @@
-judge_label,judge_model,outcome,win_count,win_rate,total_pairs,win_percent,label
-GPT-5.4,gpt-5.4,DTH-guided,15,0.75,20,75,15/20
-GPT-5.4,gpt-5.4,Tie,3,0.15,20,15,3/20
-GPT-5.4,gpt-5.4,Baseline,2,0.1,20,10,2/20
-Sonnet 4.6,claude-sonnet-4-6,DTH-guided,10,0.5,20,50,10/20
-Sonnet 4.6,claude-sonnet-4-6,Tie,5,0.25,20,25,5/20
-Sonnet 4.6,claude-sonnet-4-6,Baseline,5,0.25,20,25,5/20

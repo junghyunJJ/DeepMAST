@@ -1,4 +1,0 @@
-Outcome,Guardrail ON,Guardrail OFF
-Passed predefined checks,16/20 (80%),0/20 (0%)
-Produced with detected errors,2/20 (10%),20/20 (100%)
-Output blocked,2/20 (10%),0/20 (0%)

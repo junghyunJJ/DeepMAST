@@ -1,5 +1,0 @@
-audit_id,reviewer_id,winner,output_a_grounding,output_a_rubric_alignment,output_a_unsupported_claim_penalty,output_a_major_error,output_b_grounding,output_b_rubric_alignment,output_b_unsupported_claim_penalty,output_b_major_error,confidence,rationale
-ollama:qwen3.5:122b@temp=0.3::real_cd44_breast::4,,,,,,,,,,,,
-ollama:qwen3.5:122b@temp=0.3::real_tgfb1_breast::0,,,,,,,,,,,,
-ollama:qwen3.5:122b@temp=0.3::real_tgfb1_breast::2,,,,,,,,,,,,
-ollama:qwen3.5:122b@temp=0.3::real_tgfb1_breast::3,,,,,,,,,,,,

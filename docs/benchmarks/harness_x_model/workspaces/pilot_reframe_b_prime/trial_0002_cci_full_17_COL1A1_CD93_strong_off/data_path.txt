@@ -1,1 +1,0 @@
-/common/jungj2/project/DeepMAST/docs/benchmarks/harness_x_model/workspaces/pilot/trial_0002_cci_full_17_COL1A1_CD93_strong_off

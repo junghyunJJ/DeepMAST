@@ -1,9 +1,0 @@
-audit_id,reviewer_id,winner,output_a_grounding,output_a_rubric_alignment,output_a_unsupported_claim_penalty,output_a_major_error,output_b_grounding,output_b_rubric_alignment,output_b_unsupported_claim_penalty,output_b_major_error,confidence,rationale
-gpt-4.1::perturbation_evidence_conflict::0,,,,,,,,,,,,
-gpt-4.1::perturbation_gwas_significance_boundary::0,,,,,,,,,,,,
-gpt-4.1::perturbation_ot_safety_conflict::0,,,,,,,,,,,,
-gpt-4.1::real_cd44_breast::0,,,,,,,,,,,,
-gpt-4.1::real_flt1_breast::0,,,,,,,,,,,,
-gpt-4.1::real_tgfb1_breast::0,,,,,,,,,,,,
-gpt-4.1::real_tgfbr2_breast::0,,,,,,,,,,,,
-gpt-4.1::real_vegfa_breast::0,,,,,,,,,,,,

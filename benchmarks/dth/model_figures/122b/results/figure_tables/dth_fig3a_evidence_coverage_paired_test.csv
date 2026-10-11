@@ -1,2 +1,0 @@
-metric,test,n_pairs,mean_delta_yes_minus_no,median_delta_yes_minus_no,p_value,sig
-evidence_coverage,paired Wilcoxon signed-rank,20,0.29450000000000204,0,0.9772896499645474,ns

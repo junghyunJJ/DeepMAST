@@ -1,1 +1,0 @@
-/common/jungj2/project/DeepMAST/docs/benchmarks/harness_x_model/workspaces/pilot/trial_0023_cci_full_16_ADAM12_ITGB1_strong_on

@@ -1,5 +1,0 @@
-judge_label,judge_model,condition,metric,mean_score
-GPT-5.4,gpt-5.4,DTH_no,total_score,14.25
-GPT-5.4,gpt-5.4,DTH_yes,total_score,19.6
-Sonnet 4.6,claude-sonnet-4-6,DTH_no,total_score,16.25
-Sonnet 4.6,claude-sonnet-4-6,DTH_yes,total_score,18.05

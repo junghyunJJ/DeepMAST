@@ -1,5 +1,0 @@
-"model","baseline_condition","comparison_condition","comparison_label","accuracy_delta","comparison_only_correct","baseline_only_correct","accuracy_mcnemar_exact_p","evidence_recall_delta","evidence_recall_wilcoxon_p","no_relevant_context_baseline","no_relevant_context_comparison","latency_delta_s"
-"35B","wiki_off","wiki_static_refs","wiki_static_refs vs wiki_off",0.02660406885759,196,128,0.000187922115976343,0.0498333189353148,1.67228735715869e-22,1661,983,39.6341889671362
-"35B","wiki_doc_routing","wiki_static_refs","wiki_static_refs vs wiki_doc_routing",-0.0594679186228482,84,236,7.33116458749757e-18,-0.0509524449435755,1.34144634758118e-24,1209,983,9.05468388106416
-"122B","wiki_off","wiki_static_refs","wiki_static_refs vs wiki_off",-0.0301251956181534,141,218,5.68765303088213e-05,0.00480069942375888,0.739727353536352,1491,460,46.242608372457
-"122B","wiki_doc_routing","wiki_static_refs","wiki_static_refs vs wiki_doc_routing",-0.0669014084507042,106,277,9.70586402827842e-19,-0.0612859190575382,1.83511732773539e-28,1007,460,17.2276471048513

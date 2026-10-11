@@ -1,1 +1,0 @@
-/Users/jungj2/Dropbox/Metadata/aiagent/DeepMAST/docs/benchmarks/harness_x_model/workspaces/pilot_post_update_c/trial_0039_cci_full_01_EGF_RACK1_weak_off

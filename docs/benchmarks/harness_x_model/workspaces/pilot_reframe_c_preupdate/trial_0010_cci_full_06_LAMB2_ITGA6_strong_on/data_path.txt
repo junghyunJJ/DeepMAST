@@ -1,1 +1,0 @@
-/common/jungj2/project/DeepMAST/docs/benchmarks/harness_x_model/workspaces/pilot/trial_0010_cci_full_06_LAMB2_ITGA6_strong_on

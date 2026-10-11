@@ -1,6 +1,0 @@
-/live_runs/
-!/results/
-!/results/**
-.DS_Store
-.Rhistory
-__pycache__/

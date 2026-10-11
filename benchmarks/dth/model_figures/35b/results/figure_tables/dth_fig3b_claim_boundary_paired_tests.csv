@@ -1,3 +1,0 @@
-judge_label,n_pairs,mean_dth_yes,mean_dth_no,mean_delta_yes_minus_no,positive_pairs,tied_pairs,negative_pairs,wilcoxon_p,wilcoxon_p_bonferroni,sig,x
-GPT-5.4,20,4.5,2.55,1.95,18,1,1,1.8765343017628451e-4,3.7530686035256903e-4,***,1
-Sonnet 4.6,20,3.9,3,0.9,16,4,0,1.4993462385534087e-4,2.9986924771068174e-4,***,2
